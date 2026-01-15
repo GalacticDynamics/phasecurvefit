@@ -1,0 +1,35 @@
+".gitignore":
+  - changed-files:
+      - any-glob-to-any-file: ".gitignore"
+
+"🔨 CI / workflows":
+  - changed-files:
+      - any-glob-to-any-file: ".github/workflows/**"
+
+"🔧 Configuration":
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".pre-commit-config.yaml"
+          - "pyproject.toml"
+          - "noxfile.py"
+          - ".taplo.toml"
+          - ".gitattributes"
+
+"📝 Documentation":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "README.md"
+          - "*.md"
+
+"📄 License":
+  - changed-files:
+      - any-glob-to-any-file: "LICENSE"
+
+"✅ Tests":
+  - changed-files:
+      - any-glob-to-any-file: "tests/**"
+
+"⏱️ Benchmarks":
+  - changed-files:
+      - any-glob-to-any-file: "tests/benchmark/**"

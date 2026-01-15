@@ -1,0 +1,21 @@
+version: 2
+
+# Set the version of Python and other tools you might need
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.12"
+  commands:
+    - asdf plugin add uv
+    - asdf install uv latest
+    - asdf global uv latest
+    - uv sync --group docs --frozen
+    - uv run nox -s docs -- --output-dir=$READTHEDOCS_OUTPUT
+
+sphinx:
+  builder: html
+  configuration: docs/conf.py
+  fail_on_warning: true
+
+# Don't build any extra formats
+formats: []

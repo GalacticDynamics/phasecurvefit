@@ -1,0 +1,56 @@
+changelog:
+  exclude:
+    authors:
+      - dependabot
+      - dependabot[bot]
+      - pre-commit-ci
+      - pre-commit-ci[bot]
+  categories:
+    - title: 💥 Breaking Changes
+      labels:
+        - "💥 Introduce breaking changes"
+    - title: ✨ New Features
+      labels:
+        - "✨ New features"
+    - title: 🐛 Bug Fixes
+      labels:
+        - "🐛 Fix bug"
+        - "🚑️ Critical hotfix"
+        - "🩹 Simple fix"
+    - title: 🔒️ Security
+      labels:
+        - "🔒️ Security"
+        - "🔐 Add / update secrets"
+    - title: ⚡️ Performance
+      labels:
+        - "⚡️ Improve performance"
+    - title: 📝 Documentation
+      labels:
+        - "📝 Documentation"
+    - title: ✨ Code Quality
+      labels:
+        - "✨ Improve code / structure"
+        - "♻️ Refactor code"
+        - "⚰️ Remove dead code"
+        - "🚨 Fix linter warnings"
+    - title: ✅ Testing
+      labels:
+        - "✅ Tests"
+        - "🧪 Add / update failing test"
+    - title: 🔧 Configuration
+      labels:
+        - "🔧 Add / update configuration"
+        - "🔨 Add / update development scripts"
+        - "🔨 CI / workflows"
+        - "👷 Add / update CI build"
+        - "💚 Fix CI build"
+    - title: 📦️ Dependencies
+      labels:
+        - "⬆️ Upgrade dependencies"
+        - "⬇️ Downgrade dependencies"
+        - "📌 Pin dependencies"
+        - "➕ Add dependency"
+        - "➖ Remove dependency"
+    - title: Other Changes
+      labels:
+        - "*"
