@@ -185,33 +185,35 @@ class TestTrainingConfig:
         """Test default configuration values."""
         config = lfw.nn.TrainingConfig()
 
-        assert config.n_epochs_phase1 == 800
-        assert config.n_epochs_phase2 == 300
-        assert config.n_epochs == 1100  # Sum of both phases
+        assert config.n_epochs_encoder == 800
+        assert config.n_epochs_decoder == 100
+        assert config.n_epochs_both == 200
+        assert config.n_epochs == 1100  # Sum of all phases
         assert config.batch_size == 100
         assert config.lambda_prob == 1.0
         assert config.lambda_q == 1.0
-        assert config.lambda_p == (1.0, 1.0)
+        assert config.lambda_p == (1.0, 5.0)
         assert config.member_threshold == 0.5
-        assert config.gamma_range == (-0.75, 0.75)
+        assert config.gamma_range == (-1.0, 1.0)
         assert config.weight_by_density is False
-        assert config.freeze_encoder_phase2 is False
+        assert config.freeze_encoder_final_training is False
         assert config.show_pbar is True
 
     def test_custom_values(self):
         """Test custom configuration values."""
         config = lfw.nn.TrainingConfig(
-            n_epochs_phase1=100,
-            n_epochs_phase2=200,
+            n_epochs_encoder=100,
+            n_epochs_both=200,
             batch_size=64,
             lambda_prob=2.0,
             lambda_q=0.5,
             lambda_p=(1.0, 150.0),
         )
 
-        assert config.n_epochs_phase1 == 100
-        assert config.n_epochs_phase2 == 200
-        assert config.n_epochs == 300
+        assert config.n_epochs_encoder == 100
+        assert config.n_epochs_decoder == 100
+        assert config.n_epochs_both == 200
+        assert config.n_epochs == 400
         assert config.batch_size == 64
         assert config.lambda_prob == 2.0
         assert config.lambda_q == 0.5
@@ -225,8 +227,8 @@ class TestTrainingConfig:
     def test_phase_configs(self):
         """Test that phase-specific configs are constructed correctly."""
         config = lfw.nn.TrainingConfig(
-            n_epochs_phase1=100,
-            n_epochs_phase2=200,
+            n_epochs_encoder=100,
+            n_epochs_both=200,
             batch_size=64,
             lambda_prob=2.0,
             lambda_q=0.5,
@@ -234,19 +236,24 @@ class TestTrainingConfig:
             gamma_range=(-0.5, 0.5),
         )
 
-        # Check phase1 config
-        phase1 = config.phase1_config()
-        assert phase1.n_epochs == 100
-        assert phase1.batch_size == 64
-        assert phase1.lambda_prob == 2.0
-        assert phase1.gamma_range == (-0.5, 0.5)
+        # Check encoder config
+        encoder = config.encoderonly_config()
+        assert encoder.n_epochs == 100
+        assert encoder.batch_size == 64
+        assert encoder.lambda_prob == 2.0
+        assert encoder.gamma_range == (-0.5, 0.5)
 
-        # Check phase2 config
-        phase2 = config.phase2_config()
-        assert phase2.n_epochs == 200
-        assert phase2.batch_size == 64
-        assert phase2.lambda_q == 0.5
-        assert phase2.lambda_p == (1.0, 150.0)
+        # Check decoder config
+        decoder = config.decoderonly_config()
+        assert decoder.n_epochs == 100
+        assert decoder.batch_size == 64
+
+        # Check autoencoder config
+        autoencoder = config.autoencoder_config()
+        assert autoencoder.n_epochs == 200
+        assert autoencoder.batch_size == 64
+        assert autoencoder.lambda_q == 0.5
+        assert autoencoder.lambda_p == (1.0, 150.0)
 
     def test_gamma_range_validation(self):
         """Test that gamma_range is validated."""
@@ -285,14 +292,14 @@ class TestTrainAutoencoder:
         ae = lfw.nn.PathAutoencoder.make(normalizer, key=key1)
 
         # Use minimal epochs for fast testing
-        config = lfw.nn.TrainingConfig(n_epochs_phase1=5, n_epochs_phase2=5)
+        config = lfw.nn.TrainingConfig(n_epochs_encoder=5, n_epochs_both=5)
 
         trained, _, losses = lfw.nn.train_autoencoder(
             ae, simple_wlf_result, config=config, key=key2
         )
 
         assert trained is not None
-        assert len(losses) == 10
+        assert len(losses) == 110
 
     def test_training_reduces_loss(self, simple_wlf_result, rng_key: PRNGKeyArray):
         """Test that training reduces the loss within each phase."""
@@ -303,22 +310,22 @@ class TestTrainAutoencoder:
         ae = lfw.nn.PathAutoencoder.make(normalizer, key=key1)
 
         # Use more epochs for phase 1 to see loss reduction
-        config = lfw.nn.TrainingConfig(n_epochs_phase1=50, n_epochs_phase2=50)
+        config = lfw.nn.TrainingConfig(n_epochs_encoder=50, n_epochs_both=50)
 
         _, _, losses = lfw.nn.train_autoencoder(
             ae, simple_wlf_result, config=config, key=key2
         )
 
         # Phase 1 loss should decrease (epochs 0-49)
-        phase1_early = jnp.mean(losses[:10])
-        phase1_late = jnp.mean(losses[40:50])
+        encoder_early = jnp.mean(losses[:10])
+        encoder_late = jnp.mean(losses[40:50])
         # Phase 1 should converge or at least not increase drastically
-        assert phase1_late <= phase1_early * 2.0  # Allow some tolerance
+        assert encoder_late <= encoder_early * 2.0  # Allow some tolerance
 
         # Phase 2 starts fresh with a different loss function
         # So we just check it doesn't explode
-        phase2_losses = losses[50:]
-        assert jnp.all(jnp.isfinite(phase2_losses))
+        autoencoder_losses = losses[50:]
+        assert jnp.all(jnp.isfinite(autoencoder_losses))
 
     def test_standardization_parameters_set(
         self, simple_wlf_result, rng_key: PRNGKeyArray
@@ -330,7 +337,7 @@ class TestTrainAutoencoder:
         key1, key2 = jax.random.split(rng_key)
         ae = lfw.nn.PathAutoencoder.make(normalizer, key=key1)
 
-        config = lfw.nn.TrainingConfig(n_epochs_phase1=2, n_epochs_phase2=3)
+        config = lfw.nn.TrainingConfig(n_epochs_encoder=2, n_epochs_both=3)
 
         trained, _, _ = lfw.nn.train_autoencoder(
             ae, simple_wlf_result, config=config, key=key2
@@ -381,7 +388,9 @@ class TestFillOrderingGaps:
         key1, key2 = jax.random.split(rng_key)
         ae = lfw.nn.PathAutoencoder.make(normalizer, key=key1)
 
-        config = lfw.nn.TrainingConfig(n_epochs_phase1=25, n_epochs_phase2=25)
+        config = lfw.nn.TrainingConfig(
+            n_epochs_encoder=25, n_epochs_decoder=25, n_epochs_both=25, show_pbar=False
+        )
         trained, _, _ = lfw.nn.train_autoencoder(
             ae, localflowwalk_with_gaps, config=config, key=key2
         )
@@ -403,7 +412,9 @@ class TestFillOrderingGaps:
         key1, key2 = jax.random.split(rng_key)
         ae = lfw.nn.PathAutoencoder.make(normalizer, key=key1)
 
-        config = lfw.nn.TrainingConfig(n_epochs_phase1=5, n_epochs_phase2=5)
+        config = lfw.nn.TrainingConfig(
+            n_epochs_encoder=5, n_epochs_decoder=5, n_epochs_both=5, show_pbar=False
+        )
         trained, _, _ = lfw.nn.train_autoencoder(
             ae, localflowwalk_with_gaps, config=config, key=key2
         )
@@ -425,7 +436,9 @@ class TestFillOrderingGaps:
         key1, key2 = jax.random.split(rng_key)
         ae = lfw.nn.PathAutoencoder.make(normalizer, key=key1)
 
-        config = lfw.nn.TrainingConfig(n_epochs_phase1=5, n_epochs_phase2=5)
+        config = lfw.nn.TrainingConfig(
+            n_epochs_encoder=5, n_epochs_decoder=5, n_epochs_both=5, show_pbar=False
+        )
         trained, _, _ = lfw.nn.train_autoencoder(
             ae, localflowwalk_with_gaps, config=config, key=key2
         )
@@ -584,12 +597,14 @@ class Test3DData:
         key1, key2 = jax.random.split(rng_key)
         ae = lfw.nn.PathAutoencoder.make(normalizer, key=key1)
 
-        config = lfw.nn.TrainingConfig(n_epochs_phase1=5, n_epochs_phase2=5)
+        config = lfw.nn.TrainingConfig(
+            n_epochs_encoder=5, n_epochs_decoder=5, n_epochs_both=5, show_pbar=False
+        )
         trained, _, losses = lfw.nn.train_autoencoder(
             ae, localflowwalk_result, config=config, key=key2
         )
 
-        assert len(losses) == 10
+        assert len(losses) == 15
         assert trained is not None
 
 
@@ -609,13 +624,15 @@ class TestEdgeCases:
         key1, key2 = jax.random.split(rng_key)
         ae = lfw.nn.PathAutoencoder.make(normalizer, key=key1)
 
-        config = lfw.nn.TrainingConfig(n_epochs_phase1=2, n_epochs_phase2=3)
+        config = lfw.nn.TrainingConfig(
+            n_epochs_encoder=2, n_epochs_decoder=3, n_epochs_both=3, show_pbar=False
+        )
 
         # Should not raise
         trained, _, losses = lfw.nn.train_autoencoder(
             ae, localflowwalk_result, config=config, key=key2
         )
-        assert len(losses) == 5
+        assert len(losses) == 8
 
     def test_all_points_ordered(self, rng_key: PRNGKeyArray):
         """Test when phase-flow walk orders all points (no gaps)."""
@@ -638,7 +655,9 @@ class TestEdgeCases:
         ae = lfw.nn.PathAutoencoder.make(normalizer, key=key1)
 
         # Use more epochs for better learning
-        config = lfw.nn.TrainingConfig(n_epochs_phase1=25, n_epochs_phase2=25)
+        config = lfw.nn.TrainingConfig(
+            n_epochs_encoder=25, n_epochs_decoder=25, n_epochs_both=25, show_pbar=False
+        )
 
         # Should work fine even with no gaps
         trained, _, losses = lfw.nn.train_autoencoder(

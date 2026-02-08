@@ -152,7 +152,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"*.ipynb" = ["ANN", "FBT003", "T201"]
+"*.ipynb" = ["ANN", "FBT003", "N803", "T201"]
 "**tests/**" = [
   "ANN",
   "E731",
@@ -303,6 +303,7 @@ addopts = [
   "--timeout=300",              # 5 minute timeout per test
   "--randomly-seed=0",          # Deterministic by default, but randomizes test order
   "--randomly-dont-reorganize", # Keep test class/module structure, only shuffle within
+  "--ignore=tests/benchmarks/", # Exclude benchmark tests from normal runs
 ]
 filterwarnings = [
   "error",

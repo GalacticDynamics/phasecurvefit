@@ -1,0 +1,176 @@
+"""Simple autoencoder with user-provided decoder function."""
+
+__all__: tuple[str, ...] = ("EncoderExternalDecoder",)
+
+from typing import TypeAlias
+
+import equinox as eqx
+import plum
+from jaxtyping import Array, Float, Int, PRNGKeyArray, PyTree
+
+from .autoencoder import AbstractAutoencoder, TrainingConfig
+from .externaldecoder import AbstractExternalDecoder
+from .normalize import AbstractNormalizer
+from .order_net import OrderingNet, OrderingTrainingConfig, train_ordering_net
+from localflowwalk._src.custom_types import FSzN
+
+Gamma: TypeAlias = FSzN  # noqa: UP040
+
+
+class EncoderExternalDecoder(AbstractAutoencoder):
+    r"""Autoencoder with trained encoder and user-provided decoder function.
+
+    This class provides a flexible alternative to `PathAutoencoder` where the
+    decoder is a user-provided function rather than a trained neural network.
+    The most common use case is with a running-mean decoder that performs
+    non-parametric interpolation in $\gamma$-space.
+
+    The encoder (OrderingNet) is trained to predict $\gamma$ and membership
+    probability $p$ from phase-space coordinates. The decoder function maps
+    $\gamma$ values back to positions.
+
+    Attributes
+    ----------
+    encoder : OrderingNet
+        Neural network mapping $(x, v) \to (\gamma, p)$.
+    decoder : Callable[[Array], Array]
+        Function mapping $\gamma \to x$. Should be vmappable and JIT-compatible.
+    normalizer : AbstractNormalizer
+        Data normalizer for preprocessing phase-space coordinates.
+
+    See Also
+    --------
+    PathAutoencoder : Full autoencoder with trainable decoder network.
+    RunningMeanDecoder.make : Create a running-mean decoder.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> import jax.random as jr
+    >>> import localflowwalk as lfw
+    >>> # Create sample data
+    >>> key = jr.key(0)
+    >>> positions = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.0, 0.0])}
+    >>> velocities = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.0, 0.0, 0.0])}
+    >>> ordering = jnp.array([0, 1, 2])
+    >>> # Create normalizer and encoder
+    >>> normalizer = lfw.nn.StandardScalerNormalizer(positions, velocities)
+    >>> encoder = lfw.nn.OrderingNet(in_size=4, width_size=32, depth=2, key=jr.key(1))
+    >>> decoder = lfw.nn.RunningMeanDecoder(window_size=0.05)
+    >>> # Create model
+    >>> model = lfw.nn.EncoderExternalDecoder(
+    ...     encoder=encoder, decoder=decoder, normalizer=normalizer
+    ... )
+
+    """
+
+    encoder: OrderingNet
+    decoder: AbstractExternalDecoder
+    normalizer: AbstractNormalizer
+
+
+@plum.dispatch
+def train_autoencoder(
+    model: EncoderExternalDecoder,
+    all_ws: Float[Array, " N TwoF"],
+    ordering_indices: Int[Array, " N"],
+    /,
+    *,
+    config: OrderingTrainingConfig | TrainingConfig | None = None,
+    key: PRNGKeyArray,
+) -> tuple[
+    EncoderExternalDecoder, dict[str, PyTree], Float[Array, " {config.n_epochs}"]
+]:
+    """Train the EncoderExternalDecoder encoder and create running-mean decoder.
+
+    This function provides a simplified training workflow:
+
+    1. Train the encoder (OrderingNet) using supervised learning from ordering indices
+    2. Create a running-mean decoder using the trained encoder and training data
+
+    Unlike `train_autoencoder` for `PathAutoencoder`, this does not train a decoder
+    network. Instead, it uses the provided (or default) decoder function.
+
+    Parameters
+    ----------
+    model : EncoderExternalDecoder
+        The autoencoder model to train. Its encoder will be updated.
+    all_ws : Array, shape (N, 2*n_dims)
+        All phase-space coordinates (positions + velocities) in normalized form.
+    ordering_indices : Array, shape (N,)
+        Ordering indices from walk algorithm. Valid indices (>= 0) indicate
+        ordered tracers; -1 indicates skipped/unordered tracers.
+    config : OrderingTrainingConfig, optional
+        Training configuration for the encoder. If None, uses default config.
+    decoder_kwargs : Mapping, optional
+        Keyword arguments passed to decoder function creation. For running-mean
+        decoder, can include 'window_size'. If None, uses defaults.
+    key : PRNGKeyArray
+        Random key for training.
+
+    Returns
+    -------
+    model : EncoderExternalDecoder
+        Trained autoencoder with updated encoder and decoder.
+    opt_state : optax.OptState
+        Final optimizer state from encoder training.
+    losses : Array, shape (n_epochs,)
+        Training losses from encoder training.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> import jax.random as jr
+    >>> import localflowwalk as lfw
+
+    >>> key = jr.key(0)
+    >>> N = 50
+    >>> positions = {"x": jnp.arange(N, dtype=float), "y": jnp.zeros(N)}
+    >>> velocities = {"x": jnp.ones(N), "y": jnp.zeros(N)}
+    >>> ordering = jnp.arange(N)
+
+    >>> model = lfw.nn.EncoderExternalDecoder(
+    ...     lfw.nn.OrderingNet(in_size=4, width_size=32, depth=2, key=jr.key(1)),
+    ...     lfw.nn.RunningMeanDecoder(window_size=0.05),
+    ...     lfw.nn.StandardScalerNormalizer(positions, velocities),
+    ... )
+
+    Train (with minimal epochs for demonstration)
+
+    >>> qs_norm, ps_norm = model.normalizer.transform(positions, velocities)
+    >>> ws_norm = jnp.concat([qs_norm, ps_norm], axis=1)
+    >>> config = lfw.nn.OrderingTrainingConfig(
+    ...     n_epochs=10, batch_size=16, show_pbar=False
+    ... )
+    >>> trained_model, opt_state, losses = lfw.nn.train_autoencoder(
+    ...     model, ws_norm, ordering, config=config, key=jr.key(2)
+    ... )
+    >>> losses.shape
+    (10,)
+
+    """
+    # ===========================================
+    # Train Encoder
+
+    if config is None:
+        config = OrderingTrainingConfig()
+    elif isinstance(config, TrainingConfig):
+        config = config.encoderonly_config()
+
+    encoder, opt_state, losses = train_ordering_net(
+        model.encoder, all_ws, ordering_indices, config=config, key=key
+    )
+
+    # Update encoder in model
+    model = eqx.tree_at(lambda m: m.encoder, model, encoder)
+
+    # ===========================================
+    # Update Decoder
+
+    # Update running-mean decoder using trained encoder and training data
+    decoder = model.decoder.update(model, all_ws)
+
+    # Update decoder in model
+    model = eqx.tree_at(lambda m: m.decoder, model, decoder)
+
+    return model, opt_state, losses

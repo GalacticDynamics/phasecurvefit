@@ -1,10 +1,35 @@
 """Utility functions for models."""
 
-__all__: tuple[str, ...] = ("shuffle_and_batch",)
+__all__: tuple[str, ...] = (
+    "masked_mean",
+    "shuffle_and_batch",
+)
 
 import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Bool, Float, PRNGKeyArray, Shaped
+
+from localflowwalk._src.custom_types import FSz0
+
+
+def masked_mean(arr: Float[Array, " N"], mask: Bool[Array, " N"]) -> FSz0:
+    r"""Compute the mean of an array over only the masked elements.
+
+    Parameters
+    ----------
+    arr : Array, shape (N,)
+        Input array.
+    mask : Array, shape (N,)
+        Binary mask where True = include in mean, False = exclude.
+
+    Returns
+    -------
+    mean : Array
+        Scalar mean value over masked elements.
+
+    """
+    n_real = jnp.sum(mask)
+    return jnp.sum(arr * mask) / n_real
 
 
 def shuffle_and_batch(

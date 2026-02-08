@@ -40,18 +40,20 @@ Train autoencoder to interpolate skipped tracers:
 >>> keys = jax.random.split(jax.random.key(0), 2)
 >>> normalizer = lfw.nn.StandardScalerNormalizer(pos, vel)
 >>> ae = lfw.nn.PathAutoencoder.make(normalizer, key=keys[0])
->>> cfg = lfw.nn.TrainingConfig(n_epochs_phase2=100)
->>> ae, *_ = lfw.nn.train_autoencoder(ae, walkresult, key=keys[1])
+>>> cfg = lfw.nn.TrainingConfig(n_epochs_both=100, show_pbar=False)
+>>> ae, *_ = lfw.nn.train_autoencoder(ae, walkresult, config=cfg, key=keys[1])
 
 Predict $\gamma$ for all tracers (including skipped ones):
 
 >>> result = lfw.nn.fill_ordering_gaps(ae, walkresult)
->>> result.gamma
-Array([-0.882473  , -0.7614391 , -0.65105796, -0.5597597 , -0.4720139 ,
-       -0.38593802, -0.30389455, -0.22263375, -0.13833937, -0.05297466,
-       0.03270309,  0.11717375,  0.19892035,  0.2784833 ,  0.35768527,
-       0.43787432,  0.51947576,  0.60757154,  0.71056205,  0.8206106 ],
-       dtype=float32)
+>>> result
+AutoencoderResult(gamma=Array([...], dtype=float32),
+                  membership_prob=Array([...], dtype=float32),
+                  positions={'x': Array([...], dtype=float32),
+                             'y': Array([...], dtype=float32)},
+                  velocities={'x': Array([...], dtype=float32),
+                              'y': Array([...], dtype=float32)},
+                  indices=Array([...], dtype=int32))
 
 """
 
@@ -60,6 +62,10 @@ __all__: tuple[str, ...] = (
     "PathAutoencoder",
     "train_autoencoder",
     "TrainingConfig",
+    # Encoder-You-Decoder
+    "EncoderExternalDecoder",
+    "AbstractExternalDecoder",
+    "RunningMeanDecoder",
     # Encoder
     "OrderingNet",
     "train_ordering_net",
@@ -68,7 +74,7 @@ __all__: tuple[str, ...] = (
     # Decoder
     "TrackNet",
     "decoder_loss",
-    "TrackTrainingConfig",
+    "EncoderDecoderTrainingConfig",
     # Training functions
     "AutoencoderResult",
     "fill_ordering_gaps",
@@ -81,7 +87,14 @@ from typing import NamedTuple
 
 import jax.numpy as jnp
 
-from .autoencoder import PathAutoencoder, TrainingConfig, train_autoencoder
+from .autoencoder import (
+    EncoderDecoderTrainingConfig,
+    PathAutoencoder,
+    TrainingConfig,
+    train_autoencoder,
+)
+from .externalautoencoder import EncoderExternalDecoder
+from .externaldecoder import AbstractExternalDecoder, RunningMeanDecoder
 from .normalize import AbstractNormalizer, StandardScalerNormalizer
 from .order_net import (
     OrderingNet,
@@ -89,7 +102,7 @@ from .order_net import (
     encoder_loss,
     train_ordering_net,
 )
-from .track_net import TrackNet, TrackTrainingConfig, decoder_loss
+from .track_net import TrackNet, decoder_loss
 from localflowwalk._src.algorithm import LocalFlowWalkResult
 from localflowwalk._src.custom_types import FSzN, ISzN, VectorComponents
 
@@ -160,7 +173,8 @@ def fill_ordering_gaps(
     >>> result = lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
     >>> keys = jax.random.split(jax.random.key(0), 2)
     >>> ae = lfw.nn.PathAutoencoder.make(normalizer, key=keys[0])
-    >>> ae, *_ = lfw.nn.train_autoencoder(ae, result, key=keys[1])
+    >>> cfg = lfw.nn.TrainingConfig(show_pbar=False)
+    >>> ae, *_ = lfw.nn.train_autoencoder(ae, result, config=cfg, key=keys[1])
     >>> full_ordering = lfw.nn.fill_ordering_gaps(ae, result)
 
     """

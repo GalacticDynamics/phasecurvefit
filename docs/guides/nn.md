@@ -22,7 +22,7 @@ import localflowwalk as lfw
 # Get initial ordering from walk
 pos = {"x": jnp.linspace(0, 5, 50), "y": jnp.sin(jnp.linspace(0, jnp.pi, 50))}
 vel = {"x": jnp.ones(50), "y": jnp.cos(jnp.linspace(0, jnp.pi, 50))}
-result = lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
+walkresult = lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
 
 # Create normalizer and autoencoder
 key = jax.random.key(0)
@@ -30,16 +30,16 @@ normalizer = lfw.nn.StandardScalerNormalizer(pos, vel)
 autoencoder = lfw.nn.PathAutoencoder.make(normalizer, key=key)
 
 # Train autoencoder
-config = lfw.nn.TrainingConfig(n_epochs_phase2=500)
+config = lfw.nn.TrainingConfig(show_pbar=False)
 trained, _, losses = lfw.nn.train_autoencoder(
-    autoencoder, result, config=config, key=key
+    autoencoder, walkresult, config=config, key=key
 )
 
 # Fill gaps
-ae_result = lfw.nn.fill_ordering_gaps(trained, result)
+result = lfw.nn.fill_ordering_gaps(trained, walkresult)
 
-gamma = ae_result.gamma
-ordered_all = ae_result.indices
+gamma = result.gamma
+ordered_all = result.indices
 ```
 
 ## How It Works
@@ -51,24 +51,28 @@ ordered_all = ae_result.indices
 
 ## Customizing Training
 
+The default settings appear to work for most cases,
+but can be set by the user.
+
 ```python
 config = lfw.nn.TrainingConfig(
-    n_epochs_phase1=200,  # Phase 1 epochs (OrderingNet)
-    n_epochs_phase2=500,  # Phase 2 epochs (TrackNet)
-    batch_size=32,  # Batch size for training
-    lambda_prob=1.0,  # Probability loss weight (Phase 1)
-    lambda_q=1.0,  # Spatial reconstruction loss weight (Phase 2)
-    lambda_p=(1.0, 150.0),  # Velocity alignment loss weight range (Phase 2)
+    n_epochs_encoder=800,  # Encoder-only epochs
+    n_epochs_decoder=100,  # Decoder-only epochs
+    n_epochs_both=200,  # En+Decoder epochs
+    batch_size=100,  # Batch size for training
+    lambda_prob=1.0,  # Probability loss weight
+    lambda_q=1.0,  # Spatial reconstruction loss weight
+    lambda_p=(1.0, 150.0),  # Velocity alignment loss weight range
     show_pbar=False,
 )
 
 trained, _, losses = lfw.nn.train_autoencoder(
-    autoencoder, result, config=config, key=key
+    autoencoder, walkresult, config=config, key=key
 )
 ```
 
 **Key parameters**:
 - `lambda_p`: Higher maximum (100-150) enforces stronger velocity alignment in Phase 2
-- `n_epochs_phase1`: Should be ~200-500 for good initial interpolation
+- `n_epochs_encoder`: Should be ~200-500 for good initial interpolation
 - `batch_size`: Larger batches are more stable but require more memory
 - `lambda_q`: Weight for spatial reconstruction loss in Phase 2

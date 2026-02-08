@@ -1,20 +1,22 @@
 r"""Interpolation Network for interpolating skipped tracers."""
 
-__all__: tuple[str, ...] = ("TrackNet", "decoder_loss", "TrackTrainingConfig")
-
+__all__: tuple[str, ...] = ("TrackNet", "decoder_loss")
 
 import functools as ft
-from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
+from typing import TypeAlias, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import jax.random as jr
+import jax_tqdm
 import optax
 from jaxtyping import Array, Bool, Float, PRNGKeyArray, Real
 
-from .order_net import default_optimizer, masked_mean
+from .order_net import default_optimizer
 from .scanmlp import ScanOverMLP
+from .utils import masked_mean, shuffle_and_batch
 from localflowwalk._src.custom_types import FSz0, RSz0, RSzN
 
 
@@ -73,7 +75,7 @@ class TrackNet(eqx.Module):
 
     @ft.partial(eqx.filter_jit)
     def __call__(
-        self, gamma: RSz0, /, *, key: PRNGKeyArray | None = None
+        self, gamma: RSz0, /, key: PRNGKeyArray | None = None
     ) -> tuple[Float[Array, " {self.out_size}"], FSz0]:
         """Forward pass through Param-Net.
 
@@ -184,64 +186,197 @@ def decoder_loss(
     return prefactor * (lambda_q * spatial_l2 + lambda_p * tangent_l2)
 
 
-# ===================================================================
+@eqx.filter_value_and_grad
+def compute_loss(
+    model: TrackNet,
+    gamma: Float[Array, " B"],
+    qs_mean: Real[Array, " B D"],
+    mask: Bool[Array, " B"],
+    *,
+    key: PRNGKeyArray | None = None,
+) -> FSz0:
+    """Compute loss and gradients for a batch of data."""
+    # Predict positions from model
+    qs_pred = jax.vmap(model, (0, None))(gamma, key)
+
+    return decoder_loss(
+        qs_meas=qs_mean,
+        weights=jnp.ones_like(gamma),
+        qs_pred=qs_pred,
+        t_hat=jnp.zeros_like(qs_pred),  # Not used in current loss
+        p_hat=jnp.zeros_like(qs_pred),  # Not used in current loss
+        mask=mask,
+        lambda_q=1,
+        lambda_p=0,  # not used in current loss
+    )
+
+
+@eqx.filter_jit
+def make_step(
+    model_dynamic: TrackNet,
+    model_static: TrackNet,
+    gamma: Float[Array, " B"],
+    qs_mean: Real[Array, " B D"],
+    mask: Bool[Array, " B"],
+    opt_state: optax.OptState,
+    optimizer: optax.GradientTransformation,
+    *,
+    key: PRNGKeyArray,
+) -> tuple[FSz0, TrackNet, optax.OptState]:
+    """Make a single optimization step for the decoder."""
+    # Reconstruct full model from dynamic and static parts
+    model = eqx.combine(model_dynamic, model_static)
+
+    # Compute loss and gradients
+    loss, grads = compute_loss(model, gamma, qs_mean, mask, key=key)
+
+    # Update the dynamic components of the model
+    updates, opt_state = optimizer.update(grads, opt_state, model_dynamic)
+    model_dynamic = cast("TrackNet", optax.apply_updates(model_dynamic, updates))
+    return loss, model_dynamic, opt_state
 
 
 @dataclass
 class TrackTrainingConfig:
-    r"""Configuration for Phase 2 (TrackNet/Decoder) training.
+    """Configuration for training the TrackNet decoder."""
 
-    Parameters
-    ----------
-    optimizer : optax.GradientTransformation
-        Optax optimizer for training. Default: AdamW with lr=1e-3,
-        weight_decay=1e-7.
-    n_epochs : int
-        Number of training epochs. Default: 1000.
-    batch_size : int
-        Batch size for training. Default: 100.
-    lambda_q : float
-        Weight for spatial reconstruction loss. Default: 1.0.
-    lambda_p : tuple[float, float]
-        Weight range (min, max) for velocity alignment loss.  Linearly ramped
-        from min to max over n_epochs. Default: (1.0, 1.0).
-    member_threshold : float
-        Membership probability threshold for filtering stream members.  Points
-        with probability below this threshold are excluded from loss.
-    freeze_encoder : bool
-        Whether to freeze the encoder during training. Default: False.
-    weight_by_density : bool or Mapping, optional
-        If False: use uniform weights (default).  If True: use KDE inverse
-        density weighting with default bandwidth.  If Mapping: use KDE with
-        custom bandwidth via `**weight_by_density`.
-    show_pbar : bool
-        Whether to show an epoch progress bar via tqdm. Default: True.
-
-    """
+    _: KW_ONLY
 
     optimizer: optax.GradientTransformation = default_optimizer
-    """Optax optimizer for training."""
+    """Optax optimizer for training. Default: AdamW with lr=1e-3, weight_decay=1e-7."""
 
-    n_epochs: int = 300
+    n_epochs: int = 100
     """Number of epochs for training."""
 
     batch_size: int = 100
     """Batch size for training."""
 
-    lambda_q: float = 1.0
-    """Weight for spatial reconstruction loss."""
-
-    lambda_p: tuple[float, float] = (1.0, 1.0)
-    """Weight schedule (start, stop) for velocity alignment loss."""
-
-    member_threshold: float = 0.5
-    """Membership p > threshold for identifying stream members."""
-
-    freeze_encoder: bool = False
-    """Whether to freeze the encoder during phase 2 training."""
-
-    weight_by_density: bool | Mapping[str, object] = False
-    """Whether to inverse density weight the samples. USE WITH CARE."""
-
     show_pbar: bool = True
-    """Show an epoch progress bar via `tqdm`."""
+    """Whether to show an epoch progress bar via tqdm."""
+
+
+BatchScanCarry: TypeAlias = tuple[eqx.Module, optax.OptState, PRNGKeyArray]  # noqa: UP040
+BatchScanInputs: TypeAlias = tuple[  # noqa: UP040
+    Bool[Array, " B"],  # mask
+    Float[Array, " B"],  # gamma
+    Real[Array, " B D"],  # qs_mean
+]
+
+
+def train_track_net(
+    model: TrackNet,
+    gamma: Float[Array, " N"],
+    qs_mean: Real[Array, " N D"],
+    mask: Bool[Array, " N"],
+    *,
+    config: TrackTrainingConfig | None = None,
+    key: PRNGKeyArray,
+) -> tuple[TrackNet, optax.OptState, Float[Array, " n_epochs"]]:
+    """Train the TrackNet decoder using the provided data."""
+    if config is None:
+        config = TrackTrainingConfig()
+
+    # Model surgery: partition out static components of the model
+    filter_spec = eqx.is_array
+    model_dynamic, model_static = eqx.partition(model, filter_spec)
+
+    # Optimizer setup
+    optimizer = config.optimizer
+    opt_state = optimizer.init(model_dynamic)
+
+    # ----------------------------------------
+    # Epoch Scan Function (per-epoch scan)
+
+    batch_size = config.batch_size
+
+    def epoch_scan_fn(carry: BatchScanCarry, _: int) -> tuple[BatchScanCarry, FSz0]:
+        """Run one scanned epoch (shuffle, batch, and train)."""
+        # Unpack the carry
+        model_dyn, opt_state, key = carry
+
+        # Split key for this epoch
+        key, subkey = jr.split(key, 2)
+
+        # Shuffle and batch data
+        b_mask, (b_gamma, b_qs_mean) = shuffle_and_batch(
+            mask, gamma, qs_mean, batch_size=batch_size, key=subkey
+        )
+
+        # Scan over batches
+        carry = (model_dyn, opt_state, key)
+        x = (b_mask, b_gamma, b_qs_mean)
+        carry, batch_losses = jax.lax.scan(cond_batch_scan_fn, carry, x)
+
+        # Use mean loss across all batches for this epoch
+        avg_loss = jnp.mean(batch_losses)
+        return carry, avg_loss
+
+    # ----------------------------------------
+    # Conditionally Run Batch Scan Function
+
+    def cond_batch_scan_fn(
+        carry: BatchScanCarry, inputs: BatchScanInputs
+    ) -> tuple[BatchScanCarry, FSz0]:
+        """Run scanned batch step if there's data."""
+        mask = inputs[0]
+        return jax.lax.cond(
+            jnp.any(mask), batch_scan_fn, null_batch_scan_fn, carry, inputs
+        )
+
+    def null_batch_scan_fn(
+        carry: BatchScanCarry, inputs: BatchScanInputs
+    ) -> tuple[BatchScanCarry, FSz0]:
+        """Don't run scanned batch step."""
+        loss = jnp.array(0, dtype=jnp.result_type(*inputs[1:]))
+        return carry, loss
+
+    # ----------------------------------------
+    # Batch Scan Function (per-batch scan)
+
+    def batch_scan_fn(
+        carry: BatchScanCarry, inputs: BatchScanInputs
+    ) -> tuple[BatchScanCarry, FSz0]:
+        """Run one scanned batch step.
+
+        Notes
+        -----
+        Uses a partitioned model to keep the scan carry as arrays-only where
+        possible, then re-combines with static structure for each step.
+
+        """
+        model_dyn, opt_state, key = carry
+        mask, gamma, qs_mean = inputs
+
+        # Single training step for this batch
+        key, subkey = jr.split(key)
+        loss, model_dyn, opt_state = make_step(
+            model_dyn,
+            model_static,
+            gamma=gamma,
+            qs_mean=qs_mean,
+            mask=mask,
+            opt_state=opt_state,
+            optimizer=optimizer,
+            key=subkey,
+        )
+
+        return (model_dyn, opt_state, key), loss
+
+    # Optionally wrap the epoch scan with a progress bar
+    if config.show_pbar:
+        epoch_scan_wrapped = jax_tqdm.scan_tqdm(
+            config.n_epochs, desc="Training", unit="epoch", dynamic_ncols=True
+        )(epoch_scan_fn)
+    else:
+        epoch_scan_wrapped = epoch_scan_fn
+
+    # Prepare epoch indices and run scan over epochs, which scans over batches
+    carry = (model_dynamic, opt_state, key)
+    epoch_indices = jnp.arange(config.n_epochs)
+    carry, epoch_losses = jax.lax.scan(epoch_scan_wrapped, carry, epoch_indices)
+    model_dynamic, opt_state, _ = carry
+
+    # Reconstruct model
+    model = cast("OrderingNet", eqx.combine(model_dynamic, model_static))
+
+    return model, opt_state, epoch_losses

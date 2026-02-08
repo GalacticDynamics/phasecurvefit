@@ -25,6 +25,7 @@ repos:
     rev: "v6.0.0"
     hooks:
       - id: check-added-large-files
+        exclude: ^docs/tutorials/(epitrochoid_autoencoder|epitrochoid_runningmean)\.ipynb$
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: check-yaml

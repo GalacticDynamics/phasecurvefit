@@ -21,7 +21,7 @@ Examples
 >>> keys = jax.random.split(jax.random.key(0), 2)
 >>> normalizer = lfw.nn.StandardScalerNormalizer(pos, vel)
 >>> ae = lfw.nn.PathAutoencoder.make(normalizer=normalizer, key=keys[0])
->>> cfg = lfw.nn.TrainingConfig(n_epochs_phase2=100)
+>>> cfg = lfw.nn.TrainingConfig(n_epochs_both=100, show_pbar=False)
 >>> ae, *_ = lfw.nn.train_autoencoder(ae, result, config=cfg, key=keys[1])
 
 """
@@ -31,6 +31,8 @@ __all__: tuple[str, ...] = (
     "OrderingNet",
     "TrackNet",
     "PathAutoencoder",
+    "EncoderExternalDecoder",
+    "RunningMeanDecoder",
     # Training
     "train_autoencoder",
     "train_ordering_net",
@@ -50,9 +52,11 @@ __all__: tuple[str, ...] = (
 from ._src.autoencoder import (
     AbstractNormalizer,
     AutoencoderResult,
+    EncoderExternalDecoder,
     OrderingNet,
     OrderingTrainingConfig,
     PathAutoencoder,
+    RunningMeanDecoder,
     StandardScalerNormalizer,
     TrackNet,
     TrainingConfig,

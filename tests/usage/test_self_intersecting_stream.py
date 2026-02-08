@@ -169,9 +169,7 @@ class TestSelfIntersectingStream:
         key, model_key = jax.random.split(key)
         normalizer = lfw.nn.StandardScalerNormalizer(pos, vel)
         autoencoder = lfw.nn.PathAutoencoder.make(normalizer, key=model_key)
-        config = lfw.nn.TrainingConfig(
-            show_pbar=False,
-        )
+        config = lfw.nn.TrainingConfig(show_pbar=False)
         trained, _, losses = lfw.nn.train_autoencoder(
             autoencoder, result, config=config, key=key
         )
@@ -211,9 +209,7 @@ class TestSelfIntersectingStream:
         key, model_key = jax.random.split(key)
         normalizer = lfw.nn.StandardScalerNormalizer(pos, vel)
         autoencoder = lfw.nn.PathAutoencoder.make(normalizer, key=model_key)
-        config = lfw.nn.TrainingConfig(
-            show_pbar=False,
-        )
+        config = lfw.nn.TrainingConfig(show_pbar=False)
         trained, _, _ = lfw.nn.train_autoencoder(
             autoencoder, result, config=config, key=key
         )

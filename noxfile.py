@@ -72,10 +72,16 @@ def pytest(s: nox.Session, /) -> None:
     s.run("pytest", "tests/", "-v", *s.posargs)
 
 
-@session(uv_groups=["test"])
+@session(uv_groups=["test"], reuse_venv=True)
 def pytest_benchmark(s: nox.Session, /) -> None:
-    """Run CodSpeed benchmarks."""
-    s.run("pytest", "tests/", "--codspeed", *s.posargs)
+    """Run benchmark tests with pytest-benchmark."""
+    s.run("pytest", "tests/benchmarks/", "--benchmark-only", "-v", *s.posargs)
+
+
+@session(uv_groups=["test"])
+def codspeed(s: nox.Session, /) -> None:
+    """Run CodSpeed benchmarks for CI."""
+    s.run("pytest", "tests/benchmarks/", "--codspeed", *s.posargs)
 
 
 # =============================================================================
