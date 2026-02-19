@@ -40,7 +40,7 @@ import localflowwalk as lfw
 class Full6DMetric(lfw.metrics.AbstractDistanceMetric):
     # 6D Cartesian distance with velocity weighting.
 
-    def __call__(self, current_pos, current_vel, positions, velocities, lam):
+    def __call__(self, current_pos, current_vel, positions, velocities, metric_scale):
         pass
 ```
 

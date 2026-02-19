@@ -108,7 +108,7 @@ class TestWalkLocalFlowWithPlainArrays:
     def test_walk_local_flow_plain_arrays(self, plain_positions, plain_velocities):
         """Test lfw.walk_local_flow works with plain array inputs."""
         result = lfw.walk_local_flow(
-            plain_positions, plain_velocities, start_idx=0, lam=0.5
+            plain_positions, plain_velocities, start_idx=0, metric_scale=0.5
         )
 
         # Should visit all 4 points in order
@@ -129,7 +129,11 @@ class TestWalkLocalFlowWithPlainArrays:
         config = lfw.WalkConfig(strategy=KDTree(k=3))
 
         result = lfw.walk_local_flow(
-            plain_positions, plain_velocities, start_idx=0, lam=0.5, config=config
+            plain_positions,
+            plain_velocities,
+            start_idx=0,
+            metric_scale=0.5,
+            config=config,
         )
 
         # Should still visit all 4 points
@@ -151,7 +155,7 @@ class TestWalkLocalFlowWithQuantities:
             quantity_positions,
             quantity_velocities,
             start_idx=0,
-            lam=lam_quantity,
+            metric_scale=lam_quantity,
             usys=unit_system,
         )
 
@@ -170,7 +174,7 @@ class TestWalkLocalFlowWithQuantities:
             quantity_positions,
             quantity_velocities,
             start_idx=0,
-            lam=lam_quantity,
+            metric_scale=lam_quantity,
             usys=unit_system,
         )
 
@@ -200,7 +204,7 @@ class TestWalkLocalFlowWithQuantities:
 
         # Run with plain arrays
         result_plain = lfw.walk_local_flow(
-            plain_positions, plain_velocities, start_idx=0, lam=lam_plain
+            plain_positions, plain_velocities, start_idx=0, metric_scale=lam_plain
         )
 
         # Run with quantities
@@ -208,7 +212,7 @@ class TestWalkLocalFlowWithQuantities:
             quantity_positions,
             quantity_velocities,
             start_idx=0,
-            lam=lam_quantity,
+            metric_scale=lam_quantity,
             usys=unit_system,
         )
 
@@ -238,7 +242,7 @@ class TestWalkLocalFlowWithQuantities:
             quantity_positions,
             quantity_velocities,
             start_idx=0,
-            lam=lam_quantity,
+            metric_scale=lam_quantity,
             usys=unit_system,
         )
 
@@ -257,7 +261,7 @@ class TestWalkLocalFlowWithQuantities:
             quantity_positions,
             quantity_velocities,
             start_idx=0,
-            lam=lam_quantity,
+            metric_scale=lam_quantity,
             max_dist=max_dist,
             usys=unit_system,
         )
@@ -285,7 +289,7 @@ class TestWalkLocalFlowWithQuantities:
             quantity_positions,
             quantity_velocities,
             start_idx=0,
-            lam=lam_quantity,
+            metric_scale=lam_quantity,
             config=config,
             usys=unit_system,
         )
@@ -393,14 +397,22 @@ class TestEpitrochoidExample:
         pos = {"x": u.Q(x, "m"), "y": u.Q(y, "m")}
         vel = {"x": u.Q(dx0, "m/s"), "y": u.Q(dy0, "m/s")}
 
-        # Test with no momentum (lam=0)
+        # Test with no momentum (metric_scale=0)
         result_no_mom = lfw.walk_local_flow(
-            pos, vel, start_idx=0, lam=u.Q(0.0, "m"), usys=u.unitsystems.galactic
+            pos,
+            vel,
+            start_idx=0,
+            metric_scale=u.Q(0.0, "m"),
+            usys=u.unitsystems.galactic,
         )
 
         # Test with momentum
         result_with_mom = lfw.walk_local_flow(
-            pos, vel, start_idx=0, lam=u.Q(400.0, "m"), usys=u.unitsystems.galactic
+            pos,
+            vel,
+            start_idx=0,
+            metric_scale=u.Q(400.0, "m"),
+            usys=u.unitsystems.galactic,
         )
 
         # Both should produce valid results
@@ -445,12 +457,20 @@ class TestEpitrochoidExample:
 
         # Walk with no momentum
         result_no_mom = lfw.walk_local_flow(
-            pos, vel, start_idx=0, lam=u.Q(0.0, "m"), usys=u.unitsystems.galactic
+            pos,
+            vel,
+            start_idx=0,
+            metric_scale=u.Q(0.0, "m"),
+            usys=u.unitsystems.galactic,
         )
 
         # Walk with momentum
         result_with_mom = lfw.walk_local_flow(
-            pos, vel, start_idx=0, lam=u.Q(400.0, "m"), usys=u.unitsystems.galactic
+            pos,
+            vel,
+            start_idx=0,
+            metric_scale=u.Q(400.0, "m"),
+            usys=u.unitsystems.galactic,
         )
 
         # Count big jumps in parameter t

@@ -15,7 +15,7 @@ Create some example phase-space data:
 
 Run the algorithm:
 
->>> result = walk_local_flow(pos, vel, start_idx=0, lam=0.5)
+>>> result = walk_local_flow(pos, vel, start_idx=0, metric_scale=0.5)
 >>> result.ordering
 Array([0, 1, 2, 3], dtype=int32)
 
@@ -192,7 +192,7 @@ def walk_local_flow(
     /,
     *,
     start_idx: int = 0,
-    lam: RLikeSz0 = 1.0,
+    metric_scale: RLikeSz0 = 1.0,
     max_dist: float = jnp.inf,
     terminate_indices: Set[int] | None = None,
     n_max: int | None = None,
@@ -210,9 +210,12 @@ def walk_local_flow(
         Velocity dictionary with 1D array values of shape (N,).
     start_idx : int, optional
         The index of the starting observation (default: 0).
-    lam
-        The momentum weight ($\lambda$). Higher values favor points whose direction
-        from the current point aligns with the current velocity. Default: 1.0.
+    metric_scale
+        Metric-dependent scale parameter. Interpretation depends on the metric:
+        - AlignedMomentumDistanceMetric: Momentum weight (distance units)
+        - FullPhaseSpaceDistanceMetric: Time scale for velocity-to-position conversion
+        - SpatialDistanceMetric: Ignored
+        Default: 1.0.
     max_dist
         Maximum allowable distance between neighbors. If the minimum distance
         exceeds this value, the algorithm terminates, leaving remaining points
@@ -265,14 +268,14 @@ def walk_local_flow(
 
     Run the algorithm starting from index 0:
 
-    >>> result = lfw.walk_local_flow(pos, vel, start_idx=0, lam=0.5)
+    >>> result = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=0.5)
     >>> result.ordering
     Array([0, 1, 2, 3, 4], dtype=int32)
 
     Walk in the backward direction:
 
     >>> result_backward = lfw.walk_local_flow(
-    ...     pos, vel, start_idx=4, lam=0.5, direction="backward"
+    ...     pos, vel, start_idx=4, metric_scale=0.5, direction="backward"
     ... )
     >>> result_backward.indices
     Array([4, 3, 2, 1, 0], dtype=int32)
@@ -281,7 +284,7 @@ def walk_local_flow(
     if direction == "both":
         kwargs = {
             "start_idx": start_idx,
-            "lam": lam,
+            "metric_scale": metric_scale,
             "max_dist": max_dist,
             "terminate_indices": terminate_indices,
             "n_max": n_max,
@@ -366,7 +369,7 @@ def walk_local_flow(
 
         # Query strategy for candidate neighbors and compute distance
         query_result = config.strategy.query(
-            query_state, cur_x, cur_v, xs, vs, config.metric, lam
+            query_state, cur_x, cur_v, xs, vs, config.metric, metric_scale
         )
         ds = query_result.distances
         candidate_idxs = query_result.indices
@@ -452,7 +455,7 @@ def order_w(res: LocalFlowWalkResult, /) -> tuple[VectorComponents, VectorCompon
     >>> import localflowwalk as lfw
     >>> pos = {"x": jnp.array([3.0, 1.0, 2.0])}
     >>> vel = {"x": jnp.array([1.0, 1.0, 1.0])}
-    >>> result = lfw.walk_local_flow(pos, vel, start_idx=1, lam=0.0)
+    >>> result = lfw.walk_local_flow(pos, vel, start_idx=1, metric_scale=0.0)
     >>> ordered_pos, ordered_vel = lfw.order_w(result)
 
     """
@@ -559,9 +562,9 @@ def combine_flow_walks(
 
     Run forward and backward walks from the middle:
 
-    >>> result_fwd = lfw.walk_local_flow(pos, vel, start_idx=2, lam=0.5)
+    >>> result_fwd = lfw.walk_local_flow(pos, vel, start_idx=2, metric_scale=0.5)
     >>> result_bwd = lfw.walk_local_flow(
-    ...     pos, vel, start_idx=2, lam=0.5, direction="backward"
+    ...     pos, vel, start_idx=2, metric_scale=0.5, direction="backward"
     ... )
 
     Combine the results:

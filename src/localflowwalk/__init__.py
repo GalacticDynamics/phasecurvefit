@@ -44,7 +44,7 @@ Create phase-space observations as dictionaries:
 
 Order the observations:
 
->>> result = lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
+>>> result = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 >>> result.indices
 Array([0, 1, 2], dtype=int32)
 
@@ -54,7 +54,7 @@ Configure with custom metric and strategy:
 ...     metric=lfw.metrics.AlignedMomentumDistanceMetric(),
 ...     strategy=lfw.strats.KDTree(k=3),
 ... )
->>> result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+>>> result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 
 References
 ----------

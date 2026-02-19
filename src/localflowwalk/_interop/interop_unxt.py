@@ -91,7 +91,7 @@ def scan_p_statemetadata_quantity(
     terminate_arr: ArrayLike,
     q_x: AbcQ,
     p_x: AbcQ,
-    lam: AbcQ,
+    metric_scale: AbcQ,
     max_dist: AbcQ,
     ordered_arr: ArrayLike,
     visited_mask: ArrayLike,
@@ -127,7 +127,7 @@ def scan_p_statemetadata_quantity(
         (q_x,),
         (p_x,),
         terminate_arr,
-        lam,
+        metric_scale,
         max_dist,
         ordered_arr,
         visited_mask,
@@ -148,7 +148,7 @@ def scan_p_statemetadata_quantity(
     q_y: AbcQ,
     p_x: AbcQ,
     p_y: AbcQ,
-    lam: AbcQ,
+    metric_scale: AbcQ,
     max_dist: AbcQ,
     ordered_arr: ArrayLike,
     visited_mask: ArrayLike,
@@ -184,7 +184,7 @@ def scan_p_statemetadata_quantity(
         (q_x, q_y),
         (p_x, p_y),
         terminate_arr,
-        lam,
+        metric_scale,
         max_dist,
         ordered_arr,
         visited_mask,
@@ -207,7 +207,7 @@ def scan_p_statemetadata_quantity(
     p_x: AbcQ,
     p_y: AbcQ,
     p_z: AbcQ,
-    lam: AbcQ,
+    metric_scale: AbcQ,
     max_dist: AbcQ,
     ordered_arr: ArrayLike,
     visited_mask: ArrayLike,
@@ -243,7 +243,7 @@ def scan_p_statemetadata_quantity(
         (q_x, q_y, q_z),
         (p_x, p_y, p_z),
         terminate_arr,
-        lam,
+        metric_scale,
         max_dist,
         ordered_arr,
         visited_mask,
@@ -286,7 +286,7 @@ def scan_p_statemetadata_quantity(
     q_xy: AbcQ,
     ordered_arr: ArrayLike,
     visited_mask: ArrayLike,
-    lam: AbcQ,
+    metric_scale: AbcQ,
     max_dist: AbcQ,
     arg0: ArrayLike,
     arg1: ArrayLike,
@@ -325,7 +325,7 @@ def scan_p_statemetadata_quantity(
         q_xy,
         ordered_arr,
         visited_mask,
-        lam,
+        metric_scale,
         max_dist,
         arg0,
         arg1,
@@ -351,7 +351,7 @@ def scan_p_statemetadata_quantity(
     q_xyz: AbcQ,
     ordered_arr: ArrayLike,
     visited_mask: ArrayLike,
-    lam: AbcQ,
+    metric_scale: AbcQ,
     max_dist: AbcQ,
     arg0: ArrayLike,
     arg1: ArrayLike,
@@ -390,7 +390,7 @@ def scan_p_statemetadata_quantity(
         q_xyz,
         ordered_arr,
         visited_mask,
-        lam,
+        metric_scale,
         max_dist,
         arg0,
         arg1,
@@ -604,7 +604,7 @@ def walk_local_flow(
     /,
     *,
     start_idx: int,
-    lam: RQSz0,
+    metric_scale: RQSz0,
     max_dist: RQSz0 = u.Q(jnp.inf, "m"),  # noqa: B008
     terminate_indices: set[int] | None = None,
     n_max: int | None = None,
@@ -625,8 +625,8 @@ def walk_local_flow(
         have compatible velocity dimensions (length/time).
     start_idx
         Index of the starting observation.
-    lam
-        Momentum weighting parameter.
+    metric_scale
+        Metric-dependent scale parameter.
     max_dist
         Maximum allowed distance for neighbor selection. Observations beyond
         this distance are not considered. Default is infinity.
@@ -670,7 +670,7 @@ def walk_local_flow(
     ...     "y": u.Q(jnp.array([0.5, 0.5, 0.5]), "m/s"),
     ... }
     >>> result = walk_local_flow(
-    ...     q, p, start_idx=0, lam=u.Q(1.0, "m"), usys=u.unitsystems.si
+    ...     q, p, start_idx=0, metric_scale=u.Q(1.0, "m"), usys=u.unitsystems.si
     ... )
     >>> result
     LocalFlowWalkResult(indices=Array([0, 1, 2], dtype=int32),
@@ -689,10 +689,10 @@ def walk_local_flow(
         msg = "`usys` must be an `unxt.AbstractUnitSystem`."  # type: ignore[unreachable]
         raise TypeError(msg)
 
-    if not isinstance(lam, u.AbstractQuantity):
-        msg = "`lam` must be an `unxt.AbstractQuantity`."  # type: ignore[unreachable]
+    if not isinstance(metric_scale, u.AbstractQuantity):
+        msg = "`metric_scale` must be an `unxt.AbstractQuantity`."  # type: ignore[unreachable]
         raise TypeError(msg)
-    lam = u.ustrip(usys, lam)
+    metric_scale = u.ustrip(usys, metric_scale)
     if not isinstance(max_dist, u.AbstractQuantity):
         msg = "`max_dist` must be an `unxt.AbstractQuantity`."  # type: ignore[unreachable]
         raise TypeError(msg)
@@ -708,7 +708,7 @@ def walk_local_flow(
         q_values,
         p_values,
         start_idx=start_idx,
-        lam=lam,
+        metric_scale=metric_scale,
         max_dist=max_dist,
         terminate_indices=terminate_indices,
         n_max=n_max,

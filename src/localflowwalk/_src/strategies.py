@@ -74,7 +74,7 @@ class AbstractQueryStrategy(ABC):
         positions: VectorComponents,
         velocities: VectorComponents,
         metric_fn: AbstractDistanceMetric,
-        lam: FLikeSz0,
+        metric_scale: FLikeSz0,
     ) -> QueryResult:
         """Query for neighbors given current state.
 
@@ -92,8 +92,8 @@ class AbstractQueryStrategy(ABC):
             All velocities in dataset
         metric_fn : callable
             Distance metric function
-        lam : float
-            Momentum weight parameter
+        metric_scale : float
+            Metric-dependent scale parameter
 
         Returns
         -------
@@ -125,10 +125,12 @@ class BruteForce(AbstractQueryStrategy):
         positions: VectorComponents,
         velocities: VectorComponents,
         metric_fn: AbstractDistanceMetric,
-        lam: FLikeSz0,
+        metric_scale: FLikeSz0,
     ) -> QueryResult:
         """Compute distances to all points using the metric."""
-        distances = metric_fn(current_pos, current_vel, positions, velocities, lam)
+        distances = metric_fn(
+            current_pos, current_vel, positions, velocities, metric_scale
+        )
         return QueryResult(distances=distances, indices=None)
 
 
@@ -188,7 +190,7 @@ class KDTree(AbstractQueryStrategy):
         positions: VectorComponents,
         velocities: VectorComponents,
         metric_fn: AbstractDistanceMetric,
-        lam: FLikeSz0,
+        metric_scale: FLikeSz0,
     ) -> QueryResult:
         """Query k nearest neighbors and apply metric.
 
@@ -208,7 +210,7 @@ class KDTree(AbstractQueryStrategy):
 
         # Compute metric distances to all points
         distances_metric = metric_fn(
-            current_pos, current_vel, positions, velocities, lam
+            current_pos, current_vel, positions, velocities, metric_scale
         )
 
         return QueryResult(distances=distances_metric, indices=indices)

@@ -57,7 +57,7 @@ result = lfw.walk_local_flow(
     position,
     velocity,
     start_idx=0,  # Start from first point
-    lam=1.0,  # Momentum weight
+    metric_scale=1.0,  # Metric-dependent scale parameter
 )
 
 print(result.ordering)
@@ -84,19 +84,19 @@ The `walk_local_flow` function returns a `LocalFlowWalkResult` NamedTuple with:
 - **`velocity`**: Original velocity dictionary
 
 
-## Adjusting the Momentum Weight
+## Adjusting the Metric Scale
 
-The `lam` parameter controls how much the algorithm favors points in the velocity direction:
+The `metric_scale` parameter controls how the algorithm weighs different aspects of the data. Its interpretation depends on which distance metric you're using:
 
 ```python
-# Pure nearest neighbor (spatial only)
-result_spatial = lfw.walk_local_flow(position, velocity, start_idx=0, lam=0.0)
+# Pure nearest neighbor (spatial only) - metric_scale ignored
+result_spatial = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=0.0)
 
 # Balanced (default)
-result_balanced = lfw.walk_local_flow(position, velocity, start_idx=0, lam=1.0)
+result_balanced = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
 
-# Strong momentum preference
-result_momentum = lfw.walk_local_flow(position, velocity, start_idx=0, lam=5.0)
+# Higher metric_scale value (interpretation metric-dependent)
+result_momentum = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=5.0)
 ```
 
 ## Walking in Reverse
@@ -105,11 +105,11 @@ Use the `direction` parameter to trace streams backwards by negating the velocit
 
 ```python
 # Default: forward walk following the velocity direction
-result_forward = lfw.walk_local_flow(position, velocity, start_idx=0, lam=1.0)
+result_forward = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
 
 # Reverse: walk against the velocity direction
 result_reverse = lfw.walk_local_flow(
-    position, velocity, start_idx=0, lam=1.0, direction="backward"
+    position, velocity, start_idx=0, metric_scale=1.0, direction="backward"
 )
 ```
 
@@ -128,7 +128,9 @@ config = lfw.WalkConfig(
     strategy=lfw.strats.KDTree(k=5),  # Only 5 points in the fake dataset
 )
 
-result = lfw.walk_local_flow(position, velocity, config=config, start_idx=0, lam=1.0)
+result = lfw.walk_local_flow(
+    position, velocity, config=config, start_idx=0, metric_scale=1.0
+)
 ```
 
 ## Handling Gaps with max_dist
@@ -141,7 +143,7 @@ result = lfw.walk_local_flow(
     position,
     velocity,
     start_idx=0,
-    lam=1.0,
+    metric_scale=1.0,
     max_dist=2.0,
 )
 
@@ -169,7 +171,7 @@ velocity = {
     "z": jnp.ones_like(t) / (2 * jnp.pi),
 }
 
-result = lfw.walk_local_flow(position, velocity, start_idx=0, lam=2.0)
+result = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=2.0)
 ```
 
 ## Bidirectional Walks (Forward and Reverse)
@@ -178,7 +180,9 @@ For streams that extend in both directions from a starting point, run forward an
 
 ```python
 # Run forward walk from starting point
-result = lfw.walk_local_flow(position, velocity, start_idx=2, lam=1.0, direction="both")
+result = lfw.walk_local_flow(
+    position, velocity, start_idx=2, metric_scale=1.0, direction="both"
+)
 
 # Get the combined ordered indices
 print(result.indices)  # Indices ordered from reverse tail through start to forward tail
@@ -206,7 +210,7 @@ from jax import jit
 
 @jit
 def order_stream(pos, vel):
-    return lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
+    return lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
 
 result = order_stream(position, velocity)

@@ -15,7 +15,9 @@ class TestAutoencoderTrainingBenchmarks:
 
         Trains both ordering net (encoder) and track net (decoder).
         """
-        config = lfw.nn.TrainingConfig(n_epochs_encoder=10, n_epochs_both=10)
+        config = lfw.nn.TrainingConfig(
+            n_epochs_encoder=10, n_epochs_both=10, show_pbar=False
+        )
         trained, _, losses = benchmark(
             lfw.nn.train_autoencoder,
             simple_autoencoder,
@@ -25,13 +27,16 @@ class TestAutoencoderTrainingBenchmarks:
         )
 
         assert trained is not None
-        assert len(losses) == 20  # 10 + 10 epochs
+        # Losses from: encoder (10) + decoder (100 default) + both (10) = 120
+        assert len(losses) == 120
 
     def test_full_autoencoder_training_medium(
         self, benchmark, medium_autoencoder, medium_wlf_result, rng_key
     ):
         """Benchmark full autoencoder training on 100-point stream."""
-        config = lfw.nn.TrainingConfig(n_epochs_encoder=20, n_epochs_both=20)
+        config = lfw.nn.TrainingConfig(
+            n_epochs_encoder=20, n_epochs_both=20, show_pbar=False
+        )
         trained, _, losses = benchmark(
             lfw.nn.train_autoencoder,
             medium_autoencoder,
@@ -41,13 +46,16 @@ class TestAutoencoderTrainingBenchmarks:
         )
 
         assert trained is not None
-        assert len(losses) == 40  # 20 + 20 epochs
+        # Losses from: encoder (20) + decoder (100 default) + both (20) = 140
+        assert len(losses) == 140
 
     def test_full_autoencoder_training_high_epochs(
         self, benchmark, simple_autoencoder, simple_wlf_result, rng_key
     ):
         """Benchmark full autoencoder training with many epochs."""
-        config = lfw.nn.TrainingConfig(n_epochs_encoder=50, n_epochs_both=50)
+        config = lfw.nn.TrainingConfig(
+            n_epochs_encoder=50, n_epochs_both=50, show_pbar=False
+        )
         trained, _, losses = benchmark(
             lfw.nn.train_autoencoder,
             simple_autoencoder,
@@ -57,7 +65,8 @@ class TestAutoencoderTrainingBenchmarks:
         )
 
         assert trained is not None
-        assert len(losses) == 100
+        # Losses from: encoder (50) + decoder (100 default) + both (50) = 200
+        assert len(losses) == 200
 
     def test_encoder_only_training_simple(
         self, benchmark, simple_autoencoder, simple_wlf_result, rng_key
@@ -66,7 +75,7 @@ class TestAutoencoderTrainingBenchmarks:
 
         This is phase 1 of the full training pipeline.
         """
-        config = lfw.nn.OrderingTrainingConfig(n_epochs=5)
+        config = lfw.nn.OrderingTrainingConfig(n_epochs=5, show_pbar=False)
         ordering_net = simple_autoencoder.encoder
 
         # Prepare training data
@@ -109,7 +118,9 @@ class TestAutoencoderTrainingBenchmarks:
 
         The decoder is trained as part of the full training pipeline.
         """
-        config = lfw.nn.TrainingConfig(n_epochs_encoder=5, n_epochs_both=5)
+        config = lfw.nn.TrainingConfig(
+            n_epochs_encoder=5, n_epochs_both=5, show_pbar=False
+        )
 
         # Train full autoencoder to get decoder training
         trained, _, _ = benchmark(

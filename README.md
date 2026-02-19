@@ -53,7 +53,7 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Order the observations (use KD-tree for spatial neighbor prefiltering)
 config = lfw.WalkConfig(strategy=lfw.strats.KDTree(k=2))
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 print(result.indices)  # Array([0, 1, 2], dtype=int32)
 ```
 
@@ -69,9 +69,9 @@ pos = {"x": u.Q([0.0, 1.0, 2.0], "kpc"), "y": u.Q([0.0, 0.5, 1.0], "kpc")}
 vel = {"x": u.Q([1.0, 1.0, 1.0], "km/s"), "y": u.Q([0.5, 0.5, 0.5], "km/s")}
 
 # Units are preserved throughout the calculation
-lam = u.Q(1.0, "kpc")
+metric_scale = u.Q(1.0, "kpc")
 result = lfw.walk_local_flow(
-    pos, vel, start_idx=0, lam=lam, usys=u.unitsystems.galactic
+    pos, vel, start_idx=0, metric_scale=metric_scale, usys=u.unitsystems.galactic
 )
 ```
 
@@ -104,7 +104,7 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Configure with full phase-space metric (the default)
 config = lfw.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 ### Using Different Metrics
@@ -127,11 +127,15 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Pure spatial ordering (ignores velocity)
 config_spatial = lfw.WalkConfig(metric=SpatialDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config_spatial, start_idx=0, lam=0.0)
+result = lfw.walk_local_flow(
+    pos, vel, config=config_spatial, start_idx=0, metric_scale=0.0
+)
 
 # Full 6D phase-space distance
 config_phase = lfw.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config_phase, start_idx=0, lam=1.0)
+result = lfw.walk_local_flow(
+    pos, vel, config=config_phase, start_idx=0, metric_scale=1.0
+)
 ```
 
 ### Custom Metrics
@@ -148,7 +152,7 @@ from localflowwalk.metrics import AbstractDistanceMetric
 class WeightedPhaseSpaceMetric(AbstractDistanceMetric):
     """Custom weighted phase-space metric."""
 
-    def __call__(self, current_pos, current_vel, positions, velocities, lam):
+    def __call__(self, current_pos, current_vel, positions, velocities, metric_scale):
         # Compute position distance
         pos_diff = jax.tree.map(jnp.subtract, positions, current_pos)
         pos_dist_sq = sum(jax.tree.leaves(jax.tree.map(jnp.square, pos_diff)))
@@ -158,12 +162,12 @@ class WeightedPhaseSpaceMetric(AbstractDistanceMetric):
         vel_dist_sq = sum(jax.tree.leaves(jax.tree.map(jnp.square, vel_diff)))
 
         # Custom weighting scheme
-        return jnp.sqrt(pos_dist_sq + (lam**2) * vel_dist_sq)
+        return jnp.sqrt(pos_dist_sq + (metric_scale**2) * vel_dist_sq)
 
 
 # Use custom metric via WalkConfig
 config = lfw.WalkConfig(metric=WeightedPhaseSpaceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 See the
@@ -187,10 +191,5 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Use KD-tree strategy and query 2 spatial neighbors per step
 config = lfw.WalkConfig(strategy=lfw.strats.KDTree(k=2))
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
-
-## References
-
-Nibauer et al. (2022). "Charting Galactic Accelerations with Stellar Streams and
-Machine Learning."

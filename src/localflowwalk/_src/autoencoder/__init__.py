@@ -33,7 +33,7 @@ Create phase-space data and run phase-flow walk:
 
 >>> pos = {"x": jnp.linspace(0, 5, 20), "y": jnp.sin(jnp.linspace(0, jnp.pi, 20))}
 >>> vel = {"x": jnp.ones(20), "y": jnp.cos(jnp.linspace(0, jnp.pi, 20))}
->>> walkresult = lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
+>>> walkresult = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
 Train autoencoder to interpolate skipped tracers:
 
@@ -170,7 +170,7 @@ def fill_ordering_gaps(
 
     >>> pos = {"x": jnp.linspace(0, 5, 20), "y": jnp.zeros(20)}
     >>> vel = {"x": jnp.ones(20), "y": jnp.zeros(20)}
-    >>> result = lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
+    >>> result = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
     >>> keys = jax.random.split(jax.random.key(0), 2)
     >>> ae = lfw.nn.PathAutoencoder.make(normalizer, key=keys[0])
     >>> cfg = lfw.nn.TrainingConfig(show_pbar=False)
