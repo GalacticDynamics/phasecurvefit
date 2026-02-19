@@ -108,7 +108,7 @@ jobs:
         uses: CodSpeedHQ/action@972e3437949c89e1357ebd1a2dbc852fcbc57245 # v4.5.1
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
-          mode: instrumentation
+          mode: simulation
           run: uv run --group test pytest tests/benchmarks --codspeed
 
   status:

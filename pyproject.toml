@@ -35,7 +35,7 @@ dependencies = [
 description = "Walk through phase-space observations"
 dynamic = ["version"]
 license.file = "LICENSE"
-name = "localflowwalk"
+name = "phasecurvefit"
 readme = "README.md"
 requires-python = ">=3.12"
 
@@ -44,9 +44,9 @@ interop = ["unxt>=1.10.0"]
 kdtree  = ["jaxkd>=0.0.5"]
 
 [project.urls]
-"Bug Tracker" = "https://github.com/GalacticDynamics/nearest-neighbours-with-momentum/issues"
-Changelog     = "https://github.com/GalacticDynamics/nearest-neighbours-with-momentum/releases"
-Homepage      = "https://github.com/GalacticDynamics/nearest-neighbours-with-momentum"
+"Bug Tracker" = "https://github.com/GalacticDynamics/phasecurvefit/issues"
+Changelog     = "https://github.com/GalacticDynamics/phasecurvefit/releases"
+Homepage      = "https://github.com/GalacticDynamics/phasecurvefit"
 
 
 [build-system]
@@ -103,7 +103,7 @@ test = [
 
 
 [tool.hatch]
-build.hooks.vcs.version-file = "src/localflowwalk/_version.py"
+build.hooks.vcs.version-file = "src/phasecurvefit/_version.py"
 build.hooks.vcs.version-file-template = """\
 version: str = {version!r}
 version_tuple: tuple[int, int, int] | tuple[int, int, int, str, str]
@@ -171,28 +171,28 @@ ignore = [
 "docs/**" = ["N803", "T201"]
 "docs/conf.py" = ["A001", "INP001", "T201"]
 "noxfile.py" = ["A001", "T20"]
-"src/localflowwalk/_src/algorithm.py" = [
+"src/phasecurvefit/_src/algorithm.py" = [
   "FBT003", # Boolean literal in function call is clearer than named constant
   "PYI025", # Set from collections.abc is clear in context
   "RUF059", # Unpacked tuple elements required for JAX while loop state
 ]
-"src/localflowwalk/_src/autoencoder.py" = [
+"src/phasecurvefit/_src/autoencoder.py" = [
   "ANN001", # Missing type annotations for nested loss functions
   "ANN202", # Missing return type for nested loss functions
   "C901",   # train_autoencoder is complex but well-structured
   "RUF003", # Greek letters are intentional in math code
   "RUF059", # Unpacked variable 'keys' used for structure
 ]
-"src/localflowwalk/_src/phasespace.py" = [
+"src/phasecurvefit/_src/phasespace.py" = [
   "UP040", # TypeAlias is more explicit for Python 3.12
 ]
-"src/localflowwalk/_version.py" = ["ALL"]
+"src/phasecurvefit/_version.py" = ["ALL"]
 
 [tool.ruff.lint.flake8-import-conventions.aliases]
 equinox                 = "eqx"
 "hypothesis.strategies" = "st"
 "jax.numpy"             = "jnp"
-localflowwalk           = "lfw"
+phasecurvefit           = "pcf"
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
@@ -206,7 +206,7 @@ known-first-party = [
   "unxt",
   "zeroth",
 ]
-known-local-folder = ["localflowwalk"]
+known-local-folder = ["phasecurvefit"]
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -219,7 +219,7 @@ report.exclude_also = [
   'if TYPE_CHECKING:',
 ]
 run.branch = true
-run.source = ["localflowwalk"]
+run.source = ["phasecurvefit"]
 
 
 [tool.mypy]
@@ -237,7 +237,7 @@ warn_unused_configs      = true
 disable_error_code       = ["name-defined", "no-redef", "type-arg"]
 disallow_incomplete_defs = true
 disallow_untyped_defs    = true
-module                   = "localflowwalk.*"
+module                   = "phasecurvefit.*"
 
 [[tool.mypy.overrides]]
 ignore_missing_imports = true
@@ -333,7 +333,7 @@ xfail_strict = true
 
 
 [tool.pytest_env]
-LOCALFLOWWALK_ENABLE_RUNTIME_TYPECHECKING = "beartype.beartype"
+PHASECURVEFIT_ENABLE_RUNTIME_TYPECHECKING = "beartype.beartype"
 
 
 [tool.repo-review]

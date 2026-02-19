@@ -34,10 +34,10 @@ and implementing the ``__call__`` method
 ```python
 import equinox as eqx
 import jax.numpy as jnp
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 
-class Full6DMetric(lfw.metrics.AbstractDistanceMetric):
+class Full6DMetric(pcf.metrics.AbstractDistanceMetric):
     # 6D Cartesian distance with velocity weighting.
 
     def __call__(self, current_pos, current_vel, positions, velocities, metric_scale):

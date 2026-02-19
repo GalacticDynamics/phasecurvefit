@@ -12,7 +12,7 @@ from .autoencoder import AbstractAutoencoder, TrainingConfig
 from .externaldecoder import AbstractExternalDecoder
 from .normalize import AbstractNormalizer
 from .order_net import OrderingNet, OrderingTrainingConfig, train_ordering_net
-from localflowwalk._src.custom_types import FSzN
+from phasecurvefit._src.custom_types import FSzN
 
 Gamma: TypeAlias = FSzN  # noqa: UP040
 
@@ -47,18 +47,18 @@ class EncoderExternalDecoder(AbstractAutoencoder):
     --------
     >>> import jax.numpy as jnp
     >>> import jax.random as jr
-    >>> import localflowwalk as lfw
+    >>> import phasecurvefit as pcf
     >>> # Create sample data
     >>> key = jr.key(0)
     >>> positions = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.0, 0.0])}
     >>> velocities = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.0, 0.0, 0.0])}
     >>> ordering = jnp.array([0, 1, 2])
     >>> # Create normalizer and encoder
-    >>> normalizer = lfw.nn.StandardScalerNormalizer(positions, velocities)
-    >>> encoder = lfw.nn.OrderingNet(in_size=4, width_size=32, depth=2, key=jr.key(1))
-    >>> decoder = lfw.nn.RunningMeanDecoder(window_size=0.05)
+    >>> normalizer = pcf.nn.StandardScalerNormalizer(positions, velocities)
+    >>> encoder = pcf.nn.OrderingNet(in_size=4, width_size=32, depth=2, key=jr.key(1))
+    >>> decoder = pcf.nn.RunningMeanDecoder(window_size=0.05)
     >>> # Create model
-    >>> model = lfw.nn.EncoderExternalDecoder(
+    >>> model = pcf.nn.EncoderExternalDecoder(
     ...     encoder=encoder, decoder=decoder, normalizer=normalizer
     ... )
 
@@ -121,7 +121,7 @@ def train_autoencoder(
     --------
     >>> import jax.numpy as jnp
     >>> import jax.random as jr
-    >>> import localflowwalk as lfw
+    >>> import phasecurvefit as pcf
 
     >>> key = jr.key(0)
     >>> N = 50
@@ -129,20 +129,20 @@ def train_autoencoder(
     >>> velocities = {"x": jnp.ones(N), "y": jnp.zeros(N)}
     >>> ordering = jnp.arange(N)
 
-    >>> model = lfw.nn.EncoderExternalDecoder(
-    ...     lfw.nn.OrderingNet(in_size=4, width_size=32, depth=2, key=jr.key(1)),
-    ...     lfw.nn.RunningMeanDecoder(window_size=0.05),
-    ...     lfw.nn.StandardScalerNormalizer(positions, velocities),
+    >>> model = pcf.nn.EncoderExternalDecoder(
+    ...     pcf.nn.OrderingNet(in_size=4, width_size=32, depth=2, key=jr.key(1)),
+    ...     pcf.nn.RunningMeanDecoder(window_size=0.05),
+    ...     pcf.nn.StandardScalerNormalizer(positions, velocities),
     ... )
 
     Train (with minimal epochs for demonstration)
 
     >>> qs_norm, ps_norm = model.normalizer.transform(positions, velocities)
     >>> ws_norm = jnp.concat([qs_norm, ps_norm], axis=1)
-    >>> config = lfw.nn.OrderingTrainingConfig(
+    >>> config = pcf.nn.OrderingTrainingConfig(
     ...     n_epochs=10, batch_size=16, show_pbar=False
     ... )
-    >>> trained_model, opt_state, losses = lfw.nn.train_autoencoder(
+    >>> trained_model, opt_state, losses = pcf.nn.train_autoencoder(
     ...     model, ws_norm, ordering, config=config, key=jr.key(2)
     ... )
     >>> losses.shape

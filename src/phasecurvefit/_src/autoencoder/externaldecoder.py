@@ -14,10 +14,10 @@ from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from .normalize import AbstractNormalizer
 from .order_net import OrderingNet
-from localflowwalk._src.custom_types import FSz0, FSzN, RSz0
+from phasecurvefit._src.custom_types import FSz0, FSzN, RSz0
 
 if TYPE_CHECKING:
-    import localflowwalk  # noqa: ICN001
+    import localflowwalk
 
 Gamma: TypeAlias = FSzN  # noqa: UP040
 
@@ -202,7 +202,7 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         --------
         >>> import jax.numpy as jnp
         >>> import jax.random as jr
-        >>> from localflowwalk._src.autoencoder import (
+        >>> from phasecurvefit._src.autoencoder import (
         ...     OrderingNet,
         ...     StandardScalerNormalizer,
         ...     RunningMeanDecoder,

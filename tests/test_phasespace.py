@@ -4,13 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-import localflowwalk as lfw
-from localflowwalk.w import (
-    cosine_similarity,
-    euclidean_distance,
-    get_w_at,
-    unit_direction,
-)
+import phasecurvefit as pcf
 
 
 class TestEuclideanDistance:
@@ -21,7 +15,7 @@ class TestEuclideanDistance:
         pos_a = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         pos_b = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
 
-        dist = euclidean_distance(pos_a, pos_b)
+        dist = pcf.w.euclidean_distance(pos_a, pos_b)
         assert float(dist) == pytest.approx(5.0)
 
     def test_point_to_point_3d(self):
@@ -29,13 +23,13 @@ class TestEuclideanDistance:
         pos_a = {"x": jnp.array(0.0), "y": jnp.array(0.0), "z": jnp.array(0.0)}
         pos_b = {"x": jnp.array(1.0), "y": jnp.array(2.0), "z": jnp.array(2.0)}
 
-        dist = euclidean_distance(pos_a, pos_b)
+        dist = pcf.w.euclidean_distance(pos_a, pos_b)
         assert float(dist) == pytest.approx(3.0)
 
     def test_zero_distance(self):
         """Test distance from a point to itself."""
         pos = {"x": jnp.array(1.0), "y": jnp.array(2.0)}
-        dist = euclidean_distance(pos, pos)
+        dist = pcf.w.euclidean_distance(pos, pos)
         assert float(dist) == pytest.approx(0.0)
 
     def test_point_to_array(self):
@@ -45,7 +39,7 @@ class TestEuclideanDistance:
 
         # Vmap over the batched dimension (axis 0) of pos_arr values
         def dist_fn(pos_single):
-            return euclidean_distance(pos, pos_single)
+            return pcf.w.euclidean_distance(pos, pos_single)
 
         dists = jax.vmap(dist_fn, in_axes=({"x": 0, "y": 0},))(pos_arr)
         assert float(dists[0]) == pytest.approx(5.0)
@@ -60,7 +54,7 @@ class TestCosineSimilarity:
         vec_a = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
         vec_b = {"x": jnp.array(2.0), "y": jnp.array(0.0)}
 
-        sim = cosine_similarity(vec_a, vec_b)
+        sim = pcf.w.cosine_similarity(vec_a, vec_b)
         assert float(sim) == pytest.approx(1.0)  # dot product of unit vectors
 
     def test_antiparallel(self):
@@ -68,7 +62,7 @@ class TestCosineSimilarity:
         vec_a = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
         vec_b = {"x": jnp.array(-1.0), "y": jnp.array(0.0)}
 
-        sim = cosine_similarity(vec_a, vec_b)
+        sim = pcf.w.cosine_similarity(vec_a, vec_b)
         assert float(sim) == pytest.approx(-1.0)
 
     def test_orthogonal(self):
@@ -76,7 +70,7 @@ class TestCosineSimilarity:
         vec_a = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
         vec_b = {"x": jnp.array(0.0), "y": jnp.array(1.0)}
 
-        sim = cosine_similarity(vec_a, vec_b)
+        sim = pcf.w.cosine_similarity(vec_a, vec_b)
         assert float(sim) == pytest.approx(0.0)
 
     def test_array_valued(self):
@@ -86,7 +80,7 @@ class TestCosineSimilarity:
 
         # Vmap over the batched dimension (axis 0) of both inputs
         def sim_fn(a, b):
-            return cosine_similarity(a, b)
+            return pcf.w.cosine_similarity(a, b)
 
         sim = jax.vmap(sim_fn, in_axes=({"x": 0, "y": 0}, {"x": 0, "y": 0}))(
             vec_a, vec_b
@@ -102,19 +96,19 @@ class TestVelocityFunctions:
     def test_velocity_norm_2d(self):
         """Test velocity norm for a 2D velocity."""
         vel = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
-        norm = lfw.w.velocity_norm(vel)
+        norm = pcf.w.velocity_norm(vel)
         assert float(norm) == pytest.approx(5.0)
 
     def test_velocity_norm_3d(self):
         """Test velocity norm for a 3D velocity."""
         vel = {"x": jnp.array(1.0), "y": jnp.array(2.0), "z": jnp.array(2.0)}
-        norm = lfw.w.velocity_norm(vel)
+        norm = pcf.w.velocity_norm(vel)
         assert float(norm) == pytest.approx(3.0)
 
     def test_unit_velocity_2d(self):
         """Test unit velocity for a 2D velocity."""
         vel = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
-        uvel = lfw.w.unit_velocity(vel)
+        uvel = pcf.w.unit_velocity(vel)
 
         assert float(uvel["x"]) == pytest.approx(0.6)
         assert float(uvel["y"]) == pytest.approx(0.8)
@@ -122,7 +116,7 @@ class TestVelocityFunctions:
     def test_unit_velocity_3d(self):
         """Test unit velocity for a 3D velocity."""
         vel = {"x": jnp.array(1.0), "y": jnp.array(2.0), "z": jnp.array(2.0)}
-        uvel = lfw.w.unit_velocity(vel)
+        uvel = pcf.w.unit_velocity(vel)
 
         assert float(uvel["x"]) == pytest.approx(1.0 / 3.0)
         assert float(uvel["y"]) == pytest.approx(2.0 / 3.0)
@@ -131,8 +125,8 @@ class TestVelocityFunctions:
     def test_unit_velocity_norm_is_one(self):
         """Test that unit velocity has norm 1."""
         vel = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
-        uvel = lfw.w.unit_velocity(vel)
-        norm = lfw.w.velocity_norm(uvel)
+        uvel = pcf.w.unit_velocity(vel)
+        norm = pcf.w.velocity_norm(uvel)
         assert float(norm) == pytest.approx(1.0)
 
 
@@ -144,7 +138,7 @@ class TestDirectionFunctions:
         pos_a = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         pos_b = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
 
-        udir = lfw.w.unit_direction(pos_a, pos_b)
+        udir = pcf.w.unit_direction(pos_a, pos_b)
 
         assert float(udir["x"]) == pytest.approx(0.6)
         assert float(udir["y"]) == pytest.approx(0.8)
@@ -156,7 +150,7 @@ class TestDirectionFunctions:
 
         # Vmap over the batched dimension (axis 0) of pos_arr
         def dir_fn(pos_single):
-            return unit_direction(pos, pos_single)
+            return pcf.w.unit_direction(pos, pos_single)
 
         udirs = jax.vmap(dir_fn, in_axes=({"x": 0, "y": 0},))(pos_arr)
 
@@ -174,7 +168,7 @@ class TestUtilityFunctions:
         pos = {"x": jnp.array([1.0, 2.0, 3.0]), "y": jnp.array([4.0, 5.0, 6.0])}
         vel = {"x": jnp.array([0.1, 0.2, 0.3]), "y": jnp.array([0.4, 0.5, 0.6])}
 
-        q, p = get_w_at(pos, vel, 1)
+        q, p = pcf.w.get_w_at(pos, vel, 1)
 
         assert float(q["x"]) == pytest.approx(2.0)
         assert float(q["y"]) == pytest.approx(5.0)
@@ -186,7 +180,7 @@ class TestUtilityFunctions:
         pos = {"x": jnp.array([1.0, 2.0, 3.0]), "y": jnp.array([4.0, 5.0, 6.0])}
         vel = {"x": jnp.array([0.1, 0.2, 0.3]), "y": jnp.array([0.4, 0.5, 0.6])}
 
-        q, _ = get_w_at(pos, vel, jnp.array([0, 2]))
+        q, _ = pcf.w.get_w_at(pos, vel, jnp.array([0, 2]))
 
         assert q["x"].shape == (2,)
         assert float(q["x"][0]) == pytest.approx(1.0)
@@ -201,7 +195,7 @@ class TestJAXCompatibility:
 
         @jax.jit
         def compute_dist(pos_a, pos_b):
-            return euclidean_distance(pos_a, pos_b)
+            return pcf.w.euclidean_distance(pos_a, pos_b)
 
         pos_a = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         pos_b = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
@@ -228,7 +222,7 @@ class TestJAXCompatibility:
 
         def loss_fn(pos_b):
             pos_a = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
-            return euclidean_distance(pos_a, pos_b)
+            return pcf.w.euclidean_distance(pos_a, pos_b)
 
         pos_b = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
         grads = jax.grad(loss_fn)(pos_b)

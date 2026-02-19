@@ -1,4 +1,4 @@
-# Contributing to `localflowwalk`
+# Contributing to `phasecurvefit`
 
 ## Reporting Issues
 
@@ -9,16 +9,16 @@ When opening an issue to report a problem, please try to provide:
 
 ## Contributing Code and Documentation
 
-So you are interested in contributing to `localflowwalk`? Excellent! We love
-contributions! `localflowwalk` is open source, built on open source, and we'd
+So you are interested in contributing to `phasecurvefit`? Excellent! We love
+contributions! `phasecurvefit` is open source, built on open source, and we'd
 love to have you hang out in our community.
 
 ## How to Contribute, Best Practices
 
-Most contributions to `localflowwalk` are done via
+Most contributions to `phasecurvefit` are done via
 [pull requests](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/about-pull-requests)
 from GitHub users' forks of the
-[`localflowwalk` repository](https://github.com/GalacticDynamics/localflowwalk).
+[`phasecurvefit` repository](https://github.com/GalacticDynamics/phasecurvefit).
 If you are new to this style of development, check out Astropy's
 [development workflow](https://docs.astropy.org/en/latest/development/workflow/development_workflow.html).
 
@@ -38,7 +38,7 @@ following:
   description in the main documentation (in `docs/`).
 
 - **Performance improvements**: if you are making changes that impact
-  `localflowwalk` performance, consider adding a performance benchmark in
+  `phasecurvefit` performance, consider adding a performance benchmark in
   `tests`.
 
 ## Checklist for Contributed Code
@@ -51,7 +51,7 @@ request meets the requirements for inclusion in the package:
 
 **Relevance:**
 
-- Is the submission relevant to `localflowwalk`?
+- Is the submission relevant to `phasecurvefit`?
 - Does the code perform as expected?
 - If applicable, are references included to the origin source for the algorithm?
 - Has the code been tested against previously existing implementations?

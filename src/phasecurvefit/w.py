@@ -10,13 +10,13 @@ to JAX arrays.
 Examples
 --------
 >>> import jax.numpy as jnp
->>> import localflowwalk as lfw
+>>> import phasecurvefit as pcf
 
 Compute distance between two points:
 
 >>> pos_a = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
 >>> pos_b = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
->>> lfw.w.euclidean_distance(pos_a, pos_b)
+>>> pcf.w.euclidean_distance(pos_a, pos_b)
 Array(5., dtype=float32, weak_type=True)
 
 """

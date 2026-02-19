@@ -41,8 +41,8 @@ class AbstractDistanceMetric(eqx.Module):
 
     Examples
     --------
-    >>> import localflowwalk as lfw
-    >>> metric = lfw.metrics.AlignedMomentumDistanceMetric()
+    >>> import phasecurvefit as pcf
+    >>> metric = pcf.metrics.AlignedMomentumDistanceMetric()
     >>> # Use with walk_local_flow via metric parameter
 
     """
@@ -104,8 +104,8 @@ class SpatialDistanceMetric(AbstractDistanceMetric):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> import localflowwalk as lfw
-    >>> metric = lfw.metrics.SpatialDistanceMetric()
+    >>> import phasecurvefit as pcf
+    >>> metric = pcf.metrics.SpatialDistanceMetric()
     >>> pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
     >>> vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
     >>> current_pos = {k: v[0] for k, v in pos.items()}
@@ -173,8 +173,8 @@ class AlignedMomentumDistanceMetric(AbstractDistanceMetric):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> import localflowwalk as lfw
-    >>> metric = lfw.metrics.AlignedMomentumDistanceMetric()
+    >>> import phasecurvefit as pcf
+    >>> metric = pcf.metrics.AlignedMomentumDistanceMetric()
     >>> pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
     >>> vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
     >>> current_pos = {k: v[0] for k, v in pos.items()}
@@ -275,8 +275,8 @@ class FullPhaseSpaceDistanceMetric(AbstractDistanceMetric):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> import localflowwalk as lfw
-    >>> metric = lfw.metrics.FullPhaseSpaceDistanceMetric()
+    >>> import phasecurvefit as pcf
+    >>> metric = pcf.metrics.FullPhaseSpaceDistanceMetric()
     >>> pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
     >>> vel = {"x": jnp.array([1.0, 1.5, 2.0]), "y": jnp.array([0.5, 1.0, 1.5])}
     >>> current_pos = {k: v[0] for k, v in pos.items()}

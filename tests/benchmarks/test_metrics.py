@@ -1,6 +1,6 @@
 """Benchmarks for metrics and query strategies."""
 
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 
 class TestMetricsAndStrategiesBenchmarks:
@@ -12,7 +12,7 @@ class TestMetricsAndStrategiesBenchmarks:
 
         # Default strategy is BruteForce, spatial metric via metric_scale=0
         result = benchmark(
-            lfw.walk_local_flow,
+            pcf.walk_local_flow,
             pos,
             vel,
             start_idx=0,
@@ -29,7 +29,7 @@ class TestMetricsAndStrategiesBenchmarks:
 
         # Full phase-space metric is the default with metric_scale > 0
         result = benchmark(
-            lfw.walk_local_flow,
+            pcf.walk_local_flow,
             pos,
             vel,
             start_idx=0,
@@ -42,9 +42,9 @@ class TestMetricsAndStrategiesBenchmarks:
         """Benchmark with custom metric via WalkConfig."""
         pos, vel = simple_2d_stream
 
-        config = lfw.WalkConfig(metric=lfw.metrics.AlignedMomentumDistanceMetric())
+        config = pcf.WalkConfig(metric=pcf.metrics.AlignedMomentumDistanceMetric())
         result = benchmark(
-            lfw.walk_local_flow,
+            pcf.walk_local_flow,
             pos,
             vel,
             start_idx=0,

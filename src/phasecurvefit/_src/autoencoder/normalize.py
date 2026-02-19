@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import plum
 from jaxtyping import Array, Float
 
-from localflowwalk._src.custom_types import VectorComponents
+from phasecurvefit._src.custom_types import VectorComponents
 
 
 class AbstractNormalizer(metaclass=abc.ABCMeta):

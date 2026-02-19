@@ -1,6 +1,6 @@
-"""Tests for Quantity support in lfw.walk_local_flow.
+"""Tests for Quantity support in pcf.walk_local_flow.
 
-These tests verify that lfw.walk_local_flow works correctly with unxt Quantity inputs
+These tests verify that pcf.walk_local_flow works correctly with unxt Quantity inputs
 and that unit system information flows properly through the state tuple.
 """
 
@@ -16,9 +16,9 @@ except ImportError:
 import jax
 import jax.numpy as jnp
 
-import localflowwalk as lfw
-from localflowwalk._src.algorithm import StateMetadata
-from localflowwalk._src.strategies import KDTree
+import phasecurvefit as pcf
+from phasecurvefit._src.algorithm import StateMetadata
+from phasecurvefit._src.strategies import KDTree
 
 pytestmark = pytest.mark.skipif(not HAS_UNXT, reason="unxt not installed")
 
@@ -103,11 +103,11 @@ class TestStateMetadata:
 
 
 class TestWalkLocalFlowWithPlainArrays:
-    """Tests for lfw.walk_local_flow with plain array inputs (baseline)."""
+    """Tests for pcf.walk_local_flow with plain array inputs (baseline)."""
 
     def test_walk_local_flow_plain_arrays(self, plain_positions, plain_velocities):
-        """Test lfw.walk_local_flow works with plain array inputs."""
-        result = lfw.walk_local_flow(
+        """Test pcf.walk_local_flow works with plain array inputs."""
+        result = pcf.walk_local_flow(
             plain_positions, plain_velocities, start_idx=0, metric_scale=0.5
         )
 
@@ -126,9 +126,9 @@ class TestWalkLocalFlowWithPlainArrays:
         stripped first before KDTree processing).
         """
         # Create WalkConfig with KDTree strategy (k=3 neighbors)
-        config = lfw.WalkConfig(strategy=KDTree(k=3))
+        config = pcf.WalkConfig(strategy=KDTree(k=3))
 
-        result = lfw.walk_local_flow(
+        result = pcf.walk_local_flow(
             plain_positions,
             plain_velocities,
             start_idx=0,
@@ -143,15 +143,15 @@ class TestWalkLocalFlowWithPlainArrays:
 
 
 class TestWalkLocalFlowWithQuantities:
-    """Tests for lfw.walk_local_flow with Quantity inputs."""
+    """Tests for pcf.walk_local_flow with Quantity inputs."""
 
     def test_walk_local_flow_quantities_basic(
         self, quantity_positions, quantity_velocities, unit_system
     ):
-        """Test lfw.walk_local_flow works with Quantity inputs."""
+        """Test pcf.walk_local_flow works with Quantity inputs."""
         lam_quantity = u.Q(0.5, "m")
 
-        result = lfw.walk_local_flow(
+        result = pcf.walk_local_flow(
             quantity_positions,
             quantity_velocities,
             start_idx=0,
@@ -167,10 +167,10 @@ class TestWalkLocalFlowWithQuantities:
     def test_walk_local_flow_quantities_preserves_units(
         self, quantity_positions, quantity_velocities, unit_system
     ):
-        """Test that lfw.walk_local_flow preserves Quantity units in output."""
+        """Test that pcf.walk_local_flow preserves Quantity units in output."""
         lam_quantity = u.Q(0.5, "m")
 
-        result = lfw.walk_local_flow(
+        result = pcf.walk_local_flow(
             quantity_positions,
             quantity_velocities,
             start_idx=0,
@@ -203,12 +203,12 @@ class TestWalkLocalFlowWithQuantities:
         lam_quantity = u.Q(0.5, "m")
 
         # Run with plain arrays
-        result_plain = lfw.walk_local_flow(
+        result_plain = pcf.walk_local_flow(
             plain_positions, plain_velocities, start_idx=0, metric_scale=lam_plain
         )
 
         # Run with quantities
-        result_quantity = lfw.walk_local_flow(
+        result_quantity = pcf.walk_local_flow(
             quantity_positions,
             quantity_velocities,
             start_idx=0,
@@ -234,11 +234,11 @@ class TestWalkLocalFlowWithQuantities:
     def test_walk_local_flow_quantities_custom_lam(
         self, quantity_positions, quantity_velocities, unit_system
     ):
-        """Test lfw.walk_local_flow with different lambda values."""
+        """Test pcf.walk_local_flow with different lambda values."""
         # Test with higher lambda value (more momentum-dependent)
         lam_quantity = u.Q(2.0, "m")
 
-        result = lfw.walk_local_flow(
+        result = pcf.walk_local_flow(
             quantity_positions,
             quantity_velocities,
             start_idx=0,
@@ -253,11 +253,11 @@ class TestWalkLocalFlowWithQuantities:
     def test_walk_local_flow_quantities_with_max_dist(
         self, quantity_positions, quantity_velocities, unit_system
     ):
-        """Test lfw.walk_local_flow with max_dist constraint."""
+        """Test pcf.walk_local_flow with max_dist constraint."""
         lam_quantity = u.Q(0.5, "m")
         max_dist = u.Q(1.5, "m")
 
-        result = lfw.walk_local_flow(
+        result = pcf.walk_local_flow(
             quantity_positions,
             quantity_velocities,
             start_idx=0,
@@ -282,10 +282,10 @@ class TestWalkLocalFlowWithQuantities:
         lam_quantity = u.Q(0.5, "m")
 
         # Create WalkConfig with KDTree strategy
-        config = lfw.WalkConfig(strategy=KDTree(k=3))
+        config = pcf.WalkConfig(strategy=KDTree(k=3))
 
         # Test WITH KDTree strategy and Quantities
-        result = lfw.walk_local_flow(
+        result = pcf.walk_local_flow(
             quantity_positions,
             quantity_velocities,
             start_idx=0,
@@ -398,7 +398,7 @@ class TestEpitrochoidExample:
         vel = {"x": u.Q(dx0, "m/s"), "y": u.Q(dy0, "m/s")}
 
         # Test with no momentum (metric_scale=0)
-        result_no_mom = lfw.walk_local_flow(
+        result_no_mom = pcf.walk_local_flow(
             pos,
             vel,
             start_idx=0,
@@ -407,7 +407,7 @@ class TestEpitrochoidExample:
         )
 
         # Test with momentum
-        result_with_mom = lfw.walk_local_flow(
+        result_with_mom = pcf.walk_local_flow(
             pos,
             vel,
             start_idx=0,
@@ -456,7 +456,7 @@ class TestEpitrochoidExample:
         vel = {"x": u.Q(dx0, "m/s"), "y": u.Q(dy0, "m/s")}
 
         # Walk with no momentum
-        result_no_mom = lfw.walk_local_flow(
+        result_no_mom = pcf.walk_local_flow(
             pos,
             vel,
             start_idx=0,
@@ -465,7 +465,7 @@ class TestEpitrochoidExample:
         )
 
         # Walk with momentum
-        result_with_mom = lfw.walk_local_flow(
+        result_with_mom = pcf.walk_local_flow(
             pos,
             vel,
             start_idx=0,

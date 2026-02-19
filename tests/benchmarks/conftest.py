@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import pytest
 from jaxtyping import PRNGKeyArray
 
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 
 @pytest.fixture
@@ -95,44 +95,44 @@ def simple_3d_stream(rng_key: PRNGKeyArray) -> tuple[dict, dict]:
 def simple_wlf_result(simple_2d_stream):
     """Create a phase-flow walk result."""
     pos, vel = simple_2d_stream
-    return lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+    return pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
 
 @pytest.fixture
 def medium_wlf_result(medium_2d_stream):
     """Create a phase-flow walk result for 100 points."""
     pos, vel = medium_2d_stream
-    return lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+    return pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
 
 @pytest.fixture
 def simple_autoencoder(simple_wlf_result, rng_key):
     """Create a simple autoencoder."""
-    normalizer = lfw.nn.StandardScalerNormalizer(
+    normalizer = pcf.nn.StandardScalerNormalizer(
         simple_wlf_result.positions, simple_wlf_result.velocities
     )
-    return lfw.nn.PathAutoencoder.make(normalizer, key=rng_key)
+    return pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
 
 
 @pytest.fixture
 def medium_autoencoder(medium_wlf_result, rng_key):
     """Create autoencoder for medium dataset."""
-    normalizer = lfw.nn.StandardScalerNormalizer(
+    normalizer = pcf.nn.StandardScalerNormalizer(
         medium_wlf_result.positions, medium_wlf_result.velocities
     )
-    return lfw.nn.PathAutoencoder.make(normalizer, key=rng_key)
+    return pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
 
 
 @pytest.fixture
 def trained_autoencoder(simple_2d_stream, rng_key):
     """Create and train an autoencoder."""
     pos, vel = simple_2d_stream
-    result = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+    result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
-    normalizer = lfw.nn.StandardScalerNormalizer(result.positions, result.velocities)
-    ae = lfw.nn.PathAutoencoder.make(normalizer, key=rng_key)
+    normalizer = pcf.nn.StandardScalerNormalizer(result.positions, result.velocities)
+    ae = pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
 
-    config = lfw.nn.TrainingConfig(n_epochs_encoder=5, n_epochs_both=5, show_pbar=False)
-    trained, _, _ = lfw.nn.train_autoencoder(ae, result, config=config, key=rng_key)
+    config = pcf.nn.TrainingConfig(n_epochs_encoder=5, n_epochs_both=5, show_pbar=False)
+    trained, _, _ = pcf.nn.train_autoencoder(ae, result, config=config, key=rng_key)
 
     return trained, result

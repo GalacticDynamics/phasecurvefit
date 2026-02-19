@@ -28,7 +28,7 @@ uv add localflowwalk
 
 ```python
 import jax.numpy as jnp
-import localflowwalk as lfw
+import phasecurvefit as pcf
 ```
 
 ### 2. Prepare your phase-space data
@@ -53,7 +53,7 @@ velocity = {
 ### 3. Run the algorithm
 
 ```python
-result = lfw.walk_local_flow(
+result = pcf.walk_local_flow(
     position,
     velocity,
     start_idx=0,  # Start from first point
@@ -69,7 +69,7 @@ print(result.ordering)
 Use the convenience function to get reordered arrays:
 
 ```python
-ordered_pos, ordered_vel = lfw.order_w(result)
+ordered_pos, ordered_vel = pcf.order_w(result)
 
 print(ordered_pos["x"])
 # Array([0., 1., 2., 3., 4.])
@@ -90,13 +90,13 @@ The `metric_scale` parameter controls how the algorithm weighs different aspects
 
 ```python
 # Pure nearest neighbor (spatial only) - metric_scale ignored
-result_spatial = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=0.0)
+result_spatial = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=0.0)
 
 # Balanced (default)
-result_balanced = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+result_balanced = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
 
 # Higher metric_scale value (interpretation metric-dependent)
-result_momentum = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=5.0)
+result_momentum = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=5.0)
 ```
 
 ## Walking in Reverse
@@ -105,10 +105,10 @@ Use the `direction` parameter to trace streams backwards by negating the velocit
 
 ```python
 # Default: forward walk following the velocity direction
-result_forward = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+result_forward = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
 
 # Reverse: walk against the velocity direction
-result_reverse = lfw.walk_local_flow(
+result_reverse = pcf.walk_local_flow(
     position, velocity, start_idx=0, metric_scale=1.0, direction="backward"
 )
 ```
@@ -120,15 +120,15 @@ This is useful for tracing stellar streams from the tidal tail back towards the 
 Use `WalkConfig` to configure the distance metric and query strategy:
 
 ```python
-from localflowwalk.metrics import AlignedMomentumDistanceMetric
+from phasecurvefit.metrics import AlignedMomentumDistanceMetric
 
 # Configure with aligned momentum metric and KD-tree strategy
-config = lfw.WalkConfig(
+config = pcf.WalkConfig(
     metric=AlignedMomentumDistanceMetric(),
-    strategy=lfw.strats.KDTree(k=5),  # Only 5 points in the fake dataset
+    strategy=pcf.strats.KDTree(k=5),  # Only 5 points in the fake dataset
 )
 
-result = lfw.walk_local_flow(
+result = pcf.walk_local_flow(
     position, velocity, config=config, start_idx=0, metric_scale=1.0
 )
 ```
@@ -139,7 +139,7 @@ Use `max_dist` to stop when there's a gap in the data:
 
 ```python
 # Stop if next nearest point is more than 2 units away
-result = lfw.walk_local_flow(
+result = pcf.walk_local_flow(
     position,
     velocity,
     start_idx=0,
@@ -171,7 +171,7 @@ velocity = {
     "z": jnp.ones_like(t) / (2 * jnp.pi),
 }
 
-result = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=2.0)
+result = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=2.0)
 ```
 
 ## Bidirectional Walks (Forward and Reverse)
@@ -180,7 +180,7 @@ For streams that extend in both directions from a starting point, run forward an
 
 ```python
 # Run forward walk from starting point
-result = lfw.walk_local_flow(
+result = pcf.walk_local_flow(
     position, velocity, start_idx=2, metric_scale=1.0, direction="both"
 )
 
@@ -188,7 +188,7 @@ result = lfw.walk_local_flow(
 print(result.indices)  # Indices ordered from reverse tail through start to forward tail
 
 # Extract the ordered positions and velocities
-ordered_pos, ordered_vel = lfw.order_w(result)
+ordered_pos, ordered_vel = pcf.order_w(result)
 ```
 
 This is particularly useful for:
@@ -210,7 +210,7 @@ from jax import jit
 
 @jit
 def order_stream(pos, vel):
-    return lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+    return pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
 
 result = order_stream(position, velocity)
