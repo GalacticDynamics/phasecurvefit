@@ -69,7 +69,13 @@ def test(s: nox.Session, /) -> None:
 @session(uv_groups=["test"], reuse_venv=True)
 def pytest(s: nox.Session, /) -> None:
     """Run pytest with common options."""
-    s.run("pytest", "tests/", "-v", *s.posargs)
+    package_paths = [
+        "README.md",
+        "docs",
+        "src/",
+        "tests/",
+    ]
+    s.run("pytest", *package_paths, *s.posargs)
 
 
 @session(uv_groups=["test"], reuse_venv=True)

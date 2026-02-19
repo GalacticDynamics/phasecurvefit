@@ -43,11 +43,14 @@ class OptDeps(OptionalDependencyEnum):  # pylint: disable=invalid-enum-extension
 
     UNXT = auto()
     KDTREE = auto()
+    MATPLOTLIB = auto()
 
 
 collect_ignore_glob = []
 if not OptDeps.UNXT.installed:
     collect_ignore_glob.append("tests/test_interop_unxt.py")
+if not OptDeps.MATPLOTLIB.installed:
+    collect_ignore_glob.append("tests/usage/test_epitrochoid.py")
 if not OptDeps.KDTREE.installed:
     collect_ignore_glob.append("tests/test_kdtree.py")
 
