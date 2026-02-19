@@ -1452,6 +1452,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-env" },
     { name = "pytest-github-actions-annotate-failures" },
+    { name = "pytest-mpl" },
     { name = "pytest-randomly" },
     { name = "pytest-timeout" },
     { name = "pytz" },
@@ -1498,6 +1499,7 @@ test = [
     { name = "beartype" },
     { name = "hypothesis", extra = ["numpy"] },
     { name = "jaxkd" },
+    { name = "matplotlib" },
     { name = "pytest" },
     { name = "pytest-arraydiff" },
     { name = "pytest-benchmark" },
@@ -1505,6 +1507,7 @@ test = [
     { name = "pytest-cov" },
     { name = "pytest-env" },
     { name = "pytest-github-actions-annotate-failures" },
+    { name = "pytest-mpl" },
     { name = "pytest-randomly" },
     { name = "pytest-timeout" },
     { name = "sybil", extra = ["pytest"] },
@@ -1540,6 +1543,7 @@ dev = [
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "ipywidgets", specifier = ">=8.1.8" },
     { name = "jaxkd", specifier = ">=0.0.5" },
+    { name = "matplotlib", specifier = ">=3.8" },
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "myst-parser", specifier = ">=4.0.0" },
     { name = "nbsphinx", specifier = ">=0.9.3" },
@@ -1554,6 +1558,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=6.2.1" },
     { name = "pytest-env", specifier = ">=1.1.5" },
     { name = "pytest-github-actions-annotate-failures", specifier = ">=0.3.0" },
+    { name = "pytest-mpl", specifier = ">=0.17.0" },
     { name = "pytest-randomly", specifier = ">=3.16.0" },
     { name = "pytest-timeout", specifier = ">=2.3.1" },
     { name = "pytz", specifier = ">=2024.2" },
@@ -1600,6 +1605,7 @@ test = [
     { name = "beartype", specifier = ">=0.21.0" },
     { name = "hypothesis", extras = ["numpy"], specifier = ">=6.138.14" },
     { name = "jaxkd", specifier = ">=0.0.5" },
+    { name = "matplotlib", specifier = ">=3.8" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-arraydiff", specifier = ">=0.6.1" },
     { name = "pytest-benchmark", specifier = ">=5.1.0" },
@@ -1607,6 +1613,7 @@ test = [
     { name = "pytest-cov", specifier = ">=6.2.1" },
     { name = "pytest-env", specifier = ">=1.1.5" },
     { name = "pytest-github-actions-annotate-failures", specifier = ">=0.3.0" },
+    { name = "pytest-mpl", specifier = ">=0.17.0" },
     { name = "pytest-randomly", specifier = ">=3.16.0" },
     { name = "pytest-timeout", specifier = ">=2.3.1" },
     { name = "sybil", extras = ["pytest"], specifier = ">=8.0.0" },
@@ -2631,6 +2638,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/39/d4/c54ee6a871eee4a7468e3a8c0dead28e634c0bc2110c694309dcb7563a66/pytest_github_actions_annotate_failures-0.3.0.tar.gz", hash = "sha256:d4c3177c98046c3900a7f8ddebb22ea54b9f6822201b5d3ab8fcdea51e010db7", size = 11248, upload-time = "2025-01-17T22:39:32.722Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/73/7b0b15cb8605ee967b34aa1d949737ab664f94e6b0f1534e8339d9e64ab2/pytest_github_actions_annotate_failures-0.3.0-py3-none-any.whl", hash = "sha256:41ea558ba10c332c0bfc053daeee0c85187507b2034e990f21e4f7e5fef044cf", size = 6030, upload-time = "2025-01-17T22:39:31.701Z" },
+]
+
+[[package]]
+name = "pytest-mpl"
+version = "0.18.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "matplotlib" },
+    { name = "packaging" },
+    { name = "pillow" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9c/40/ba3caed7a54a6a5fe035ecc62dbb473f6f41ecade2ea3e0474f7e8e65c5c/pytest_mpl-0.18.0.tar.gz", hash = "sha256:04c949ea1278a38ca3d8d675871f6c5a0958bfedfaf4fd8bfd4e25e5861759a7", size = 880354, upload-time = "2025-11-15T13:54:52.69Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/eb/01/f9128b75808840fc070042c57168c800da57d2d80b97071dc6f07c793d58/pytest_mpl-0.18.0-py3-none-any.whl", hash = "sha256:e474b7676957c521104dbe351df937da5e582231cd34daeb43b9d1ecc048e5c0", size = 28063, upload-time = "2025-11-15T13:54:51.147Z" },
 ]
 
 [[package]]

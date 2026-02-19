@@ -85,6 +85,7 @@ nox = ["nox>=2024.10.9", "nox-uv>=0.6.3"]
 test = [
   "beartype>=0.21.0",
   "hypothesis[numpy]>=6.138.14",
+  "matplotlib>=3.8",
   "pytest>=9.0.2",
   "pytest-arraydiff>=0.6.1",
   "pytest-benchmark>=5.1.0",
@@ -92,6 +93,7 @@ test = [
   "pytest-cov>=6.2.1",
   "pytest-env>=1.1.5",
   "pytest-github-actions-annotate-failures>=0.3.0",
+  "pytest-mpl>=0.17.0",
   "pytest-randomly>=3.16.0",
   "pytest-timeout>=2.3.1",
   "sybil[pytest]>=8.0.0",
@@ -157,6 +159,7 @@ ignore = [
   "ANN",
   "E731",
   "INP001",
+  "N803",
   "PLC0415",
   "RUF059",
   "S101",
@@ -299,12 +302,13 @@ addopts = [
   "--showlocals",
   "--strict-config",
   "--strict-markers",
-  "-p no:doctest",              # using sybil
+  "-p no:doctest",                                       # using sybil
   "-ra",
-  "--timeout=300",              # 5 minute timeout per test
-  "--randomly-seed=0",          # Deterministic by default, but randomizes test order
-  "--randomly-dont-reorganize", # Keep test class/module structure, only shuffle within
-  "--ignore=tests/benchmarks/", # Exclude benchmark tests from normal runs
+  "--timeout=300",                                       # 5 minute timeout per test
+  "--randomly-seed=0",                                   # Deterministic by default, but randomizes test order
+  "--randomly-dont-reorganize",                          # Keep test class/module structure, only shuffle within
+  "--ignore=tests/benchmarks/",                          # Exclude benchmark tests from normal runs
+  "--mpl-hash-library=tests/usage/baseline_hashes.json",
 ]
 filterwarnings = [
   "error",
