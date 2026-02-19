@@ -306,7 +306,9 @@ class TestTrainEncoderExternalDecoder:
         positions = sample_data["positions"]
         velocities = sample_data["velocities"]
 
-        walk_result = lfw.walk_local_flow(positions, velocities, start_idx=0, lam=1.0)
+        walk_result = lfw.walk_local_flow(
+            positions, velocities, start_idx=0, metric_scale=1.0
+        )
 
         # Create model
         normalizer = lfw.nn.StandardScalerNormalizer(positions, velocities)
@@ -390,7 +392,9 @@ class TestIntegration:
         velocities = {"x": -jnp.sin(t), "y": jnp.cos(t)}
 
         # Run phase-flow walk (skip some points by using larger lambda)
-        walk_result = lfw.walk_local_flow(positions, velocities, start_idx=0, lam=0.5)
+        walk_result = lfw.walk_local_flow(
+            positions, velocities, start_idx=0, metric_scale=0.5
+        )
 
         # Create normalizer
         normalizer = lfw.nn.StandardScalerNormalizer(positions, velocities)
@@ -444,7 +448,9 @@ class TestIntegration:
         positions = {"x": jnp.linspace(0, 5, N), "y": jnp.zeros(N)}
         velocities = {"x": jnp.ones(N), "y": jnp.zeros(N)}
 
-        walk_result = lfw.walk_local_flow(positions, velocities, start_idx=0, lam=0.3)
+        walk_result = lfw.walk_local_flow(
+            positions, velocities, start_idx=0, metric_scale=0.3
+        )
 
         normalizer = lfw.nn.StandardScalerNormalizer(positions, velocities)
 

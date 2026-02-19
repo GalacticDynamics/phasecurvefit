@@ -94,9 +94,7 @@ velocity = {
 }
 
 # Run the algorithm
-result = lfw.walk_local_flow(
-    position, velocity, start_idx=0, lam=1.0
-)  # momentum weight
+result = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
 
 result.indices
 # Array([0, 1, 2, 3])
@@ -128,10 +126,10 @@ For the mathematical background on momentum-weighted ordering, refer to the [NN+
 
 - **`metric`**: Distance metric to use (default: `AlignedMomentumDistanceMetric`). Determines how "closeness" is computed. See [Metrics Guide](guides/metrics).
 
-- **`lam`**: Momentum weight parameter (for metrics that use it).
-  - `lam=0`: Spatial proximity only
-  - `lam>0`: Blend spatial and momentum information
-  - Not used by all metrics
+- **`metric_scale`**: Scale parameter for distance metrics. Interpretation depends on the metric:
+  - `AlignedMomentumDistanceMetric`: momentum weight (distance units)
+  - `FullPhaseSpaceDistanceMetric`: time scale for velocity-to-position conversion
+  - `SpatialDistanceMetric`: unused (can be any value)
 
 - **`max_dist`**: Maximum allowed distance to the next point. Stops the walk if no unvisited point is closer.
 

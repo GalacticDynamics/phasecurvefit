@@ -22,7 +22,7 @@ pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 config = lfw.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 ## Built-in Metrics
@@ -35,14 +35,14 @@ A position-only metric that computes pure Euclidean distance, completely ignorin
 
 $$ d = d_0 $$
 
-where $d_0$ is the Euclidean distance between positions. The `lam` parameter is ignored.
+where $d_0$ is the Euclidean distance between positions. The `metric_scale` parameter is ignored.
 
 **When to use:**
 
 - Velocity information is unreliable or unavailable
 - Pure spatial proximity is desired (e.g., spatial clustering)
 - Comparing against baseline nearest-neighbor approaches
-- Setting `lam=0` with `AlignedMomentumDistanceMetric` is equivalent, but this metric is more explicit
+- Setting `metric_scale=0` with `AlignedMomentumDistanceMetric` is equivalent, but this metric is more explicit
 
 **Usage:**
 
@@ -51,7 +51,7 @@ from localflowwalk.metrics import SpatialDistanceMetric
 
 # Pure nearest-neighbor search in position space
 config = lfw.WalkConfig(metric=SpatialDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=0.0)
+result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=0.0)
 ```
 
 ### AlignedMomentumDistanceMetric
@@ -85,7 +85,7 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Aligned momentum metric
 config = lfw.WalkConfig(metric=AlignedMomentumDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 ### FullPhaseSpaceDistanceMetric
@@ -100,11 +100,11 @@ where:
 
 - $d_0$ is the Euclidean distance in position space
 - $d_v$ is the Euclidean distance in velocity space
-- $\tau$ is the time parameter (`lam`) that converts velocity differences to position units
+- $\tau$ is the time parameter (`metric_scale`) that converts velocity differences to position units
 
 **Physical interpretation:**
 
-This metric computes true Euclidean distance in the 6-dimensional phase space by combining position and velocity differences. The parameter `lam` (with time units) determines the relative weighting: for example, if positions are measured in kpc and velocities in kpc/Myr, then `lam` in Myr converts velocity differences to kpc, creating a uniformly scaled phase space.
+This metric computes true Euclidean distance in the 6-dimensional phase space by combining position and velocity differences. The parameter `metric_scale` (with time units) determines the relative weighting: for example, if positions are measured in kpc and velocities in kpc/Myr, then `metric_scale` in Myr converts velocity differences to kpc, creating a uniformly scaled phase space.
 
 Unlike `AlignedMomentumDistanceMetric`, this metric has no directional bias from momentum alignment — it treats all directions in phase space equally.
 
@@ -121,16 +121,16 @@ Unlike `AlignedMomentumDistanceMetric`, this metric has no directional bias from
 from localflowwalk.metrics import FullPhaseSpaceDistanceMetric
 
 # Full 6D phase-space distance (this is the default)
-# lam represents a time scale (e.g., if pos ~ kpc, vel ~ kpc/Myr, lam ~ Myr)
+# metric_scale represents a time scale (e.g., if pos ~ kpc, vel ~ kpc/Myr, metric_scale ~ Myr)
 config = lfw.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 **Comparison with momentum metric:**
 
 - `AlignedMomentumDistanceMetric`: Directional — favors points along velocity direction
 - `FullPhaseSpaceDistanceMetric`: Isotropic — treats all directions equally
-- Both reduce to `SpatialDistanceMetric` when `lam=0`
+- Both reduce to `SpatialDistanceMetric` when `metric_scale=0`
 
 ## Creating Custom Metrics
 
@@ -152,7 +152,7 @@ from localflowwalk.metrics import AbstractDistanceMetric
 class CustomMetric(AbstractDistanceMetric):
     """Your custom distance metric."""
 
-    def __call__(self, current_pos, current_vel, positions, velocities, lam):
+    def __call__(self, current_pos, current_vel, positions, velocities, metric_scale):
         """Compute modified distances."""
         # Your distance calculation here
         ...
@@ -172,7 +172,7 @@ from localflowwalk.metrics import AbstractDistanceMetric
 class Full6DMetric(AbstractDistanceMetric):
     """6D Cartesian distance in phase-space.
 
-    Treats position and velocity on equal footing, with `lam` serving as
+    Treats position and velocity on equal footing, with `metric_scale` serving as
     a velocity-to-position scaling factor (units of time).
 
     Distance formula:
@@ -181,7 +181,7 @@ class Full6DMetric(AbstractDistanceMetric):
     where Δr is position difference and Δv is velocity difference.
     """
 
-    def __call__(self, current_pos, current_vel, positions, velocities, lam):
+    def __call__(self, current_pos, current_vel, positions, velocities, metric_scale):
         # Compute position differences (vmap over N points)
         pos_diff = jax.tree.map(jnp.subtract, positions, current_pos)
 
@@ -191,11 +191,11 @@ class Full6DMetric(AbstractDistanceMetric):
         # Compute velocity differences (vmap over N points)
         vel_diff = jax.tree.map(jnp.subtract, velocities, current_vel)
 
-        # Sum of squared velocity differences, weighted by lambda^2
+        # Sum of squared velocity differences, weighted by metric_scale^2
         vel_dist_sq = sum(jax.tree.leaves(jax.tree.map(jnp.square, vel_diff)))
 
         # Combined 6D distance
-        return jnp.sqrt(pos_dist_sq + (lam**2) * vel_dist_sq)
+        return jnp.sqrt(pos_dist_sq + (metric_scale**2) * vel_dist_sq)
 
 
 # Use the custom metric via WalkConfig
@@ -203,7 +203,7 @@ pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 config = lfw.WalkConfig(metric=Full6DMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 ### Example: Weighted Position Metric
@@ -216,7 +216,7 @@ class WeightedPositionMetric(AbstractDistanceMetric):
 
     weights: dict[str, float] = eqx.field(static=True)
 
-    def __call__(self, current_pos, current_vel, positions, velocities, lam):
+    def __call__(self, current_pos, current_vel, positions, velocities, metric_scale):
         # Compute weighted position differences
         def weighted_diff_sq(component_name, positions_component):
             diff = positions_component - current_pos[component_name]
@@ -232,7 +232,7 @@ class WeightedPositionMetric(AbstractDistanceMetric):
 # Use with custom weights (ignore y-coordinate)
 metric = WeightedPositionMetric(weights={"x": 1.0, "y": 0.1})
 config = lfw.WalkConfig(metric=metric)
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=0.0)
+result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=0.0)
 ```
 
 ## Units and Metrics
@@ -250,25 +250,27 @@ from localflowwalk.metrics import (
 pos = {"x": u.Q([0.0, 1.0, 2.0], "kpc"), "y": u.Q([0.0, 0.5, 1.0], "kpc")}
 vel = {"x": u.Q([1.0, 1.0, 1.0], "km/s"), "y": u.Q([0.5, 0.5, 0.5], "km/s")}
 
-# Lambda must have units of distance for AlignedMomentumDistanceMetric
+# metric_scale must have units of distance for AlignedMomentumDistanceMetric
 config = lfw.WalkConfig(metric=AlignedMomentumDistanceMetric())
 result = lfw.walk_local_flow(
     pos,
     vel,
     config=config,
     start_idx=0,
-    lam=u.Q(100.0, "kpc"),  # Momentum weight in distance units
+    metric_scale=u.Q(100.0, "kpc"),  # Momentum weight in distance units
     usys=u.unitsystems.galactic,  # Required when using Quantities
 )
 
-# For FullPhaseSpaceDistanceMetric, lambda has units of time
+# For FullPhaseSpaceDistanceMetric, metric_scale has units of time
 config_6d = lfw.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
 result_6d = lfw.walk_local_flow(
     pos,
     vel,
     config=config_6d,
     start_idx=0,
-    lam=u.Q(1.0, "Gyr"),  # Time to convert velocity distance to spatial distance
+    metric_scale=u.Q(
+        1.0, "Gyr"
+    ),  # Time to convert velocity distance to spatial distance
     usys=u.unitsystems.galactic,  # Required when using Quantities
 )
 ```
@@ -319,7 +321,7 @@ metrics = {
 
 for name, metric in metrics.items():
     config = lfw.WalkConfig(metric=metric)
-    result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+    result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
     n_visited = len([i for i in result.indices if i >= 0])
     print(f"{name}: {n_visited}/100 points ordered")
 ```

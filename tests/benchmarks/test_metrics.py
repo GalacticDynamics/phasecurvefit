@@ -10,13 +10,13 @@ class TestMetricsAndStrategiesBenchmarks:
         """Benchmark with spatial distance metric using brute force."""
         pos, vel = simple_2d_stream
 
-        # Default strategy is BruteForce, spatial metric via lam=0
+        # Default strategy is BruteForce, spatial metric via metric_scale=0
         result = benchmark(
             lfw.walk_local_flow,
             pos,
             vel,
             start_idx=0,
-            lam=0.0,
+            metric_scale=0.0,
         )
 
         assert result.indices.shape == (50,)
@@ -27,13 +27,13 @@ class TestMetricsAndStrategiesBenchmarks:
         """Benchmark with full phase-space distance metric using brute force."""
         pos, vel = simple_2d_stream
 
-        # Full phase-space metric is the default with lam > 0
+        # Full phase-space metric is the default with metric_scale > 0
         result = benchmark(
             lfw.walk_local_flow,
             pos,
             vel,
             start_idx=0,
-            lam=1.0,
+            metric_scale=1.0,
         )
 
         assert result.indices.shape == (50,)
@@ -48,7 +48,7 @@ class TestMetricsAndStrategiesBenchmarks:
             pos,
             vel,
             start_idx=0,
-            lam=1.0,
+            metric_scale=1.0,
             config=config,
         )
 

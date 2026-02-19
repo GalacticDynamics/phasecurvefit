@@ -281,7 +281,7 @@ class TestTrainAutoencoder:
         pos = {"x": t, "y": 0.5 * t}
         vel = {"x": jnp.ones(n_points), "y": 0.5 * jnp.ones(n_points)}
 
-        return lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
+        return lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
     def test_training_runs(self, simple_wlf_result, rng_key: PRNGKeyArray):
         """Test that training completes without errors."""
@@ -374,7 +374,9 @@ class TestFillOrderingGaps:
 
         # Use max_dist to create gaps
         start_idx = int(jnp.argmax(pos["x"]))
-        return lfw.walk_local_flow(pos, vel, start_idx=start_idx, lam=3.0, max_dist=0.8)
+        return lfw.walk_local_flow(
+            pos, vel, start_idx=start_idx, metric_scale=3.0, max_dist=0.8
+        )
 
     def test_fills_gaps(self, localflowwalk_with_gaps, rng_key: PRNGKeyArray):
         """Test that fill_ordering_gaps produces complete ordering."""
@@ -588,7 +590,7 @@ class Test3DData:
 
         start_idx = int(jnp.argmin(pos["z"]))
         localflowwalk_result = lfw.walk_local_flow(
-            pos, vel, start_idx=start_idx, lam=3.0
+            pos, vel, start_idx=start_idx, metric_scale=3.0
         )
 
         normalizer = lfw.nn.StandardScalerNormalizer(
@@ -616,7 +618,9 @@ class TestEdgeCases:
         pos = {"x": jnp.array([0.0, 1.0]), "y": jnp.array([0.0, 1.0])}
         vel = {"x": jnp.array([1.0, 1.0]), "y": jnp.array([1.0, 1.0])}
 
-        localflowwalk_result = lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
+        localflowwalk_result = lfw.walk_local_flow(
+            pos, vel, start_idx=0, metric_scale=1.0
+        )
 
         normalizer = lfw.nn.StandardScalerNormalizer(
             localflowwalk_result.positions, localflowwalk_result.velocities
@@ -642,7 +646,9 @@ class TestEdgeCases:
         pos = {"x": t, "y": jnp.zeros(n_points)}
         vel = {"x": jnp.ones(n_points), "y": jnp.zeros(n_points)}
 
-        localflowwalk_result = lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
+        localflowwalk_result = lfw.walk_local_flow(
+            pos, vel, start_idx=0, metric_scale=1.0
+        )
 
         # All points should be ordered
         assert len(localflowwalk_result.indices) == n_points

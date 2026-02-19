@@ -118,7 +118,7 @@ def test_epitrochoid_autoencoder_fit() -> plt.Figure:
         strategy=lfw.strats.KDTree(k=60),
         metric=lfw.metrics.FullPhaseSpaceDistanceMetric(),
     )
-    lam = u.Q(4, "s")
+    metric_scale = u.Q(4, "s")
     max_dist = u.Q(40, "m")
 
     # Perform walk
@@ -126,7 +126,7 @@ def test_epitrochoid_autoencoder_fit() -> plt.Figure:
         qs,
         ps,
         start_idx=start_idx,
-        lam=lam,
+        metric_scale=metric_scale,
         max_dist=max_dist,
         config=config,
         direction="forward",

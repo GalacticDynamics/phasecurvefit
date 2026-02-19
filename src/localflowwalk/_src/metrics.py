@@ -56,7 +56,7 @@ class AbstractDistanceMetric(eqx.Module):
         current_vel: VectorComponents,
         positions: VectorComponents,
         velocities: VectorComponents,
-        lam: FLikeSz0,
+        metric_scale: FLikeSz0,
     ) -> FSzN:
         """Compute distances from current point to all candidate points.
 
@@ -70,8 +70,8 @@ class AbstractDistanceMetric(eqx.Module):
             Positions of all points (array components).
         velocities : dict[str, Array]
             Velocities of all points (array components).
-        lam : float
-            Weight parameter for the metric (interpretation depends on metric type).
+        metric_scale : float
+            Scale parameter for the metric (interpretation depends on metric type).
 
         Returns
         -------
@@ -93,7 +93,7 @@ class SpatialDistanceMetric(AbstractDistanceMetric):
     d = d_0
     $$
 
-    where $d_0$ is the Euclidean distance between positions. The `lam`
+    where $d_0$ is the Euclidean distance between positions. The `metric_scale`
     parameter is ignored.
 
     This metric is useful when:
@@ -110,7 +110,7 @@ class SpatialDistanceMetric(AbstractDistanceMetric):
     >>> vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
     >>> current_pos = {k: v[0] for k, v in pos.items()}
     >>> current_vel = {k: v[0] for k, v in vel.items()}
-    >>> distances = metric(current_pos, current_vel, pos, vel, lam=0.0)
+    >>> distances = metric(current_pos, current_vel, pos, vel, metric_scale=0.0)
     >>> distances.shape
     (3,)
 
@@ -124,7 +124,7 @@ class SpatialDistanceMetric(AbstractDistanceMetric):
         current_vel: VectorComponents,
         positions: VectorComponents,
         velocities: VectorComponents,
-        lam: FLikeSz0,
+        metric_scale: FLikeSz0,
     ) -> FSzN:
         """Compute spatial distances only.
 
@@ -138,8 +138,8 @@ class SpatialDistanceMetric(AbstractDistanceMetric):
             Positions of all points (array components).
         velocities : dict[str, Array]
             Velocities of all points (array components). Ignored.
-        lam : float
-            Weight parameter. Ignored for spatial-only metric.
+        metric_scale : float
+            Scale parameter. Ignored for spatial-only metric.
 
         Returns
         -------
@@ -147,7 +147,7 @@ class SpatialDistanceMetric(AbstractDistanceMetric):
             Euclidean distances in position space.
 
         """
-        del current_vel, velocities, lam
+        del current_vel, velocities, metric_scale
         # Compute Euclidean distances in position space (vmap over array)
         return vec_euclidean_distance(current_pos, positions)
 
@@ -179,7 +179,7 @@ class AlignedMomentumDistanceMetric(AbstractDistanceMetric):
     >>> vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
     >>> current_pos = {k: v[0] for k, v in pos.items()}
     >>> current_vel = {k: v[0] for k, v in vel.items()}
-    >>> distances = metric(current_pos, current_vel, pos, vel, lam=1.0)
+    >>> distances = metric(current_pos, current_vel, pos, vel, metric_scale=1.0)
     >>> distances.shape
     (3,)
 
@@ -195,7 +195,7 @@ class AlignedMomentumDistanceMetric(AbstractDistanceMetric):
         current_vel: VectorComponents,
         positions: VectorComponents,
         velocities: VectorComponents,
-        lam: FLikeSz0,
+        metric_scale: FLikeSz0,
     ) -> FSzN:
         """Compute momentum-weighted distances.
 
@@ -209,7 +209,7 @@ class AlignedMomentumDistanceMetric(AbstractDistanceMetric):
             Positions of all points (array components).
         velocities : dict[str, Array]
             Velocities of all points (array components).
-        lam : float
+        metric_scale : float
             Momentum weight parameter (units of distance). When 0, reduces to
             pure nearest-neighbor search.
 
@@ -235,7 +235,7 @@ class AlignedMomentumDistanceMetric(AbstractDistanceMetric):
         cos_sim = vec_cosine_similarity(unit_vel, unit_dirs)
 
         # Momentum distance: d = d0 + λ * (1 - cos_sim)
-        return d0 + lam * (1.0 - cos_sim)
+        return d0 + metric_scale * (1.0 - cos_sim)
 
 
 @final
@@ -243,8 +243,8 @@ class FullPhaseSpaceDistanceMetric(AbstractDistanceMetric):
     r"""Full 6D phase-space distance metric.
 
     Computes the Euclidean distance in the full 6-dimensional phase space by
-    combining position and velocity differences. The parameter `lam` (with time
-    units) converts velocity differences to position units.
+    combining position and velocity differences. The parameter `metric_scale`
+    (with time units) converts velocity differences to position units.
 
     $$
     d = \sqrt{d_0^2 + (\tau \cdot d_v)^2}
@@ -253,18 +253,21 @@ class FullPhaseSpaceDistanceMetric(AbstractDistanceMetric):
     where:
     - $d_0$ is the Euclidean distance in position space
     - $d_v$ is the Euclidean distance in velocity space
-    - $\tau$ is the time parameter (lam) that converts velocity to position units
+    - $\tau$ is the time parameter (metric_scale) that converts velocity to
+      position units
 
     This metric treats position and velocity symmetrically in phase space,
-    without directional bias from momentum alignment. The `lam` parameter
-    determines the relative weighting of velocity differences.
+    without directional bias from momentum alignment. The `metric_scale`
+    parameter determines the relative weighting of velocity differences.
 
     Physically, if we think of phase space as having position coordinates
-    measured in kpc and velocity coordinates measured in kpc/Myr, then `lam`
-    with units of Myr converts velocity differences to kpc, allowing us to
-    compute a true Euclidean distance in a uniformly scaled phase space.
+    measured in kpc and velocity coordinates measured in kpc/Myr, then
+    `metric_scale` with units of Myr converts velocity differences to kpc,
+    allowing us to compute a true Euclidean distance in a uniformly scaled phase
+    space.
 
     This metric is useful when:
+
     - Position and velocity information are equally important
     - You want true 6D proximity without momentum direction bias
     - The natural time scale of the system is known
@@ -278,8 +281,8 @@ class FullPhaseSpaceDistanceMetric(AbstractDistanceMetric):
     >>> vel = {"x": jnp.array([1.0, 1.5, 2.0]), "y": jnp.array([0.5, 1.0, 1.5])}
     >>> current_pos = {k: v[0] for k, v in pos.items()}
     >>> current_vel = {k: v[0] for k, v in vel.items()}
-    >>> # lam=1.0 means 1 unit of velocity diff = 1 unit of position diff
-    >>> distances = metric(current_pos, current_vel, pos, vel, lam=1.0)
+    >>> # metric_scale=1.0 means 1 unit of velocity diff = 1 unit of position diff
+    >>> distances = metric(current_pos, current_vel, pos, vel, metric_scale=1.0)
     >>> distances.shape
     (3,)
 
@@ -293,7 +296,7 @@ class FullPhaseSpaceDistanceMetric(AbstractDistanceMetric):
         current_vel: VectorComponents,
         positions: VectorComponents,
         velocities: VectorComponents,
-        lam: FLikeSz0,
+        metric_scale: FLikeSz0,
     ) -> FSzN:
         """Compute full 6D phase-space distances.
 
@@ -307,7 +310,7 @@ class FullPhaseSpaceDistanceMetric(AbstractDistanceMetric):
             Positions of all points (array components).
         velocities : dict[str, Array]
             Velocities of all points (array components).
-        lam : FLikeSz0
+        metric_scale : FLikeSz0
             Time parameter (tau) to convert velocity differences to position units.
             Higher values weight velocity differences more heavily.
 
@@ -323,5 +326,5 @@ class FullPhaseSpaceDistanceMetric(AbstractDistanceMetric):
         # Compute velocity distances (vmap over array)
         d_vel = vec_euclidean_distance(current_vel, velocities)
 
-        # Combine: sqrt(d_pos^2 + (lam * d_vel)^2)
-        return jnp.sqrt(d_pos**2 + (lam * d_vel) ** 2)
+        # Combine: sqrt(d_pos^2 + (metric_scale * d_vel)^2)
+        return jnp.sqrt(d_pos**2 + (metric_scale * d_vel) ** 2)

@@ -22,7 +22,7 @@ import localflowwalk as lfw
 # Get initial ordering from walk
 pos = {"x": jnp.linspace(0, 5, 50), "y": jnp.sin(jnp.linspace(0, jnp.pi, 50))}
 vel = {"x": jnp.ones(50), "y": jnp.cos(jnp.linspace(0, jnp.pi, 50))}
-walkresult = lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
+walkresult = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
 # Create normalizer and autoencoder
 key = jax.random.key(0)

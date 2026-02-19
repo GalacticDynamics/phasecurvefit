@@ -33,7 +33,9 @@ class WalkConfig(eqx.Module):
     >>> config = lfw.WalkConfig()
     >>> pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
     >>> vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
-    >>> result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, lam=1.0)
+    >>> result = lfw.walk_local_flow(
+    ...     pos, vel, config=config, start_idx=0, metric_scale=1.0
+    ... )
 
     KD-tree strategy with aligned momentum metric:
 

@@ -21,8 +21,8 @@ class TestAbstractDistanceMetric:
         class CustomMetric(lfw.metrics.AbstractDistanceMetric):
             """Minimal custom metric for testing."""
 
-            def __call__(self, cur_pos, cur_vel, positions, velocities, lam):
-                del cur_vel, velocities, lam
+            def __call__(self, cur_pos, cur_vel, positions, velocities, metric_scale):
+                del cur_vel, velocities, metric_scale
                 # Simple Euclidean distance
                 diffs = jax.tree.map(lambda p, c: p - c, positions, cur_pos)
                 dist_sq = sum(jax.tree.leaves(jax.tree.map(lambda x: x**2, diffs)))
@@ -36,7 +36,11 @@ class TestAbstractDistanceMetric:
         pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
         vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
         result = lfw.walk_local_flow(
-            pos, vel, start_idx=0, lam=0.0, config=lfw.WalkConfig(metric=metric)
+            pos,
+            vel,
+            start_idx=0,
+            metric_scale=0.0,
+            config=lfw.WalkConfig(metric=metric),
         )
         assert len(result.indices) == 3
 
@@ -59,7 +63,7 @@ class TestAlignedMomentumDistanceMetric:
         cur_pos = {k: v[0] for k, v in pos.items()}
         cur_vel = {k: v[0] for k, v in vel.items()}
 
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=1.0)
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=1.0)
 
         assert distances.shape == (3,)
         assert jnp.all(jnp.isfinite(distances))
@@ -75,7 +79,7 @@ class TestAlignedMomentumDistanceMetric:
         cur_pos = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         cur_vel = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
 
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=0.0)
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=0.0)
 
         # Should be [0, 1, 2] (pure Euclidean distance)
         expected = jnp.array([0.0, 1.0, 2.0])
@@ -94,10 +98,10 @@ class TestAlignedMomentumDistanceMetric:
         cur_pos = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         cur_vel = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
 
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=10.0)
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=10.0)
 
         # Distance to self (coincident point) has undefined direction, so gets
-        # max penalty d = 0 + lam * (1 - 0) = lam
+        # max penalty d = 0 + metric_scale * (1 - 0) = metric_scale
         assert jnp.isclose(distances[0], 10.0)
         # Point in velocity direction should have lower modified distance than
         # perpendicular
@@ -122,8 +126,8 @@ class TestAlignedMomentumDistanceMetric:
         cur_pos = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         cur_vel = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
 
-        lam = 1.0
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=lam)
+        metric_scale = 1.0
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=metric_scale)
 
         # Point 0 (self/coincident): undefined direction, gets max penalty
         # d = 0 + λ * 1 = 1
@@ -143,8 +147,8 @@ class TestAlignedMomentumDistanceMetric:
         metric = lfw.metrics.AlignedMomentumDistanceMetric()
 
         @jax.jit
-        def compute_distances(cur_pos, cur_vel, positions, velocities, lam):
-            return metric(cur_pos, cur_vel, positions, velocities, lam)
+        def compute_distances(cur_pos, cur_vel, positions, velocities, metric_scale):
+            return metric(cur_pos, cur_vel, positions, velocities, metric_scale)
 
         pos = {"x": jnp.array([0.0, 1.0, 2.0])}
         vel = {"x": jnp.array([1.0, 1.0, 1.0])}
@@ -164,7 +168,11 @@ class TestAlignedMomentumDistanceMetric:
         vel = {"x": jnp.array([1.0, 1.0, 1.0, 1.0])}
 
         result = lfw.walk_local_flow(
-            pos, vel, start_idx=0, lam=1.0, config=lfw.WalkConfig(metric=metric)
+            pos,
+            vel,
+            start_idx=0,
+            metric_scale=1.0,
+            config=lfw.WalkConfig(metric=metric),
         )
 
         # Should follow the line in order
@@ -189,7 +197,7 @@ class TestSpatialDistanceMetric:
         cur_pos = {k: v[0] for k, v in pos.items()}
         cur_vel = {k: v[0] for k, v in vel.items()}
 
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=0.0)
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=0.0)
 
         assert distances.shape == (3,)
         assert jnp.all(jnp.isfinite(distances))
@@ -207,8 +215,8 @@ class TestSpatialDistanceMetric:
         cur_vel2 = {"x": jnp.array(0.0), "y": jnp.array(1.0)}
 
         # Same position, different velocities - should give same distances
-        distances1 = metric(cur_pos, cur_vel1, pos, vel1, lam=0.0)
-        distances2 = metric(cur_pos, cur_vel2, pos, vel2, lam=0.0)
+        distances1 = metric(cur_pos, cur_vel1, pos, vel1, metric_scale=0.0)
+        distances2 = metric(cur_pos, cur_vel2, pos, vel2, metric_scale=0.0)
 
         assert jnp.allclose(distances1, distances2)
 
@@ -223,8 +231,8 @@ class TestSpatialDistanceMetric:
         cur_vel = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
 
         # Different lambda values should give same result
-        distances_lam0 = metric(cur_pos, cur_vel, pos, vel, lam=0.0)
-        distances_lam10 = metric(cur_pos, cur_vel, pos, vel, lam=10.0)
+        distances_lam0 = metric(cur_pos, cur_vel, pos, vel, metric_scale=0.0)
+        distances_lam10 = metric(cur_pos, cur_vel, pos, vel, metric_scale=10.0)
 
         assert jnp.allclose(distances_lam0, distances_lam10)
 
@@ -238,7 +246,7 @@ class TestSpatialDistanceMetric:
         cur_pos = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         cur_vel = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
 
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=0.0)
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=0.0)
 
         # Should be [0, 3, 4] (Euclidean distances)
         expected = jnp.array([0.0, 3.0, 4.0])
@@ -255,8 +263,8 @@ class TestSpatialDistanceMetric:
         cur_pos = {k: v[0] for k, v in pos.items()}
         cur_vel = {k: v[0] for k, v in vel.items()}
 
-        spatial_dist = spatial_metric(cur_pos, cur_vel, pos, vel, lam=0.0)
-        momentum_dist = momentum_metric(cur_pos, cur_vel, pos, vel, lam=0.0)
+        spatial_dist = spatial_metric(cur_pos, cur_vel, pos, vel, metric_scale=0.0)
+        momentum_dist = momentum_metric(cur_pos, cur_vel, pos, vel, metric_scale=0.0)
 
         assert jnp.allclose(spatial_dist, momentum_dist)
 
@@ -265,8 +273,8 @@ class TestSpatialDistanceMetric:
         metric = lfw.metrics.SpatialDistanceMetric()
 
         @jax.jit
-        def compute_distances(cur_pos, cur_vel, positions, velocities, lam):
-            return metric(cur_pos, cur_vel, positions, velocities, lam)
+        def compute_distances(cur_pos, cur_vel, positions, velocities, metric_scale):
+            return metric(cur_pos, cur_vel, positions, velocities, metric_scale)
 
         pos = {"x": jnp.array([0.0, 1.0, 2.0])}
         vel = {"x": jnp.array([1.0, 1.0, 1.0])}
@@ -286,7 +294,11 @@ class TestSpatialDistanceMetric:
         vel = {"x": jnp.array([-1.0, -1.0, -1.0, -1.0])}  # Velocity points backward
 
         result = lfw.walk_local_flow(
-            pos, vel, start_idx=0, lam=0.0, config=lfw.WalkConfig(metric=metric)
+            pos,
+            vel,
+            start_idx=0,
+            metric_scale=0.0,
+            config=lfw.WalkConfig(metric=metric),
         )
 
         # Should still follow spatial order despite backward velocity
@@ -311,7 +323,7 @@ class TestSpatialDistanceMetric:
         cur_pos = {k: v[0] for k, v in pos.items()}
         cur_vel = {k: v[0] for k, v in vel.items()}
 
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=0.0)
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=0.0)
 
         # All points at distance 1 from origin (except self at 0)
         expected = jnp.array([0.0, 1.0, 1.0, 1.0])
@@ -335,7 +347,7 @@ class TestMetricComparison:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5, 0.5])}
 
         result = lfw.walk_local_flow(
-            q, p, start_idx=0, lam=1.0, config=lfw.WalkConfig(metric=metric)
+            q, p, start_idx=0, metric_scale=1.0, config=lfw.WalkConfig(metric=metric)
         )
 
         assert result.all_visited, metric_name
@@ -356,14 +368,14 @@ class TestMetricComparison:
             q,
             p,
             start_idx=0,
-            lam=0.0,
+            metric_scale=0.0,
             config=lfw.WalkConfig(metric=lfw.metrics.SpatialDistanceMetric()),
         )
         momentum_result = lfw.walk_local_flow(
             q,
             p,
             start_idx=0,
-            lam=5.0,
+            metric_scale=5.0,
             config=lfw.WalkConfig(metric=lfw.metrics.AlignedMomentumDistanceMetric()),
         )
 
@@ -397,7 +409,7 @@ class TestFullPhaseSpaceDistanceMetric:
         cur_pos = {k: v[0] for k, v in pos.items()}
         cur_vel = {k: v[0] for k, v in vel.items()}
 
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=1.0)
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=1.0)
 
         assert distances.shape == (3,)
         assert jnp.all(jnp.isfinite(distances))
@@ -414,13 +426,13 @@ class TestFullPhaseSpaceDistanceMetric:
         cur_pos = {k: v[0] for k, v in pos.items()}
         cur_vel = {k: v[0] for k, v in vel.items()}
 
-        phase_dist = phase_metric(cur_pos, cur_vel, pos, vel, lam=1.0)
-        spatial_dist = spatial_metric(cur_pos, cur_vel, pos, vel, lam=0.0)
+        phase_dist = phase_metric(cur_pos, cur_vel, pos, vel, metric_scale=1.0)
+        spatial_dist = spatial_metric(cur_pos, cur_vel, pos, vel, metric_scale=0.0)
 
         assert jnp.allclose(phase_dist, spatial_dist)
 
     def test_zero_lambda_matches_spatial(self):
-        """Test that lam=0 gives same result as spatial metric."""
+        """Test that metric_scale=0 gives same result as spatial metric."""
         phase_metric = lfw.metrics.FullPhaseSpaceDistanceMetric()
         spatial_metric = lfw.metrics.SpatialDistanceMetric()
 
@@ -430,8 +442,8 @@ class TestFullPhaseSpaceDistanceMetric:
         cur_pos = {k: v[0] for k, v in pos.items()}
         cur_vel = {k: v[0] for k, v in vel.items()}
 
-        phase_dist = phase_metric(cur_pos, cur_vel, pos, vel, lam=0.0)
-        spatial_dist = spatial_metric(cur_pos, cur_vel, pos, vel, lam=0.0)
+        phase_dist = phase_metric(cur_pos, cur_vel, pos, vel, metric_scale=0.0)
+        spatial_dist = spatial_metric(cur_pos, cur_vel, pos, vel, metric_scale=0.0)
 
         assert jnp.allclose(phase_dist, spatial_dist)
 
@@ -449,17 +461,17 @@ class TestFullPhaseSpaceDistanceMetric:
         cur_pos = {k: v[0] for k, v in pos.items()}
         cur_vel = {k: v[0] for k, v in vel.items()}
 
-        lam = 2.0
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=lam)
+        metric_scale = 2.0
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=metric_scale)
 
         # Point 0 (self): zero distance
         assert jnp.isclose(distances[0], 0.0)
 
-        # Point 1: d_vel = 1, d = lam * 1 = 2
-        assert jnp.isclose(distances[1], lam, atol=1e-5)
+        # Point 1: d_vel = 1, d = metric_scale * 1 = 2
+        assert jnp.isclose(distances[1], metric_scale, atol=1e-5)
 
-        # Point 2: d_vel = 1, d = lam * 1 = 2
-        assert jnp.isclose(distances[2], lam, atol=1e-5)
+        # Point 2: d_vel = 1, d = metric_scale * 1 = 2
+        assert jnp.isclose(distances[2], metric_scale, atol=1e-5)
 
     def test_combined_position_and_velocity(self):
         """Test correct combination of position and velocity distances."""
@@ -473,9 +485,9 @@ class TestFullPhaseSpaceDistanceMetric:
         cur_pos = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         cur_vel = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
 
-        # With lam=1, should get sqrt(3^2 + 4^2) = 5
-        lam = 1.0
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=lam)
+        # With metric_scale=1, should get sqrt(3^2 + 4^2) = 5
+        metric_scale = 1.0
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=metric_scale)
 
         assert jnp.isclose(distances[0], 0.0)
         assert jnp.isclose(distances[1], 5.0, atol=1e-5)
@@ -491,31 +503,31 @@ class TestFullPhaseSpaceDistanceMetric:
         cur_pos = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         cur_vel = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
 
-        # With lam=2, velocity diff of 1 becomes distance of 2
-        distances_lam2 = metric(cur_pos, cur_vel, pos, vel, lam=2.0)
+        # With metric_scale=2, velocity diff of 1 becomes distance of 2
+        distances_lam2 = metric(cur_pos, cur_vel, pos, vel, metric_scale=2.0)
         assert jnp.isclose(distances_lam2[1], 2.0, atol=1e-5)
 
-        # With lam=5, velocity diff of 1 becomes distance of 5
-        distances_lam5 = metric(cur_pos, cur_vel, pos, vel, lam=5.0)
+        # With metric_scale=5, velocity diff of 1 becomes distance of 5
+        distances_lam5 = metric(cur_pos, cur_vel, pos, vel, metric_scale=5.0)
         assert jnp.isclose(distances_lam5[1], 5.0, atol=1e-5)
 
     def test_symmetry(self):
         """Test that metric is symmetric in position and velocity."""
         metric = lfw.metrics.FullPhaseSpaceDistanceMetric()
 
-        # Case 1: Position diff = 3, velocity diff = 0, lam = 1
+        # Case 1: Position diff = 3, velocity diff = 0, metric_scale = 1
         pos1 = {"x": jnp.array([0.0, 3.0]), "y": jnp.array([0.0, 0.0])}
         vel1 = {"x": jnp.array([0.0, 0.0]), "y": jnp.array([0.0, 0.0])}
 
-        # Case 2: Position diff = 0, velocity diff = 3, lam = 1
+        # Case 2: Position diff = 0, velocity diff = 3, metric_scale = 1
         pos2 = {"x": jnp.array([0.0, 0.0]), "y": jnp.array([0.0, 0.0])}
         vel2 = {"x": jnp.array([0.0, 3.0]), "y": jnp.array([0.0, 0.0])}
 
         cur_pos = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         cur_vel = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
 
-        dist1 = metric(cur_pos, cur_vel, pos1, vel1, lam=1.0)
-        dist2 = metric(cur_pos, cur_vel, pos2, vel2, lam=1.0)
+        dist1 = metric(cur_pos, cur_vel, pos1, vel1, metric_scale=1.0)
+        dist2 = metric(cur_pos, cur_vel, pos2, vel2, metric_scale=1.0)
 
         # Both should give distance of 3
         assert jnp.isclose(dist1[1], dist2[1], atol=1e-5)
@@ -525,8 +537,8 @@ class TestFullPhaseSpaceDistanceMetric:
         metric = lfw.metrics.FullPhaseSpaceDistanceMetric()
 
         @jax.jit
-        def compute_distances(cur_pos, cur_vel, positions, velocities, lam):
-            return metric(cur_pos, cur_vel, positions, velocities, lam)
+        def compute_distances(cur_pos, cur_vel, positions, velocities, metric_scale):
+            return metric(cur_pos, cur_vel, positions, velocities, metric_scale)
 
         pos = {"x": jnp.array([0.0, 1.0, 2.0])}
         vel = {"x": jnp.array([1.0, 1.0, 1.0])}
@@ -546,7 +558,11 @@ class TestFullPhaseSpaceDistanceMetric:
         vel = {"x": jnp.array([1.0, 2.0, 3.0, 4.0])}
 
         result = lfw.walk_local_flow(
-            pos, vel, start_idx=0, lam=0.5, config=lfw.WalkConfig(metric=metric)
+            pos,
+            vel,
+            start_idx=0,
+            metric_scale=0.5,
+            config=lfw.WalkConfig(metric=metric),
         )
 
         # Should complete successfully
@@ -572,12 +588,12 @@ class TestFullPhaseSpaceDistanceMetric:
         cur_pos = {k: v[0] for k, v in pos.items()}
         cur_vel = {k: v[0] for k, v in vel.items()}
 
-        lam = 1.0
-        distances = metric(cur_pos, cur_vel, pos, vel, lam=lam)
+        metric_scale = 1.0
+        distances = metric(cur_pos, cur_vel, pos, vel, metric_scale=metric_scale)
 
         # Point 0: zero distance
         assert jnp.isclose(distances[0], 0.0)
         # Point 1: position distance = 3
         assert jnp.isclose(distances[1], 3.0, atol=1e-5)
-        # Point 2: velocity distance = 4, with lam=1 gives 4
+        # Point 2: velocity distance = 4, with metric_scale=1 gives 4
         assert jnp.isclose(distances[2], 4.0, atol=1e-5)

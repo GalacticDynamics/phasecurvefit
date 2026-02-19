@@ -95,7 +95,7 @@ Input:
     position: dict[str, Array]  # N points with shape (N,) per component
     velocity: dict[str, Array]  # N points with shape (N,) per component
     start_idx: int              # starting index
-    lam: float                  # momentum weight
+    metric_scale: float         # scale parameter for distance metric
     max_dist: float | None      # optional gap detection
     terminate_indices: Set[int] | None  # optional termination indices
     n_max: int | None           # optional iteration limit
@@ -194,11 +194,11 @@ vel = {
 }
 
 # Forward walk (default)
-result_forward = lfw.walk_local_flow(pos, vel, start_idx=0, lam=1.0)
+result_forward = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
 # Reverse walk from the same starting point
 result_reverse = lfw.walk_local_flow(
-    pos, vel, start_idx=0, lam=1.0, direction="backward"
+    pos, vel, start_idx=0, metric_scale=1.0, direction="backward"
 )
 ```
 
@@ -215,10 +215,10 @@ combines the results of two separate walks into a single coherent ordering:
 ```python
 # Run forward and reverse walks separately
 result_forward = lfw.walk_local_flow(
-    pos, vel, start_idx=2, lam=1.0, direction="forward"
+    pos, vel, start_idx=2, metric_scale=1.0, direction="forward"
 )
 result_reverse = lfw.walk_local_flow(
-    pos, vel, start_idx=2, lam=1.0, direction="backward"
+    pos, vel, start_idx=2, metric_scale=1.0, direction="backward"
 )
 
 # Combine the results
@@ -230,7 +230,7 @@ result = lfw.combine_flow_walks(result_forward, result_reverse)
 This can be simplified to:
 
 ```python
-result = lfw.walk_local_flow(pos, vel, start_idx=2, lam=1.0, direction="both")
+result = lfw.walk_local_flow(pos, vel, start_idx=2, metric_scale=1.0, direction="both")
 ```
 
 This is particularly useful for:
