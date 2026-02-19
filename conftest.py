@@ -1,4 +1,4 @@
-"""Pytest configuration for localflowwalk tests."""
+"""Pytest configuration for phasecurvefit tests."""
 
 from collections.abc import Callable, Iterable, Sequence
 from doctest import ELLIPSIS, NORMALIZE_WHITESPACE
@@ -39,7 +39,7 @@ pytest_collect_file = (docs + python).pytest()
 
 
 class OptDeps(OptionalDependencyEnum):  # pylint: disable=invalid-enum-extension
-    """Optional dependencies for localflowwalk."""
+    """Optional dependencies for phasecurvefit."""
 
     UNXT = auto()
     KDTREE = auto()

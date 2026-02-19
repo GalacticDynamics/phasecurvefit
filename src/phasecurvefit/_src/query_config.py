@@ -26,23 +26,23 @@ class WalkConfig(eqx.Module):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> import localflowwalk as lfw
+    >>> import phasecurvefit as pcf
 
     Default configuration (brute-force with full phase-space metric):
 
-    >>> config = lfw.WalkConfig()
+    >>> config = pcf.WalkConfig()
     >>> pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
     >>> vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
-    >>> result = lfw.walk_local_flow(
+    >>> result = pcf.walk_local_flow(
     ...     pos, vel, config=config, start_idx=0, metric_scale=1.0
     ... )
 
     KD-tree strategy with aligned momentum metric:
 
-    >>> from localflowwalk.metrics import AlignedMomentumDistanceMetric
-    >>> config = lfw.WalkConfig(
+    >>> from phasecurvefit.metrics import AlignedMomentumDistanceMetric
+    >>> config = pcf.WalkConfig(
     ...     metric=AlignedMomentumDistanceMetric(),
-    ...     strategy=lfw.strats.KDTree(k=50),
+    ...     strategy=pcf.strats.KDTree(k=50),
     ... )
 
     """

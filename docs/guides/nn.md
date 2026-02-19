@@ -17,26 +17,26 @@ The encoder learns from the walk-ordered tracers and generalizes to predict $\ga
 ```python
 import jax
 import jax.numpy as jnp
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 # Get initial ordering from walk
 pos = {"x": jnp.linspace(0, 5, 50), "y": jnp.sin(jnp.linspace(0, jnp.pi, 50))}
 vel = {"x": jnp.ones(50), "y": jnp.cos(jnp.linspace(0, jnp.pi, 50))}
-walkresult = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
 # Create normalizer and autoencoder
 key = jax.random.key(0)
-normalizer = lfw.nn.StandardScalerNormalizer(pos, vel)
-autoencoder = lfw.nn.PathAutoencoder.make(normalizer, key=key)
+normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+autoencoder = pcf.nn.PathAutoencoder.make(normalizer, key=key)
 
 # Train autoencoder
-config = lfw.nn.TrainingConfig(show_pbar=False)
-trained, _, losses = lfw.nn.train_autoencoder(
+config = pcf.nn.TrainingConfig(show_pbar=False)
+trained, _, losses = pcf.nn.train_autoencoder(
     autoencoder, walkresult, config=config, key=key
 )
 
 # Fill gaps
-result = lfw.nn.fill_ordering_gaps(trained, walkresult)
+result = pcf.nn.fill_ordering_gaps(trained, walkresult)
 
 gamma = result.gamma
 ordered_all = result.indices
@@ -55,7 +55,7 @@ The default settings appear to work for most cases,
 but can be set by the user.
 
 ```python
-config = lfw.nn.TrainingConfig(
+config = pcf.nn.TrainingConfig(
     n_epochs_encoder=800,  # Encoder-only epochs
     n_epochs_decoder=100,  # Decoder-only epochs
     n_epochs_both=200,  # En+Decoder epochs
@@ -66,7 +66,7 @@ config = lfw.nn.TrainingConfig(
     show_pbar=False,
 )
 
-trained, _, losses = lfw.nn.train_autoencoder(
+trained, _, losses = pcf.nn.train_autoencoder(
     autoencoder, walkresult, config=config, key=key
 )
 ```

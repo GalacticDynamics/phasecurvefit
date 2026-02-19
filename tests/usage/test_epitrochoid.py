@@ -10,7 +10,7 @@ from jaxtyping import PRNGKeyArray
 import quaxed.numpy as jnp
 import unxt as u
 
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 plt = pytest.importorskip("matplotlib.pyplot")
 
@@ -114,15 +114,15 @@ def test_epitrochoid_autoencoder_fit() -> plt.Figure:
     start_idx = int(jnp.argsort(order)[0])
 
     # Walk configuration
-    config = lfw.WalkConfig(
-        strategy=lfw.strats.KDTree(k=60),
-        metric=lfw.metrics.FullPhaseSpaceDistanceMetric(),
+    config = pcf.WalkConfig(
+        strategy=pcf.strats.KDTree(k=60),
+        metric=pcf.metrics.FullPhaseSpaceDistanceMetric(),
     )
     metric_scale = u.Q(4, "s")
     max_dist = u.Q(40, "m")
 
     # Perform walk
-    walkresult = lfw.walk_local_flow(
+    walkresult = pcf.walk_local_flow(
         qs,
         ps,
         start_idx=start_idx,
@@ -130,15 +130,15 @@ def test_epitrochoid_autoencoder_fit() -> plt.Figure:
         max_dist=max_dist,
         config=config,
         direction="forward",
-        metadata=lfw.StateMetadata(usys=usys),
+        metadata=pcf.StateMetadata(usys=usys),
     )
 
     # Train autoencoder
     key, model_key, train_key = jr.split(key, 3)
-    normalizer = lfw.nn.StandardScalerNormalizer(qs, ps)
-    model = lfw.nn.PathAutoencoder.make(normalizer, track_depth=4, key=model_key)
-    train_config = lfw.nn.TrainingConfig(show_pbar=False)
-    model, _, _ = lfw.nn.train_autoencoder(
+    normalizer = pcf.nn.StandardScalerNormalizer(qs, ps)
+    model = pcf.nn.PathAutoencoder.make(normalizer, track_depth=4, key=model_key)
+    train_config = pcf.nn.TrainingConfig(show_pbar=False)
+    model, _, _ = pcf.nn.train_autoencoder(
         model, walkresult, key=train_key, config=train_config
     )
 

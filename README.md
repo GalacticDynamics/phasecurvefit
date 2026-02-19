@@ -1,7 +1,7 @@
-# localflowwalk: Construct Paths through Phase-Space Points
+# phasecurvefit: Construct Paths through Phase-Space Points
 
-[![PyPI version](https://img.shields.io/pypi/v/localflowwalk.svg)](https://pypi.org/project/localflowwalk/)
-[![Python versions](https://img.shields.io/pypi/pyversions/localflowwalk.svg)](https://pypi.org/project/localflowwalk/)
+[![PyPI version](https://img.shields.io/pypi/v/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
+[![Python versions](https://img.shields.io/pypi/pyversions/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
 
 Construct paths through phase-Space points, supporting many different
 algorithms.
@@ -11,18 +11,40 @@ algorithms.
 Install the core package:
 
 ```bash
-pip install localflowwalk
+pip install phasecurvefit
 ```
 
 Or with uv:
 
 ```bash
-uv add localflowwalk
+uv add phasecurvefit
 ```
+
+<details>
+  <summary>from source, using uv</summary>
+
+```bash
+uv add git+https://github.com/GalacticDynamics/phasecurvefit.git@main
+```
+
+You can customize the branch by replacing `main` with any other branch name.
+
+</details>
+<details>
+  <summary>building from source</summary>
+
+```bash
+cd /path/to/parent
+git clone https://github.com/GalacticDynamics/phasecurvefit.git
+cd phasecurvefit
+uv pip install -e .  # editable mode
+```
+
+</details>
 
 ### Optional Dependencies
 
-localflowwalk has optional dependencies for extended functionality:
+phasecurvefit has optional dependencies for extended functionality:
 
 - **unxt**: Physical units support for phase-space calculations
 - **tree (jaxkd)**: Spatial KD-tree queries for large datasets
@@ -30,30 +52,30 @@ localflowwalk has optional dependencies for extended functionality:
 Install with optional dependencies:
 
 ```bash
-pip install localflowwalk[interop]  # Install with unxt for unit support
-pip install localflowwalk[kdtree]  # Install with jaxkd for KD-tree strategy
+pip install phasecurvefit[interop]  # Install with unxt for unit support
+pip install phasecurvefit[kdtree]  # Install with jaxkd for KD-tree strategy
 ```
 
 Or with uv:
 
 ```bash
-uv add localflowwalk --extra interop
-uv add localflowwalk --extra kdtree
+uv add phasecurvefit --extra interop
+uv add phasecurvefit --extra kdtree
 ```
 
 ## Quick Start
 
 ```python
 import jax.numpy as jnp
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 # Create phase-space observations as dictionaries (Cartesian coordinates)
 pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Order the observations (use KD-tree for spatial neighbor prefiltering)
-config = lfw.WalkConfig(strategy=lfw.strats.KDTree(k=2))
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2))
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 print(result.indices)  # Array([0, 1, 2], dtype=int32)
 ```
 
@@ -70,7 +92,7 @@ vel = {"x": u.Q([1.0, 1.0, 1.0], "km/s"), "y": u.Q([0.5, 0.5, 0.5], "km/s")}
 
 # Units are preserved throughout the calculation
 metric_scale = u.Q(1.0, "kpc")
-result = lfw.walk_local_flow(
+result = pcf.walk_local_flow(
     pos, vel, start_idx=0, metric_scale=metric_scale, usys=u.unitsystems.galactic
 )
 ```
@@ -95,7 +117,7 @@ ordered. The default `FullPhaseSpaceDistanceMetric` uses true 6D Euclidean
 distance across positions and velocities:
 
 ```python
-from localflowwalk.metrics import FullPhaseSpaceDistanceMetric
+from phasecurvefit.metrics import FullPhaseSpaceDistanceMetric
 import jax.numpy as jnp
 
 # Define simple Cartesian arrays (not quantities)
@@ -103,13 +125,13 @@ pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Configure with full phase-space metric (the default)
-config = lfw.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+config = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 ### Using Different Metrics
 
-`localflowwalk` provides three built-in metrics:
+`phasecurvefit` provides three built-in metrics:
 
 1. **FullPhaseSpaceDistanceMetric** (default): True 6D Euclidean distance in
    phase space
@@ -118,7 +140,7 @@ result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=
 3. **SpatialDistanceMetric**: Pure spatial distance, ignoring velocity
 
 ```python
-from localflowwalk.metrics import SpatialDistanceMetric, FullPhaseSpaceDistanceMetric
+from phasecurvefit.metrics import SpatialDistanceMetric, FullPhaseSpaceDistanceMetric
 import jax.numpy as jnp
 
 # Define simple Cartesian arrays (not quantities)
@@ -126,14 +148,14 @@ pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Pure spatial ordering (ignores velocity)
-config_spatial = lfw.WalkConfig(metric=SpatialDistanceMetric())
-result = lfw.walk_local_flow(
+config_spatial = pcf.WalkConfig(metric=SpatialDistanceMetric())
+result = pcf.walk_local_flow(
     pos, vel, config=config_spatial, start_idx=0, metric_scale=0.0
 )
 
 # Full 6D phase-space distance
-config_phase = lfw.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = lfw.walk_local_flow(
+config_phase = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
+result = pcf.walk_local_flow(
     pos, vel, config=config_phase, start_idx=0, metric_scale=1.0
 )
 ```
@@ -146,7 +168,7 @@ You can define custom metrics by subclassing `AbstractDistanceMetric`:
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from localflowwalk.metrics import AbstractDistanceMetric
+from phasecurvefit.metrics import AbstractDistanceMetric
 
 
 class WeightedPhaseSpaceMetric(AbstractDistanceMetric):
@@ -166,12 +188,12 @@ class WeightedPhaseSpaceMetric(AbstractDistanceMetric):
 
 
 # Use custom metric via WalkConfig
-config = lfw.WalkConfig(metric=WeightedPhaseSpaceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+config = pcf.WalkConfig(metric=WeightedPhaseSpaceMetric())
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 See the
-[Metrics Guide](https://localflowwalk.readthedocs.io/en/latest/guides/metrics.html)
+[Metrics Guide](https://phasecurvefit.readthedocs.io/en/latest/guides/metrics.html)
 for more details and examples.
 
 ## KD-tree Strategy
@@ -181,7 +203,7 @@ neighbor selection:
 
 ```python
 # Install optional dependency first:
-# pip install localflowwalk[kdtree]
+# pip install phasecurvefit[kdtree]
 
 import jax.numpy as jnp
 
@@ -190,6 +212,6 @@ pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Use KD-tree strategy and query 2 spatial neighbors per step
-config = lfw.WalkConfig(strategy=lfw.strats.KDTree(k=2))
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2))
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```

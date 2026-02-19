@@ -1,6 +1,6 @@
 """Benchmarks for walk_local_flow function."""
 
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 
 class TestWalkLocalFlowBenchmarks:
@@ -9,38 +9,38 @@ class TestWalkLocalFlowBenchmarks:
     def test_walk_local_flow_simple_2d(self, benchmark, simple_2d_stream):
         """Benchmark walk_local_flow on 50-point 2D stream."""
         pos, vel = simple_2d_stream
-        result = benchmark(lfw.walk_local_flow, pos, vel, start_idx=0, metric_scale=1.0)
+        result = benchmark(pcf.walk_local_flow, pos, vel, start_idx=0, metric_scale=1.0)
         assert result.indices.shape == (50,)
 
     def test_walk_local_flow_medium_2d(self, benchmark, medium_2d_stream):
         """Benchmark walk_local_flow on 100-point 2D stream."""
         pos, vel = medium_2d_stream
-        result = benchmark(lfw.walk_local_flow, pos, vel, start_idx=0, metric_scale=1.0)
+        result = benchmark(pcf.walk_local_flow, pos, vel, start_idx=0, metric_scale=1.0)
         assert result.indices.shape == (100,)
 
     def test_walk_local_flow_large_2d(self, benchmark, large_2d_stream):
         """Benchmark walk_local_flow on 500-point 2D stream."""
         pos, vel = large_2d_stream
-        result = benchmark(lfw.walk_local_flow, pos, vel, start_idx=0, metric_scale=1.0)
+        result = benchmark(pcf.walk_local_flow, pos, vel, start_idx=0, metric_scale=1.0)
         assert result.indices.shape == (500,)
 
     def test_walk_local_flow_simple_3d(self, benchmark, simple_3d_stream):
         """Benchmark walk_local_flow on 50-point 3D stream."""
         pos, vel = simple_3d_stream
-        result = benchmark(lfw.walk_local_flow, pos, vel, start_idx=0, metric_scale=1.0)
+        result = benchmark(pcf.walk_local_flow, pos, vel, start_idx=0, metric_scale=1.0)
         assert result.indices.shape == (50,)
 
     def test_walk_local_flow_spatial_only(self, benchmark, simple_2d_stream):
         """Benchmark walk_local_flow with spatial metric only (metric_scale=0)."""
         pos, vel = simple_2d_stream
-        result = benchmark(lfw.walk_local_flow, pos, vel, start_idx=0, metric_scale=0.0)
+        result = benchmark(pcf.walk_local_flow, pos, vel, start_idx=0, metric_scale=0.0)
         assert result.indices.shape == (50,)
 
     def test_walk_local_flow_high_momentum_weight(self, benchmark, simple_2d_stream):
         """Benchmark walk_local_flow with high momentum weight (metric_scale=10)."""
         pos, vel = simple_2d_stream
         result = benchmark(
-            lfw.walk_local_flow, pos, vel, start_idx=0, metric_scale=10.0
+            pcf.walk_local_flow, pos, vel, start_idx=0, metric_scale=10.0
         )
         assert result.indices.shape == (50,)
 
@@ -48,6 +48,6 @@ class TestWalkLocalFlowBenchmarks:
         """Benchmark walk_local_flow starting from different point."""
         pos, vel = simple_2d_stream
         result = benchmark(
-            lfw.walk_local_flow, pos, vel, start_idx=25, metric_scale=1.0
+            pcf.walk_local_flow, pos, vel, start_idx=25, metric_scale=1.0
         )
         assert result.indices.shape == (50,)

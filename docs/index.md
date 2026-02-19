@@ -2,7 +2,7 @@
 sd_hide_title: true
 ---
 
-<h1> <code> localflowwalk </code> </h1>
+<h1> <code> phasecurvefit </code> </h1>
 
 ```{toctree}
 :maxdepth: 1
@@ -42,7 +42,7 @@ contributing
 
 # 🚀 Get Started
 
-**localflowwalk** is a Python library for constructing a single, ordered walk
+**phasecurvefit** is a Python library for constructing a single, ordered walk
 through phase-space data. It was originally built for stellar stream
 simulations but is general-purpose and applies to any dataset where you want to
 order observations by proximity and momentum in phase-space.
@@ -62,7 +62,7 @@ This is particularly useful for coherent trajectories in phase-space, such as st
 :::{tab-item} pip
 
 ```bash
-pip install localflowwalk
+pip install phasecurvefit
 ```
 
 :::
@@ -70,7 +70,33 @@ pip install localflowwalk
 :::{tab-item} uv
 
 ```bash
-uv add localflowwalk
+uv add phasecurvefit
+```
+
+:::
+
+:::{tab-item} source, via uv
+
+To install the latest development version of `phasecurvefit` directly from the
+GitHub repository, use uv:
+
+```bash
+uv add git+https://github.com/GalacticDynamics/phasecurvefit.git@main
+```
+
+You can customize the branch by replacing `main` with any other branch name.
+
+:::
+
+:::{tab-item} building from source
+
+To build `phasecurvefit` from source, clone the repository and install it with uv:
+
+```bash
+cd /path/to/parent
+git clone https://github.com/GalacticDynamics/phasecurvefit.git
+cd phasecurvefit
+uv pip install -e .  # editable mode
 ```
 
 :::
@@ -81,7 +107,7 @@ uv add localflowwalk
 
 ```python
 import jax.numpy as jnp
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 # Define phase-space data as dictionaries
 position = {
@@ -94,7 +120,7 @@ velocity = {
 }
 
 # Run the algorithm
-result = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+result = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
 
 result.indices
 # Array([0, 1, 2, 3])
@@ -148,10 +174,10 @@ For the mathematical background on momentum-weighted ordering, refer to the [NN+
 Example using KD-tree:
 
 ```python
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
-config = lfw.WalkConfig(strategy=lfw.strats.KDTree(k=2))
-result = lfw.walk_local_flow(position, velocity, config=config)
+config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2))
+result = pcf.walk_local_flow(position, velocity, config=config)
 ```
 
 ## Data Format

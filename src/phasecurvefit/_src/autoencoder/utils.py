@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Bool, Float, PRNGKeyArray, Shaped
 
-from localflowwalk._src.custom_types import FSz0
+from phasecurvefit._src.custom_types import FSz0
 
 
 def masked_mean(arr: Float[Array, " N"], mask: Bool[Array, " N"]) -> FSz0:

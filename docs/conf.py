@@ -22,14 +22,14 @@ sys.path.insert(0, str(_repo_root / "src"))
 
 # Import version
 try:
-    from localflowwalk._version import version as __version__
+    from phasecurvefit._version import version as __version__
 except ImportError:
     __version__ = "0.1.0"
 
 # -- Project information -----------------------------------------------------
 
-author = "localflowwalk Developers"
-project = "localflowwalk"
+author = "phasecurvefit Developers"
+project = "phasecurvefit"
 copyright = f"{datetime.now(pytz.timezone('UTC')).year}, {author}"
 version = __version__
 
@@ -158,7 +158,7 @@ myst_substitutions = {
 # -- HTML output -------------------------------------------------
 
 html_theme = "sphinx_book_theme"
-html_title = "localflowwalk"
+html_title = "phasecurvefit"
 html_copy_source = True
 html_favicon = "_static/favicon.png"
 html_logo = "_static/favicon.png"
@@ -168,7 +168,7 @@ html_css_files = []
 
 html_theme_options: dict[str, Any] = {
     "home_page_in_toc": True,
-    "repository_url": "https://github.com/nstarman/nearest-neighbours-with-momentum",
+    "repository_url": "https://github.com/GalacticDynamics/phasecurvefit",
     "repository_branch": "main",
     "path_to_docs": "docs",
     "use_repository_button": True,
@@ -178,13 +178,13 @@ html_theme_options: dict[str, Any] = {
     "icon_links": [
         {
             "name": "GitHub",
-            "url": "https://github.com/nstarman/nearest-neighbours-with-momentum",
+            "url": "https://github.com/GalacticDynamics/phasecurvefit",
             "icon": "fa-brands fa-github",
         },
         {
             "name": "PyPI",
-            "url": "https://pypi.org/project/localflowwalk/",
-            "icon": "https://img.shields.io/pypi/v/localflowwalk",
+            "url": "https://pypi.org/project/phasecurvefit/",
+            "icon": "https://img.shields.io/pypi/v/phasecurvefit",
             "type": "url",
         },
     ],

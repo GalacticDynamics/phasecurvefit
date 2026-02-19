@@ -26,8 +26,8 @@ from .order_net import (
 )
 from .track_net import TrackNet, TrackTrainingConfig, decoder_loss, train_track_net
 from .utils import shuffle_and_batch
-from localflowwalk._src.algorithm import LocalFlowWalkResult
-from localflowwalk._src.custom_types import FLikeSz0, FSz0, FSzN, VectorComponents
+from phasecurvefit._src.algorithm import LocalFlowWalkResult
+from phasecurvefit._src.custom_types import FLikeSz0, FSz0, FSzN, VectorComponents
 
 Gamma: TypeAlias = FSzN  # noqa: UP040
 

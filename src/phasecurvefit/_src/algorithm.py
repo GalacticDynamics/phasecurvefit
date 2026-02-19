@@ -6,7 +6,7 @@ coherent trajectories through phase-space.
 Examples
 --------
 >>> import jax.numpy as jnp
->>> import localflowwalk as lfw
+>>> import phasecurvefit as pcf
 
 Create some example phase-space data:
 
@@ -253,7 +253,7 @@ def walk_local_flow(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> import localflowwalk as lfw
+    >>> import phasecurvefit as pcf
 
     Create phase-space data for a simple stream:
 
@@ -268,13 +268,13 @@ def walk_local_flow(
 
     Run the algorithm starting from index 0:
 
-    >>> result = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=0.5)
+    >>> result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=0.5)
     >>> result.ordering
     Array([0, 1, 2, 3, 4], dtype=int32)
 
     Walk in the backward direction:
 
-    >>> result_backward = lfw.walk_local_flow(
+    >>> result_backward = pcf.walk_local_flow(
     ...     pos, vel, start_idx=4, metric_scale=0.5, direction="backward"
     ... )
     >>> result_backward.indices
@@ -452,11 +452,11 @@ def order_w(res: LocalFlowWalkResult, /) -> tuple[VectorComponents, VectorCompon
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> import localflowwalk as lfw
+    >>> import phasecurvefit as pcf
     >>> pos = {"x": jnp.array([3.0, 1.0, 2.0])}
     >>> vel = {"x": jnp.array([1.0, 1.0, 1.0])}
-    >>> result = lfw.walk_local_flow(pos, vel, start_idx=1, metric_scale=0.0)
-    >>> ordered_pos, ordered_vel = lfw.order_w(result)
+    >>> result = pcf.walk_local_flow(pos, vel, start_idx=1, metric_scale=0.0)
+    >>> ordered_pos, ordered_vel = pcf.order_w(result)
 
     """
     # Filter out -1 (unvisited) indices
@@ -547,7 +547,7 @@ def combine_flow_walks(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> import localflowwalk as lfw
+    >>> import phasecurvefit as pcf
 
     Create phase-space data for a stream extending in both directions:
 
@@ -562,14 +562,14 @@ def combine_flow_walks(
 
     Run forward and backward walks from the middle:
 
-    >>> result_fwd = lfw.walk_local_flow(pos, vel, start_idx=2, metric_scale=0.5)
-    >>> result_bwd = lfw.walk_local_flow(
+    >>> result_fwd = pcf.walk_local_flow(pos, vel, start_idx=2, metric_scale=0.5)
+    >>> result_bwd = pcf.walk_local_flow(
     ...     pos, vel, start_idx=2, metric_scale=0.5, direction="backward"
     ... )
 
     Combine the results:
 
-    >>> result = lfw.combine_flow_walks(result_fwd, result_bwd)
+    >>> result = pcf.combine_flow_walks(result_fwd, result_bwd)
     >>> result.indices
     Array([4, 3, 0, 1, 2], dtype=int32)
 

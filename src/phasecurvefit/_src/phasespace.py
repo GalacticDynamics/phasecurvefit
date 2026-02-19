@@ -33,7 +33,7 @@ For arrays of points, use vmap:
 >>> pos_array = {"x": jnp.array([1.0, 2.0, 3.0]), "y": jnp.array([4.0, 5.0, 6.0])}
 >>> vel_array = {"x": jnp.array([0.1, 0.2, 0.3]), "y": jnp.array([0.4, 0.5, 0.6])}
 >>> # Use vmap to compute norms for all points:
->>> from localflowwalk._src.phasespace import velocity_norm
+>>> from phasecurvefit._src.phasespace import velocity_norm
 >>> jax.vmap(velocity_norm)(vel_array)
 Array([0.41231057, 0.53851646, 0.6708204 ], dtype=float32)
 
