@@ -24,7 +24,7 @@ uv add phasecurvefit
   <summary>from source, using uv</summary>
 
 ```bash
-uv add git+https://https://github.com/GalacticDynamics/phasecurvefit.git@main
+uv add git+https://github.com/GalacticDynamics/phasecurvefit.git@main
 ```
 
 You can customize the branch by replacing `main` with any other branch name.
@@ -35,7 +35,7 @@ You can customize the branch by replacing `main` with any other branch name.
 
 ```bash
 cd /path/to/parent
-git clone https://https://github.com/GalacticDynamics/phasecurvefit.git
+git clone https://github.com/GalacticDynamics/phasecurvefit.git
 cd phasecurvefit
 uv pip install -e .  # editable mode
 ```

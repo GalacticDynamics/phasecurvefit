@@ -81,7 +81,7 @@ To install the latest development version of `phasecurvefit` directly from the
 GitHub repository, use uv:
 
 ```bash
-uv add git+https://https://github.com/GalacticDynamics/phasecurvefit.git@main
+uv add git+https://github.com/GalacticDynamics/phasecurvefit.git@main
 ```
 
 You can customize the branch by replacing `main` with any other branch name.
@@ -94,7 +94,7 @@ To build `phasecurvefit` from source, clone the repository and install it with u
 
 ```bash
 cd /path/to/parent
-git clone https://https://github.com/GalacticDynamics/phasecurvefit.git
+git clone https://github.com/GalacticDynamics/phasecurvefit.git
 cd phasecurvefit
 uv pip install -e .  # editable mode
 ```
