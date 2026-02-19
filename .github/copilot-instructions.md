@@ -52,7 +52,7 @@ import unxt as u
 
 pos = {"x": u.Q([0, 1, 2], "kpc"), "y": u.Q([0, 0.5, 1], "kpc")}
 vel = {"x": u.Q([1, 1, 1], "km/s"), "y": u.Q([0.5, 0.5, 0.5], "km/s")}
-result = lfw.walk_local_flow(pos, vel, start_idx=0, lam=u.Q(1.0, "kpc"))
+result = pcf.walk_local_flow(pos, vel, start_idx=0, lam=u.Q(1.0, "kpc"))
 ```
 
 ## Folder Structure

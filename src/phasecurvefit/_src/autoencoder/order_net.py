@@ -26,7 +26,7 @@ from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
 from .scanmlp import ScanOverMLP
 from .utils import masked_mean, shuffle_and_batch
-from localflowwalk._src.custom_types import FSz0, FSzN
+from phasecurvefit._src.custom_types import FSz0, FSzN
 
 
 class OrderingNet(eqx.Module):
@@ -241,7 +241,7 @@ def compute_loss(
     --------
     >>> import jax
     >>> import jax.numpy as jnp
-    >>> from localflowwalk.nn import OrderingNet
+    >>> from phasecurvefit.nn import OrderingNet
 
     >>> key = jax.random.key(0)
     >>> net = OrderingNet(in_size=4, key=key)

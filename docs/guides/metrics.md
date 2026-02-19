@@ -15,14 +15,14 @@ strategy (discussed in a separate guide):
 
 ```python
 import jax.numpy as jnp
-import localflowwalk as lfw
-from localflowwalk.metrics import FullPhaseSpaceDistanceMetric
+import phasecurvefit as pcf
+from phasecurvefit.metrics import FullPhaseSpaceDistanceMetric
 
 pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
-config = lfw.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+config = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 ## Built-in Metrics
@@ -47,11 +47,11 @@ where $d_0$ is the Euclidean distance between positions. The `metric_scale` para
 **Usage:**
 
 ```python
-from localflowwalk.metrics import SpatialDistanceMetric
+from phasecurvefit.metrics import SpatialDistanceMetric
 
 # Pure nearest-neighbor search in position space
-config = lfw.WalkConfig(metric=SpatialDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=0.0)
+config = pcf.WalkConfig(metric=SpatialDistanceMetric())
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=0.0)
 ```
 
 ### AlignedMomentumDistanceMetric
@@ -77,15 +77,15 @@ This metric combines spatial proximity with velocity alignment. Points that lie 
 
 ```python
 import jax.numpy as jnp
-import localflowwalk as lfw
-from localflowwalk.metrics import AlignedMomentumDistanceMetric
+import phasecurvefit as pcf
+from phasecurvefit.metrics import AlignedMomentumDistanceMetric
 
 pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Aligned momentum metric
-config = lfw.WalkConfig(metric=AlignedMomentumDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+config = pcf.WalkConfig(metric=AlignedMomentumDistanceMetric())
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 ### FullPhaseSpaceDistanceMetric
@@ -118,12 +118,12 @@ Unlike `AlignedMomentumDistanceMetric`, this metric has no directional bias from
 **Usage:**
 
 ```python
-from localflowwalk.metrics import FullPhaseSpaceDistanceMetric
+from phasecurvefit.metrics import FullPhaseSpaceDistanceMetric
 
 # Full 6D phase-space distance (this is the default)
 # metric_scale represents a time scale (e.g., if pos ~ kpc, vel ~ kpc/Myr, metric_scale ~ Myr)
-config = lfw.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+config = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 **Comparison with momentum metric:**
@@ -146,7 +146,7 @@ All metrics must inherit from `AbstractDistanceMetric` and implement the `__call
 
 ```python
 import equinox as eqx
-from localflowwalk.metrics import AbstractDistanceMetric
+from phasecurvefit.metrics import AbstractDistanceMetric
 
 
 class CustomMetric(AbstractDistanceMetric):
@@ -166,7 +166,7 @@ Here's a complete example of a metric that computes full 6D Cartesian distance:
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from localflowwalk.metrics import AbstractDistanceMetric
+from phasecurvefit.metrics import AbstractDistanceMetric
 
 
 class Full6DMetric(AbstractDistanceMetric):
@@ -202,8 +202,8 @@ class Full6DMetric(AbstractDistanceMetric):
 pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
-config = lfw.WalkConfig(metric=Full6DMetric())
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+config = pcf.WalkConfig(metric=Full6DMetric())
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 ```
 
 ### Example: Weighted Position Metric
@@ -231,8 +231,8 @@ class WeightedPositionMetric(AbstractDistanceMetric):
 
 # Use with custom weights (ignore y-coordinate)
 metric = WeightedPositionMetric(weights={"x": 1.0, "y": 0.1})
-config = lfw.WalkConfig(metric=metric)
-result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=0.0)
+config = pcf.WalkConfig(metric=metric)
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=0.0)
 ```
 
 ## Units and Metrics
@@ -241,7 +241,7 @@ When using physical units via `unxt`, ensure your metric correctly handles unit 
 
 ```python
 import unxt as u
-from localflowwalk.metrics import (
+from phasecurvefit.metrics import (
     AlignedMomentumDistanceMetric,
     FullPhaseSpaceDistanceMetric,
 )
@@ -251,8 +251,8 @@ pos = {"x": u.Q([0.0, 1.0, 2.0], "kpc"), "y": u.Q([0.0, 0.5, 1.0], "kpc")}
 vel = {"x": u.Q([1.0, 1.0, 1.0], "km/s"), "y": u.Q([0.5, 0.5, 0.5], "km/s")}
 
 # metric_scale must have units of distance for AlignedMomentumDistanceMetric
-config = lfw.WalkConfig(metric=AlignedMomentumDistanceMetric())
-result = lfw.walk_local_flow(
+config = pcf.WalkConfig(metric=AlignedMomentumDistanceMetric())
+result = pcf.walk_local_flow(
     pos,
     vel,
     config=config,
@@ -262,8 +262,8 @@ result = lfw.walk_local_flow(
 )
 
 # For FullPhaseSpaceDistanceMetric, metric_scale has units of time
-config_6d = lfw.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result_6d = lfw.walk_local_flow(
+config_6d = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
+result_6d = pcf.walk_local_flow(
     pos,
     vel,
     config=config_6d,
@@ -296,8 +296,8 @@ Here's a comparison of different metrics on the same data:
 
 ```python
 import jax.numpy as jnp
-import localflowwalk as lfw
-from localflowwalk.metrics import (
+import phasecurvefit as pcf
+from phasecurvefit.metrics import (
     AlignedMomentumDistanceMetric,
     SpatialDistanceMetric,
 )
@@ -320,8 +320,8 @@ metrics = {
 }
 
 for name, metric in metrics.items():
-    config = lfw.WalkConfig(metric=metric)
-    result = lfw.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+    config = pcf.WalkConfig(metric=metric)
+    result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
     n_visited = len([i for i in result.indices if i >= 0])
     print(f"{name}: {n_visited}/100 points ordered")
 ```

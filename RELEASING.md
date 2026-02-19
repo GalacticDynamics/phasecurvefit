@@ -1,4 +1,4 @@
-# Release Process for localflowwalk
+# Release Process for phasecurvefit
 
 This package uses **uv** for dependency management and **hatch-vcs** for
 automatic version detection from git tags.
@@ -44,8 +44,7 @@ When you tag a commit:
    ```
 
 3. **Create a GitHub Release:**
-   - Go to
-     https://github.com/GalacticDynamics/nearest-neighbours-with-momentum/releases/new
+   - Go to https://github.com/GalacticDynamics/phasecurvefit/releases/new
    - Choose or create the tag `v0.1.0`
    - Fill in release notes
    - Publish the release

@@ -21,7 +21,7 @@ import numpy as np
 import quaxed.numpy as jnp
 import unxt as u
 
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 
 def make_self_intersecting_stream(
@@ -129,14 +129,14 @@ def main(
 
     # Perform local flow walk
     print("Performing local flow walk...")
-    config = lfw.WalkConfig(
-        strategy=lfw.strats.KDTree(k=60),
-        metric=lfw.metrics.FullPhaseSpaceDistanceMetric(),
+    config = pcf.WalkConfig(
+        strategy=pcf.strats.KDTree(k=60),
+        metric=pcf.metrics.FullPhaseSpaceDistanceMetric(),
     )
     metric_scale = u.Q(4, "s")
     max_dist = u.Q(40, "m")
 
-    walkresult = lfw.walk_local_flow(
+    walkresult = pcf.walk_local_flow(
         qs,
         ps,
         start_idx=start_idx,
@@ -144,15 +144,15 @@ def main(
         max_dist=max_dist,
         config=config,
         direction="forward",
-        metadata=lfw.StateMetadata(usys=usys),
+        metadata=pcf.StateMetadata(usys=usys),
     )
 
     # Train autoencoder
     print("Training autoencoder...")
     key, model_key, train_key = jr.split(key, 3)
-    normalizer = lfw.nn.StandardScalerNormalizer(qs, ps)
-    model = lfw.nn.PathAutoencoder.make(normalizer, track_depth=4, key=model_key)
-    model, _, losses = lfw.nn.train_autoencoder(model, walkresult, key=train_key)
+    normalizer = pcf.nn.StandardScalerNormalizer(qs, ps)
+    model = pcf.nn.PathAutoencoder.make(normalizer, track_depth=4, key=model_key)
+    model, _, losses = pcf.nn.train_autoencoder(model, walkresult, key=train_key)
     print(f"Final training loss: {losses[-1]:.6f}")
 
     # Encode all points and get mean path

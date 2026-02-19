@@ -14,7 +14,7 @@ Examples
 --------
 >>> import jax.numpy as jnp
 >>> import unxt as u
->>> from localflowwalk._src.phasespace import euclidean_distance
+>>> from phasecurvefit._src.phasespace import euclidean_distance
 
 With Quantity-valued components:
 
@@ -43,11 +43,11 @@ import unxt as u
 from unxt import AbstractQuantity as AbcQ
 from unxt.quantity import AllowValue
 
-from localflowwalk._src import algorithm, phasespace
-from localflowwalk._src.algorithm import Direction, LocalFlowWalkResult, StateMetadata
-from localflowwalk._src.autoencoder.normalize import StandardScalerNormalizer
-from localflowwalk._src.custom_types import VectorComponents
-from localflowwalk._src.query_config import WalkConfig
+from phasecurvefit._src import algorithm, phasespace
+from phasecurvefit._src.algorithm import Direction, LocalFlowWalkResult, StateMetadata
+from phasecurvefit._src.autoencoder.normalize import StandardScalerNormalizer
+from phasecurvefit._src.custom_types import VectorComponents
+from phasecurvefit._src.query_config import WalkConfig
 
 RQSz0: TypeAlias = Real[AbcQ, " "]  # noqa: UP040
 ScalarQComponents: TypeAlias = Mapping[str, RQSz0]  # noqa: UP040

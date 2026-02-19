@@ -72,7 +72,7 @@ Example:
 
 ```python
 import jax.numpy as jnp
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 
 def test_basic_ordering():
@@ -80,7 +80,7 @@ def test_basic_ordering():
     position = {"x": jnp.array([0.0, 1.0, 2.0])}
     velocity = {"x": jnp.array([1.0, 1.0, 1.0])}
 
-    result = lfw.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+    result = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
 
     assert jnp.array_equal(result.indices, jnp.array([0, 1, 2]))
 ```

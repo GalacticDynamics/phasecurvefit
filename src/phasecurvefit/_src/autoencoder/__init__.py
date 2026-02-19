@@ -27,25 +27,25 @@ Examples
 --------
 >>> import jax
 >>> import jax.numpy as jnp
->>> import localflowwalk as lfw
+>>> import phasecurvefit as pcf
 
 Create phase-space data and run phase-flow walk:
 
 >>> pos = {"x": jnp.linspace(0, 5, 20), "y": jnp.sin(jnp.linspace(0, jnp.pi, 20))}
 >>> vel = {"x": jnp.ones(20), "y": jnp.cos(jnp.linspace(0, jnp.pi, 20))}
->>> walkresult = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+>>> walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
 Train autoencoder to interpolate skipped tracers:
 
 >>> keys = jax.random.split(jax.random.key(0), 2)
->>> normalizer = lfw.nn.StandardScalerNormalizer(pos, vel)
->>> ae = lfw.nn.PathAutoencoder.make(normalizer, key=keys[0])
->>> cfg = lfw.nn.TrainingConfig(n_epochs_both=100, show_pbar=False)
->>> ae, *_ = lfw.nn.train_autoencoder(ae, walkresult, config=cfg, key=keys[1])
+>>> normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+>>> ae = pcf.nn.PathAutoencoder.make(normalizer, key=keys[0])
+>>> cfg = pcf.nn.TrainingConfig(n_epochs_both=100, show_pbar=False)
+>>> ae, *_ = pcf.nn.train_autoencoder(ae, walkresult, config=cfg, key=keys[1])
 
 Predict $\gamma$ for all tracers (including skipped ones):
 
->>> result = lfw.nn.fill_ordering_gaps(ae, walkresult)
+>>> result = pcf.nn.fill_ordering_gaps(ae, walkresult)
 >>> result
 AutoencoderResult(gamma=Array([...], dtype=float32),
                   membership_prob=Array([...], dtype=float32),
@@ -103,8 +103,8 @@ from .order_net import (
     train_ordering_net,
 )
 from .track_net import TrackNet, decoder_loss
-from localflowwalk._src.algorithm import LocalFlowWalkResult
-from localflowwalk._src.custom_types import FSzN, ISzN, VectorComponents
+from phasecurvefit._src.algorithm import LocalFlowWalkResult
+from phasecurvefit._src.custom_types import FSzN, ISzN, VectorComponents
 
 # ===================================================================
 
@@ -166,16 +166,16 @@ def fill_ordering_gaps(
     --------
     >>> import jax
     >>> import jax.numpy as jnp
-    >>> import localflowwalk as lfw
+    >>> import phasecurvefit as pcf
 
     >>> pos = {"x": jnp.linspace(0, 5, 20), "y": jnp.zeros(20)}
     >>> vel = {"x": jnp.ones(20), "y": jnp.zeros(20)}
-    >>> result = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+    >>> result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
     >>> keys = jax.random.split(jax.random.key(0), 2)
-    >>> ae = lfw.nn.PathAutoencoder.make(normalizer, key=keys[0])
-    >>> cfg = lfw.nn.TrainingConfig(show_pbar=False)
-    >>> ae, *_ = lfw.nn.train_autoencoder(ae, result, config=cfg, key=keys[1])
-    >>> full_ordering = lfw.nn.fill_ordering_gaps(ae, result)
+    >>> ae = pcf.nn.PathAutoencoder.make(normalizer, key=keys[0])
+    >>> cfg = pcf.nn.TrainingConfig(show_pbar=False)
+    >>> ae, *_ = pcf.nn.train_autoencoder(ae, result, config=cfg, key=keys[1])
+    >>> full_ordering = pcf.nn.fill_ordering_gaps(ae, result)
 
     """
     q, p = lfw_result.positions, lfw_result.velocities

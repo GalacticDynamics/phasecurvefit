@@ -2,7 +2,7 @@
 
 import jax.numpy as jnp
 
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 
 class TestAutoencoderTrainingBenchmarks:
@@ -15,11 +15,11 @@ class TestAutoencoderTrainingBenchmarks:
 
         Trains both ordering net (encoder) and track net (decoder).
         """
-        config = lfw.nn.TrainingConfig(
+        config = pcf.nn.TrainingConfig(
             n_epochs_encoder=10, n_epochs_both=10, show_pbar=False
         )
         trained, _, losses = benchmark(
-            lfw.nn.train_autoencoder,
+            pcf.nn.train_autoencoder,
             simple_autoencoder,
             simple_wlf_result,
             config=config,
@@ -34,11 +34,11 @@ class TestAutoencoderTrainingBenchmarks:
         self, benchmark, medium_autoencoder, medium_wlf_result, rng_key
     ):
         """Benchmark full autoencoder training on 100-point stream."""
-        config = lfw.nn.TrainingConfig(
+        config = pcf.nn.TrainingConfig(
             n_epochs_encoder=20, n_epochs_both=20, show_pbar=False
         )
         trained, _, losses = benchmark(
-            lfw.nn.train_autoencoder,
+            pcf.nn.train_autoencoder,
             medium_autoencoder,
             medium_wlf_result,
             config=config,
@@ -53,11 +53,11 @@ class TestAutoencoderTrainingBenchmarks:
         self, benchmark, simple_autoencoder, simple_wlf_result, rng_key
     ):
         """Benchmark full autoencoder training with many epochs."""
-        config = lfw.nn.TrainingConfig(
+        config = pcf.nn.TrainingConfig(
             n_epochs_encoder=50, n_epochs_both=50, show_pbar=False
         )
         trained, _, losses = benchmark(
-            lfw.nn.train_autoencoder,
+            pcf.nn.train_autoencoder,
             simple_autoencoder,
             simple_wlf_result,
             config=config,
@@ -75,7 +75,7 @@ class TestAutoencoderTrainingBenchmarks:
 
         This is phase 1 of the full training pipeline.
         """
-        config = lfw.nn.OrderingTrainingConfig(n_epochs=5, show_pbar=False)
+        config = pcf.nn.OrderingTrainingConfig(n_epochs=5, show_pbar=False)
         ordering_net = simple_autoencoder.encoder
 
         # Prepare training data
@@ -100,7 +100,7 @@ class TestAutoencoderTrainingBenchmarks:
         x_feat = jnp.concatenate([ordered_pos_norm, ordered_vel_norm], axis=1)
 
         trained, _, losses = benchmark(
-            lfw.nn.train_ordering_net,
+            pcf.nn.train_ordering_net,
             ordering_net,
             x_feat,
             jnp.arange(len(x_feat)),
@@ -118,13 +118,13 @@ class TestAutoencoderTrainingBenchmarks:
 
         The decoder is trained as part of the full training pipeline.
         """
-        config = lfw.nn.TrainingConfig(
+        config = pcf.nn.TrainingConfig(
             n_epochs_encoder=5, n_epochs_both=5, show_pbar=False
         )
 
         # Train full autoencoder to get decoder training
         trained, _, _ = benchmark(
-            lfw.nn.train_autoencoder,
+            pcf.nn.train_autoencoder,
             simple_autoencoder,
             simple_wlf_result,
             config=config,

@@ -17,7 +17,7 @@ from jaxtyping import Array, Bool, Float, PRNGKeyArray, Real
 from .order_net import default_optimizer
 from .scanmlp import ScanOverMLP
 from .utils import masked_mean, shuffle_and_batch
-from localflowwalk._src.custom_types import FSz0, RSz0, RSzN
+from phasecurvefit._src.custom_types import FSz0, RSz0, RSzN
 
 
 class TrackNet(eqx.Module):

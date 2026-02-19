@@ -1,6 +1,6 @@
 """Benchmarks for data normalization."""
 
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 
 class TestNormalizerBenchmarks:
@@ -9,19 +9,19 @@ class TestNormalizerBenchmarks:
     def test_normalizer_creation_simple(self, benchmark, simple_2d_stream):
         """Benchmark StandardScalerNormalizer creation."""
         pos, vel = simple_2d_stream
-        normalizer = benchmark(lfw.nn.StandardScalerNormalizer, pos, vel)
+        normalizer = benchmark(pcf.nn.StandardScalerNormalizer, pos, vel)
         assert normalizer is not None
 
     def test_normalizer_creation_medium(self, benchmark, medium_2d_stream):
         """Benchmark StandardScalerNormalizer on medium dataset."""
         pos, vel = medium_2d_stream
-        normalizer = benchmark(lfw.nn.StandardScalerNormalizer, pos, vel)
+        normalizer = benchmark(pcf.nn.StandardScalerNormalizer, pos, vel)
         assert normalizer is not None
 
     def test_normalizer_normalization_simple(self, benchmark, simple_2d_stream):
         """Benchmark normalization operations."""
         pos, vel = simple_2d_stream
-        normalizer = lfw.nn.StandardScalerNormalizer(pos, vel)
+        normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
 
         normalized_pos, normalized_vel = benchmark(normalizer.transform, pos, vel)
 

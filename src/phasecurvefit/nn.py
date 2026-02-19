@@ -12,17 +12,17 @@ Examples
 --------
 >>> import jax
 >>> import jax.numpy as jnp
->>> import localflowwalk as lfw
+>>> import phasecurvefit as pcf
 
 >>> pos = {"x": jnp.linspace(0, 5, 20), "y": jnp.zeros(20)}
 >>> vel = {"x": jnp.ones(20), "y": jnp.zeros(20)}
->>> result = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+>>> result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
 >>> keys = jax.random.split(jax.random.key(0), 2)
->>> normalizer = lfw.nn.StandardScalerNormalizer(pos, vel)
->>> ae = lfw.nn.PathAutoencoder.make(normalizer=normalizer, key=keys[0])
->>> cfg = lfw.nn.TrainingConfig(n_epochs_both=100, show_pbar=False)
->>> ae, *_ = lfw.nn.train_autoencoder(ae, result, config=cfg, key=keys[1])
+>>> normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+>>> ae = pcf.nn.PathAutoencoder.make(normalizer=normalizer, key=keys[0])
+>>> cfg = pcf.nn.TrainingConfig(n_epochs_both=100, show_pbar=False)
+>>> ae, *_ = pcf.nn.train_autoencoder(ae, result, config=cfg, key=keys[1])
 
 """
 

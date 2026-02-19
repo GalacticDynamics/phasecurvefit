@@ -3,14 +3,14 @@
 import jax.numpy as jnp
 import pytest
 
-import localflowwalk as lfw
+import phasecurvefit as pcf
 
 
 @pytest.mark.parametrize(
     "config",
     [
-        lfw.WalkConfig(strategy=lfw.BruteForce()),
-        lfw.WalkConfig(strategy=lfw.strats.KDTree(k=2)),
+        pcf.WalkConfig(strategy=pcf.BruteForce()),
+        pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2)),
     ],
 )
 def test_walk_local_flow_kdtree_matches_bruteforce(config):
@@ -23,7 +23,7 @@ def test_walk_local_flow_kdtree_matches_bruteforce(config):
         "y": jnp.array([0.2, 0.2, 0.2, 0.2]),
     }
 
-    res = lfw.walk_local_flow(pos, vel, start_idx=0, metric_scale=0.5, config=config)
+    res = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=0.5, config=config)
     # For this simple dataset, both strategies should visit all points in order
     assert res.all_visited
     assert (res.indices == jnp.array([0, 1, 2, 3])).all()
@@ -40,20 +40,20 @@ def test_walk_local_flow_kdtree_k_parameter():
     }
 
     # Run with KD-tree using small k
-    res_small = lfw.walk_local_flow(
+    res_small = pcf.walk_local_flow(
         pos,
         vel,
         start_idx=0,
         metric_scale=0.5,
-        config=lfw.WalkConfig(strategy=lfw.strats.KDTree(k=3)),
+        config=pcf.WalkConfig(strategy=pcf.strats.KDTree(k=3)),
     )
     # Run with KD-tree using larger k
-    res_large = lfw.walk_local_flow(
+    res_large = pcf.walk_local_flow(
         pos,
         vel,
         start_idx=0,
         metric_scale=0.5,
-        config=lfw.WalkConfig(strategy=lfw.strats.KDTree(k=8)),
+        config=pcf.WalkConfig(strategy=pcf.strats.KDTree(k=8)),
     )
 
     # Both should produce valid ordered results
