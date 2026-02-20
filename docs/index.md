@@ -37,6 +37,7 @@ api/index
 :hidden:
 :caption: More
 
+paper
 contributing
 ```
 
@@ -147,7 +148,7 @@ Localflowwalk constructs a **single ordered walk** through your phase-space data
 
 The library ships with multiple built-in metrics (e.g., momentum-weighted, spatial-only), and you can implement custom metrics for domain-specific use cases. See the [Metrics Guide](guides/metrics) for full details and examples.
 
-For the mathematical background on momentum-weighted ordering, refer to the [NN+p paper](https://arxiv.org/abs/2201.12042).
+For the mathematical background on momentum-weighted ordering, refer to the [NN+p paper](https://ui.adsabs.harvard.edu/abs/2022ApJ...940...22N/abstract).
 
 ## Configuration Options
 
@@ -214,7 +215,7 @@ This dict-based API is designed for:
 The core algorithm originates from Nibauer et al. (2022). If you use **momentum-weighted ordering** or reference the original work in your research, please cite:
 
 ```bibtex
-@article{nibauer2022charting,
+@article{Nibauer2022,
   title={Charting Galactic Accelerations with Stellar Streams and Machine Learning},
   author={Nibauer, Jacob and others},
   journal={arXiv preprint arXiv:2201.12042},
