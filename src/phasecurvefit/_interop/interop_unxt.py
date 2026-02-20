@@ -44,9 +44,9 @@ from unxt import AbstractQuantity as AbcQ
 from unxt.quantity import AllowValue
 
 from phasecurvefit._src import algorithm, phasespace
-from phasecurvefit._src.algorithm import Direction, LocalFlowWalkResult, StateMetadata
-from phasecurvefit._src.autoencoder.normalize import StandardScalerNormalizer
+from phasecurvefit._src.algorithm import Direction, StateMetadata, WalkLocalFlowResult
 from phasecurvefit._src.custom_types import VectorComponents
+from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
 from phasecurvefit._src.query_config import WalkConfig
 
 RQSz0: TypeAlias = Real[AbcQ, " "]  # noqa: UP040
@@ -612,7 +612,7 @@ def walk_local_flow(
     direction: Direction = "forward",
     metadata: StateMetadata = StateMetadata(),  # noqa: B008
     usys: u.AbstractUnitSystem | None = None,
-) -> LocalFlowWalkResult:
+) -> WalkLocalFlowResult:
     """Implement for Quantity-valued phase-space data.
 
     Parameters
@@ -654,7 +654,7 @@ def walk_local_flow(
 
     Returns
     -------
-    LocalFlowWalkResult
+    WalkLocalFlowResult
         Result container with ordered indices and original data.
 
     Examples
@@ -673,11 +673,14 @@ def walk_local_flow(
     ...     q, p, start_idx=0, metric_scale=u.Q(1.0, "m"), usys=u.unitsystems.si
     ... )
     >>> result
-    LocalFlowWalkResult(indices=Array([0, 1, 2], dtype=int32),
-        positions={'x': Quantity(Array([0., 1., 2.], dtype=float32), unit='m'),
-                   'y': Quantity(Array([0. , 0.5, 1. ], dtype=float32), unit='m')},
-        velocities={'x': Quantity(Array([1., 1., 1.], dtype=float32), unit='m / s'),
-                    'y': Quantity(Array([0.5, 0.5, 0.5], dtype=float32), unit='m / s')})
+    WalkLocalFlowResult(
+      positions={'x': Quantity(f32[3], unit='m'), 'y': Quantity(f32[3], unit='m')},
+      velocities={
+        'x': Quantity(f32[3], unit='m / s'), 'y': Quantity(f32[3], unit='m / s')
+      },
+      indices=i32[3],
+      gamma_range=(0.0, 1.0)
+    )
 
     """
     # Process the metadata
@@ -704,7 +707,7 @@ def walk_local_flow(
     # Quaxify the walk_local_flow so Quantities are handled properly
     # by custom dispatches in the quax context. StateMetadata is part of init
     # so the scan_p handler can dispatch on it directly.
-    result: LocalFlowWalkResult = quax.quaxify(_walk_local_flow)(
+    result: WalkLocalFlowResult = quax.quaxify(_walk_local_flow)(
         q_values,
         p_values,
         start_idx=start_idx,

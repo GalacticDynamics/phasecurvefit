@@ -82,7 +82,7 @@ class TrackNet(eqx.Module):
         Parameters
         ----------
         gamma : RSz0
-            Ordering parameter in [-1, 1], shape (...).
+            Ordering parameter in [0, 1], shape (...).
         key : PRNGKeyArray | None
             Optional key.
 
@@ -207,7 +207,7 @@ def compute_loss(
         p_hat=jnp.zeros_like(qs_pred),  # Not used in current loss
         mask=mask,
         lambda_q=1,
-        lambda_p=0,  # not used in current loss
+        lambda_p=0.1,  # set to small value in loss
     )
 
 

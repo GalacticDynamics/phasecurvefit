@@ -27,16 +27,15 @@ walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 # Create normalizer and autoencoder
 key = jax.random.key(0)
 normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
-autoencoder = pcf.nn.PathAutoencoder.make(normalizer, key=key)
+autoencoder = pcf.nn.PathAutoencoder.make(
+    normalizer, gamma_range=walkresult.gamma_range, key=key
+)
 
 # Train autoencoder
 config = pcf.nn.TrainingConfig(show_pbar=False)
-trained, _, losses = pcf.nn.train_autoencoder(
+result, _, losses = pcf.nn.train_autoencoder(
     autoencoder, walkresult, config=config, key=key
 )
-
-# Fill gaps
-result = pcf.nn.fill_ordering_gaps(trained, walkresult)
 
 gamma = result.gamma
 ordered_all = result.indices
@@ -66,7 +65,7 @@ config = pcf.nn.TrainingConfig(
     show_pbar=False,
 )
 
-trained, _, losses = pcf.nn.train_autoencoder(
+result, _, losses = pcf.nn.train_autoencoder(
     autoencoder, walkresult, config=config, key=key
 )
 ```

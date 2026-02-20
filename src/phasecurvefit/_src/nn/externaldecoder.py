@@ -115,8 +115,17 @@ class RunningMeanDecoder(AbstractExternalDecoder):
             "Decoder not initialized with training data.",
         )
 
-        # Avoid edge cases where no samples are in window
-        gamma = jnp.clip(gamma, -0.95, 0.95)
+        # Error if gamma is outside the training data bounds
+        gamma = eqx.error_if(
+            gamma,
+            gamma < jnp.min(gamma_train),
+            "gamma is below minimum training gamma value",
+        )
+        gamma = eqx.error_if(
+            gamma,
+            gamma > jnp.max(gamma_train),
+            "gamma is above maximum training gamma value",
+        )
 
         # Find samples within the window
         in_window = jnp.abs(gamma_train - gamma) < (self.window_size / 2)
@@ -200,28 +209,47 @@ class RunningMeanDecoder(AbstractExternalDecoder):
 
         Examples
         --------
+        >>> import jax
         >>> import jax.numpy as jnp
         >>> import jax.random as jr
-        >>> from phasecurvefit._src.autoencoder import (
-        ...     OrderingNet,
-        ...     StandardScalerNormalizer,
-        ...     RunningMeanDecoder,
-        ... )
-        >>> # Create sample stream data
+        >>> import phasecurvefit as pcf
+
+        Create sample stream data
+
         >>> key = jr.key(0)
         >>> N = 100
         >>> t = jnp.linspace(0, 2 * jnp.pi, N)
         >>> positions = {"x": jnp.cos(t), "y": jnp.sin(t)}
         >>> velocities = {"x": -jnp.sin(t), "y": jnp.cos(t)}
-        >>> # Create and "train" encoder (skipped for brevity)
-        >>> normalizer = StandardScalerNormalizer(positions, velocities)
-        >>> encoder = OrderingNet(in_size=4, width_size=32, depth=2, key=key)
-        >>> # Create running-mean decoder
-        >>> decoder = RunningMeanDecoder.make(
-        ...     encoder, normalizer, positions, velocities, window_size=0.15
+
+        Create and train encoder
+
+        >>> key, key1, key2 = jr.split(key, 3)
+        >>> normalizer = pcf.nn.StandardScalerNormalizer(positions, velocities)
+        >>> encoder = pcf.nn.OrderingNet(
+        ...     in_size=4, width_size=32, depth=2, gamma_range=(0.0, 1.0), key=key1
         ... )
-        >>> # Use decoder to reconstruct positions for gamma values
-        >>> gamma_test = jnp.array([-0.5, 0.0, 0.5])
+
+        >>> # Prepare training data: concatenate normalized positions and velocities
+        >>> qs_norm, ps_norm = normalizer.transform(positions, velocities)
+        >>> all_ws = jnp.concatenate([qs_norm, ps_norm], axis=1)
+        >>> # For this synthetic example, the ordering is just 0, 1, 2, ..., N-1
+        >>> ordering_indices = jnp.arange(N)
+
+        >>> # Train the encoder on the ordered stream data
+        >>> config = pcf.nn.OrderingTrainingConfig(n_epochs=10, show_pbar=False)
+        >>> trained_encoder, _, _ = pcf.nn.train_ordering_net(
+        ...     encoder, all_ws, ordering_indices, config, key=key2
+        ... )
+
+        >>> # Create decoder using trained encoder
+        >>> decoder = pcf.nn.RunningMeanDecoder.make(
+        ...     trained_encoder, normalizer, positions, velocities, window_size=0.05
+        ... )
+        >>> # Reconstruct positions for gamma values within the training range.
+        >>> # The decoder can only interpolate gamma values that are within the
+        >>> # range of gamma predictions from the encoder on its training data.
+        >>> gamma_test = jnp.array([0.4, 0.5, 0.6])
         >>> reconstructed = jax.vmap(decoder)(gamma_test)
         >>> reconstructed.shape
         (3, 2)

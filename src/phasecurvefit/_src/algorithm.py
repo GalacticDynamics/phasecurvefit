@@ -22,14 +22,15 @@ Array([0, 1, 2, 3], dtype=int32)
 """
 
 __all__: tuple[str, ...] = (
-    "LocalFlowWalkResult",
+    "WalkLocalFlowResult",
     "StateMetadata",
     "walk_local_flow",
-    "combine_flow_walks",
+    "combine_results",
 )
 
 from collections.abc import Iterator, Set
-from typing import Literal, NamedTuple, TypeAlias
+from dataclasses import KW_ONLY
+from typing import Literal, TypeAlias
 
 import equinox as eqx
 import jax
@@ -38,10 +39,11 @@ import jax.tree as jtu
 import plum
 import quax
 from jax_bounded_while import bounded_while_loop
-from jaxtyping import Array, Bool, Int
+from jaxtyping import Array, Bool, Int, PRNGKeyArray
 
 from zeroth import zeroth
 
+from .abstract_result import AbstractResult
 from .custom_types import BSzN, ISz0, ISzN, RLikeSz0, VectorComponents
 from .phasespace import euclidean_distance, get_w_at
 from .query_config import WalkConfig
@@ -110,24 +112,154 @@ class StateMetadata(quax.Value):
         return jnp.array(True)
 
 
-class LocalFlowWalkResult(NamedTuple):
-    """Result of the local flow walk algorithm.
+class WalkLocalFlowResult(AbstractResult):
+    r"""Result of the local flow walk algorithm.
+
+    This class represents the complete output of the phase-flow walk algorithm.
+    It contains the walk ordering, original phase-space data, and provides methods
+    for examining and interpolating along the discovered stream.
 
     Attributes
     ----------
-    indices : Int[Array, " n_obs"]
-        Indices of observations in the order they were visited. Unvisited
-        observations are marked with -1.
     positions : dict[str, Array]
-        The original positions data.
+        Position dictionary with keys (e.g., "x", "y", "z") and values as
+        1D arrays of shape (n_obs,). These are the original positions from
+        the input, not reordered.
     velocities : dict[str, Array]
-        The original velocities data.
+        Velocity dictionary with same keys and shape as ``positions``.
+        These are the original velocities from the input, not reordered.
+    indices : Int[Array, " n_obs"]
+        Ordered indices of visited observations. Shape (n_obs,).
+        Unvisited observations are marked with -1.
+
+        The walk order can be extracted by filtering: `indices[indices >= 0]`.
+        See :attr:`ordering` property for a convenience accessor.
+    gamma_range : tuple[float, float]
+        Valid range of the ordering parameter in `__call__`. Default is (0.0, 1.0).
+        This is a static field and cannot be changed after construction.
+
+    Notes
+    -----
+    The walk algorithm discovers a path through phase-space by following the
+    local flow defined by the velocity field. The ordering encodes which
+    observations form a coherent sequence along this path.
+
+    **Key distinction**: ``indices`` is an array of length ``n_obs`` where the
+    *position* in the array indicates the *order* in the walk, and the *value*
+    at that position is the original observation index. For example::
+
+        indices = [3, 7, 1, -1, 5, ...]
+        #          ^ 1st visited observation is index 3
+        #             ^ 2nd visited observation is index 7
+        #                ^ 3rd visited observation is index 1
+        #                   ^ 4th observation was not visited
+        #                      ^ 5th visited observation is index 5
+
+    Properties provide convenient access to:
+    - :attr:`visited`: Boolean mask of visited observations
+    - :attr:`ordering`: Indices in walk order (filtered non-negative)
+    - :attr:`ordered`: Positions/velocities reordered by walk
+    - :attr:`skipped_indices`: Indices of unvisited observations
+
+    The interpolation method (:meth:`__call__`) enables smooth spatial
+    interpolation along the discovered path using a continuous ordering
+    parameter $\gamma \in [0, 1]$.
+
+    Examples
+    --------
+    **Basic Usage: Extract Ordering and Properties**
+
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+    >>> pos = {
+    ...     "x": jnp.linspace(0, 10, 20),
+    ...     "y": jnp.sin(jnp.linspace(0, 2 * 3.14159, 20)),
+    ... }
+    >>> vel = {"x": jnp.ones(20), "y": jnp.cos(jnp.linspace(0, 2 * 3.14159, 20))}
+    >>> result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+    >>> result.indices
+    Array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16,
+           17, 18, 19], dtype=int32)
+    >>> result.n_visited
+    Array(20, dtype=int32)
+    >>> result.n_skipped
+    Array(0, dtype=int32)
+
+    **Accessing Ordered Data**
+
+    >>> qs_ordered, vs_ordered = result.ordered
+    >>> qs_ordered["x"].shape
+    (20,)
+
+    **Spatial Interpolation with Gamma Parameter**
+
+    The walk result can be called as a function to interpolate spatial positions
+    from an ordering parameter $\gamma \in [0, 1]$:
+
+    >>> gamma = jnp.array([0.0, 0.5, 1.0])
+    >>> positions_interp = result(gamma)
+    >>> positions_interp["x"]
+    Array([ 0.,  5., 10.], dtype=float32)
+
+    **Scalar Interpolation**
+
+    >>> pos_at_midpoint = result(0.5)
+    >>> pos_at_midpoint["x"]
+    Array(5., dtype=float32)
+
+    **JAX Transformations: JIT Compilation**
+
+    The interpolator is JIT-compatible for efficient compilation:
+
+    >>> import jax
+    >>> @jax.jit
+    ... def get_position(gamma):
+    ...     return result(gamma)
+    >>> get_position(0.25)
+    {'x': Array(2.5, dtype=float32), 'y': Array(0.9897884, dtype=float32)}
+
+    **JAX Transformations: Vectorization with vmap**
+
+    Interpolate multiple gamma values efficiently:
+
+    >>> gamma_batch = jnp.linspace(0, 1, 100)
+    >>> @jax.jit
+    ... def interpolate_many(gammas):
+    ...     return jax.vmap(result)(gammas)
+    >>> positions_batch = interpolate_many(gamma_batch)
+    >>> positions_batch["x"].shape
+    (100,)
+
+    **JAX Transformations: Automatic Differentiation**
+
+    Compute gradients of positions with respect to the ordering parameter:
+
+    >>> def loss(gamma):
+    ...     pos = result(gamma)
+    ...     return jnp.sum(pos["x"] ** 2 + pos["y"] ** 2)
+    >>> grad_fn = jax.grad(loss)
+    >>> grad_at_half = grad_fn(0.5)
+
+    **Composition: JIT + vmap + grad**
+
+    Combine transformations for maximum efficiency:
+
+    >>> @jax.jit
+    ... def compute_gradients(gammas):
+    ...     return jax.vmap(jax.grad(loss))(gammas)
+    >>> compute_gradients(jnp.linspace(0, 1, 50))
+    Array([  0. , 5.6351056, 11.270211 , ...],  dtype=float32)
+
+    >>> result.visited.shape
+    (20,)
 
     """
 
-    indices: ISzN
     positions: VectorComponents
     velocities: VectorComponents
+    indices: ISzN
+    _: KW_ONLY
+    gamma_range: tuple[float, float] = (0.0, 1.0)
 
     @property
     def visited(self) -> BSzN:
@@ -169,9 +301,93 @@ class LocalFlowWalkResult(NamedTuple):
         """Positions and velocities ordered by the walk."""
         return order_w(self)
 
-    def __replace__(self, **kw: object) -> "LocalFlowWalkResult":
-        """Return a new LocalFlowWalkResult with specified fields replaced."""
-        return self._replace(**kw)
+    def __call__(
+        self, gamma: Array, /, *, key: PRNGKeyArray | None = None
+    ) -> VectorComponents:
+        r"""Interpolate spatial positions from ordering parameter $\gamma$.
+
+        Uses linear interpolation between consecutive visited observations, with
+        unvisited observations (indices of -1) automatically masked out using
+        JIT-safe operations.
+
+        Parameters
+        ----------
+        gamma : Array
+            Ordering parameter in [min_gamma, max_gamma], shape (...).
+        key : PRNGKeyArray, optional
+            JAX random key. Not used by linear interpolation, provided for
+            interface compatibility. Default is None.
+
+        Returns
+        -------
+        positions : dict[str, Array]
+            Interpolated spatial positions with same shape (...) as gamma.
+
+        Notes
+        -----
+        This method uses JIT-safe masked operations to interpolate only
+        visited observations. The indices of -1 (unvisited) are automatically
+        handled without changing array shapes.
+
+        The input gamma is automatically clipped to the valid range
+        [min_gamma, max_gamma] and normalized to [0, 1] before interpolation.
+
+        """
+        del key
+
+        # Convert gamma to JAX array to ensure error_if works with scalars
+        gamma = jnp.asarray(gamma)
+
+        # Number of visited observations
+        n_visited = self.n_visited
+
+        # Validate and normalize gamma to range
+        min_gamma, max_gamma = self.gamma_range
+        gamma_range_width = max_gamma - min_gamma
+        # Error if gamma is out of valid range
+        gamma = eqx.error_if(
+            gamma, jnp.any(gamma < min_gamma), "gamma must be >= min_gamma"
+        )
+        gamma = eqx.error_if(
+            gamma, jnp.any(gamma > max_gamma), "gamma must be <= max_gamma"
+        )
+        # Normalize to [0, 1]
+        gamma_normalized = (gamma - min_gamma) / gamma_range_width
+
+        # Create a mapping from walk order to original indices, clamping invalid
+        # indices (those with -1) to 0 for safe indexing in JIT
+        visited_indices = jnp.where(
+            self.indices >= 0, self.indices, 0
+        )  # Shape: (n_obs,) but only first n_visited are valid
+
+        # Map normalized gamma from [0, 1] to [0, n_visited-1]
+        indices_float = gamma_normalized * (n_visited - 1)
+
+        # Get lower and upper indices for linear interpolation
+        idx_lower = jnp.floor(indices_float).astype(jnp.int32)
+        idx_upper = jnp.ceil(indices_float).astype(jnp.int32)
+
+        # Clamp to valid range [0, n_visited-1]
+        idx_lower = jnp.clip(idx_lower, 0, n_visited - 1)
+        idx_upper = jnp.clip(idx_upper, 0, n_visited - 1)
+
+        # Map to original indices using the visited_indices array
+        # This works in JIT because visited_indices is an array of concrete values
+        orig_idx_lower = visited_indices[idx_lower]
+        orig_idx_upper = visited_indices[idx_upper]
+
+        # Compute interpolation weights
+        weights = indices_float - jnp.floor(indices_float)
+
+        # Interpolate each component using tree.map for cleaner code
+        def interpolate_component(q_vals: Array) -> Array:
+            """Interpolate a single position component."""
+            q_lower = q_vals[orig_idx_lower]
+            q_upper = q_vals[orig_idx_upper]
+            # Linear interpolation: (1-w)*q_lower + w*q_upper
+            return (1 - weights) * q_lower + weights * q_upper
+
+        return jax.tree.map(interpolate_component, self.positions)
 
 
 Direction: TypeAlias = Literal["forward", "backward", "both"]  # noqa: UP040
@@ -199,7 +415,7 @@ def walk_local_flow(
     config: WalkConfig = WalkConfig(),  # noqa: B008
     metadata: StateMetadata = StateMetadata(),  # noqa: B008
     direction: Direction = "forward",
-) -> LocalFlowWalkResult:
+) -> WalkLocalFlowResult:
     r"""Find an ordered path through phase-space using the local flow.
 
     Parameters
@@ -242,7 +458,7 @@ def walk_local_flow(
 
     Returns
     -------
-    LocalFlowWalkResult
+    WalkLocalFlowResult
         NamedTuple with fields:
 
         - "indices": ordered indices array with -1 for unvisited observations.
@@ -293,7 +509,7 @@ def walk_local_flow(
         }
         result_forward = walk_local_flow(xs, vs, **kwargs, direction="forward")
         result_backward = walk_local_flow(xs, vs, **kwargs, direction="backward")
-        return combine_flow_walks(result_forward, result_backward)
+        return combine_results(result_forward, result_backward)
 
     # ---------------------------------------------------------------
 
@@ -420,17 +636,21 @@ def walk_local_flow(
     # Extract results - return arrays directly
     final_ordered, *_ = final_state
 
-    # Package results into LocalFlowWalkResult. This is a NamedTuple, so can be
+    # Set gamma_range based on direction
+    gamma_range = (-1.0, 0.0) if direction == "backward" else (0.0, 1.0)
+
+    # Package results into WalkLocalFlowResult. This is a NamedTuple, so can be
     # unpacked easily.
-    return LocalFlowWalkResult(
-        indices=final_ordered,
+    return WalkLocalFlowResult(
         positions=dict(xs),
         velocities=dict(vs_original),
+        indices=final_ordered,
+        gamma_range=gamma_range,
     )
 
 
-def order_w(res: LocalFlowWalkResult, /) -> tuple[VectorComponents, VectorComponents]:
-    """Get xs and vs in the ordered sequence from a LocalFlowWalkResult.
+def order_w(res: WalkLocalFlowResult, /) -> tuple[VectorComponents, VectorComponents]:
+    """Get xs and vs in the ordered sequence from a WalkLocalFlowResult.
 
     Filters out unvisited indices (marked as -1) and returns only the visited
     observations in the order they were traversed.
@@ -478,7 +698,7 @@ DedupCarry: TypeAlias = tuple[  # noqa: UP040
 def _dedup_step(carry: DedupCarry, idx: Array) -> tuple[DedupCarry, None]:
     """Remove duplicate indices while preserving order (scan step function).
 
-    Used by {func}`combine_flow_walks` to deduplicate the concatenated
+    Used by {func}`combine_results` to deduplicate the concatenated
     forward/backward walk results. Skips invalid indices (-1) and previously
     seen indices, building an output array of unique valid indices in their
     original order.
@@ -510,9 +730,10 @@ def _dedup_step(carry: DedupCarry, idx: Array) -> tuple[DedupCarry, None]:
     return (new_seen, new_out, new_count), None
 
 
-def combine_flow_walks(
-    result_fwd: LocalFlowWalkResult, result_bwd: LocalFlowWalkResult, /
-) -> LocalFlowWalkResult:
+@plum.dispatch
+def combine_results(
+    result_fwd: WalkLocalFlowResult, result_bwd: WalkLocalFlowResult, /
+) -> WalkLocalFlowResult:
     r"""Combine forward and reverse flow walk results into a single result.
 
     Takes the results from two separate walk_local_flow calls (one forward, one
@@ -531,18 +752,21 @@ def combine_flow_walks(
 
     Parameters
     ----------
-    result_fwd : LocalFlowWalkResult
+    result_fwd : WalkLocalFlowResult
         Result from a forward walk (direction='forward').
-    result_bwd : LocalFlowWalkResult
+    result_bwd : WalkLocalFlowResult
         Result from a backward walk (direction='backward'), typically starting
         from the same index as the forward walk.
 
     Returns
     -------
-    LocalFlowWalkResult
+    WalkLocalFlowResult
         {class}`~typing.NamedTuple` with combined ordering that includes both
         forward and backward traversals. Indices are ordered from the backward
-        tail through the starting point to the forward tail.
+        tail through the starting point to the forward tail. The gamma_range
+        is stitched together: if result_bwd has gamma_range [min_bwd, 0] and
+        result_fwd has gamma_range [0, max_fwd], the combined result has
+        gamma_range [min_bwd, max_fwd].
 
     Examples
     --------
@@ -569,7 +793,7 @@ def combine_flow_walks(
 
     Combine the results:
 
-    >>> result = pcf.combine_flow_walks(result_fwd, result_bwd)
+    >>> result = pcf.combine_results(result_fwd, result_bwd)
     >>> result.indices
     Array([4, 3, 0, 1, 2], dtype=int32)
 
@@ -628,8 +852,14 @@ def combine_flow_walks(
     indices = jnp.full(n_obs, -1, dtype=int)
     indices = indices.at[:n_obs].set(deduplicated[:n_obs])
 
-    return LocalFlowWalkResult(
-        indices=indices,
+    # Combine gamma ranges: backward [-1, 0] + forward [0, 1] → [-1, 1]
+    min_gamma_bwd, _ = result_bwd.gamma_range
+    _, max_gamma_fwd = result_fwd.gamma_range
+    combined_gamma_range = (min_gamma_bwd, max_gamma_fwd)
+
+    return WalkLocalFlowResult(
         positions=result_fwd.positions,
         velocities=result_fwd.velocities,
+        indices=indices,
+        gamma_range=combined_gamma_range,
     )

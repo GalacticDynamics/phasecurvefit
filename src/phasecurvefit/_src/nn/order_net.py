@@ -34,7 +34,7 @@ class OrderingNet(eqx.Module):
 
     This network takes N-D phase-space coordinates and outputs:
 
-    - $\gamma \in [-1, 1]$: The ordering parameter along the stream
+    - $\gamma \in [0, 1]$: The ordering parameter along the stream
     - $p \in [0, 1]$: The membership probability (1 = likely stream member)
 
     The architecture follows Appendix B.3 of Nibauer et al. (2022).
@@ -68,6 +68,7 @@ class OrderingNet(eqx.Module):
     in_size: int = eqx.field(static=True)
     width_size: int = eqx.field(static=True)
     depth: int = eqx.field(static=True)
+    gamma_range: tuple[float, float] = eqx.field(static=True)
 
     __citation__: ClassVar[str] = (
         "https://ui.adsabs.harvard.edu/abs/2022ApJ...940...22N/abstract"
@@ -79,12 +80,14 @@ class OrderingNet(eqx.Module):
         width_size: int = 100,
         depth: int = 2,
         *,
+        gamma_range: tuple[float, float] = (0.0, 1.0),
         key: PRNGKeyArray,
     ) -> None:
         # Store parameters
         self.in_size = in_size
         self.width_size = width_size
         self.depth = depth
+        self.gamma_range = gamma_range
 
         keys = jr.split(key, 3)
 
@@ -123,7 +126,7 @@ class OrderingNet(eqx.Module):
         Returns
         -------
         gamma : Array
-            Ordering parameter in [-1, 1], shape (...).
+            Ordering parameter in [0, 1], shape (...).
         prob : Array
             Membership probability in [0, 1], shape (...).
 
@@ -132,8 +135,12 @@ class OrderingNet(eqx.Module):
         x = self.mlp(ws, key=key)
 
         # Output heads with appropriate activations
-        gamma = jax.nn.tanh(self.gamma_head(x)).squeeze(-1)
+        gamma_raw = jax.nn.tanh(self.gamma_head(x)).squeeze(-1)  # [-1, 1]
         prob = jax.nn.sigmoid(self.prob_head(x)).squeeze(-1)
+
+        # Rescale gamma from [-1, 1] to gamma_range
+        gmin, gmax = self.gamma_range
+        gamma = gmin + (gmax - gmin) * (gamma_raw + 1) / 2
 
         return gamma, prob
 
@@ -354,9 +361,6 @@ class OrderingTrainingConfig:
     lambda_prob: float = 1.0
     """Weight for probability loss terms."""
 
-    gamma_range: tuple[float, float] = (-1.0, 1.0)
-    r"""Minimum/maximum $\gamma$ value for ordered tracers."""
-
     arclength_alpha: float = 0.8
     r"""Blend factor for arclength-like targets.
 
@@ -378,18 +382,6 @@ BatchScanInputs: TypeAlias = tuple[  # noqa: UP040
     Float[Array, " B"],  # batch_gamma: target ordering parameter for batch_ws
     Float[Array, "B 2D"],  # batch_rand_ws: random phase-space samples
 ]
-
-
-# def linear_map_from_ordering(ordering, vmin, vmax, *, fill=0):
-#     ordering = jnp.asarray(ordering)
-#     # Mask for valid (ordered) entries
-#     mask = ordering >= 0
-#     # Maximum ordering index (assumes at least one valid entry)
-#     kmax = ordering.max()
-#     # Linear map: [0, kmax] -> [vmin, vmax]
-#     mapped = vmin + (vmax - vmin) * (ordering / kmax)
-#     # Fill unordered entries
-#     return jnp.where(mask, mapped, fill)
 
 
 def train_ordering_net(
@@ -451,9 +443,20 @@ def train_ordering_net(
     ws_min = jnp.min(jnp.where(is_ordered[:, None], all_ws, jnp.inf), axis=0)
     ws_max = jnp.max(jnp.where(is_ordered[:, None], all_ws, -jnp.inf), axis=0)
 
+    # Edge case: if the curve is degenerate (e.g., 1D line), some dimensions
+    # will have min=max. Expand bounds to avoid random samples landing on curve.
+    extent = ws_max - ws_min
+    has_degenerate_dims = extent == 0
+    extent = jnp.where(
+        has_degenerate_dims, 1.0, extent
+    )  # Use unit extent if degenerate
+    ws_min = ws_min - 0.5 * extent
+    ws_max = ws_max + 0.5 * extent
+
     # Initialize gamma targets.
     # Base target: uniform spacing in [gamma_min, gamma_max]
-    gamma_lin = jnp.linspace(*config.gamma_range, n_total)
+    gmin, gmax = model.gamma_range
+    gamma_lin = jnp.linspace(gmin, gmax, n_total)
 
     # Optional arclength-like target (computed from positions of ordered
     # tracers) This mitigates tanh-compression in gamma by encouraging gamma to
@@ -468,7 +471,6 @@ def train_ordering_net(
     s_tot = s[-1]
 
     # Map s -> gamma_range, guarding against degenerate s_tot
-    gmin, gmax = config.gamma_range
     gamma_arc = jnp.where(s_tot > 0, gmin + (gmax - gmin) * (s / s_tot), gamma_lin)
 
     # Blend: alpha=0 -> gamma_lin, alpha=1 -> gamma_arc
