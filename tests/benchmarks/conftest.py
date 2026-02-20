@@ -20,7 +20,7 @@ def pytest_collection_modifyitems(config, items):
     # For benchmark tests, disable the default timeout since they can take a while
     for item in items:
         # All tests in the benchmarks directory get extended timeout
-        if "benchmarks" in str(item.fspath):
+        if "benchmarks" in str(item.path):
             # Apply a much longer timeout (30 minutes)
             item.add_marker(pytest.mark.timeout(1800))
 
