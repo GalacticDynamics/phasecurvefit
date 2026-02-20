@@ -18,7 +18,7 @@ class TestAutoencoderTrainingBenchmarks:
         config = pcf.nn.TrainingConfig(
             n_epochs_encoder=10, n_epochs_both=10, show_pbar=False
         )
-        trained, _, losses = benchmark(
+        result, _, losses = benchmark(
             pcf.nn.train_autoencoder,
             simple_autoencoder,
             simple_wlf_result,
@@ -26,7 +26,7 @@ class TestAutoencoderTrainingBenchmarks:
             key=rng_key,
         )
 
-        assert trained is not None
+        assert result is not None
         # Losses from: encoder (10) + decoder (100 default) + both (10) = 120
         assert len(losses) == 120
 
@@ -37,7 +37,7 @@ class TestAutoencoderTrainingBenchmarks:
         config = pcf.nn.TrainingConfig(
             n_epochs_encoder=20, n_epochs_both=20, show_pbar=False
         )
-        trained, _, losses = benchmark(
+        result, _, losses = benchmark(
             pcf.nn.train_autoencoder,
             medium_autoencoder,
             medium_wlf_result,
@@ -45,7 +45,7 @@ class TestAutoencoderTrainingBenchmarks:
             key=rng_key,
         )
 
-        assert trained is not None
+        assert result is not None
         # Losses from: encoder (20) + decoder (100 default) + both (20) = 140
         assert len(losses) == 140
 
@@ -56,7 +56,7 @@ class TestAutoencoderTrainingBenchmarks:
         config = pcf.nn.TrainingConfig(
             n_epochs_encoder=50, n_epochs_both=50, show_pbar=False
         )
-        trained, _, losses = benchmark(
+        result, _, losses = benchmark(
             pcf.nn.train_autoencoder,
             simple_autoencoder,
             simple_wlf_result,
@@ -64,7 +64,7 @@ class TestAutoencoderTrainingBenchmarks:
             key=rng_key,
         )
 
-        assert trained is not None
+        assert result is not None
         # Losses from: encoder (50) + decoder (100 default) + both (50) = 200
         assert len(losses) == 200
 
@@ -99,7 +99,7 @@ class TestAutoencoderTrainingBenchmarks:
         # Concatenate into feature vectors
         x_feat = jnp.concatenate([ordered_pos_norm, ordered_vel_norm], axis=1)
 
-        trained, _, losses = benchmark(
+        result, _, losses = benchmark(
             pcf.nn.train_ordering_net,
             ordering_net,
             x_feat,
@@ -108,7 +108,7 @@ class TestAutoencoderTrainingBenchmarks:
             key=rng_key,
         )
 
-        assert trained is not None
+        assert result is not None
         assert losses is not None
 
     def test_decoder_training_simple(
@@ -123,7 +123,7 @@ class TestAutoencoderTrainingBenchmarks:
         )
 
         # Train full autoencoder to get decoder training
-        trained, _, _ = benchmark(
+        result, _, losses = benchmark(
             pcf.nn.train_autoencoder,
             simple_autoencoder,
             simple_wlf_result,
@@ -131,6 +131,6 @@ class TestAutoencoderTrainingBenchmarks:
             key=rng_key,
         )
 
-        # The decoder is part of the trained autoencoder
-        assert trained is not None
-        assert trained.decoder is not None
+        # Verify training completed successfully
+        assert result is not None
+        assert len(losses) == 110  # encoder (5) + decoder (100 default) + both (5)

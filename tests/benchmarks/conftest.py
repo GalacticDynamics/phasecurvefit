@@ -7,6 +7,24 @@ from jaxtyping import PRNGKeyArray
 import phasecurvefit as pcf
 
 
+def pytest_configure(config):
+    """Configure pytest for benchmark tests."""
+    # Register custom marker for benchmark tests
+    config.addinivalue_line(
+        "markers", "benchmark: mark test as a benchmark test (may take long)"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Modify benchmark tests to have longer timeout."""
+    # For benchmark tests, disable the default timeout since they can take a while
+    for item in items:
+        # All tests in the benchmarks directory get extended timeout
+        if "benchmarks" in str(item.fspath):
+            # Apply a much longer timeout (30 minutes)
+            item.add_marker(pytest.mark.timeout(1800))
+
+
 @pytest.fixture
 def simple_2d_stream(rng_key: PRNGKeyArray) -> tuple[dict, dict]:
     """Create a simple 2D stream for benchmarking.
