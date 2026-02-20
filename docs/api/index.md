@@ -81,7 +81,7 @@ Low-level functions for phase-space operations. Available in the `localflowwalk.
 ## Types
 
 ```{eval-rst}
-.. autoclass:: LocalFlowWalkResult
+.. autoclass:: WalkLocalFlowResult
    :no-index:
    :members:
    :show-inheritance:

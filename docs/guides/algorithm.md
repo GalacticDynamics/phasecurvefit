@@ -166,7 +166,7 @@ The current implementation supports:
 - **Limited search**: `n_max` parameter
 - **Gap filling**: Autoencoder neural network for skipped tracers
 - **Reverse walks**: `direction="backward"` parameter to trace streams backwards by negating velocities
-- **Bidirectional walks**: `combine_flow_walks()` to trace streams in both directions simultaneously
+- **Bidirectional walks**: `combine_results()` to trace streams in both directions simultaneously
 
 ### Reverse Walks
 
@@ -209,7 +209,7 @@ time in the dynamical system.
 ### Combining Forward and Reverse Walks
 
 For stellar streams that extend in both directions from a starting point (e.g.,
-from a progenitor or disruption point), the `combine_flow_walks()` function
+from a progenitor or disruption point), the `combine_results()` function
 combines the results of two separate walks into a single coherent ordering:
 
 ```python
@@ -222,7 +222,7 @@ result_reverse = pcf.walk_local_flow(
 )
 
 # Combine the results
-result = pcf.combine_flow_walks(result_forward, result_reverse)
+result = pcf.combine_results(result_forward, result_reverse)
 
 # Result indices are ordered: [reverse tail] → [start] → [forward tail]
 ```
@@ -244,6 +244,97 @@ The combination strategy ensures spatial coherence by placing the starting point
 near the center with the reverse tail on one end and the forward tail on the
 other. Since you run the walks separately, you have full control over the
 parameters for each direction (e.g., different `max_dist` thresholds).
+
+### Spatial Interpolation from Ordering Parameter
+
+The `WalkLocalFlowResult` object provides a `__call__` method that enables
+efficient linear interpolation of spatial positions along the walk ordering
+from an ordering parameter $\gamma \in [0, 1]$:
+
+```python
+import jax
+import jax.numpy as jnp
+import phasecurvefit as pcf
+
+# Create sample data
+pos = {
+    "x": jnp.linspace(0, 10, 50),
+    "y": jnp.sin(jnp.linspace(0, 2 * jnp.pi, 50)),
+}
+vel = {
+    "x": jnp.ones(50),
+    "y": 2 * jnp.pi * jnp.cos(jnp.linspace(0, 2 * jnp.pi, 50)) / (2 * jnp.pi),
+}
+
+# Run walk algorithm
+result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+
+# Interpolate positions at specific gamma values
+gamma_values = jnp.array([0.0, 0.25, 0.5, 0.75, 1.0])
+interpolated_pos = result(gamma_values)
+
+print("Interpolated x:", interpolated_pos["x"])  # Shape (5,)
+print("Interpolated y:", interpolated_pos["y"])  # Shape (5,)
+```
+
+The interpolator is **JAX-compatible** and works with all JAX transformations:
+
+**JIT Compilation:**
+```python
+@jax.jit
+def interpolate_position(gamma):
+    return result(gamma)
+
+
+# Compile once, run efficiently
+pos_jitted = interpolate_position(0.5)
+```
+
+**Vectorization (vmap):**
+```python
+# Interpolate batch of gamma values
+@jax.jit
+def interpolate_batch(gamma_array):
+    return jax.vmap(result)(gamma_array)
+
+
+gamma_batch = jnp.linspace(0, 1, 100)
+pos_batch = interpolate_batch(gamma_batch)
+print("Shape:", pos_batch["x"].shape)  # (100,)
+```
+
+**Automatic Differentiation (grad):**
+```python
+# Compute gradients with respect to gamma
+def loss_fn(gamma):
+    pos = result(gamma)
+    return jnp.sum(pos["x"] ** 2 + pos["y"] ** 2)
+
+
+grad_fn = jax.grad(loss_fn)
+gradient = grad_fn(0.5)
+```
+
+**Composition of Transformations:**
+```python
+# JIT + vmap + grad combination
+@jax.jit
+def compute_gradients(gamma_array):
+    return jax.vmap(jax.grad(loss_fn))(gamma_array)
+
+
+gradients = compute_gradients(jnp.linspace(0, 1, 50))
+```
+
+The interpolator works by:
+
+1. Mapping $\gamma \in [0, 1]$ to indices in the visited observation sequence
+2. Finding lower and upper neighboring visited observations
+3. Computing linear interpolation weights
+4. Interpolating each position component across all visited observations
+
+Unvisited observations (marked with index -1) are automatically masked out
+without changing array shapes, making the interpolation efficient in JIT.
 
 Potential future extensions:
 - Adaptive $\lambda$ based on local stream properties

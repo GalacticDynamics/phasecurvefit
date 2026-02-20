@@ -76,7 +76,6 @@ class ScanOverMLP(eqx.nn.MLP):
 
         hidden_keys = keys[1:depth]
         if depth > 1:
-            hidden_keys = keys[1:depth]
             hidden_layers = eqx.filter_vmap(make_hidden_layer)(hidden_keys)
         else:
             # For depth == 1, construct an empty collection of hidden layers

@@ -14,7 +14,7 @@ using a variety of tools.
 ### Core Algorithm
 
 - `walk_local_flow(positions, velocities, ...)`: Main entry point for ordering
-  phase-space data. Returns `LocalFlowWalkResult` with ordered indices.
+  phase-space data. Returns `WalkLocalFlowResult` with ordered indices.
 - Phase-space data: Two dicts with matching keys, e.g.,
   `{"x": array, "y": array}` for positions and velocities.
 
@@ -148,7 +148,7 @@ uv run pre-commit run -a # Run all pre-commit hooks
 
 ### Result Structure
 
-`LocalFlowWalkResult` contains:
+`WalkLocalFlowResult` contains:
 
 - `indices`: Array of indices in walk order (-1 for skipped)
 - `positions`: Original position dict

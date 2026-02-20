@@ -77,7 +77,7 @@ print(ordered_pos["x"])
 
 ## Understanding the Result
 
-The `walk_local_flow` function returns a `LocalFlowWalkResult` NamedTuple with:
+The `walk_local_flow` function returns a `WalkLocalFlowResult` NamedTuple with:
 
 - **`ordering`**: Array of indices of the discovered order
 - **`position`**: Original position dictionary

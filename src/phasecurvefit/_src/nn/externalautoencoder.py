@@ -8,10 +8,12 @@ import equinox as eqx
 import plum
 from jaxtyping import Array, Float, Int, PRNGKeyArray, PyTree
 
-from .autoencoder import AbstractAutoencoder, TrainingConfig
+from .abstractautoencoder import AbstractAutoencoder
+from .autoencoder import TrainingConfig
 from .externaldecoder import AbstractExternalDecoder
 from .normalize import AbstractNormalizer
 from .order_net import OrderingNet, OrderingTrainingConfig, train_ordering_net
+from .result import AutoencoderResult
 from phasecurvefit._src.custom_types import FSzN
 
 Gamma: TypeAlias = FSzN  # noqa: UP040
@@ -68,6 +70,11 @@ class EncoderExternalDecoder(AbstractAutoencoder):
     decoder: AbstractExternalDecoder
     normalizer: AbstractNormalizer
 
+    @property
+    def gamma_range(self) -> tuple[float, float]:
+        """Return the gamma range from the encoder."""
+        return self.encoder.gamma_range
+
 
 @plum.dispatch
 def train_autoencoder(
@@ -78,9 +85,7 @@ def train_autoencoder(
     *,
     config: OrderingTrainingConfig | TrainingConfig | None = None,
     key: PRNGKeyArray,
-) -> tuple[
-    EncoderExternalDecoder, dict[str, PyTree], Float[Array, " {config.n_epochs}"]
-]:
+) -> tuple[AutoencoderResult, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
     """Train the EncoderExternalDecoder encoder and create running-mean decoder.
 
     This function provides a simplified training workflow:
@@ -110,10 +115,10 @@ def train_autoencoder(
 
     Returns
     -------
-    model : EncoderExternalDecoder
-        Trained autoencoder with updated encoder and decoder.
-    opt_state : optax.OptState
-        Final optimizer state from encoder training.
+    result : AutoencoderResult
+        Result containing the trained autoencoder and ordering data.
+    opt_state : dict[str, PyTree]
+        Optimizer state from encoder training (wrapped in dict for consistency).
     losses : Array, shape (n_epochs,)
         Training losses from encoder training.
 
@@ -142,7 +147,7 @@ def train_autoencoder(
     >>> config = pcf.nn.OrderingTrainingConfig(
     ...     n_epochs=10, batch_size=16, show_pbar=False
     ... )
-    >>> trained_model, opt_state, losses = pcf.nn.train_autoencoder(
+    >>> result, opt_state, losses = pcf.nn.train_autoencoder(
     ...     model, ws_norm, ordering, config=config, key=jr.key(2)
     ... )
     >>> losses.shape
@@ -173,4 +178,26 @@ def train_autoencoder(
     # Update decoder in model
     model = eqx.tree_at(lambda m: m.decoder, model, decoder)
 
-    return model, opt_state, losses
+    # Convert all_ws back to VectorComponents for AutoencoderResult
+    D = all_ws.shape[1] // 2
+    qs_norm = all_ws[:, :D]
+    ps_norm = all_ws[:, D:]
+    positions, velocities = model.normalizer.inverse_transform(qs_norm, ps_norm)
+
+    # Encode to get gamma and membership_prob
+    gamma, membership_prob = model.encode(positions, velocities)
+
+    result = AutoencoderResult(
+        model=model,
+        positions=positions,
+        velocities=velocities,
+        indices=ordering_indices,
+        gamma=gamma,
+        membership_prob=membership_prob,
+        gamma_range=model.gamma_range,
+    )
+
+    # Wrap opt_state in dict for consistency with other dispatches
+    opt_states = {"encoder": opt_state}
+
+    return result, opt_states, losses

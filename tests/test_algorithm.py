@@ -8,8 +8,8 @@ import pytest
 import phasecurvefit as pcf
 
 
-class TestLocalFlowWalkResult:
-    """Tests for LocalFlowWalkResult and accessors."""
+class TestWalkLocalFlowResult:
+    """Tests for WalkLocalFlowResult and accessors."""
 
     def test_result_structure(self):
         """Test that result has correct structure."""
@@ -189,7 +189,7 @@ class TestNearestNeighborsWithMomentum:
         result_bwd = pcf.walk_local_flow(
             q, p, start_idx=2, metric_scale=1.0, direction="backward"
         )
-        result_combined = pcf.combine_flow_walks(result_fwd, result_bwd)
+        result_combined = pcf.combine_results(result_fwd, result_bwd)
 
         # Both should visit the same points
         visited_both = set(result_both.ordering.tolist())
@@ -459,7 +459,7 @@ class TestAlgorithmIntegration:
 
 
 class TestCombineFlowWalks:
-    """Tests for the combine_flow_walks function."""
+    """Tests for the combine_results function."""
 
     def test_combine_simple_line(self):
         """Test combining forward and backward walks on a simple line."""
@@ -474,7 +474,7 @@ class TestCombineFlowWalks:
         result_bwd = pcf.walk_local_flow(
             pos, vel, start_idx=2, metric_scale=1.0, direction="backward"
         )
-        result = pcf.combine_flow_walks(result_fwd, result_bwd)
+        result = pcf.combine_results(result_fwd, result_bwd)
 
         # Should visit all 5 points
         assert result.all_visited
@@ -494,7 +494,7 @@ class TestCombineFlowWalks:
         result_bwd = pcf.walk_local_flow(
             pos, vel, start_idx=2, metric_scale=1.0, direction="backward"
         )
-        result = pcf.combine_flow_walks(result_fwd, result_bwd)
+        result = pcf.combine_results(result_fwd, result_bwd)
 
         # The result should have the start_idx in it
         assert jnp.any(result.ordering == 2)
@@ -510,9 +510,9 @@ class TestCombineFlowWalks:
         result_bwd = pcf.walk_local_flow(
             pos, vel, start_idx=1, metric_scale=0.5, direction="backward"
         )
-        result = pcf.combine_flow_walks(result_fwd, result_bwd)
+        result = pcf.combine_results(result_fwd, result_bwd)
 
-        # Should be a LocalFlowWalkResult
+        # Should be a WalkLocalFlowResult
         assert hasattr(result, "indices")
         assert hasattr(result, "positions")
         assert hasattr(result, "velocities")
@@ -529,7 +529,7 @@ class TestCombineFlowWalks:
         res_bwd = pcf.walk_local_flow(
             q, p, start_idx=0, metric_scale=1.0, direction="backward"
         )
-        res = pcf.combine_flow_walks(res_fwd, res_bwd)
+        res = pcf.combine_results(res_fwd, res_bwd)
 
         # Original data should be preserved
         assert jnp.array_equal(res.positions["x"], q["x"])
@@ -548,7 +548,7 @@ class TestCombineFlowWalks:
         res_bwd = pcf.walk_local_flow(
             q, p, start_idx=1, metric_scale=0.5, direction="backward"
         )
-        res = pcf.combine_flow_walks(res_fwd, res_bwd)
+        res = pcf.combine_results(res_fwd, res_bwd)
 
         # Should be able to extract ordered data
         ordered_q, ordered_p = pcf.order_w(res)
@@ -576,7 +576,7 @@ class TestCombineFlowWalks:
         res_bwd = pcf.walk_local_flow(
             q, p, start_idx=2, metric_scale=1.0, direction="backward"
         )
-        res = pcf.combine_flow_walks(res_fwd, res_bwd)
+        res = pcf.combine_results(res_fwd, res_bwd)
 
         # Should visit all points
         assert res.all_visited
@@ -593,7 +593,7 @@ class TestCombineFlowWalks:
         res_bwd_0 = pcf.walk_local_flow(
             q, p, start_idx=0, metric_scale=1.0, direction="backward"
         )
-        res_0 = pcf.combine_flow_walks(res_fwd_0, res_bwd_0)
+        res_0 = pcf.combine_results(res_fwd_0, res_bwd_0)
 
         # Combine from index 4
         res_fwd_4 = pcf.walk_local_flow(
@@ -602,7 +602,7 @@ class TestCombineFlowWalks:
         res_bwd_4 = pcf.walk_local_flow(
             q, p, start_idx=4, metric_scale=1.0, direction="backward"
         )
-        res_4 = pcf.combine_flow_walks(res_fwd_4, res_bwd_4)
+        res_4 = pcf.combine_results(res_fwd_4, res_bwd_4)
 
         # Both should visit all points (or similar counts)
         assert res_0.n_visited >= 3  # At least start and forward
@@ -620,7 +620,7 @@ class TestCombineFlowWalks:
         res_bwd_lam0 = pcf.walk_local_flow(
             q, p, start_idx=2, metric_scale=0.0, direction="backward"
         )
-        res_lam0 = pcf.combine_flow_walks(res_fwd_lam0, res_bwd_lam0)
+        res_lam0 = pcf.combine_results(res_fwd_lam0, res_bwd_lam0)
 
         # With metric_scale=1.0 (balanced)
         res_fwd_lam1 = pcf.walk_local_flow(
@@ -629,7 +629,7 @@ class TestCombineFlowWalks:
         res_bwd_lam1 = pcf.walk_local_flow(
             q, p, start_idx=2, metric_scale=1.0, direction="backward"
         )
-        res_lam1 = pcf.combine_flow_walks(res_fwd_lam1, res_bwd_lam1)
+        res_lam1 = pcf.combine_results(res_fwd_lam1, res_bwd_lam1)
 
         # Both should be valid results
         assert res_lam0.n_visited >= 3
@@ -647,7 +647,7 @@ class TestCombineFlowWalks:
         res_bwd = pcf.walk_local_flow(
             q, p, start_idx=1, metric_scale=1.0, max_dist=2.0, direction="backward"
         )
-        res = pcf.combine_flow_walks(res_fwd, res_bwd)
+        res = pcf.combine_results(res_fwd, res_bwd)
 
         # Should have some skipped indices (can't cross the gap)
         assert res.n_skipped > 0
@@ -670,4 +670,4 @@ class TestCombineFlowWalks:
 
         # Should raise an error when combining
         with pytest.raises((eqx.EquinoxRuntimeError, ValueError)):
-            pcf.combine_flow_walks(res1, res2)
+            pcf.combine_results(res1, res2)

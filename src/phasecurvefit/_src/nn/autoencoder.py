@@ -1,6 +1,6 @@
 """Autoencoder."""
 
-__all__: tuple[str, ...] = ("PathAutoencoder", "train_autoencoder")
+__all__: tuple[str, ...] = ("PathAutoencoder", "train_autoencoder", "TrainingConfig")
 
 from collections.abc import Mapping
 from dataclasses import KW_ONLY, dataclass
@@ -16,6 +16,7 @@ import optax
 import plum
 from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray, PyTree
 
+from .abstractautoencoder import AbstractAutoencoder
 from .externaldecoder import RunningMeanDecoder
 from .normalize import AbstractNormalizer
 from .order_net import (
@@ -24,74 +25,13 @@ from .order_net import (
     default_optimizer,
     train_ordering_net,
 )
+from .result import AutoencoderResult
 from .track_net import TrackNet, TrackTrainingConfig, decoder_loss, train_track_net
 from .utils import shuffle_and_batch
-from phasecurvefit._src.algorithm import LocalFlowWalkResult
-from phasecurvefit._src.custom_types import FLikeSz0, FSz0, FSzN, VectorComponents
+from phasecurvefit._src.algorithm import WalkLocalFlowResult
+from phasecurvefit._src.custom_types import FLikeSz0, FSz0, FSzN
 
 Gamma: TypeAlias = FSzN  # noqa: UP040
-
-
-class AbstractAutoencoder(eqx.Module):
-    encoder: eqx.Module
-    decoder: eqx.Module
-    normalizer: AbstractNormalizer
-
-    def encode(
-        self,
-        qs: VectorComponents,
-        ps: VectorComponents,
-        /,
-        *,
-        key: PRNGKeyArray | None = None,
-    ) -> tuple[Gamma, FSzN]:
-        r"""Encode phase-space coordinates to ($\gamma$, $p$).
-
-        Parameters
-        ----------
-        qs, ps : VectorComponents
-            Spatial / velocity coordinates of shape (N, n_dims).
-        key : PRNGKeyArray, optional
-            JAX random key for stochastic encoding (if applicable).
-
-        Returns
-        -------
-        gamma : Array
-            Ordering parameter in [-1, 1], shape (N,).
-        prob : Array
-            Membership probability in [0, 1], shape (N,).
-
-        """
-        qs_norm, ps_norm = self.normalizer.transform(qs, ps)
-        ws_norm = jnp.concatenate([qs_norm, ps_norm], axis=1)
-        gamma, prob = jax.vmap(self.encoder, (0, None))(jnp.atleast_2d(ws_norm), key)
-        # Remove extra dim if input was 1D
-        gamma = gamma.squeeze() if qs_norm.ndim == 1 else gamma
-        prob = prob.squeeze() if qs_norm.ndim == 1 else prob
-        return gamma, prob
-
-    def decode(
-        self, gamma: Gamma, /, *, key: PRNGKeyArray | None = None
-    ) -> VectorComponents:
-        r"""Decode $\gamma$ to reconstructed position.
-
-        Parameters
-        ----------
-        gamma : Array
-            Ordering parameter in [-1, 1], shape (N,).
-        key : PRNGKeyArray, optional
-            JAX random key for stochastic decoding (if applicable).
-
-        Returns
-        -------
-        position : VectorComponents
-            Reconstructed dict of positions.
-
-        """
-        qs_norm = jax.vmap(self.decoder, (0, None))(jnp.atleast_1d(gamma), key)
-        qs_norm = qs_norm.squeeze() if gamma.ndim == 0 else qs_norm
-        qs, _ = self.normalizer.inverse_transform(qs_norm, jnp.zeros_like(qs_norm))
-        return qs
 
 
 class PathAutoencoder(AbstractAutoencoder):
@@ -102,7 +42,7 @@ class PathAutoencoder(AbstractAutoencoder):
     parts:
 
     1. **Interpolation Network**: Maps phase-space coordinates $(x, v) \to (\gamma,
-       p)$ where $\gamma \in [-1, 1]$ is the ordering parameter and $p \in [0, 1]$
+       p)$ where $\gamma \in [0, 1]$ is the ordering parameter and $p \in [0, 1]$
        is the membership probability.
     2. **Param-Net (Decoder)**: Maps $\gamma \to x$, reconstructing the position
        from the ordering parameter.
@@ -117,11 +57,17 @@ class PathAutoencoder(AbstractAutoencoder):
         "https://ui.adsabs.harvard.edu/abs/2022ApJ...940...22N/abstract"
     )
 
+    @property
+    def gamma_range(self) -> tuple[float, float]:
+        """Return the gamma range from the encoder."""
+        return self.encoder.gamma_range
+
     @classmethod
     def make(
         cls,
         normalizer: AbstractNormalizer,
         *,
+        gamma_range: tuple[float, float],
         ordering_width_size: int = 100,
         ordering_depth: int = 2,
         track_width_size: int = 128,
@@ -133,6 +79,7 @@ class PathAutoencoder(AbstractAutoencoder):
             in_size=2 * normalizer.n_spatial_dims,
             width_size=ordering_width_size,
             depth=ordering_depth,
+            gamma_range=gamma_range,
             key=key_encode,
         )
         decoder = TrackNet(
@@ -315,9 +262,6 @@ class TrainingConfig:
     lambda_prob: float = OrderingTrainingConfig.lambda_prob
     """Weight for probability loss terms."""
 
-    gamma_range: tuple[float, float] = OrderingTrainingConfig.gamma_range
-    r"""Minimum/maximum $\gamma$ value for ordered tracers."""
-
     # -------------------------------
     # Decoder-only training
 
@@ -347,14 +291,7 @@ class TrainingConfig:
     # =================================
 
     def __post_init__(self) -> None:
-        # Validate gamma_range
-        min_gamma, max_gamma = self.gamma_range
-        if min_gamma < -1:
-            msg = "gamma_range minimum must be >= -1"
-            raise ValueError(msg)
-        if max_gamma > 1:
-            msg = "gamma_range maximum must be <= 1"
-            raise ValueError(msg)
+        pass
 
     @property
     def n_epochs(self) -> int:
@@ -368,7 +305,6 @@ class TrainingConfig:
             n_epochs=self.n_epochs_encoder,
             batch_size=self.batch_size,
             lambda_prob=self.lambda_prob,
-            gamma_range=self.gamma_range,
             show_pbar=self.show_pbar,
         )
 
@@ -740,7 +676,7 @@ def train_autoencoder(
     *,
     config: TrainingConfig | None = None,
     key: PRNGKeyArray,
-) -> tuple[PathAutoencoder, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
+) -> tuple[AutoencoderResult, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
     r"""Train the PathAutoencoder in two phases.
 
     This function orchestrates the complete two-phase training procedure:
@@ -771,8 +707,8 @@ def train_autoencoder(
 
     Returns
     -------
-    model : PathAutoencoder
-        Fully trained autoencoder.
+    result : AutoencoderResult
+        Result containing the fully trained autoencoder and ordering data.
     opt_states : dict[str, optax.OptState]
         Dictionary with 'encoder', 'decoder' and 'both' optimizer states.
     losses : Array, shape (n_epochs_encoder + n_epochs_both,)
@@ -859,20 +795,49 @@ def train_autoencoder(
     }
     losses = jnp.concat([encoder_losses, decoder_losses, autoencoder_losses])
 
-    return model, opt_states, losses
+    # Convert all_ws back to VectorComponents for AutoencoderResult
+    D = all_ws.shape[1] // 2
+    qs_norm = all_ws[:, :D]
+    ps_norm = all_ws[:, D:]
+    positions, velocities = model.normalizer.inverse_transform(qs_norm, ps_norm)
+
+    # Encode to get gamma and membership_prob
+    gamma, prob = model.encode(positions, velocities)
+    # Sort by gamma to get ordering
+    sorted_indices = jnp.argsort(gamma)
+    # Filter by probability threshold
+    high_prob_mask = prob[sorted_indices] >= config.member_threshold
+    filtered_indices = sorted_indices[high_prob_mask]
+
+    result = AutoencoderResult(
+        model=model,
+        positions=positions,
+        velocities=velocities,
+        indices=filtered_indices,
+        gamma=gamma,
+        membership_prob=prob,
+        gamma_range=model.gamma_range,
+    )
+
+    return result, opt_states, losses
 
 
 @plum.dispatch
 def train_autoencoder(
     model: AbstractAutoencoder,
-    walk_results: LocalFlowWalkResult,
+    walk_results: WalkLocalFlowResult,
     /,
     *,
     config: TrainingConfig | None = None,
     key: PRNGKeyArray,
-) -> tuple[AbstractAutoencoder, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
-    # We need to make sure the model has a norma
+) -> tuple[AutoencoderResult, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
+    # Transform walk results using the model's normalizer
     qs, ps = model.normalizer.transform(walk_results.positions, walk_results.velocities)
     ws = jnp.concatenate([qs, ps], axis=1)
 
-    return train_autoencoder(model, ws, walk_results.indices, config=config, key=key)
+    # Train the model
+    result, opt_states, losses = train_autoencoder(
+        model, ws, walk_results.indices, config=config, key=key
+    )
+
+    return result, opt_states, losses

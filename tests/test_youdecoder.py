@@ -43,6 +43,7 @@ class TestEncoderExternalDecoder:
             in_size=2 * normalizer.n_spatial_dims,
             width_size=32,
             depth=2,
+            gamma_range=(-1.0, 1.0),
             key=jr.key(0),
         )
 
@@ -90,8 +91,11 @@ class TestEncoderExternalDecoder:
             encoder=encoder, decoder=decoder, normalizer=normalizer
         )
 
-        # Test multiple gamma values - use vmap for batched decoding
-        gamma = jnp.array([0.0, 0.5, -0.5])
+        # Test multiple gamma values within the decoder's valid range
+        # Use values from the decoder's training gamma range
+        gamma_min = jnp.min(decoder.gamma_train)
+        gamma_max = jnp.max(decoder.gamma_train)
+        gamma = jnp.array([gamma_min, (gamma_min + gamma_max) / 2, gamma_max])
         qs = jax.vmap(model.decode)(gamma)
 
         assert len(qs) == 2
@@ -164,8 +168,8 @@ class TestRunningMeanDecoder:
             window_size=0.1,
         )
 
-        # Test single gamma value
-        gamma = jnp.array(0.0)
+        # Test single gamma value within the decoder's valid range
+        gamma = jnp.mean(decoder.gamma_train)
         result = decoder(gamma)
 
         assert result.shape == (2,)  # 2D position
@@ -180,8 +184,10 @@ class TestRunningMeanDecoder:
             window_size=0.1,
         )
 
-        # Test multiple gamma values
-        gammas = jnp.array([-0.5, 0.0, 0.5])
+        # Test multiple gamma values within the decoder's valid range
+        gamma_min = jnp.min(decoder.gamma_train)
+        gamma_max = jnp.max(decoder.gamma_train)
+        gammas = jnp.linspace(gamma_min, gamma_max, 3)
         results = jax.vmap(decoder)(gammas)
 
         assert results.shape == (3, 2)
@@ -198,7 +204,9 @@ class TestRunningMeanDecoder:
 
         # JIT the vmapped decoder instead of the decoder itself
         jitted_decoder = jax.jit(jax.vmap(decoder))
-        gammas = jnp.array([0.0, 0.5, -0.5])
+        gamma_min = jnp.min(decoder.gamma_train)
+        gamma_max = jnp.max(decoder.gamma_train)
+        gammas = jnp.linspace(gamma_min, gamma_max, 3)
 
         # Should not raise
         result = jitted_decoder(gammas)
@@ -220,7 +228,7 @@ class TestRunningMeanDecoder:
             window_size=0.1,
         )
 
-        gamma = jnp.array(0.0)
+        gamma = jnp.mean(decoder.gamma_train)
         result = decoder(gamma)
 
         assert result.shape == (2,)
@@ -244,7 +252,8 @@ class TestRunningMeanDecoder:
             window_size=0.5,
         )
 
-        gamma = jnp.array(0.0)
+        # Use a gamma value within both decoders' valid ranges
+        gamma = jnp.mean(decoder_small.gamma_train)
 
         # Both should produce valid outputs
         result_small = decoder_small(gamma)
@@ -292,21 +301,22 @@ class TestTrainEncoderExternalDecoder:
             n_epochs=5, batch_size=16, show_pbar=False
         )
 
-        trained_model, opt_state, losses = pcf.nn.train_autoencoder(
+        result, opt_state, losses = pcf.nn.train_autoencoder(
             model, ws_norm, sample_data["ordering"], config=config, key=jr.key(1)
         )
 
-        assert isinstance(trained_model, pcf.nn.EncoderExternalDecoder)
+        assert isinstance(result, pcf.nn.AutoencoderResult)
+        assert isinstance(result.model, pcf.nn.EncoderExternalDecoder)
         assert losses.shape == (5,)
         assert jnp.all(jnp.isfinite(losses))
 
     def test_train_with_walk_result(self, sample_data):
-        """Test training with LocalFlowWalkResult input."""
+        """Test training with WalkLocalFlowResult input."""
         # Create a walk result
         positions = sample_data["positions"]
         velocities = sample_data["velocities"]
 
-        walk_result = pcf.walk_local_flow(
+        result = pcf.walk_local_flow(
             positions, velocities, start_idx=0, metric_scale=1.0
         )
 
@@ -324,11 +334,12 @@ class TestTrainEncoderExternalDecoder:
         config = pcf.nn.OrderingTrainingConfig(
             n_epochs=5, batch_size=16, show_pbar=False
         )
-        trained_model, opt_state, losses = pcf.nn.train_autoencoder(
-            model, walk_result, config=config, key=jr.key(1)
+        result, opt_state, losses = pcf.nn.train_autoencoder(
+            model, result, config=config, key=jr.key(1)
         )
 
-        assert isinstance(trained_model, pcf.nn.EncoderExternalDecoder)
+        assert isinstance(result, pcf.nn.AutoencoderResult)
+        assert isinstance(result.model, pcf.nn.EncoderExternalDecoder)
         assert losses.shape == (5,)
 
     def test_training_reduces_loss(self, model, sample_data):
@@ -364,8 +375,8 @@ class TestTrainEncoderExternalDecoder:
             model, ws_norm, sample_data["ordering"], config=config, key=jr.key(1)
         )
 
-        # Predict gamma for training data
-        gamma, prob = trained_model.encode(
+        # Predict gamma for training data using the trained model
+        gamma, prob = trained_model.model.encode(
             sample_data["positions"], sample_data["velocities"]
         )
 
@@ -392,7 +403,7 @@ class TestIntegration:
         velocities = {"x": -jnp.sin(t), "y": jnp.cos(t)}
 
         # Run phase-flow walk (skip some points by using larger lambda)
-        walk_result = pcf.walk_local_flow(
+        result = pcf.walk_local_flow(
             positions, velocities, start_idx=0, metric_scale=0.5
         )
 
@@ -416,8 +427,8 @@ class TestIntegration:
         config = pcf.nn.OrderingTrainingConfig(
             n_epochs=10, batch_size=20, show_pbar=False
         )
-        trained_model, _, losses = pcf.nn.train_autoencoder(
-            model, walk_result, config=config, key=jr.key(1)
+        result, _, losses = pcf.nn.train_autoencoder(
+            model, result, config=config, key=jr.key(1)
         )
 
         # Check training worked
@@ -425,10 +436,10 @@ class TestIntegration:
         assert losses[-1] < losses[0]
 
         # Predict for all points
-        gamma, prob = trained_model.encode(positions, velocities)
+        gamma, prob = result.model.encode(positions, velocities)
 
         # Decode back to positions
-        reconstructed = jax.vmap(trained_model.decode)(gamma)
+        reconstructed = jax.vmap(result.model.decode)(gamma)
 
         # Check outputs
         assert gamma.shape == (N,)
@@ -448,7 +459,7 @@ class TestIntegration:
         positions = {"x": jnp.linspace(0, 5, N), "y": jnp.zeros(N)}
         velocities = {"x": jnp.ones(N), "y": jnp.zeros(N)}
 
-        walk_result = pcf.walk_local_flow(
+        result = pcf.walk_local_flow(
             positions, velocities, start_idx=0, metric_scale=0.3
         )
 
@@ -467,12 +478,12 @@ class TestIntegration:
         config = pcf.nn.OrderingTrainingConfig(
             n_epochs=10, batch_size=16, show_pbar=False
         )
-        trained_simple, _, _ = pcf.nn.train_autoencoder(
-            simple_model, walk_result, config=config, key=jr.key(1)
+        result, _, _ = pcf.nn.train_autoencoder(
+            simple_model, result, config=config, key=jr.key(1)
         )
 
         # Get predictions
-        gamma_simple, prob_simple = trained_simple.encode(positions, velocities)
+        gamma_simple, prob_simple = result.model.encode(positions, velocities)
 
         # Both should produce valid outputs
         assert jnp.all((gamma_simple >= -1) & (gamma_simple <= 1))

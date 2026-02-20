@@ -1,9 +1,6 @@
 """Utility functions for models."""
 
-__all__: tuple[str, ...] = (
-    "masked_mean",
-    "shuffle_and_batch",
-)
+__all__: tuple[str, ...] = ("masked_mean", "shuffle_and_batch")
 
 import jax.numpy as jnp
 import jax.random as jr

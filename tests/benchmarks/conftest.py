@@ -111,7 +111,7 @@ def simple_autoencoder(simple_wlf_result, rng_key):
     normalizer = pcf.nn.StandardScalerNormalizer(
         simple_wlf_result.positions, simple_wlf_result.velocities
     )
-    return pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
+    return pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=rng_key)
 
 
 @pytest.fixture
@@ -120,19 +120,23 @@ def medium_autoencoder(medium_wlf_result, rng_key):
     normalizer = pcf.nn.StandardScalerNormalizer(
         medium_wlf_result.positions, medium_wlf_result.velocities
     )
-    return pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
+    return pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=rng_key)
 
 
 @pytest.fixture
 def trained_autoencoder(simple_2d_stream, rng_key):
     """Create and train an autoencoder."""
     pos, vel = simple_2d_stream
-    result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+    walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
-    normalizer = pcf.nn.StandardScalerNormalizer(result.positions, result.velocities)
-    ae = pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
+    normalizer = pcf.nn.StandardScalerNormalizer(
+        walkresult.positions, walkresult.velocities
+    )
+    ae = pcf.nn.PathAutoencoder.make(
+        normalizer, gamma_range=walkresult.gamma_range, key=rng_key
+    )
 
     config = pcf.nn.TrainingConfig(n_epochs_encoder=5, n_epochs_both=5, show_pbar=False)
-    trained, _, _ = pcf.nn.train_autoencoder(ae, result, config=config, key=rng_key)
+    result, _, _ = pcf.nn.train_autoencoder(ae, walkresult, config=config, key=rng_key)
 
-    return trained, result
+    return result.model, result

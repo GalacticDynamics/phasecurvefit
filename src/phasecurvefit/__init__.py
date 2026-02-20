@@ -12,9 +12,9 @@ Main Components
 ---------------
 walk_local_flow : function
     The main algorithm for ordering phase-space observations.
-combine_flow_walks : function
-    Run forward and backward walks and combine them into a single ordering.
-LocalFlowWalkResult : NamedTuple
+combine_results : function
+    Combine results from forward and backward walks into a single ordering.
+WalkLocalFlowResult : NamedTuple
     Result container with ordered indices and original data.
 WalkConfig : class
     Configuration for neighbor queries, composing a metric and strategy.
@@ -73,8 +73,8 @@ __all__: tuple[str, ...] = (
     "strats",
     # Algorithm
     "walk_local_flow",
-    "combine_flow_walks",
-    "LocalFlowWalkResult",
+    "combine_results",
+    "WalkLocalFlowResult",
     "StateMetadata",
     # Query configuration
     "WalkConfig",
@@ -84,9 +84,9 @@ __all__: tuple[str, ...] = (
 
 from . import metrics, nn, strats, w
 from ._src.algorithm import (
-    LocalFlowWalkResult,
     StateMetadata,
-    combine_flow_walks,
+    WalkLocalFlowResult,
+    combine_results,
     order_w,
     walk_local_flow,
 )

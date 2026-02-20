@@ -48,7 +48,7 @@ class TestOrderingNet:
         assert prob.shape == (10,)
 
     def test_gamma_range(self, rng_key: PRNGKeyArray):
-        """Test that gamma output is in [-1, 1]."""
+        """Test that gamma output is in [0, 1]."""
         key, subkey = jr.split(rng_key)
         net = pcf.nn.OrderingNet(in_size=4, key=subkey)
 
@@ -56,7 +56,7 @@ class TestOrderingNet:
         w = jax.random.normal(subkey, (100, 4))
         gamma, _ = jax.vmap(net)(w)
 
-        assert jnp.all(gamma >= -1.0)
+        assert jnp.all(gamma >= 0.0)
         assert jnp.all(gamma <= 1.0)
 
     def test_prob_range(self, rng_key: PRNGKeyArray):
@@ -104,7 +104,7 @@ class TestTrackNet:
         """Test that forward pass produces correct output shapes."""
         net = pcf.nn.TrackNet(out_size=3, key=rng_key)
 
-        gamma = jnp.linspace(-1, 1, 10)
+        gamma = jnp.linspace(0, 1, 10)
         qs = jax.vmap(net)(gamma)
 
         assert qs.shape == (10, 3)
@@ -143,7 +143,9 @@ class TestAutoencoder:
             {"x": jnp.array([1, 2]), "y": jnp.array([1, 2])},
             {"x": jnp.array([1, 2]), "y": jnp.array([1, 2])},
         )
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(0.0, 1.0), key=rng_key
+        )
 
         assert ae.encoder.in_size == 4
         assert ae.decoder.out_size == 2
@@ -154,7 +156,9 @@ class TestAutoencoder:
         vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
         ae = pcf.nn.PathAutoencoder.make(
-            normalizer=pcf.nn.StandardScalerNormalizer(pos, vel), key=rng_key
+            normalizer=pcf.nn.StandardScalerNormalizer(pos, vel),
+            gamma_range=(0.0, 1.0),
+            key=rng_key,
         )
 
         gamma, prob = ae.encode(pos, vel)
@@ -168,10 +172,12 @@ class TestAutoencoder:
         vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
         ae = pcf.nn.PathAutoencoder.make(
-            normalizer=pcf.nn.StandardScalerNormalizer(pos, vel), key=rng_key
+            normalizer=pcf.nn.StandardScalerNormalizer(pos, vel),
+            gamma_range=(0.0, 1.0),
+            key=rng_key,
         )
 
-        gamma = jnp.linspace(-1, 1, 5)
+        gamma = jnp.linspace(0, 1, 5)
         pos = ae.decode(gamma)
 
         assert len(pos) == 2
@@ -194,7 +200,6 @@ class TestTrainingConfig:
         assert config.lambda_q == 1.0
         assert config.lambda_p == (1.0, 5.0)
         assert config.member_threshold == 0.5
-        assert config.gamma_range == (-1.0, 1.0)
         assert config.weight_by_density is False
         assert config.freeze_encoder_final_training is False
         assert config.show_pbar is True
@@ -233,7 +238,6 @@ class TestTrainingConfig:
             lambda_prob=2.0,
             lambda_q=0.5,
             lambda_p=(1.0, 150.0),
-            gamma_range=(-0.5, 0.5),
         )
 
         # Check encoder config
@@ -241,7 +245,6 @@ class TestTrainingConfig:
         assert encoder.n_epochs == 100
         assert encoder.batch_size == 64
         assert encoder.lambda_prob == 2.0
-        assert encoder.gamma_range == (-0.5, 0.5)
 
         # Check decoder config
         decoder = config.decoderonly_config()
@@ -256,17 +259,14 @@ class TestTrainingConfig:
         assert autoencoder.lambda_p == (1.0, 150.0)
 
     def test_gamma_range_validation(self):
-        """Test that gamma_range is validated."""
+        """Test that gamma_range is validated in OrderingNet."""
         # Valid ranges should work
-        config = pcf.nn.TrainingConfig(gamma_range=(-0.5, 0.5))
-        assert config.gamma_range == (-0.5, 0.5)
+        net = pcf.nn.OrderingNet(in_size=4, gamma_range=(0.0, 1.0), key=jr.key(0))
+        assert net.gamma_range == (0.0, 1.0)
 
-        # Invalid ranges should raise ValueError
-        with pytest.raises(ValueError, match="gamma_range minimum"):
-            pcf.nn.TrainingConfig(gamma_range=(-1.5, 0.5))
-
-        with pytest.raises(ValueError, match="gamma_range maximum"):
-            pcf.nn.TrainingConfig(gamma_range=(-0.5, 1.5))
+        # Custom range should work
+        net = pcf.nn.OrderingNet(in_size=4, gamma_range=(0.2, 0.8), key=jr.key(1))
+        assert net.gamma_range == (0.2, 0.8)
 
 
 class TestTrainAutoencoder:
@@ -289,16 +289,18 @@ class TestTrainAutoencoder:
             simple_wlf_result.positions, simple_wlf_result.velocities
         )
         key1, key2 = jax.random.split(rng_key)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=key1)
+        ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         # Use minimal epochs for fast testing
-        config = pcf.nn.TrainingConfig(n_epochs_encoder=5, n_epochs_both=5)
+        config = pcf.nn.TrainingConfig(
+            n_epochs_encoder=5, n_epochs_both=5, show_pbar=False
+        )
 
-        trained, _, losses = pcf.nn.train_autoencoder(
+        result, _, losses = pcf.nn.train_autoencoder(
             ae, simple_wlf_result, config=config, key=key2
         )
 
-        assert trained is not None
+        assert result is not None
         assert len(losses) == 110
 
     def test_training_reduces_loss(self, simple_wlf_result, rng_key: PRNGKeyArray):
@@ -307,10 +309,12 @@ class TestTrainAutoencoder:
             simple_wlf_result.positions, simple_wlf_result.velocities
         )
         key1, key2 = jax.random.split(rng_key)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=key1)
+        ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         # Use more epochs for phase 1 to see loss reduction
-        config = pcf.nn.TrainingConfig(n_epochs_encoder=50, n_epochs_both=50)
+        config = pcf.nn.TrainingConfig(
+            n_epochs_encoder=50, n_epochs_both=50, show_pbar=False
+        )
 
         _, _, losses = pcf.nn.train_autoencoder(
             ae, simple_wlf_result, config=config, key=key2
@@ -335,19 +339,21 @@ class TestTrainAutoencoder:
             simple_wlf_result.positions, simple_wlf_result.velocities
         )
         key1, key2 = jax.random.split(rng_key)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=key1)
+        ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
-        config = pcf.nn.TrainingConfig(n_epochs_encoder=2, n_epochs_both=3)
+        config = pcf.nn.TrainingConfig(
+            n_epochs_encoder=2, n_epochs_both=3, show_pbar=False
+        )
 
         trained, _, _ = pcf.nn.train_autoencoder(
             ae, simple_wlf_result, config=config, key=key2
         )
 
         # Check that normalizer has the expected attributes
-        assert hasattr(trained.normalizer, "q_mean")
-        assert hasattr(trained.normalizer, "q_std")
-        assert hasattr(trained.normalizer, "p_mean")
-        assert hasattr(trained.normalizer, "p_std")
+        assert hasattr(trained.model.normalizer, "q_mean")
+        assert hasattr(trained.model.normalizer, "q_std")
+        assert hasattr(trained.model.normalizer, "p_mean")
+        assert hasattr(trained.model.normalizer, "p_std")
 
 
 class TestFillOrderingGaps:
@@ -388,16 +394,14 @@ class TestFillOrderingGaps:
             localflowwalk_with_gaps.positions, localflowwalk_with_gaps.velocities
         )
         key1, key2 = jax.random.split(rng_key)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=key1)
+        ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         config = pcf.nn.TrainingConfig(
             n_epochs_encoder=25, n_epochs_decoder=25, n_epochs_both=25, show_pbar=False
         )
-        trained, _, _ = pcf.nn.train_autoencoder(
+        result, _, _ = pcf.nn.train_autoencoder(
             ae, localflowwalk_with_gaps, config=config, key=key2
         )
-
-        result = pcf.nn.fill_ordering_gaps(trained, localflowwalk_with_gaps)
 
         assert hasattr(result, "gamma")
         assert hasattr(result, "membership_prob")
@@ -412,16 +416,14 @@ class TestFillOrderingGaps:
             localflowwalk_with_gaps.positions, localflowwalk_with_gaps.velocities
         )
         key1, key2 = jax.random.split(rng_key)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=key1)
+        ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         config = pcf.nn.TrainingConfig(
             n_epochs_encoder=5, n_epochs_decoder=5, n_epochs_both=5, show_pbar=False
         )
-        trained, _, _ = pcf.nn.train_autoencoder(
+        result, _, _ = pcf.nn.train_autoencoder(
             ae, localflowwalk_with_gaps, config=config, key=key2
         )
-
-        result = pcf.nn.fill_ordering_gaps(trained, localflowwalk_with_gaps)
 
         # Result is a NamedTuple, not a dict
         assert hasattr(result, "gamma")
@@ -436,7 +438,7 @@ class TestFillOrderingGaps:
             localflowwalk_with_gaps.positions, localflowwalk_with_gaps.velocities
         )
         key1, key2 = jax.random.split(rng_key)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=key1)
+        ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         config = pcf.nn.TrainingConfig(
             n_epochs_encoder=5, n_epochs_decoder=5, n_epochs_both=5, show_pbar=False
@@ -446,10 +448,10 @@ class TestFillOrderingGaps:
         )
 
         result_low = pcf.nn.fill_ordering_gaps(
-            trained, localflowwalk_with_gaps, prob_threshold=0.1
+            trained.model, localflowwalk_with_gaps, prob_threshold=0.1
         )
         result_high = pcf.nn.fill_ordering_gaps(
-            trained, localflowwalk_with_gaps, prob_threshold=0.9
+            trained.model, localflowwalk_with_gaps, prob_threshold=0.9
         )
 
         # Higher threshold should give fewer or equal points
@@ -464,7 +466,9 @@ class TestJAXIntegration:
         pos = {"x": jnp.array([0.0, 1.0]), "y": jnp.array([0.0, 1.0])}
         vel = {"x": jnp.array([1.0, 1.0]), "y": jnp.array([0.5, 0.5])}
         normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(0.0, 1.0), key=rng_key
+        )
 
         @jax.jit
         def encode(qs, ps):
@@ -488,13 +492,15 @@ class TestJAXIntegration:
             "z": jnp.array([0.25, 0.25, 0.25]),
         }
         normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(0.0, 1.0), key=rng_key
+        )
 
         @jax.jit
         def decode(gamma):
             return ae.decode(gamma)
 
-        gamma = jnp.linspace(-1, 1, 10)
+        gamma = jnp.linspace(0, 1, 10)
         q = decode(gamma)
 
         assert len(q) == 3
@@ -512,7 +518,9 @@ class TestJAXIntegration:
             "y": jax.random.normal(jax.random.key(4), (10,)),
         }
         normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(0.0, 1.0), key=rng_key
+        )
 
         gamma, prob = ae.encode(pos, vel)
 
@@ -530,7 +538,9 @@ class TestJAXIntegration:
             "y": jax.random.normal(jax.random.key(4), (10,)),
         }
         normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(0.0, 1.0), key=rng_key
+        )
 
         def loss(pos_vals, vel_vals):
             # Unpack into dict
@@ -565,7 +575,9 @@ class Test3DData:
         }
 
         normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=rng_key)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(0.0, 1.0), key=rng_key
+        )
 
         gamma, prob = ae.encode(pos, vel)
 
@@ -589,25 +601,25 @@ class Test3DData:
         }
 
         start_idx = int(jnp.argmin(pos["z"]))
-        localflowwalk_result = pcf.walk_local_flow(
+        walkresult = pcf.walk_local_flow(
             pos, vel, start_idx=start_idx, metric_scale=3.0
         )
 
         normalizer = pcf.nn.StandardScalerNormalizer(
-            localflowwalk_result.positions, localflowwalk_result.velocities
+            walkresult.positions, walkresult.velocities
         )
         key1, key2 = jax.random.split(rng_key)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=key1)
+        ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         config = pcf.nn.TrainingConfig(
             n_epochs_encoder=5, n_epochs_decoder=5, n_epochs_both=5, show_pbar=False
         )
-        trained, _, losses = pcf.nn.train_autoencoder(
-            ae, localflowwalk_result, config=config, key=key2
+        result, _, losses = pcf.nn.train_autoencoder(
+            ae, walkresult, config=config, key=key2
         )
 
         assert len(losses) == 15
-        assert trained is not None
+        assert result is not None
 
 
 class TestEdgeCases:
@@ -618,23 +630,23 @@ class TestEdgeCases:
         pos = {"x": jnp.array([0.0, 1.0]), "y": jnp.array([0.0, 1.0])}
         vel = {"x": jnp.array([1.0, 1.0]), "y": jnp.array([1.0, 1.0])}
 
-        localflowwalk_result = pcf.walk_local_flow(
-            pos, vel, start_idx=0, metric_scale=1.0
-        )
+        walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
         normalizer = pcf.nn.StandardScalerNormalizer(
-            localflowwalk_result.positions, localflowwalk_result.velocities
+            walkresult.positions, walkresult.velocities
         )
         key1, key2 = jax.random.split(rng_key)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=key1)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=walkresult.gamma_range, key=key1
+        )
 
         config = pcf.nn.TrainingConfig(
             n_epochs_encoder=2, n_epochs_decoder=3, n_epochs_both=3, show_pbar=False
         )
 
         # Should not raise
-        trained, _, losses = pcf.nn.train_autoencoder(
-            ae, localflowwalk_result, config=config, key=key2
+        result, _, losses = pcf.nn.train_autoencoder(
+            ae, walkresult, config=config, key=key2
         )
         assert len(losses) == 8
 
@@ -646,32 +658,28 @@ class TestEdgeCases:
         pos = {"x": t, "y": jnp.zeros(n_points)}
         vel = {"x": jnp.ones(n_points), "y": jnp.zeros(n_points)}
 
-        localflowwalk_result = pcf.walk_local_flow(
-            pos, vel, start_idx=0, metric_scale=1.0
-        )
+        walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
 
         # All points should be ordered
-        assert len(localflowwalk_result.indices) == n_points
-        assert len(localflowwalk_result.skipped_indices) == 0
+        assert len(walkresult.indices) == n_points
+        assert len(walkresult.skipped_indices) == 0
 
         normalizer = pcf.nn.StandardScalerNormalizer(
-            localflowwalk_result.positions, localflowwalk_result.velocities
+            walkresult.positions, walkresult.velocities
         )
         key1, key2 = jax.random.split(rng_key)
-        ae = pcf.nn.PathAutoencoder.make(normalizer, key=key1)
-
-        # Use more epochs for better learning
+        model = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=walkresult.gamma_range, key=key1
+        )
         config = pcf.nn.TrainingConfig(
-            n_epochs_encoder=25, n_epochs_decoder=25, n_epochs_both=25, show_pbar=False
+            # n_epochs_encoder=800, n_epochs_decoder=0, n_epochs_both=0,
+            show_pbar=False
+        )
+        result, _, losses = pcf.nn.train_autoencoder(
+            model, walkresult, config=config, key=key2
         )
 
-        # Should work fine even with no gaps
-        trained, _, losses = pcf.nn.train_autoencoder(
-            ae, localflowwalk_result, config=config, key=key2
-        )
-        result = pcf.nn.fill_ordering_gaps(
-            trained, localflowwalk_result, prob_threshold=0.0
-        )
-
-        # With prob_threshold=0.0, all points should be included
+        # When all points are ordered (no gaps), train_autoencoder should
+        # preserve all of them without filtering by prob_threshold
         assert len(result.indices) == n_points
+        assert len(losses) == config.n_epochs

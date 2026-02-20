@@ -136,9 +136,11 @@ def test_epitrochoid_autoencoder_fit() -> plt.Figure:
     # Train autoencoder
     key, model_key, train_key = jr.split(key, 3)
     normalizer = pcf.nn.StandardScalerNormalizer(qs, ps)
-    model = pcf.nn.PathAutoencoder.make(normalizer, track_depth=4, key=model_key)
+    model = pcf.nn.PathAutoencoder.make(
+        normalizer, gamma_range=(0.0, 1.0), track_depth=4, key=model_key
+    )
     train_config = pcf.nn.TrainingConfig(show_pbar=False)
-    model, _, _ = pcf.nn.train_autoencoder(
+    result, _, _ = pcf.nn.train_autoencoder(
         model, walkresult, key=train_key, config=train_config
     )
 
@@ -146,11 +148,13 @@ def test_epitrochoid_autoencoder_fit() -> plt.Figure:
     fig, ax = plt.subplots(figsize=(10, 10))
 
     # Encode all points
-    all_gamma, all_probs = model.encode(walkresult.positions, walkresult.velocities)
+    all_gamma, all_probs = result.model.encode(
+        walkresult.positions, walkresult.velocities
+    )
     rejected_membership = all_probs < 0.9
 
     # Decode predicted path
-    qs_pred = model.decode(jnp.linspace(-1, 1, 1_000))
+    qs_pred = result.model.decode(jnp.linspace(*result.model.gamma_range, 1_000))
 
     # Extract values from Quantities for plotting
     qs_x_vals = jnp.asarray(u.ustrip(qs["x"]))

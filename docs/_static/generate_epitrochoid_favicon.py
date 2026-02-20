@@ -158,7 +158,7 @@ def main(
     # Encode all points and get mean path
     print("Encoding points and generating mean path...")
     all_gamma, _ = model.encode(walkresult.positions, walkresult.velocities)
-    qs_pred = model.decode(jnp.linspace(-1, 1, 1_000))
+    qs_pred = model.decode(jnp.linspace(*model.gamma_range, 1_000))
 
     # Create clean visualization for favicon
     print("Creating favicon visualization...")

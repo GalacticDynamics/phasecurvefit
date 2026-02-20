@@ -20,9 +20,11 @@ Examples
 
 >>> keys = jax.random.split(jax.random.key(0), 2)
 >>> normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
->>> ae = pcf.nn.PathAutoencoder.make(normalizer=normalizer, key=keys[0])
+>>> model = pcf.nn.PathAutoencoder.make(
+...     normalizer=normalizer, gamma_range=result.gamma_range, key=keys[0]
+... )
 >>> cfg = pcf.nn.TrainingConfig(n_epochs_both=100, show_pbar=False)
->>> ae, *_ = pcf.nn.train_autoencoder(ae, result, config=cfg, key=keys[1])
+>>> result, *_ = pcf.nn.train_autoencoder(model, result, config=cfg, key=keys[1])
 
 """
 
@@ -30,7 +32,9 @@ __all__: tuple[str, ...] = (
     # Network components
     "OrderingNet",
     "TrackNet",
+    "AbstractAutoencoder",
     "PathAutoencoder",
+    "AbstractExternalDecoder",
     "EncoderExternalDecoder",
     "RunningMeanDecoder",
     # Training
@@ -49,7 +53,9 @@ __all__: tuple[str, ...] = (
     "StandardScalerNormalizer",
 )
 
-from ._src.autoencoder import (
+from ._src.nn import (
+    AbstractAutoencoder,
+    AbstractExternalDecoder,
     AbstractNormalizer,
     AutoencoderResult,
     EncoderExternalDecoder,

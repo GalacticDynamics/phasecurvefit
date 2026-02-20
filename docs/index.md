@@ -48,6 +48,7 @@ simulations but is general-purpose and applies to any dataset where you want to
 order observations by proximity and momentum in phase-space.
 
 The core approach combines:
+
 - **Spatial proximity**: Finding nearby points in position space
 - **Velocity momentum**: Preferring points that align with the current velocity direction
 
@@ -203,6 +204,7 @@ velocity = {
 ```
 
 This dict-based API is designed for:
+
 - Efficient JAX tree operations via `jax.tree.map`
 - Seamless integration with JAX transformations (`jit`, `vmap`, `grad`)
 - Minimal overhead in hot loops
