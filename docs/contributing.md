@@ -5,12 +5,14 @@ Thank you for your interest in contributing! This guide covers the essentials.
 ## Setup
 
 1. **Clone the repository:**
+
    ```bash
-   git clone https://github.com/YOUR_USERNAME/nearest-neighbours-with-momentum.git
-   cd nearest-neighbours-with-momentum
+   git clone https://github.com/YOUR_USERNAME/phasecurvefit.git
+   cd phasecurvefit
    ```
 
 2. **Install dependencies:**
+
    ```bash
    uv sync --all-extras
    ```
@@ -25,11 +27,13 @@ Thank you for your interest in contributing! This guide covers the essentials.
 ## Testing and Quality
 
 Run tests:
+
 ```bash
 uv run pytest tests/ -v
 ```
 
 Lint your code:
+
 ```bash
 uv run pre-commit run --all-files
 ```
@@ -37,6 +41,7 @@ uv run pre-commit run --all-files
 ## Making Changes
 
 1. **Create a feature branch:**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -46,12 +51,14 @@ uv run pre-commit run --all-files
 3. **Add tests** in `tests/` for your changes
 
 4. **Run tests and linting:**
+
    ```bash
    uv run pytest tests/ -v
    uv run pre-commit run --all-files
    ```
 
 5. **Commit and push:**
+
    ```bash
    git add .
    git commit -m "Brief description"
@@ -63,6 +70,7 @@ uv run pre-commit run --all-files
 ## Writing Tests
 
 Tests must:
+
 - **Test something**: Include assertions
 - **Be JAX-compatible**: Test with `jit`, `vmap`
 - **Have clear names**: `test_ordering_increases_gamma` not `test_1`
@@ -94,6 +102,7 @@ def test_basic_ordering():
 ## Performance
 
 For hot-path code:
+
 - Use `jax.lax` primitives instead of Python loops
 - Use `jax.vmap` for vectorization
 - Avoid Python control flow in JAX-compiled functions
@@ -107,6 +116,7 @@ For hot-path code:
 ## Code Review
 
 We look for:
+
 - Correctness and tests
 - JAX compatibility
 - Code quality
