@@ -84,7 +84,6 @@ lint = ["cz-conventional-gitmoji>=0.6.1", "pre-commit>=4.1.0", "pylint>=3.3.8"]
 nox = ["nox>=2024.10.9", "nox-uv>=0.6.3"]
 test = [
   "beartype>=0.21.0",
-  "hypothesis[numpy]>=6.138.14",
   "matplotlib>=3.8",
   "pytest>=9.0.2",
   "pytest-arraydiff>=0.6.1",
@@ -189,10 +188,9 @@ ignore = [
 "src/phasecurvefit/_version.py" = ["ALL"]
 
 [tool.ruff.lint.flake8-import-conventions.aliases]
-equinox                 = "eqx"
-"hypothesis.strategies" = "st"
-"jax.numpy"             = "jnp"
-phasecurvefit           = "pcf"
+equinox       = "eqx"
+"jax.numpy"   = "jnp"
+phasecurvefit = "pcf"
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
@@ -244,7 +242,6 @@ ignore_missing_imports = true
 module = [
   "equinox.*",
   "flax.*",
-  "hypothesis.*",
   "jax.*",
   "jax_tqdm.*",
   "jaxtyping.*",
