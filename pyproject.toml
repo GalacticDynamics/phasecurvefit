@@ -19,17 +19,15 @@ classifiers = [
 ]
 dependencies = [
   "equinox>=0.11.0",
-  "galax",
   "jax>=0.7.2",
-  "jax-bounded-while>=0.1",
+  "jaxmore>=0.2.0",
   "jax-tqdm>=0.4.0",
   "jaxtyping>=0.3.5",
   "optax>=0.2.4",
   "optional-dependencies>=0.4.0",
-  "orbax-checkpoint>=0.11.32",
   "plum-dispatch>=2.6.1",
   "quax>=0.2.1",
-  "unxt",
+  "unxt>=1.10.0",
   "zeroth>=1.0.1",
 ]
 description = "Walk through phase-space observations"
@@ -62,6 +60,8 @@ dev = [
   { include-group = "nox" },
   { include-group = "test" },
   "ipywidgets>=8.1.8",
+  "cz-conventional-gitmoji>=0.7.0",
+  "commitizen>=4.11.3",
 ]
 docs = [
   "myst-parser>=4.0.0",
@@ -200,7 +200,7 @@ extra-standard-library = ["typing_extensions"]
 known-first-party = [
   "dataclassish",
   "is_annotated",
-  "jax-bounded-while",
+  "jaxmore",
   "optional_dependencies",
   "quaxed",
   "unxt",

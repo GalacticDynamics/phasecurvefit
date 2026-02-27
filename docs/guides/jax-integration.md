@@ -54,6 +54,7 @@ Process multiple streams in parallel:
 import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
+from jaxmore import vmap  # a better vmap
 
 # Multiple streams
 streams_pos = [
@@ -72,9 +73,10 @@ stacked_pos = {"x": jnp.stack([s["x"] for s in streams_pos])}
 stacked_vel = {"x": jnp.stack([s["x"] for s in streams_vel])}
 
 # Apply vmap over batch dimension
-batched_fn = jax.vmap(
-    lambda q, p: pcf.walk_local_flow(q, p, start_idx=0, metric_scale=1.0),
+batched_fn = vmap(
+    pcf.walk_local_flow,
     in_axes=(0, 0),
+    static_kw={"start_idx": 0, "metric_scale": 1.0},
 )
 results = batched_fn(stacked_pos, stacked_vel)
 print(f"Processed {results.indices.shape[0]} streams in parallel")
@@ -146,9 +148,10 @@ result = pcf.walk_local_flow(pos_jax, vel_jax, start_idx=0, metric_scale=1.0)
 ```python
 @jax.jit
 def batch_order(stacked_pos, stacked_vel):
-    return jax.vmap(
-        lambda q, p: pcf.walk_local_flow(q, p, start_idx=0, metric_scale=1.0),
+    return vmap(
+        pcf.walk_local_flow,
         in_axes=(0, 0),
+        static_kw={"start_idx": 0, "metric_scale": 1.0},
     )(stacked_pos, stacked_vel)
 ```
 

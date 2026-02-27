@@ -38,9 +38,9 @@ import jax.numpy as jnp
 import jax.tree as jtu
 import plum
 import quax
-from jax_bounded_while import bounded_while_loop
 from jaxtyping import Array, Bool, Int, PRNGKeyArray
 
+from jaxmore import bounded_while_loop
 from zeroth import zeroth
 
 from .abstract_result import AbstractResult
