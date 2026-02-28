@@ -11,13 +11,13 @@ algorithms.
 Install the core package:
 
 ```bash
-pip install phasecurvefit
+pip install phasecurvefit[all]
 ```
 
 Or with uv:
 
 ```bash
-uv add phasecurvefit
+uv add phasecurvefit[all]
 ```
 
 <details>
@@ -52,6 +52,7 @@ phasecurvefit has optional dependencies for extended functionality:
 Install with optional dependencies:
 
 ```bash
+# pip install phasecurvefit[all]  # Install with all extras
 pip install phasecurvefit[interop]  # Install with unxt for unit support
 pip install phasecurvefit[kdtree]  # Install with jaxkd for KD-tree strategy
 ```
@@ -59,6 +60,7 @@ pip install phasecurvefit[kdtree]  # Install with jaxkd for KD-tree strategy
 Or with uv:
 
 ```bash
+# uv add phasecurvefit --extra all  # installs all extras
 uv add phasecurvefit --extra interop
 uv add phasecurvefit --extra kdtree
 ```

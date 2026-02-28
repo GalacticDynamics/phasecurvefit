@@ -1901,11 +1901,14 @@ dependencies = [
     { name = "optional-dependencies" },
     { name = "plum-dispatch" },
     { name = "quax" },
-    { name = "unxt" },
     { name = "zeroth" },
 ]
 
 [package.optional-dependencies]
+all = [
+    { name = "jaxkd" },
+    { name = "unxt" },
+]
 interop = [
     { name = "unxt" },
 ]
@@ -2004,6 +2007,7 @@ requires-dist = [
     { name = "equinox", specifier = ">=0.11.0" },
     { name = "jax", specifier = ">=0.7.2" },
     { name = "jax-tqdm", specifier = ">=0.4.0" },
+    { name = "jaxkd", marker = "extra == 'all'", specifier = ">=0.0.5" },
     { name = "jaxkd", marker = "extra == 'kdtree'", specifier = ">=0.0.5" },
     { name = "jaxmore", specifier = ">=0.2.0" },
     { name = "jaxtyping", specifier = ">=0.3.5" },
@@ -2011,11 +2015,11 @@ requires-dist = [
     { name = "optional-dependencies", specifier = ">=0.4.0" },
     { name = "plum-dispatch", specifier = ">=2.6.1" },
     { name = "quax", specifier = ">=0.2.1" },
-    { name = "unxt", specifier = ">=1.10.0" },
-    { name = "unxt", marker = "extra == 'interop'", specifier = ">=1.10.0" },
+    { name = "unxt", marker = "extra == 'all'", specifier = ">=1.10.4" },
+    { name = "unxt", marker = "extra == 'interop'", specifier = ">=1.10.4" },
     { name = "zeroth", specifier = ">=1.0.1" },
 ]
-provides-extras = ["interop", "kdtree"]
+provides-extras = ["all", "interop", "kdtree"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2203,16 +2207,22 @@ wheels = [
 
 [[package]]
 name = "plum-dispatch"
-version = "2.6.1"
+version = "2.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beartype" },
     { name = "rich" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a8/df/36f6677eff00a853c6a7d365316920ea411aa8015cf218612871082e25e7/plum_dispatch-2.6.1.tar.gz", hash = "sha256:05d14f31bf2ac8550d7742426d5c5a3fa532d8ed7cc12ffd695c4b452cffbdfa", size = 34952, upload-time = "2025-12-18T11:56:54.862Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4b/7a/5bbae2b6431df921757188f742be6e919393aa55787b582aecb281d1a4bf/plum_dispatch-2.7.1.tar.gz", hash = "sha256:38f04f42f2cc4f726083244e52ee04cfd155f53fad55423ec0fd1bfee3fc97a9", size = 242770, upload-time = "2026-02-21T09:27:49.964Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/42/88/71fa06eb487ed9d4fab0ad173300b7a58706385f98fb66b1ccdc3ec3d4dd/plum_dispatch-2.6.1-py3-none-any.whl", hash = "sha256:49cd83027498e35eac32c7a93ecd6a99970d72d90f4141cc93be760c7ba831c4", size = 41456, upload-time = "2025-12-18T11:56:53.599Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/c6/b6ac3e87fee0c22e973e7551257511271037457714d3d98a13c0a635f402/plum_dispatch-2.7.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:9aae69d9239d9c8421d0874b2050f840e2dd0835ae56b521d0bc6cb8e0a2842d", size = 165265, upload-time = "2026-02-21T09:27:40.112Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/97/8fcd79b86d550350af486a09aafaf8405f84bc405aae17ce78358b02b386/plum_dispatch-2.7.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:32680ac1990785065246bdc7f8b19a40fd5eb4114226b1dbc1bcbfc32580a3b1", size = 193280, upload-time = "2026-02-21T09:27:41.346Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/c4/134e90aec2555198c2ed291bbf216066abe94e8239c0649ebfa5f1b3fbec/plum_dispatch-2.7.1-cp312-cp312-win_amd64.whl", hash = "sha256:d967d57077ae05a7f3c6bc3b72eaf6a83f0733f6f7cd417a2ba63f39490b446d", size = 146817, upload-time = "2026-02-21T09:27:42.939Z" },
+    { url = "https://files.pythonhosted.org/packages/de/3b/0a31c5bf6500b1edd2a0dd1a562c58bf030d07f38644a78c84d3dae4e011/plum_dispatch-2.7.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:f9b6c6d70b37525bae0f77e897c7fee49845b38429958ded50f5be7e3bebb535", size = 165237, upload-time = "2026-02-21T09:27:44.589Z" },
+    { url = "https://files.pythonhosted.org/packages/89/da/ac745bb38b466bdd2c374374391b6e1ab5e446c0a1e31424f9de841d6afc/plum_dispatch-2.7.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:12653d78f1840e6411523fb42a72c46f4941a9b354cc6ecebdfaad471b11aa98", size = 192689, upload-time = "2026-02-21T09:27:46.03Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/67/6f3cef28ff828b9867d75d018dab100b1c969650bfdaf6b1a55f9b826ae0/plum_dispatch-2.7.1-cp313-cp313-win_amd64.whl", hash = "sha256:fe2f149b9d1edc183a66c529259f1cfcc4bc6433574d7819dad2a6b280fe30bc", size = 146941, upload-time = "2026-02-21T09:27:47.57Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/61/52666dd036af3279351ba36a38dfcc0f1f6bc03975611ea5bcfa9cf8ba76/plum_dispatch-2.7.1-py3-none-any.whl", hash = "sha256:7f9fdf3f58fc8a738234f0b47569b079eac666e9ed6e095f1fcb7f158cbc3e1c", size = 44544, upload-time = "2026-02-21T09:27:48.708Z" },
 ]
 
 [[package]]
@@ -3333,7 +3343,7 @@ wheels = [
 
 [[package]]
 name = "unxt"
-version = "1.10.3"
+version = "1.10.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "astropy" },
@@ -3353,9 +3363,9 @@ dependencies = [
     { name = "xmmutablemap" },
     { name = "zeroth" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/25/2f/78436064bc5112882dcf871f5a51f16a6a2b2c27c7e36e8ca146e51cab34/unxt-1.10.3.tar.gz", hash = "sha256:522318b9d19171f52faeaceb5aff9ceaa73c39ba7f7dfea434b42c1d126bc164", size = 1005379, upload-time = "2026-01-31T17:28:11.699Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/7e/86ece74255db28f59e4adf40dafd4aa66efea60887a6329e66076609e359/unxt-1.10.4.tar.gz", hash = "sha256:c349c6e6f01f4241ac91da31a4abb882c7bb9d22a84771bfafac38d0992e1b4a", size = 1021924, upload-time = "2026-02-28T15:45:09.09Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/e7/2635b0f644deb4cf9e92b3d3c10f6230ecde9814b85808b4302c8d7cf7fd/unxt-1.10.3-py3-none-any.whl", hash = "sha256:127c6a66e08126bba40e9f9383af31c089a9112d06eebabdf9eb1cdeff0f1359", size = 83510, upload-time = "2026-01-31T17:28:10.261Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/c5/22f1d2919489ab223c2f27a89d915ad10318803d022afce83b82107e8436/unxt-1.10.4-py3-none-any.whl", hash = "sha256:d9218ada0f4871fd35ce24a3d28dca20771c9f3ab8c81fc5460234f55beee5e1", size = 83507, upload-time = "2026-02-28T15:45:07.241Z" },
 ]
 
 [[package]]
