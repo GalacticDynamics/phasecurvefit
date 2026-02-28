@@ -27,7 +27,6 @@ dependencies = [
   "optional-dependencies>=0.4.0",
   "plum-dispatch>=2.6.1",
   "quax>=0.2.1",
-  "unxt>=1.10.0",
   "zeroth>=1.0.1",
 ]
 description = "Walk through phase-space observations"
@@ -38,7 +37,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
-interop = ["unxt>=1.10.0"]
+all     = ["phasecurvefit[interop,kdtree]"]
+interop = ["unxt>=1.10.4"]
 kdtree  = ["jaxkd>=0.0.5"]
 
 [project.urls]
