@@ -63,16 +63,20 @@ This is particularly useful for coherent trajectories in phase-space, such as st
 :::{tab-item} pip
 
 ```bash
-pip install phasecurvefit
+pip install phasecurvefit[all]
 ```
+
+where "all" enables unit support (through `unxt`) and kdtree support through `jaxkd`.
 
 :::
 
 :::{tab-item} uv
 
 ```bash
-uv add phasecurvefit
+uv add phasecurvefit --extra all
 ```
+
+where "all" enables unit support (through `unxt`) and kdtree support through `jaxkd`.
 
 :::
 
@@ -172,7 +176,7 @@ For the mathematical background on momentum-weighted ordering, refer to the [NN+
         - Install optional dependency: `uv add phasecurvefit[kdtree]`
         - Uses [jaxkd](https://github.com/dodgebc/jaxkd)
 
-Example using KD-tree:
+Example using KD-tree (requires `jaxkd`):
 
 ```python
 import phasecurvefit as pcf
