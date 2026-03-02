@@ -111,24 +111,37 @@ uv pip install -e .  # editable mode
 ## Quick Example
 
 ```python
+import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
 
-# Define phase-space data as dictionaries
-position = {
-    "x": jnp.array([0.0, 1.0, 2.0, 3.0]),
-    "y": jnp.array([0.0, 0.5, 1.0, 1.5]),
+# Create phase-space observations as dictionaries
+pos = {
+    "x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0]),
+    "y": jnp.array([0.0, 0.5, 1.0, 1.5, 2.0]),
 }
-velocity = {
-    "x": jnp.array([1.0, 1.0, 1.0, 1.0]),
-    "y": jnp.array([0.5, 0.5, 0.5, 0.5]),
+vel = {
+    "x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0]),
+    "y": jnp.array([0.5, 0.5, 0.5, 0.5, 0.5]),
 }
 
-# Run the algorithm
-result = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+# Order observations using walk_local_flow
+config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=3))
+result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
 
-result.indices
-# Array([0, 1, 2, 3])
+# Train autoencoder for gap filling
+key = jax.random.key(0)
+normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+autoencoder = pcf.nn.PathAutoencoder.make(
+    normalizer, gamma_range=result.gamma_range, key=key
+)
+
+train_cfg = pcf.nn.TrainingConfig(
+    n_epochs_encoder=100, n_epochs_both=50, show_pbar=False
+)
+result, _, _ = pcf.nn.train_autoencoder(autoencoder, result, config=train_cfg, key=key)
+
+print(result.indices)  # Array([0, 1, 2, 3, 4])
 ```
 
 ## Features
@@ -182,7 +195,7 @@ Example using KD-tree (requires `jaxkd`):
 import phasecurvefit as pcf
 
 config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2))
-result = pcf.walk_local_flow(position, velocity, config=config)
+result = pcf.walk_local_flow(pos, vel, config=config)
 ```
 
 ## Data Format
