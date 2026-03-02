@@ -97,7 +97,7 @@ test = [
   "pytest-randomly>=3.16.0",
   "pytest-timeout>=2.3.1",
   "sybil[pytest]>=8.0.0",
-  "unxt>=1.10.0",
+  "unxt>=1.10.4",
   "jaxkd>=0.0.5",
 ]
 

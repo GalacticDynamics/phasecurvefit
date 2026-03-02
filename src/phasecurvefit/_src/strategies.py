@@ -19,6 +19,7 @@ __all__: tuple[str, ...] = (
     "AbstractQueryStrategy",
     "BruteForce",
     "KDTree",
+    "QueryResult",
 )
 
 from abc import ABC, abstractmethod
