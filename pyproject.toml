@@ -18,7 +18,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "equinox>=0.11.0",
+  "equinox>=0.13.5",
   "jax>=0.7.2",
   "jaxmore>=0.2.0",
   "jax-tqdm>=0.4.0",
@@ -315,9 +315,11 @@ filterwarnings = [
   # pytest
   "ignore:The hookimpl.*uses old-style configuration options:pytest.PytestDeprecationWarning",
   # jax
-  "ignore:jax\\.core\\.pp_eqn_rules is deprecated:DeprecationWarning",
-  "ignore:jax\\.core\\.Primitive is deprecated:DeprecationWarning",
-  "ignore:jax\\.interpreters\\.batching\\.NotMapped is deprecated:DeprecationWarning",
+  "ignore:.*pp_eqn_rules is deprecated:DeprecationWarning",
+  "ignore:.*Primitive is deprecated:DeprecationWarning",
+  "ignore:.*mapped_aval is deprecated:DeprecationWarning",
+  "ignore:.*unmapped_aval is deprecated:DeprecationWarning",
+  "ignore:.*NotMapped is deprecated:DeprecationWarning",
   "ignore:The numpy\\.array_function protocol:DeprecationWarning",
   "ignore:numpy\\.ndarray size changed:RuntimeWarning",
   # matplotlib
