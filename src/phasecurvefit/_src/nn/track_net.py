@@ -15,7 +15,6 @@ import optax
 from jaxtyping import Array, Bool, Float, PRNGKeyArray, Real
 
 from .order_net import default_optimizer
-from .scanmlp import ScanOverMLP
 from .utils import masked_mean, shuffle_and_batch
 from phasecurvefit._src.custom_types import FSz0, RSz0, RSzN
 
@@ -45,7 +44,7 @@ class TrackNet(eqx.Module):
 
     """
 
-    mlp: ScanOverMLP
+    mlp: eqx.nn.MLP
 
     out_size: int = eqx.field(static=True)
     width_size: int = eqx.field(static=True)
@@ -64,12 +63,13 @@ class TrackNet(eqx.Module):
         self.width_size = width_size
         self.depth = depth
 
-        self.mlp = ScanOverMLP(
+        self.mlp = eqx.nn.MLP(
             in_size="scalar",
             out_size=out_size,
             width_size=width_size,
             depth=depth,
             activation=jax.nn.tanh,
+            scan=True,
             key=key,
         )
 
