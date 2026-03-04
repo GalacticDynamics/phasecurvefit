@@ -24,7 +24,6 @@ import jax_tqdm
 import optax
 from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
-from .scanmlp import ScanOverMLP
 from .utils import masked_mean, shuffle_and_batch
 from phasecurvefit._src.custom_types import FSz0, FSzN
 
@@ -61,7 +60,7 @@ class OrderingNet(eqx.Module):
 
     """
 
-    mlp: ScanOverMLP
+    mlp: eqx.nn.MLP
     gamma_head: eqx.nn.Linear
     prob_head: eqx.nn.Linear
 
@@ -93,7 +92,7 @@ class OrderingNet(eqx.Module):
 
         # MLP backbone: input -> hidden layers -> (hidden_size,) The output of
         # this MLP has size hidden_size, which feeds to both output heads
-        self.mlp = ScanOverMLP(
+        self.mlp = eqx.nn.MLP(
             in_size=in_size,
             width_size=width_size,
             out_size=width_size,  # Output fed to the two heads
@@ -102,6 +101,7 @@ class OrderingNet(eqx.Module):
             final_activation=jax.nn.tanh,
             use_bias=True,
             use_final_bias=True,
+            scan=True,
             key=keys[0],
         )
 

@@ -59,6 +59,5 @@ from .externaldecoder import *
 from .normalize import *
 from .order_net import *
 from .result import *
-from .scanmlp import *
 from .track_net import *
 from .utils import *

@@ -18,7 +18,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "equinox>=0.11.0",
+  "equinox>=0.13.5",
   "jax>=0.7.2",
   "jaxmore>=0.2.0",
   "jax-tqdm>=0.4.0",
@@ -314,10 +314,12 @@ filterwarnings = [
   "error",
   # pytest
   "ignore:The hookimpl.*uses old-style configuration options:pytest.PytestDeprecationWarning",
-  # jax
-  "ignore:jax\\.core\\.pp_eqn_rules is deprecated:DeprecationWarning",
-  "ignore:jax\\.core\\.Primitive is deprecated:DeprecationWarning",
-  "ignore:jax\\.interpreters\\.batching\\.NotMapped is deprecated:DeprecationWarning",
+  # jax (restrict to relevant modules: equinox and jax use these deprecated APIs)
+  "ignore:jax\\.core\\.pp_eqn_rules is deprecated:DeprecationWarning:(jax|equinox)(\\.|_)",
+  "ignore:jax\\._src\\.interpreters\\.mlir\\.Primitive is deprecated:DeprecationWarning:(jax|equinox)(\\.|_)",
+  "ignore:jax\\.core\\.mapped_aval is deprecated:DeprecationWarning:(jax|equinox)(\\.|_)",
+  "ignore:jax\\.core\\.unmapped_aval is deprecated:DeprecationWarning:(jax|equinox)(\\.|_)",
+  "ignore:jax\\.core\\.NotMapped is deprecated:DeprecationWarning:(jax|equinox)(\\.|_)",
   "ignore:The numpy\\.array_function protocol:DeprecationWarning",
   "ignore:numpy\\.ndarray size changed:RuntimeWarning",
   # matplotlib
