@@ -27,6 +27,7 @@ dependencies = [
   "optional-dependencies>=0.4.0",
   "plum-dispatch>=2.6.1",
   "quax>=0.2.1",
+  "scipy>=1.11",
   "zeroth>=1.0.1",
 ]
 description = "Walk through phase-space observations"
@@ -182,6 +183,10 @@ ignore = [
   "C901",   # train_autoencoder is complex but well-structured
   "RUF003", # Greek letters are intentional in math code
   "RUF059", # Unpacked variable 'keys' used for structure
+]
+"src/phasecurvefit/_src/orderers/mst.py" = [
+  "N803", # P, V are conventional names for the point / velocity matrices
+  "N806", # Cb is the conventional name for the backbone coordinate matrix
 ]
 "src/phasecurvefit/_src/phasespace.py" = [
   "UP040", # TypeAlias is more explicit for Python 3.12
