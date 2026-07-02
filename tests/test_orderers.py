@@ -56,6 +56,18 @@ class TestOrderingResultUnification:
                 gamma_range=(1.0, 1.0),
             )
 
+    def test_empty_backbone_call_raises_clear_error(self):
+        """__call__ on an empty backbone gives a clear error, not an index crash."""
+        res = pcf.orderers.OrderingResult(
+            positions={"x": jnp.array([])},
+            velocities={"x": jnp.array([])},
+            indices=jnp.array([], dtype=jnp.int32),
+            gamma_range=(-1.0, 1.0),
+            backbone={"x": jnp.array([])},
+        )
+        with pytest.raises(ValueError, match="backbone"):
+            res(jnp.array(0.0))
+
     def test_no_backbone_falls_back_to_ordered_points(self):
         """No backbone falls back to ordered points."""
         # Without a backbone, __call__ matches the legacy walk interpolation.

@@ -115,8 +115,9 @@ class OrderingResult(AbstractResult):
 
         Uses linear interpolation between consecutive control points. The
         control points are the ``backbone`` polyline vertices when a backbone is
-        present, otherwise the ordered visited observations. ``gamma`` is
-        clipped to ``gamma_range`` and normalized to ``[0, 1]`` first.
+        present, otherwise the ordered visited observations. ``gamma`` must lie
+        within ``gamma_range``; values outside it raise (via ``eqx.error_if``).
+        It is normalized to ``[0, 1]`` before interpolation.
         """
         del key
         gamma = jnp.asarray(gamma)
@@ -148,6 +149,9 @@ class OrderingResult(AbstractResult):
     def _interp_backbone(self, gamma_normalized: Array) -> VectorComponents:
         """Interpolate along the static backbone polyline vertices."""
         n_control = len(next(iter(self.backbone.values())))
+        if n_control == 0:
+            msg = "Cannot interpolate: the backbone has no vertices."
+            raise ValueError(msg)
         lo, hi, w = self._lerp_bracket(gamma_normalized, n_control)
 
         def interpolate_component(vals: Array) -> Array:
