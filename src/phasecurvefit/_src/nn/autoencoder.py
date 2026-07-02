@@ -28,8 +28,8 @@ from .order_net import (
 from .result import AutoencoderResult
 from .track_net import TrackNet, TrackTrainingConfig, decoder_loss, train_track_net
 from .utils import shuffle_and_batch
-from phasecurvefit._src.algorithm import WalkLocalFlowResult
 from phasecurvefit._src.custom_types import FLikeSz0, FSz0, FSzN
+from phasecurvefit._src.orderers.result import OrderingResult
 
 Gamma: TypeAlias = FSzN  # noqa: UP040
 
@@ -825,7 +825,7 @@ def train_autoencoder(
 @plum.dispatch
 def train_autoencoder(
     model: AbstractAutoencoder,
-    walk_results: WalkLocalFlowResult,
+    walk_results: OrderingResult,
     /,
     *,
     config: TrainingConfig | None = None,

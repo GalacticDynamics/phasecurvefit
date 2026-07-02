@@ -33,6 +33,20 @@ This section contains practical examples demonstrating how to use phasecurvefit.
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_runningmean.ipynb)
 :::
 
+:::{grid-item-card} Stream MST Backbone
+:link: stream_mst
+:link-type: doc
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_mst.ipynb)
+:::
+
+:::{grid-item-card} Epitrochoid MST Backbone
+:link: epitrochoid_mst
+:link-type: doc
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_mst.ipynb)
+:::
+
 ::::
 
 ```{toctree}
@@ -43,4 +57,6 @@ stream_autoencoder
 stream_runningmean
 epitrochoid_autoencoder
 epitrochoid_runningmean
+stream_mst
+epitrochoid_mst
 ```

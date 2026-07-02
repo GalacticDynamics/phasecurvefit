@@ -12,6 +12,7 @@ sd_hide_title: true
 guides/quickstart
 guides/metrics
 guides/algorithm
+guides/orderers
 guides/nn
 guides/jax-integration
 ```
