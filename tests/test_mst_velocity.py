@@ -7,8 +7,11 @@ between the arms; velocity information should keep them apart or orient them.
 
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 import phasecurvefit as pcf
+
+pytest.importorskip("scipy")
 
 
 def _hairpin(n_a=50, n_b=40, gap=0.05):

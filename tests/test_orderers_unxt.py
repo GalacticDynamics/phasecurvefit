@@ -11,6 +11,7 @@ import pytest
 import phasecurvefit as pcf
 from phasecurvefit._src.algorithm import StateMetadata
 
+pytest.importorskip("scipy")
 u = pytest.importorskip("unxt")
 
 

@@ -3,8 +3,11 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 import phasecurvefit as pcf
+
+pytest.importorskip("scipy")
 
 
 def _clean_arc(n=80):
