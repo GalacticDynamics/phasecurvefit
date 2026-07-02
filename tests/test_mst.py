@@ -160,3 +160,8 @@ class TestMSTDisconnected:
             pcf.orderers.MSTOrderer(k=5, jump_cap=0.5, on_disconnected="warn").order(
                 pos, vel
             )
+
+    def test_unknown_on_disconnected_raises(self):
+        """An unknown policy is rejected at construction, not treated as 'largest'."""
+        with pytest.raises(ValueError, match="on_disconnected"):
+            pcf.orderers.MSTOrderer(on_disconnected="nonsense")

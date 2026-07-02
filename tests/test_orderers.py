@@ -46,6 +46,16 @@ class TestOrderingResultUnification:
         assert jnp.allclose(mid["x"], 0.5)
         assert jnp.allclose(mid["y"], 0.0)
 
+    def test_degenerate_gamma_range_raises(self):
+        """A zero-width gamma_range is rejected at construction (no inf/NaN)."""
+        with pytest.raises(ValueError, match="gamma_range"):
+            pcf.orderers.OrderingResult(
+                positions={"x": jnp.array([0.0, 1.0])},
+                velocities={"x": jnp.zeros(2)},
+                indices=jnp.array([0, 1]),
+                gamma_range=(1.0, 1.0),
+            )
+
     def test_no_backbone_falls_back_to_ordered_points(self):
         """No backbone falls back to ordered points."""
         # Without a backbone, __call__ matches the legacy walk interpolation.

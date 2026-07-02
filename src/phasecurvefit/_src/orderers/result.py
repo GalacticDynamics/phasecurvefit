@@ -55,6 +55,13 @@ class OrderingResult(AbstractResult):
     gamma_range: tuple[float, float] = eqx.field(static=True, default=(0.0, 1.0))
     backbone: VectorComponents | None = None
 
+    def __check_init__(self) -> None:
+        """Reject a degenerate ``gamma_range`` (its width divides in ``__call__``)."""
+        min_gamma, max_gamma = self.gamma_range
+        if not max_gamma > min_gamma:
+            msg = f"gamma_range must satisfy max > min; got {self.gamma_range}."
+            raise ValueError(msg)
+
     # -- ordering introspection ------------------------------------------
 
     @property

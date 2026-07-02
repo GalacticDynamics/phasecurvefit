@@ -226,6 +226,16 @@ class MSTOrderer(AbstractOrderer):
     orient_by_velocity: bool = eqx.field(static=True, default=False)
     on_disconnected: OnDisconnected = eqx.field(static=True, default="raise")
 
+    def __check_init__(self) -> None:
+        """Reject unknown disconnected-graph policies early, at construction."""
+        allowed = ("raise", "warn", "largest")
+        if self.on_disconnected not in allowed:
+            msg = (
+                f"on_disconnected must be one of {allowed}; "
+                f"got {self.on_disconnected!r}."
+            )
+            raise ValueError(msg)
+
     @plum.dispatch
     def order(
         self,

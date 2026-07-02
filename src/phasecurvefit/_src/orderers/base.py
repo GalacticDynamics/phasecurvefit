@@ -9,8 +9,10 @@ Contract
 --------
 ``order()`` is a one-shot, **host-side** preprocessing step: it is *not* required
 to be jit/vmap-traceable (this lets ``MSTOrderer`` use plain NumPy/SciPy). It
-always returns ``jnp`` arrays so the AE consumes them. ``indices`` fills visited
-slots with the ordering and ``-1`` elsewhere; ``gamma_range`` is static.
+returns arrays the AE consumes directly: plain ``jnp`` arrays for array inputs,
+or unit-aware ``unxt`` Quantities when given Quantity inputs (via the ``unxt``
+interop). ``indices`` fills visited slots with the ordering and ``-1``
+elsewhere; ``gamma_range`` is static.
 """
 
 __all__: tuple[str, ...] = ("AbstractOrderer", "order")
