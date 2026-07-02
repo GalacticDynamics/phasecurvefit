@@ -34,6 +34,14 @@ api/index
 ```
 
 ```{toctree}
+:maxdepth: 1
+:hidden:
+:caption: 🔀 Migration
+
+migration
+```
+
+```{toctree}
 :maxdepth: 2
 :hidden:
 :caption: More
