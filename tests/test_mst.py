@@ -70,6 +70,13 @@ class TestMSTConformance:
         out = res(jnp.linspace(-1.0, 1.0, 11))
         assert jnp.all(jnp.isfinite(out["x"]))
 
+    def test_mismatched_component_keys_raise(self):
+        """Positions and velocities must share the same component keys."""
+        pos = {"x": jnp.arange(4.0), "y": jnp.arange(4.0)}
+        vel = {"x": jnp.ones(4), "z": jnp.ones(4)}  # 'z' != 'y'
+        with pytest.raises(ValueError, match="same component keys"):
+            pcf.orderers.MSTOrderer(k=2, jump_cap=10.0).order(pos, vel)
+
 
 class TestMSTOrderingCorrectness:
     """Tests for MST ordering correctness."""
