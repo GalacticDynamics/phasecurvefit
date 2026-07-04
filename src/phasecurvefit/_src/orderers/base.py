@@ -11,8 +11,9 @@ Contract
 to be jit/vmap-traceable (this lets ``MSTOrderer`` use plain NumPy/SciPy). It
 returns arrays the AE consumes directly: plain ``jnp`` arrays for array inputs,
 or unit-aware ``unxt`` Quantities when given Quantity inputs (via the ``unxt``
-interop). ``indices`` fills visited slots with the ordering and ``-1``
-elsewhere; ``gamma_range`` is static.
+interop). ``indices`` stores visited observation indices in visit order as a
+prefix of length ``n_visited``, with all remaining entries set to ``-1``;
+``gamma_range`` is static.
 """
 
 __all__: tuple[str, ...] = ("AbstractOrderer", "order")

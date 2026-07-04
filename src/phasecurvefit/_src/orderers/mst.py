@@ -245,10 +245,18 @@ class MSTOrderer(AbstractOrderer):
         metadata: StateMetadata | None = None,  # noqa: ARG002
     ) -> OrderingResult:
         """Order tracers along the MST backbone (host-side)."""
+        if set(positions) != set(velocities):
+            missing = sorted(set(positions) - set(velocities))
+            extra = sorted(set(velocities) - set(positions))
+            msg = (
+                "positions and velocities must have the same component keys; "
+                f"missing={missing}, extra={extra}."
+            )
+            raise ValueError(msg)
+
         comps = sorted(positions)
         P = np.stack([np.asarray(positions[c]) for c in comps], axis=1)
         V = np.stack([np.asarray(velocities[c]) for c in comps], axis=1)
-
         order_idx, backbone_P = _mst_backbone(
             P,
             V,
