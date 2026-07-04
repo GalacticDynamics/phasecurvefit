@@ -754,33 +754,46 @@ def train_autoencoder(
     # ===========================================
     # Train Decoder on the running mean
 
-    # Use the trained encoder to compute gamma values for all member samples
+    # Use the trained encoder to compute membership for all samples.
     # TODO: this happens outside of JIT. Speed up.
     # TODO: add an optional exclusion for the progenitor
-    gamma, prob = jax.jit(jax.vmap(model.encoder, in_axes=(0, None)))(all_ws, keys[1])
+    _, prob = jax.jit(jax.vmap(model.encoder, in_axes=(0, None)))(all_ws, keys[1])
     is_member = prob > config.member_threshold
 
-    # Then compute the running mean decoder targets for the member samples. This
-    # gives us a denoised target for the decoder to train on, which is
-    # especially important in the early stages of training when the encoder is
-    # still noisy.
+    # Denoise the decoder target over the ORDERING coordinate, not the (locally
+    # noisy) encoder gamma. The encoder gamma is globally monotone but jittery at
+    # the running-mean window scale, so a window in encoder-gamma averages
+    # spatially-scattered points and blurs the target off the track. The ordering
+    # gamma (rank along the walk) is exact, so its running mean is a clean
+    # centerline. The decoder is therefore trained in the ordering's own gamma; at
+    # inference the encoder maps points into (approximately) that same coordinate.
+    gmin, gmax = model.encoder.gamma_range
+    visited = ordering_indices >= 0
+    ordering = ordering_indices[visited]  # point indices, in visit order
+    gamma_ord = jnp.full(ordering_indices.shape, gmin, dtype=prob.dtype)
+    gamma_ord = gamma_ord.at[ordering].set(
+        jnp.linspace(gmin, gmax, ordering.shape[0], dtype=prob.dtype)
+    )
+    # Only ordered members train the decoder; unvisited tracers are gaps to fill.
+    decoder_mask = is_member & visited
+
     D = all_ws.shape[1] // 2
     all_qs = all_ws[:, :D]
     mean_fn = RunningMeanDecoder(
         window_size=0.05,
-        gamma_train=gamma,
+        gamma_train=gamma_ord,
         positions_train=all_qs,
-        member_train=is_member,
+        member_train=decoder_mask,
     )
-    mean_qs = jax.vmap(mean_fn, (0, None))(gamma, keys[2])
+    mean_qs = jax.vmap(mean_fn, (0, None))(gamma_ord, keys[2])
 
-    # Train the decoder to reconstruct the running mean positions from gamma.
+    # Train the decoder to reconstruct the running-mean positions from gamma.
     config_decoder = config.decoderonly_config()
     decoder, decoder_opt_state, decoder_losses = train_track_net(
         model.decoder,
-        gamma=gamma,
+        gamma=gamma_ord,
         qs_mean=mean_qs,
-        mask=is_member,
+        mask=decoder_mask,
         config=config_decoder,
         key=keys[2],
     )
