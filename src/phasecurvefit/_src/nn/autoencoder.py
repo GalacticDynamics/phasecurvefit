@@ -26,7 +26,13 @@ from .order_net import (
     train_ordering_net,
 )
 from .result import AutoencoderResult
-from .track_net import TrackNet, TrackTrainingConfig, decoder_loss, train_track_net
+from .track_net import (
+    AbstractTrackNet,
+    TrackNet,
+    TrackTrainingConfig,
+    decoder_loss,
+    train_track_net,
+)
 from .utils import shuffle_and_batch
 from phasecurvefit._src.custom_types import FLikeSz0, FSz0, FSzN
 from phasecurvefit._src.orderers.result import OrderingResult
@@ -50,7 +56,7 @@ class PathAutoencoder(AbstractAutoencoder):
     """
 
     encoder: OrderingNet
-    decoder: TrackNet
+    decoder: AbstractTrackNet
     normalizer: AbstractNormalizer
 
     __citation__: ClassVar[str] = (
@@ -72,6 +78,7 @@ class PathAutoencoder(AbstractAutoencoder):
         ordering_depth: int = 2,
         track_width_size: int = 128,
         track_depth: int = 3,
+        decoder: AbstractTrackNet | None = None,
         key: PRNGKeyArray,
     ) -> "PathAutoencoder":
         key_encode, key_decode = jr.split(key)
@@ -82,12 +89,19 @@ class PathAutoencoder(AbstractAutoencoder):
             gamma_range=gamma_range,
             key=key_encode,
         )
-        decoder = TrackNet(
-            out_size=normalizer.n_spatial_dims,
-            width_size=track_width_size,
-            depth=track_depth,
-            key=key_decode,
-        )
+        if decoder is None:
+            decoder = TrackNet(
+                out_size=normalizer.n_spatial_dims,
+                width_size=track_width_size,
+                depth=track_depth,
+                key=key_decode,
+            )
+        elif decoder.out_size != normalizer.n_spatial_dims:
+            msg = (
+                f"decoder.out_size ({decoder.out_size}) must match "
+                f"normalizer.n_spatial_dims ({normalizer.n_spatial_dims})."
+            )
+            raise ValueError(msg)
         return cls(encoder=encoder, decoder=decoder, normalizer=normalizer)
 
 

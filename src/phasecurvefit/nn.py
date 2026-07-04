@@ -31,7 +31,9 @@ Examples
 __all__: tuple[str, ...] = (
     # Network components
     "OrderingNet",
+    "AbstractTrackNet",
     "TrackNet",
+    "FourierTrackNet",
     "AbstractAutoencoder",
     "PathAutoencoder",
     "AbstractExternalDecoder",
@@ -57,8 +59,10 @@ from ._src.nn import (
     AbstractAutoencoder,
     AbstractExternalDecoder,
     AbstractNormalizer,
+    AbstractTrackNet,
     AutoencoderResult,
     EncoderExternalDecoder,
+    FourierTrackNet,
     OrderingNet,
     OrderingTrainingConfig,
     PathAutoencoder,
