@@ -32,7 +32,7 @@ same = orderer.order(pos, vel)  # or: pcf.order(pos, vel, orderer)
 assert jnp.array_equal(result.indices, same.indices)
 ```
 
-You do **not** need to switch — `walk_local_flow` remains fully supported. The
+You eventually need to switch, but for now `walk_local_flow` remains fully supported. The
 orderer interface is useful when you want to swap ordering algorithms behind a
 uniform call site.
 
