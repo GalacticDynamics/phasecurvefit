@@ -1,8 +1,8 @@
 # Distance Metrics Guide
 
-The `walk_local_flow` algorithm uses distance metrics to determine how to select
-the next point in a phase-space trajectory. This guide explains the metric
-system and shows how to use and create custom metrics.
+The local-flow walk uses distance metrics to determine how to select the next
+point in a phase-space trajectory. This guide explains the metric system and
+shows how to use and create custom metrics.
 
 ## Overview
 
@@ -31,7 +31,11 @@ pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 config = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+)
 ```
 
 ## Built-in Metrics
@@ -60,7 +64,11 @@ from phasecurvefit.metrics import SpatialDistanceMetric
 
 # Pure nearest-neighbor search in position space
 config = pcf.WalkConfig(metric=SpatialDistanceMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=0.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=0.0),
+)
 ```
 
 ### AlignedMomentumDistanceMetric
@@ -94,7 +102,11 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Aligned momentum metric
 config = pcf.WalkConfig(metric=AlignedMomentumDistanceMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+)
 ```
 
 ### FullPhaseSpaceDistanceMetric
@@ -132,7 +144,11 @@ from phasecurvefit.metrics import FullPhaseSpaceDistanceMetric
 # Full 6D phase-space distance (this is the default)
 # metric_scale represents a time scale (e.g., if pos ~ kpc, vel ~ kpc/Myr, metric_scale ~ Myr)
 config = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+)
 ```
 
 **Comparison with momentum metric:**
@@ -212,7 +228,11 @@ pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 config = pcf.WalkConfig(metric=Full6DMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+)
 ```
 
 ### Example: Weighted Position Metric
@@ -241,7 +261,11 @@ class WeightedPositionMetric(AbstractDistanceMetric):
 # Use with custom weights (ignore y-coordinate)
 metric = WeightedPositionMetric(weights={"x": 1.0, "y": 0.1})
 config = pcf.WalkConfig(metric=metric)
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=0.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=0.0),
+)
 ```
 
 ## Units and Metrics
@@ -261,26 +285,30 @@ vel = {"x": u.Q([1.0, 1.0, 1.0], "km/s"), "y": u.Q([0.5, 0.5, 0.5], "km/s")}
 
 # metric_scale must have units of distance for AlignedMomentumDistanceMetric
 config = pcf.WalkConfig(metric=AlignedMomentumDistanceMetric())
-result = pcf.walk_local_flow(
+result = pcf.order(
     pos,
     vel,
-    config=config,
-    start_idx=0,
-    metric_scale=u.Q(100.0, "kpc"),  # Momentum weight in distance units
-    usys=u.unitsystems.galactic,  # Required when using Quantities
+    pcf.orderers.LocalFlowOrderer(
+        config=config,
+        start_idx=0,
+        metric_scale=u.Q(100.0, "kpc"),  # Momentum weight in distance units
+    ),
+    metadata=pcf.StateMetadata(usys=u.unitsystems.galactic),  # Required for Quantities
 )
 
 # For FullPhaseSpaceDistanceMetric, metric_scale has units of time
 config_6d = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result_6d = pcf.walk_local_flow(
+result_6d = pcf.order(
     pos,
     vel,
-    config=config_6d,
-    start_idx=0,
-    metric_scale=u.Q(
-        1.0, "Gyr"
-    ),  # Time to convert velocity distance to spatial distance
-    usys=u.unitsystems.galactic,  # Required when using Quantities
+    pcf.orderers.LocalFlowOrderer(
+        config=config_6d,
+        start_idx=0,
+        metric_scale=u.Q(
+            1.0, "Gyr"
+        ),  # Time to convert velocity distance to spatial distance
+    ),
+    metadata=pcf.StateMetadata(usys=u.unitsystems.galactic),  # Required for Quantities
 )
 ```
 
@@ -330,7 +358,11 @@ metrics = {
 
 for name, metric in metrics.items():
     config = pcf.WalkConfig(metric=metric)
-    result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+    result = pcf.order(
+        pos,
+        vel,
+        pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+    )
     n_visited = len([i for i in result.indices if i >= 0])
     print(f"{name}: {n_visited}/100 points ordered")
 ```

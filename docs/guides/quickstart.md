@@ -53,11 +53,13 @@ velocity = {
 ### 3. Run the algorithm
 
 ```python
-result = pcf.walk_local_flow(
+result = pcf.order(
     position,
     velocity,
-    start_idx=0,  # Start from first point
-    metric_scale=1.0,  # Metric-dependent scale parameter
+    pcf.orderers.LocalFlowOrderer(
+        start_idx=0,  # Start from first point
+        metric_scale=1.0,  # Metric-dependent scale parameter
+    ),
 )
 
 print(result.ordering)
@@ -65,10 +67,12 @@ print(result.ordering)
 ```
 
 ```{note}
-`walk_local_flow` is one **ordering algorithm**. The pluggable orderer interface
-(`pcf.order` / `pcf.orderers`) lets you swap it for others behind the same call —
-notably the {class}`~phasecurvefit.orderers.MSTOrderer` for near-closed loops
-where the velocity reverses. See the [Orderers guide](orderers.md).
+Above we ran the **local-flow walk** through `pcf.order` with a
+{class}`~phasecurvefit.orderers.LocalFlowOrderer` — one of several pluggable
+orderers. Swap in the {class}`~phasecurvefit.orderers.MSTOrderer` for near-closed
+loops where the velocity reverses. The historical
+{func}`~phasecurvefit.walk_local_flow` remains available and equivalent. See the
+[Orderers guide](orderers.md).
 ```
 
 ### 4. Extract ordered data
@@ -84,7 +88,7 @@ print(ordered_pos["x"])
 
 ## Understanding the Result
 
-The `walk_local_flow` function returns a `WalkLocalFlowResult` NamedTuple with:
+`pcf.order` returns an `OrderingResult` (a `WalkLocalFlowResult` for the walk) with:
 
 - **`ordering`**: Array of indices of the discovered order
 - **`position`**: Original position dictionary
@@ -97,13 +101,19 @@ The `metric_scale` parameter controls how the algorithm weighs different aspects
 
 ```python
 # Pure nearest neighbor (spatial only) - metric_scale ignored
-result_spatial = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=0.0)
+result_spatial = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=0.0)
+)
 
 # Balanced (default)
-result_balanced = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+result_balanced = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 
 # Higher metric_scale value (interpretation metric-dependent)
-result_momentum = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=5.0)
+result_momentum = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=5.0)
+)
 ```
 
 ## Walking in Reverse
@@ -112,11 +122,15 @@ Use the `direction` parameter to trace streams backwards by negating the velocit
 
 ```python
 # Default: forward walk following the velocity direction
-result_forward = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+result_forward = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 
 # Reverse: walk against the velocity direction
-result_reverse = pcf.walk_local_flow(
-    position, velocity, start_idx=0, metric_scale=1.0, direction="backward"
+result_reverse = pcf.order(
+    position,
+    velocity,
+    pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0, direction="backward"),
 )
 ```
 
@@ -135,8 +149,10 @@ config = pcf.WalkConfig(
     strategy=pcf.strats.KDTree(k=5),  # Only 5 points in the fake dataset
 )
 
-result = pcf.walk_local_flow(
-    position, velocity, config=config, start_idx=0, metric_scale=1.0
+result = pcf.order(
+    position,
+    velocity,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
 )
 ```
 
@@ -146,12 +162,14 @@ Use `max_dist` to stop when there's a gap in the data:
 
 ```python
 # Stop if next nearest point is more than 2 units away
-result = pcf.walk_local_flow(
+result = pcf.order(
     position,
     velocity,
-    start_idx=0,
-    metric_scale=1.0,
-    max_dist=2.0,
+    pcf.orderers.LocalFlowOrderer(
+        start_idx=0,
+        metric_scale=1.0,
+        max_dist=2.0,
+    ),
 )
 
 # Check if any points were skipped
@@ -178,7 +196,9 @@ velocity = {
     "z": jnp.ones_like(t) / (2 * jnp.pi),
 }
 
-result = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=2.0)
+result = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=2.0)
+)
 ```
 
 ## Bidirectional Walks (Forward and Reverse)
@@ -187,8 +207,10 @@ For streams that extend in both directions from a starting point, run forward an
 
 ```python
 # Run forward walk from starting point
-result = pcf.walk_local_flow(
-    position, velocity, start_idx=2, metric_scale=1.0, direction="both"
+result = pcf.order(
+    position,
+    velocity,
+    pcf.orderers.LocalFlowOrderer(start_idx=2, metric_scale=1.0, direction="both"),
 )
 
 # Get the combined ordered indices
@@ -217,7 +239,9 @@ from jax import jit
 
 @jit
 def order_stream(pos, vel):
-    return pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+    return pcf.order(
+        pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+    )
 
 
 result = order_stream(position, velocity)
