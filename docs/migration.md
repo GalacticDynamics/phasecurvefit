@@ -1,6 +1,6 @@
 # Migration Guide
 
-`phasecurvefit` v0.1 introduces a pluggable **orderer** abstraction: the ordering
+`phasecurvefit` v0.2 introduces a pluggable **orderer** abstraction: the ordering
 step (previously only `walk_local_flow`) is now one implementation behind a
 common interface, alongside a new MST-backbone orderer.
 
