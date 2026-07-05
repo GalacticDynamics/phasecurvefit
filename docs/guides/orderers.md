@@ -20,7 +20,7 @@ ae, *_ = pcf.nn.train_autoencoder(model, result, config=cfg, key=key)
 
 | Orderer | Best for | Mechanism |
 |---|---|---|
-| {class}`~phasecurvefit.orderers.LocalFlowOrderer` | open streams; multi-petal / self-intersecting curves where a coherent velocity field can be *followed* | velocity-following greedy walk (wraps {func}`~phasecurvefit.walk_local_flow`) |
+| {class}`~phasecurvefit.orderers.LocalFlowOrderer` | open streams; multi-petal / self-intersecting curves where a coherent velocity field can be *followed* | velocity-following greedy walk from a start point |
 | {class}`~phasecurvefit.orderers.MSTOrderer` | **near-closed loops** and self-overlapping streams where the velocity field *reverses* and a single walk cannot traverse the arc | kNN graph → minimum spanning tree → longest-path (diameter) backbone → arc-length ordering |
 
 The two are complementary. The walk needs a start point and follows the flow; it
@@ -31,9 +31,8 @@ with bounded per-step jumps, which is exactly what a near-closed loop needs.
 ## LocalFlowOrderer
 
 The {class}`~phasecurvefit.orderers.LocalFlowOrderer` is the velocity-following
-greedy walk — the original `phasecurvefit` algorithm
-({func}`~phasecurvefit.walk_local_flow`), now available behind the orderer
-interface. From `start_idx` it repeatedly steps to the nearest unvisited tracer
+greedy walk — the original `phasecurvefit` ordering algorithm, now behind the
+orderer interface. From `start_idx` it repeatedly steps to the nearest unvisited tracer
 under a pluggable phase-space **metric**, tracing the coherent flow of the
 velocity field. Unlike the MST it is **fully JAX-traceable** (jit / vmap / grad).
 
@@ -50,8 +49,7 @@ res = walk.order(pos, vel)
 assert int(res.n_visited) == 20
 ```
 
-The hyperparameters (carried by the orderer object) are exactly those of
-`walk_local_flow`:
+The hyperparameters (carried by the orderer object) are:
 
 - **`metric_scale`** — the metric's scale parameter (e.g. the momentum weight for
   the default {class}`~phasecurvefit.metrics.AlignedMomentumDistanceMetric`).
@@ -122,8 +120,8 @@ near-closed single loop.
 
 ## Physical units (unxt)
 
-Like {func}`~phasecurvefit.walk_local_flow`, orderers accept `unxt.Quantity`
-inputs and return Quantities, given a unit system:
+Orderers accept `unxt.Quantity` inputs and return Quantities, given a unit
+system:
 
 <!-- skip: next -->
 ```python

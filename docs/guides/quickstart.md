@@ -70,9 +70,7 @@ print(result.ordering)
 Above we ran the **local-flow walk** through `pcf.order` with a
 {class}`~phasecurvefit.orderers.LocalFlowOrderer` — one of several pluggable
 orderers. Swap in the {class}`~phasecurvefit.orderers.MSTOrderer` for near-closed
-loops where the velocity reverses. The historical
-{func}`~phasecurvefit.walk_local_flow` remains available and equivalent. See the
-[Orderers guide](orderers.md).
+loops where the velocity reverses. See the [Orderers guide](orderers.md).
 ```
 
 ### 4. Extract ordered data

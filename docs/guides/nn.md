@@ -28,10 +28,12 @@ import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
 
-# Get initial ordering from walk
+# Get an initial ordering from the local-flow walk
 pos = {"x": jnp.linspace(0, 5, 50), "y": jnp.sin(jnp.linspace(0, jnp.pi, 50))}
 vel = {"x": jnp.ones(50), "y": jnp.cos(jnp.linspace(0, jnp.pi, 50))}
-walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+walkresult = pcf.order(
+    pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 
 # Create normalizer and autoencoder
 key = jax.random.key(0)
