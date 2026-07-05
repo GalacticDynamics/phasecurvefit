@@ -64,6 +64,13 @@ print(result.ordering)
 # Array([0, 1, 2, 3, 4])
 ```
 
+```{note}
+`walk_local_flow` is one **ordering algorithm**. The pluggable orderer interface
+(`pcf.order` / `pcf.orderers`) lets you swap it for others behind the same call —
+notably the {class}`~phasecurvefit.orderers.MSTOrderer` for near-closed loops
+where the velocity reverses. See the [Orderers guide](orderers.md).
+```
+
 ### 4. Extract ordered data
 
 Use the convenience function to get reordered arrays:

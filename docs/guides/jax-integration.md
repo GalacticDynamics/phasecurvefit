@@ -2,6 +2,16 @@
 
 This guide shows how to use `phasecurvefit` with JAX for faster computation, batching, and differentiation.
 
+```{note}
+This guide covers the **local-flow walk**
+({func}`~phasecurvefit.walk_local_flow` /
+{class}`~phasecurvefit.orderers.LocalFlowOrderer`), which is fully JAX-traceable.
+The {class}`~phasecurvefit.orderers.MSTOrderer` is **host-side** (NumPy/SciPy):
+its `order()` is a one-shot preprocessing step and is *not* jit/vmap/grad-able.
+Its *result*, however, is an ordinary `OrderingResult` whose `__call__`
+interpolation is JAX-traceable like any other.
+```
+
 ## Basic Usage
 
 The library works seamlessly with JAX arrays—no special setup needed:

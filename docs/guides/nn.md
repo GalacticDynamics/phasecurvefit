@@ -2,6 +2,15 @@
 
 The walk algorithm skips some tracers due to the momentum condition. This guide explains how to use an autoencoder to assign ordering values ($\gamma$) to these skipped tracers.
 
+```{note}
+The examples below start from a walk, but `train_autoencoder` accepts **any**
+orderer's output — it dispatches on the unified
+{class}`~phasecurvefit.orderers.OrderingResult`. An
+{class}`~phasecurvefit.orderers.MSTOrderer` result feeds the autoencoder the same
+way (see the [Orderers guide](orderers.md)); the MST even supplies a `backbone`
+that the decoder can be trained against.
+```
+
 ## Problem and Solution
 
 **Problem**: walk inevitably skips tracers that don't align with the velocity direction.

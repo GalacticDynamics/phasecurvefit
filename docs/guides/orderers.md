@@ -28,6 +28,53 @@ covers only one arm when the velocity reverses at a progenitor. The MST needs no
 progenitor — the graph diameter finds the two tips itself — and orders tip-to-tip
 with bounded per-step jumps, which is exactly what a near-closed loop needs.
 
+## LocalFlowOrderer
+
+The {class}`~phasecurvefit.orderers.LocalFlowOrderer` is the velocity-following
+greedy walk — the original `phasecurvefit` algorithm
+({func}`~phasecurvefit.walk_local_flow`), now available behind the orderer
+interface. From `start_idx` it repeatedly steps to the nearest unvisited tracer
+under a pluggable phase-space **metric**, tracing the coherent flow of the
+velocity field. Unlike the MST it is **fully JAX-traceable** (jit / vmap / grad).
+
+```python
+import jax.numpy as jnp
+
+import phasecurvefit as pcf
+
+pos = {"x": jnp.linspace(0.0, 5.0, 20), "y": jnp.zeros(20)}
+vel = {"x": jnp.ones(20), "y": jnp.zeros(20)}
+
+walk = pcf.orderers.LocalFlowOrderer(metric_scale=1.0, start_idx=0)
+res = walk.order(pos, vel)
+assert int(res.n_visited) == 20
+```
+
+The hyperparameters (carried by the orderer object) are exactly those of
+`walk_local_flow`:
+
+- **`metric_scale`** — the metric's scale parameter (e.g. the momentum weight for
+  the default {class}`~phasecurvefit.metrics.AlignedMomentumDistanceMetric`).
+- **`config`** — a {class}`~phasecurvefit.WalkConfig` composing the distance
+  **metric** with the neighbor-query **strategy** (brute force, or
+  {class}`~phasecurvefit.strats.KDTree` for large datasets). See the
+  [Metrics guide](metrics.md).
+- **`start_idx`** — index of the starting tracer.
+- **`direction`** — `"forward"` follows the velocity field, `"backward"` traces
+  against it, and `"both"` walks each way from `start_idx` and stitches the two
+  arms into one tip-to-tip ordering.
+- **`max_dist`** — gap detection: stop when the nearest unvisited tracer is
+  farther than this (the rest are left unvisited for the autoencoder to fill).
+- **`terminate_indices`**, **`n_max`** — optional stopping conditions.
+
+Because the walk *follows* a coherent flow, it is the right choice for open
+streams and for self-intersecting curves where the velocity stays coherent
+through the crossings. Its one blind spot is a near-closed loop whose velocity
+**reverses** at a progenitor: a single walk then covers only one arm — which is
+exactly where the [MSTOrderer](#mstorderer) takes over. For the walk's
+mathematics, the metric internals, and the `direction="both"` / `combine_results`
+machinery, see the [Algorithm guide](algorithm.md).
+
 ## MSTOrderer
 
 The MST is **host-side** (NumPy/SciPy): `order()` is a one-shot preprocessing

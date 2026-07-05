@@ -3,6 +3,16 @@
 This page explains the mathematical foundations and implementation details of
 the phase flow walking algorithm.
 
+```{note}
+The walk described here is one of the pluggable **orderers**, exposed both as
+{func}`~phasecurvefit.walk_local_flow` and as the
+{class}`~phasecurvefit.orderers.LocalFlowOrderer`. It *follows* the velocity
+field, so it covers only one arm of a **near-closed loop** whose velocity
+reverses at a progenitor. For that case the
+{class}`~phasecurvefit.orderers.MSTOrderer` backbone orders the loop tip-to-tip
+without a start point — see the [Orderers guide](orderers.md).
+```
+
 ## Mathematical Foundation
 
 ### Walking Algorithm (Metric-Agnostic)

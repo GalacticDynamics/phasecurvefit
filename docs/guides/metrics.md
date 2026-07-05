@@ -10,6 +10,15 @@ A distance metric defines how the algorithm measures "closeness" between the
 current point and candidate next points in phase-space. Different metrics enable
 different physical interpretations and behaviors.
 
+```{note}
+Metrics configure the {class}`~phasecurvefit.orderers.LocalFlowOrderer` /
+{func}`~phasecurvefit.walk_local_flow`. The same velocity-alignment idea — the
+`cos θ` term below — also powers the opt-in velocity mechanisms of the
+{class}`~phasecurvefit.orderers.MSTOrderer` (`velocity_weight`,
+`sever_cos_threshold`), which reuse `cos(v_i, v_j)` on graph edges. See the
+[Orderers guide](orderers.md).
+```
+
 Metrics are configured via `WalkConfig`, which composes a metric with a query
 strategy (discussed in a separate guide):
 
