@@ -7,8 +7,6 @@ import pytest
 import phasecurvefit as pcf
 from phasecurvefit._src.abstract_result import AbstractResult
 
-pytest.importorskip("scipy")
-
 
 def _open_arc(n=200, seed=0):
     """Points sampled along a known open 1-D curve, then shuffled.

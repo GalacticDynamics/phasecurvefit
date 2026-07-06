@@ -27,6 +27,7 @@ dependencies = [
   "optional-dependencies>=0.4.0",
   "plum-dispatch>=2.6.1",
   "quax>=0.2.1",
+  "scipy>=1.11",
   "zeroth>=1.0.1",
 ]
 description = "Walk through phase-space observations"
