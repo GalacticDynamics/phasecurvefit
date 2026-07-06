@@ -93,13 +93,9 @@ class SpatialDistanceMetric(AbstractDistanceMetric):
     d = d_0
     $$
 
-    where $d_0$ is the Euclidean distance between positions. The `metric_scale`
-    parameter is ignored.
-
-    This metric is useful when:
-    - Velocity information is unreliable or unavailable
-    - Pure spatial proximity is the desired ordering criterion
-    - Comparing against baseline nearest-neighbor approaches
+    where $d_0$ is the Euclidean distance in position space, $d_v$ is the
+    Euclidean distance in velocity space, and $\tau$ is the time parameter
+    (metric_scale) that converts velocity to position units.
 
     Examples
     --------
