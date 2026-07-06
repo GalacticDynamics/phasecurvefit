@@ -217,6 +217,60 @@ class MSTOrderer(AbstractOrderer):
         (default), ``"warn"`` (order the largest component, warn, leave the rest
         unvisited), or ``"largest"`` (same, silently).
 
+    Examples
+    --------
+    Order a simple 2D stream using the MST backbone:
+
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+
+    >>> positions = {
+    ...     "x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0]),
+    ...     "y": jnp.array([0.0, 0.5, 1.0, 1.5, 2.0]),
+    ... }
+    >>> velocities = {"x": jnp.ones(5), "y": jnp.full(5, 0.5)}
+
+    >>> orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=3.0)
+    >>> result = pcf.order(positions, velocities, orderer)
+    >>> result.indices
+    Array([4, 3, 2, 1, 0], dtype=int32)
+
+    For near-closed loops where the velocity field reverses, use
+    ``velocity_weight`` to penalize edges between opposite-moving arms:
+
+    >>> # Synthetic near-closed loop (two arms moving in opposite directions)
+    >>> theta = jnp.linspace(0, 2 * jnp.pi, 100)
+    >>> positions = {"x": jnp.cos(theta), "y": jnp.sin(theta)}
+    >>> # Velocity tangent to the circle, but reversing at the crossing
+    >>> velocities = {"x": -jnp.sin(theta), "y": jnp.cos(theta)}
+
+    Use ``velocity_weight`` to down-weight edges between opposite-moving regions:
+
+    >>> orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=2.0, velocity_weight=1.0)
+    >>> result = pcf.order(positions, velocities, orderer)
+    >>> result.n_visited > 0  # Most points ordered
+    Array(True, dtype=bool)
+
+    Alternatively, use ``sever_cos_threshold`` to explicitly cut edges where
+    velocities are anti-parallel:
+
+    >>> orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=2.0, sever_cos_threshold=0.0)
+    >>> result = pcf.order(positions, velocities, orderer)
+
+    The result includes a ``backbone`` polyline (the MST longest path) that
+    ``__call__`` uses for smooth interpolation:
+
+    >>> result.backbone is not None
+    True
+    >>> result.backbone["x"].shape
+    (100,)
+
+    Orient the ordering to increase along the mean velocity using
+    ``orient_by_velocity``:
+
+    >>> orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=2.0, orient_by_velocity=True)
+    >>> result = pcf.order(positions, velocities, orderer)
+
     """
 
     k: int = eqx.field(static=True, default=10)

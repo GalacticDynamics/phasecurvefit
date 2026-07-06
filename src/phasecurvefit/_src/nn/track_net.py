@@ -153,6 +153,62 @@ class FourierTrackNet(AbstractTrackNet):
     key : PRNGKeyArray
         JAX random key for initialization.
 
+    Examples
+    --------
+    Create a Fourier decoder for 2D tracks:
+
+    >>> import jax.random as jr
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+
+    >>> # Create a decoder mapping gamma to 2D positions
+    >>> decoder = pcf.nn.FourierTrackNet(
+    ...     out_size=2, n_frequencies=8, width_size=128, depth=3, key=jr.key(0)
+    ... )
+    >>> decoder.out_size
+    2
+
+    Decode a single position from the ordering parameter:
+
+    >>> # Evaluate decoder at gamma=0.5 (middle of track)
+    >>> gamma_val = jnp.array(0.5)
+    >>> position = decoder(gamma_val)
+    >>> position.shape
+    (2,)
+
+    The Fourier embedding converts ``gamma`` to higher-dimensional features
+    before the MLP, allowing sharp / multi-petal structure:
+
+    >>> # Inspect the Fourier features
+    >>> features = decoder.features(jnp.array(0.3))
+    >>> features.shape  # (1 + 2 * 8,)
+    (17,)
+
+    Compute the tangent vector (velocity) for the tangent/momentum loss:
+
+    >>> import jax
+    >>> gamma = jnp.array(0.5)
+    >>> position, tangent = jax.jvp(decoder, (gamma,), (jnp.array(1.0),))
+    >>> tangent.shape  # Tangent vector in position space
+    (2,)
+
+    Use with ``PathAutoencoder.make()`` to build a complete autoencoder
+    with Fourier decoding instead of the default plain MLP:
+
+    >>> positions = {"x": jnp.linspace(0, 1, 20), "y": jnp.linspace(0, 1, 20)}
+    >>> velocities = {"x": jnp.ones(20), "y": jnp.ones(20)}
+    >>> normalizer = pcf.nn.StandardScalerNormalizer(positions, velocities)
+
+    >>> # Create decoder with specific parameters for sharp tracks
+    >>> decoder_sharp = pcf.nn.FourierTrackNet(
+    ...     out_size=2, n_frequencies=16, width_size=256, depth=4, key=jr.key(1)
+    ... )
+    >>> autoencoder = pcf.nn.PathAutoencoder.make(
+    ...     normalizer, gamma_range=(0.0, 1.0), decoder=decoder_sharp, key=jr.key(2)
+    ... )
+    >>> isinstance(autoencoder.decoder, pcf.nn.FourierTrackNet)
+    True
+
     """
 
     mlp: eqx.nn.MLP

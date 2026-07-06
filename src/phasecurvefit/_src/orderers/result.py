@@ -19,9 +19,11 @@ __all__: tuple[str, ...] = ("OrderingResult",)
 from dataclasses import KW_ONLY
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
+import jax.tree as jt
 from jaxtyping import Array, Bool, Int, PRNGKeyArray
+
+from zeroth import zeroth
 
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.custom_types import BSzN, ISz0, ISzN, VectorComponents
@@ -45,6 +47,70 @@ class OrderingResult(AbstractResult):
         Optional ordered polyline (tip-to-tip) that ``__call__`` interpolates
         along. ``None`` for walk-style results, which interpolate along the
         ordered visited observations instead.
+
+    Examples
+    --------
+    Create an ``OrderingResult`` from ordering observations:
+
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+
+    >>> # Define phase-space data
+    >>> positions = {
+    ...     "x": jnp.array([0.0, 1.0, 2.0, 3.0]),
+    ...     "y": jnp.array([0.0, 0.5, 1.0, 1.5]),
+    ... }
+    >>> velocities = {"x": jnp.ones(4), "y": jnp.full(4, 0.5)}
+    >>> indices = jnp.array([0, 1, 2, 3])  # All observations visited
+
+    >>> # Create a result object
+    >>> result = pcf.orderers.OrderingResult(
+    ...     positions=positions,
+    ...     velocities=velocities,
+    ...     indices=indices,
+    ...     gamma_range=(0.0, 1.0),
+    ... )
+
+    Access ordering properties:
+
+    >>> result.ordering  # Ordered indices
+    Array([0, 1, 2, 3], dtype=int32)
+    >>> result.n_visited  # Number of observations included
+    Array(4, dtype=int32)
+    >>> result.n_skipped  # Number of observations skipped
+    Array(0, dtype=int32)
+    >>> result.all_visited  # Were all observations included?
+    Array(True, dtype=bool)
+
+    Get ordered data:
+
+    >>> ordered_pos, ordered_vel = result.ordered
+    >>> ordered_pos["x"]
+    Array([0., 1., 2., 3.], dtype=float32)
+
+    Interpolate positions along the ordering using ``gamma``:
+
+    >>> # gamma=0 returns the first position, gamma=1 the last
+    >>> result(jnp.array(0.0))
+    {'x': Array(0., dtype=float32), 'y': Array(0., dtype=float32)}
+    >>> result(jnp.array(0.5))
+    {'x': Array(1.5, dtype=float32), 'y': Array(0.75, dtype=float32)}
+    >>> result(jnp.array(1.0))
+    {'x': Array(3., dtype=float32), 'y': Array(1.5, dtype=float32)}
+
+    With a ``backbone`` (e.g., from ``MSTOrderer``), ``__call__`` interpolates
+    along the smooth polyline instead:
+
+    >>> backbone = {"x": jnp.array([0.0, 1.5, 3.0]), "y": jnp.array([0.0, 0.75, 1.5])}
+    >>> result_with_backbone = pcf.orderers.OrderingResult(
+    ...     positions=positions,
+    ...     velocities=velocities,
+    ...     indices=indices,
+    ...     gamma_range=(0.0, 1.0),
+    ...     backbone=backbone,
+    ... )
+    >>> result_with_backbone(jnp.array(0.5))
+    {'x': Array(1.5, dtype=float32), 'y': Array(0.75, dtype=float32)}
 
     """
 
@@ -101,10 +167,7 @@ class OrderingResult(AbstractResult):
     def ordered(self) -> tuple[VectorComponents, VectorComponents]:
         """Positions and velocities ordered by the walk (visited only)."""
         order = lambda x: x[self.ordering]  # noqa: E731
-        return (
-            jax.tree.map(order, self.positions),
-            jax.tree.map(order, self.velocities),
-        )
+        return (jt.map(order, self.positions), jt.map(order, self.velocities))
 
     # -- interpolation ---------------------------------------------------
 
@@ -125,10 +188,9 @@ class OrderingResult(AbstractResult):
         min_gamma, max_gamma = self.gamma_range
         gamma_range_width = max_gamma - min_gamma
         gamma = eqx.error_if(
-            gamma, jnp.any(gamma < min_gamma), "gamma must be >= min_gamma"
-        )
-        gamma = eqx.error_if(
-            gamma, jnp.any(gamma > max_gamma), "gamma must be <= max_gamma"
+            gamma,
+            jnp.any(jnp.logical_or(gamma < min_gamma, gamma > max_gamma)),
+            "gamma must be in [min_gamma, max_gamma]",
         )
         gamma_normalized = (gamma - min_gamma) / gamma_range_width
 
@@ -148,7 +210,7 @@ class OrderingResult(AbstractResult):
 
     def _interp_backbone(self, gamma_normalized: Array) -> VectorComponents:
         """Interpolate along the static backbone polyline vertices."""
-        n_control = len(next(iter(self.backbone.values())))
+        n_control = len(zeroth(self.backbone.values()))
         if n_control == 0:
             msg = "Cannot interpolate: the backbone has no vertices."
             raise ValueError(msg)
@@ -157,7 +219,7 @@ class OrderingResult(AbstractResult):
         def interpolate_component(vals: Array) -> Array:
             return (1 - w) * vals[lo] + w * vals[hi]
 
-        return jax.tree.map(interpolate_component, self.backbone)
+        return jt.map(interpolate_component, self.backbone)
 
     def _interp_ordered(self, gamma_normalized: Array) -> VectorComponents:
         """Interpolate along the ordered visited observations (legacy walk)."""
@@ -168,4 +230,4 @@ class OrderingResult(AbstractResult):
         def interpolate_component(q_vals: Array) -> Array:
             return (1 - w) * q_vals[orig_lo] + w * q_vals[orig_hi]
 
-        return jax.tree.map(interpolate_component, self.positions)
+        return jt.map(interpolate_component, self.positions)

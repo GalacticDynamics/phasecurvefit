@@ -823,9 +823,7 @@ def order(
     usys = _require_usys(metadata)
 
     def _as_length_q(val: object) -> AbcQ:
-        if isinstance(val, u.AbstractQuantity):
-            return val
-        return u.Q(val, usys["length"])
+        return val if isinstance(val, u.AbstractQuantity) else u.Q(val, usys["length"])
 
     return algorithm.walk_local_flow(
         positions,
