@@ -2,6 +2,15 @@
 
 This guide shows how to use `phasecurvefit` with JAX for faster computation, batching, and differentiation.
 
+```{note}
+This guide covers the **local-flow walk**
+({class}`~phasecurvefit.orderers.LocalFlowOrderer`), which is fully JAX-traceable.
+The {class}`~phasecurvefit.orderers.MSTOrderer` is **host-side** (NumPy/SciPy):
+its `order()` is a one-shot preprocessing step and is *not* jit/vmap/grad-able.
+Its *result*, however, is an ordinary `OrderingResult` whose `__call__`
+interpolation is JAX-traceable like any other.
+```
+
 ## Basic Usage
 
 The library works seamlessly with JAX arrays—no special setup needed:
@@ -15,7 +24,9 @@ position = {"x": jnp.array([0.0, 1.0, 2.0, 3.0])}
 velocity = {"x": jnp.array([1.0, 1.1, 1.2, 1.3])}
 
 # Direct call works
-result = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 ```
 
 The dict-based API is JAX PyTree compatible, so it works seamlessly with JAX transformations.
@@ -33,7 +44,9 @@ import phasecurvefit as pcf
 # Wrap for JIT
 @jax.jit
 def order_stream(position, velocity):
-    return pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+    return pcf.order(
+        position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+    )
 
 
 # Data
@@ -74,9 +87,9 @@ stacked_vel = {"x": jnp.stack([s["x"] for s in streams_vel])}
 
 # Apply vmap over batch dimension
 batched_fn = vmap(
-    pcf.walk_local_flow,
+    pcf.order,
     in_axes=(0, 0),
-    static_kw={"start_idx": 0, "metric_scale": 1.0},
+    static_kw={"orderer": pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)},
 )
 results = batched_fn(stacked_pos, stacked_vel)
 print(f"Processed {results.indices.shape[0]} streams in parallel")
@@ -91,7 +104,9 @@ streams = [
 ]
 
 results = jax.tree.map(
-    lambda sd: pcf.walk_local_flow(sd["q"], sd["p"], start_idx=0, metric_scale=1.0),
+    lambda sd: pcf.order(
+        sd["q"], sd["p"], pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+    ),
     streams,
     is_leaf=lambda x: isinstance(x, dict),
 )
@@ -112,8 +127,10 @@ velocity = {"x": jnp.array([1.0, 1.1, 1.2, 1.3])}
 
 # Define a scalar loss
 def loss_fn(metric_scale):
-    result = pcf.walk_local_flow(
-        position, velocity, start_idx=0, metric_scale=metric_scale
+    result = pcf.order(
+        position,
+        velocity,
+        pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=metric_scale),
     )
     return jnp.sum(result.indices.astype(jnp.float32))
 
@@ -140,7 +157,9 @@ vel_numpy = {"x": np.array([1.0, 1.1, 1.2, 1.3])}
 # Convert to JAX
 pos_jax = jax.tree.map(jnp.asarray, pos_numpy)
 vel_jax = jax.tree.map(jnp.asarray, vel_numpy)
-result = pcf.walk_local_flow(pos_jax, vel_jax, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    pos_jax, vel_jax, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 ```
 
 **Combine JIT and vmap**: For batched operations that run repeatedly, wrap both:
@@ -149,9 +168,11 @@ result = pcf.walk_local_flow(pos_jax, vel_jax, start_idx=0, metric_scale=1.0)
 @jax.jit
 def batch_order(stacked_pos, stacked_vel):
     return vmap(
-        pcf.walk_local_flow,
+        pcf.order,
         in_axes=(0, 0),
-        static_kw={"start_idx": 0, "metric_scale": 1.0},
+        static_kw={
+            "orderer": pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+        },
     )(stacked_pos, stacked_vel)
 ```
 
@@ -171,7 +192,9 @@ devices = jax.devices()
 print(f"Available devices: {devices}")
 
 # Computation automatically runs on GPU/TPU if available
-result = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 ```
 
 ## Debugging Tips
@@ -182,7 +205,9 @@ result = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
 import jax
 
 with jax.disable_jit():
-    result = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+    result = pcf.order(
+        position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+    )
 ```
 
 **Check shapes**: Verify array shapes in dicts:

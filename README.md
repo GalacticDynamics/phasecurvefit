@@ -17,6 +17,8 @@ algorithms.
   interpretations
 - **Pluggable query strategies**: Flexible neighbor search strategies (e.g.,
   brute-force, KD-tree) to optimize performance
+- **Pluggable orderers**: One interface over multiple ordering algorithms — the
+  velocity-following walk and an MST backbone for near-closed loops
 - **Highly customizable ML setup and training**: Well-chosen defaults with
   highly flexible customization for specific use-cases.
 - **Physical units**: Optional support via `unxt` for unit-aware calculations
@@ -63,6 +65,7 @@ phasecurvefit has optional dependencies for extended functionality:
 
 - **unxt**: Physical units support for phase-space calculations
 - **tree (jaxkd)**: Spatial KD-tree queries for large datasets
+- **mst (scipy)**: The `MSTOrderer` backbone orderer
 
 Install with optional dependencies:
 
@@ -70,6 +73,7 @@ Install with optional dependencies:
 # pip install phasecurvefit[all]  # Install with all extras
 pip install phasecurvefit[interop]  # Install with unxt for unit support
 pip install phasecurvefit[kdtree]  # Install with jaxkd for KD-tree strategy
+pip install phasecurvefit[mst]  # Install with scipy for the MST orderer
 ```
 
 Or with uv:
@@ -78,6 +82,7 @@ Or with uv:
 # uv add phasecurvefit --extra all  # installs all extras
 uv add phasecurvefit --extra interop
 uv add phasecurvefit --extra kdtree
+uv add phasecurvefit --extra mst
 ```
 
 ## Quick Start
@@ -166,6 +171,47 @@ result, _, losses = pcf.nn.train_autoencoder(
     autoencoder, result, config=train_config, key=key
 )
 ```
+
+## Orderers
+
+The ordering step is pluggable. Every orderer implements the same interface —
+`order(positions, velocities)` — and returns an `OrderingResult` that feeds the
+autoencoder unchanged, so orderers are interchangeable:
+
+- **`LocalFlowOrderer`** — the velocity-following walk (wraps
+  `walk_local_flow`). Follows a coherent flow from a start point.
+- **`MSTOrderer`** — a minimum-spanning-tree backbone. It needs no start point
+  (the graph diameter finds the two tips itself), which makes it ideal for
+  **near-closed loops** where the velocity field reverses and a single walk
+  covers only one arm. Requires the `mst` extra.
+
+```python
+import jax.numpy as jnp
+import phasecurvefit as pcf
+
+# Points along a curve
+t = jnp.linspace(0.0, 1.0, 60)
+pos = {"x": 10.0 * t, "y": jnp.sin(3.0 * t)}
+vel = {"x": jnp.ones(60), "y": 3.0 * jnp.cos(3.0 * t)}
+
+# The velocity-following walk, via the orderer interface
+walk_orderer = pcf.orderers.LocalFlowOrderer(metric_scale=1.0, start_idx=0)
+walk_result = walk_orderer.order(pos, vel)
+
+# The MST backbone (no start point needed)
+mst_orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0)
+mst_result = pcf.order(pos, vel, mst_orderer)  # or mst_orderer.order(pos, vel)
+
+# Either result feeds the autoencoder unchanged
+print(mst_result.gamma_range)  # (-1.0, 1.0)
+```
+
+`MSTOrderer` also has opt-in velocity mechanisms (`velocity_weight`,
+`sever_cos_threshold`, `orient_by_velocity`) for self-overlapping streams. See
+the
+[Orderers Guide](https://phasecurvefit.readthedocs.io/en/latest/guides/orderers.html)
+and the
+[Migration Guide](https://phasecurvefit.readthedocs.io/en/latest/migration.html).
 
 ## Distance Metrics
 

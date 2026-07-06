@@ -29,7 +29,6 @@ __all__: tuple[str, ...] = (
 )
 
 from collections.abc import Iterator, Set
-from dataclasses import KW_ONLY
 from typing import Literal, TypeAlias
 
 import equinox as eqx
@@ -38,13 +37,13 @@ import jax.numpy as jnp
 import jax.tree as jtu
 import plum
 import quax
-from jaxtyping import Array, Bool, Int, PRNGKeyArray
+from jaxtyping import Array, Bool, Int
 
 from jaxmore import bounded_while_loop
 from zeroth import zeroth
 
-from .abstract_result import AbstractResult
-from .custom_types import BSzN, ISz0, ISzN, RLikeSz0, VectorComponents
+from .custom_types import ISz0, RLikeSz0, VectorComponents
+from .orderers.result import OrderingResult
 from .phasespace import euclidean_distance, get_w_at
 from .query_config import WalkConfig
 
@@ -112,7 +111,7 @@ class StateMetadata(quax.Value):
         return jnp.array(True)
 
 
-class WalkLocalFlowResult(AbstractResult):
+class WalkLocalFlowResult(OrderingResult):
     r"""Result of the local flow walk algorithm.
 
     This class represents the complete output of the phase-flow walk algorithm.
@@ -254,140 +253,6 @@ class WalkLocalFlowResult(AbstractResult):
     (20,)
 
     """
-
-    positions: VectorComponents
-    velocities: VectorComponents
-    indices: ISzN
-    _: KW_ONLY
-    gamma_range: tuple[float, float] = (0.0, 1.0)
-
-    @property
-    def visited(self) -> BSzN:
-        """Boolean array indicating which observations were visited."""
-        return self.indices >= 0
-
-    @property
-    def n_visited(self) -> ISz0:
-        """Number of observations that were visited (not skipped)."""
-        return jnp.sum(self.visited)
-
-    @property
-    def n_skipped(self) -> ISz0:
-        """Number of observations that were not visited (skipped)."""
-        return jnp.sum(~self.visited)
-
-    @property
-    def all_visited(self) -> Bool[Array, " "]:
-        """Whether all observations were visited (no skips)."""
-        return jnp.all(self.visited)
-
-    @property
-    def skipped_indices(self) -> Int[Array, " n_skipped"]:
-        """Indices of skipped observations (marked as -1 in indices)."""
-        all_indices = jnp.arange(len(self.indices))
-        # Get set of visited indices (filtering out -1)
-        visited = self.indices[self.visited]
-        # Find indices not in visited set using isin
-        is_visited = jnp.isin(all_indices, visited)
-        return all_indices[~is_visited]
-
-    @property
-    def ordering(self) -> Int[Array, " n_visited"]:
-        """Indices of visited observations in the order they were visited."""
-        return self.indices[self.visited]
-
-    @property
-    def ordered(self) -> tuple[VectorComponents, VectorComponents]:
-        """Positions and velocities ordered by the walk."""
-        return order_w(self)
-
-    def __call__(
-        self, gamma: Array, /, *, key: PRNGKeyArray | None = None
-    ) -> VectorComponents:
-        r"""Interpolate spatial positions from ordering parameter $\gamma$.
-
-        Uses linear interpolation between consecutive visited observations, with
-        unvisited observations (indices of -1) automatically masked out using
-        JIT-safe operations.
-
-        Parameters
-        ----------
-        gamma : Array
-            Ordering parameter in [min_gamma, max_gamma], shape (...).
-        key : PRNGKeyArray, optional
-            JAX random key. Not used by linear interpolation, provided for
-            interface compatibility. Default is None.
-
-        Returns
-        -------
-        positions : dict[str, Array]
-            Interpolated spatial positions with same shape (...) as gamma.
-
-        Notes
-        -----
-        This method uses JIT-safe masked operations to interpolate only
-        visited observations. The indices of -1 (unvisited) are automatically
-        handled without changing array shapes.
-
-        The input gamma is automatically clipped to the valid range
-        [min_gamma, max_gamma] and normalized to [0, 1] before interpolation.
-
-        """
-        del key
-
-        # Convert gamma to JAX array to ensure error_if works with scalars
-        gamma = jnp.asarray(gamma)
-
-        # Number of visited observations
-        n_visited = self.n_visited
-
-        # Validate and normalize gamma to range
-        min_gamma, max_gamma = self.gamma_range
-        gamma_range_width = max_gamma - min_gamma
-        # Error if gamma is out of valid range
-        gamma = eqx.error_if(
-            gamma, jnp.any(gamma < min_gamma), "gamma must be >= min_gamma"
-        )
-        gamma = eqx.error_if(
-            gamma, jnp.any(gamma > max_gamma), "gamma must be <= max_gamma"
-        )
-        # Normalize to [0, 1]
-        gamma_normalized = (gamma - min_gamma) / gamma_range_width
-
-        # Create a mapping from walk order to original indices, clamping invalid
-        # indices (those with -1) to 0 for safe indexing in JIT
-        visited_indices = jnp.where(
-            self.indices >= 0, self.indices, 0
-        )  # Shape: (n_obs,) but only first n_visited are valid
-
-        # Map normalized gamma from [0, 1] to [0, n_visited-1]
-        indices_float = gamma_normalized * (n_visited - 1)
-
-        # Get lower and upper indices for linear interpolation
-        idx_lower = jnp.floor(indices_float).astype(jnp.int32)
-        idx_upper = jnp.ceil(indices_float).astype(jnp.int32)
-
-        # Clamp to valid range [0, n_visited-1]
-        idx_lower = jnp.clip(idx_lower, 0, n_visited - 1)
-        idx_upper = jnp.clip(idx_upper, 0, n_visited - 1)
-
-        # Map to original indices using the visited_indices array
-        # This works in JIT because visited_indices is an array of concrete values
-        orig_idx_lower = visited_indices[idx_lower]
-        orig_idx_upper = visited_indices[idx_upper]
-
-        # Compute interpolation weights
-        weights = indices_float - jnp.floor(indices_float)
-
-        # Interpolate each component using tree.map for cleaner code
-        def interpolate_component(q_vals: Array) -> Array:
-            """Interpolate a single position component."""
-            q_lower = q_vals[orig_idx_lower]
-            q_upper = q_vals[orig_idx_upper]
-            # Linear interpolation: (1-w)*q_lower + w*q_upper
-            return (1 - weights) * q_lower + weights * q_upper
-
-        return jax.tree.map(interpolate_component, self.positions)
 
 
 Direction: TypeAlias = Literal["forward", "backward", "both"]  # noqa: UP040

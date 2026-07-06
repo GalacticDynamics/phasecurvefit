@@ -2,6 +2,15 @@
 
 The walk algorithm skips some tracers due to the momentum condition. This guide explains how to use an autoencoder to assign ordering values ($\gamma$) to these skipped tracers.
 
+```{note}
+The examples below start from a walk, but `train_autoencoder` accepts **any**
+orderer's output — it dispatches on the unified
+{class}`~phasecurvefit.orderers.OrderingResult`. An
+{class}`~phasecurvefit.orderers.MSTOrderer` result feeds the autoencoder the same
+way (see the [Orderers guide](orderers.md)); the MST even supplies a `backbone`
+that the decoder can be trained against.
+```
+
 ## Problem and Solution
 
 **Problem**: walk inevitably skips tracers that don't align with the velocity direction.
@@ -19,10 +28,12 @@ import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
 
-# Get initial ordering from walk
+# Get an initial ordering from the local-flow walk
 pos = {"x": jnp.linspace(0, 5, 50), "y": jnp.sin(jnp.linspace(0, jnp.pi, 50))}
 vel = {"x": jnp.ones(50), "y": jnp.cos(jnp.linspace(0, jnp.pi, 50))}
-walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+walkresult = pcf.order(
+    pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 
 # Create normalizer and autoencoder
 key = jax.random.key(0)

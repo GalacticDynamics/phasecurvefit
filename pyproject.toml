@@ -37,9 +37,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
-all     = ["phasecurvefit[interop,kdtree]"]
+all     = ["phasecurvefit[interop,kdtree,mst]"]
 interop = ["unxt>=1.10.4"]
 kdtree  = ["jaxkd>=0.0.5"]
+mst     = ["scipy>=1.11"]
 
 [project.urls]
 "Bug Tracker" = "https://github.com/GalacticDynamics/phasecurvefit/issues"
@@ -79,6 +80,7 @@ docs = [
   "sphinxext-opengraph>=0.9.2",
   "jaxkd>=0.0.5",
   "galax",
+  "scipy>=1.11",
 ]
 lint = ["cz-conventional-gitmoji>=0.6.1", "pre-commit>=4.1.0", "pylint>=3.3.8"]
 nox = ["nox>=2024.10.9", "nox-uv>=0.6.3"]
@@ -99,6 +101,7 @@ test = [
   "sybil[pytest]>=8.0.0",
   "unxt>=1.10.4",
   "jaxkd>=0.0.5",
+  "scipy>=1.11",
 ]
 
 
@@ -182,6 +185,10 @@ ignore = [
   "C901",   # train_autoencoder is complex but well-structured
   "RUF003", # Greek letters are intentional in math code
   "RUF059", # Unpacked variable 'keys' used for structure
+]
+"src/phasecurvefit/_src/orderers/mst.py" = [
+  "N803", # P, V are conventional names for the point / velocity matrices
+  "N806", # Cb is the conventional name for the backbone coordinate matrix
 ]
 "src/phasecurvefit/_src/phasespace.py" = [
   "UP040", # TypeAlias is more explicit for Python 3.12

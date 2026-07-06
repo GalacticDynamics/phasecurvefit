@@ -47,6 +47,9 @@ from phasecurvefit._src import algorithm, phasespace
 from phasecurvefit._src.algorithm import Direction, StateMetadata, WalkLocalFlowResult
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
+from phasecurvefit._src.orderers.localflow import LocalFlowOrderer
+from phasecurvefit._src.orderers.mst import MSTOrderer
+from phasecurvefit._src.orderers.result import OrderingResult
 from phasecurvefit._src.query_config import WalkConfig
 
 RQSz0: TypeAlias = Real[AbcQ, " "]  # noqa: UP040
@@ -752,3 +755,85 @@ def transform(
     vs = qnp.stack([ps[k] for k in self.p_comps], axis=1)
     norm_ps = (vs - self.p_mean) / self.p_std
     return norm_qs.ustrip(""), norm_ps.ustrip("")
+
+
+# ==============================================================================
+# Orderers (Quantity-valued inputs)
+# ==============================================================================
+
+
+def _require_usys(metadata: StateMetadata) -> u.AbstractUnitSystem:
+    usys = metadata.get("usys")
+    if not isinstance(usys, u.AbstractUnitSystem):
+        msg = (
+            "`usys` must be provided for Quantity inputs, e.g. "
+            "order(q, p, metadata=StateMetadata(usys=...))."
+        )
+        raise TypeError(msg)
+    return usys
+
+
+@MSTOrderer.order.dispatch
+def order(
+    self: MSTOrderer,
+    positions: VectorQComponents,
+    velocities: VectorQComponents,
+    *,
+    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+) -> OrderingResult:
+    """Order Quantity-valued tracers with the MST backbone.
+
+    Strips units into ``usys`` (host-side), runs the MST pipeline, and reattaches
+    units: ``positions``/``velocities`` keep their input units and ``backbone``
+    is returned in the position units.
+    """
+    usys = _require_usys(metadata)
+    q_plain = {k: u.ustrip(usys, v) for k, v in positions.items()}
+    p_plain = {k: u.ustrip(usys, v) for k, v in velocities.items()}
+
+    result = self.order(q_plain, p_plain)  # -> plain VectorComponents dispatch
+
+    length_unit = usys["length"]
+    backbone = {
+        k: u.uconvert(positions[k].unit, u.Q(v, length_unit))
+        for k, v in result.backbone.items()
+    }
+    return dataclassish.replace(
+        result,
+        positions=dict(positions),
+        velocities=dict(velocities),
+        backbone=backbone,
+    )
+
+
+@LocalFlowOrderer.order.dispatch
+def order(
+    self: LocalFlowOrderer,
+    positions: VectorQComponents,
+    velocities: VectorQComponents,
+    *,
+    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+) -> WalkLocalFlowResult:
+    """Order Quantity-valued tracers with the local-flow walk.
+
+    Delegates to the ``walk_local_flow`` Quantity dispatch. Scalar
+    hyperparameters (``metric_scale``, ``max_dist``) that are plain numbers are
+    interpreted in the ``usys`` length unit.
+    """
+    usys = _require_usys(metadata)
+
+    def _as_length_q(val: object) -> AbcQ:
+        return val if isinstance(val, u.AbstractQuantity) else u.Q(val, usys["length"])
+
+    return algorithm.walk_local_flow(
+        positions,
+        velocities,
+        start_idx=self.start_idx,
+        metric_scale=_as_length_q(self.metric_scale),
+        max_dist=_as_length_q(self.max_dist),
+        terminate_indices=self.terminate_indices,
+        n_max=self.n_max,
+        config=self.config,
+        direction=self.direction,
+        usys=usys,
+    )

@@ -1,7 +1,13 @@
 r"""Interpolation Network for interpolating skipped tracers."""
 
-__all__: tuple[str, ...] = ("TrackNet", "decoder_loss")
+__all__: tuple[str, ...] = (
+    "AbstractTrackNet",
+    "TrackNet",
+    "FourierTrackNet",
+    "decoder_loss",
+)
 
+import abc
 import functools as ft
 from dataclasses import KW_ONLY, dataclass
 from typing import TypeAlias, cast
@@ -19,7 +25,37 @@ from .utils import masked_mean, shuffle_and_batch
 from phasecurvefit._src.custom_types import FSz0, RSz0, RSzN
 
 
-class TrackNet(eqx.Module):
+class AbstractTrackNet(eqx.Module):
+    r"""Interface for a trainable decoder mapping $\gamma \to$ position.
+
+    A track net is the second half of the autoencoder: it reconstructs the
+    spatial track position from the scalar ordering parameter $\gamma$.
+
+    Subclasses must:
+
+    - expose ``out_size`` (the number of spatial dimensions), and
+    - implement ``__call__(gamma, /, key=None) -> position`` of shape
+      ``(out_size,)``, **differentiable in** ``gamma`` (Phase-2 training takes a
+      ``jvp`` of the decoder w.r.t. $\gamma$ for the velocity/tangent loss).
+
+    Concrete variants (all interchangeable via ``PathAutoencoder.make(decoder=...)``):
+
+    - :class:`TrackNet` — a plain MLP on $\gamma$ (default).
+    - :class:`FourierTrackNet` — Fourier features on $\gamma$, for sharp /
+      self-intersecting tracks a plain MLP over-smooths.
+    """
+
+    out_size: eqx.AbstractVar[int]
+
+    @abc.abstractmethod
+    def __call__(
+        self, gamma: RSz0, /, key: PRNGKeyArray | None = None
+    ) -> Float[Array, " {self.out_size}"]:
+        """Reconstruct the position at ordering parameter ``gamma``."""
+        ...
+
+
+class TrackNet(AbstractTrackNet):
     r"""Param-Net (decoder): maps $\gamma \to$ position (x, y, z).
 
     This network reconstructs the stream track position from the ordering
@@ -93,6 +129,131 @@ class TrackNet(eqx.Module):
 
         """
         return self.mlp(gamma, key=key)
+
+
+class FourierTrackNet(AbstractTrackNet):
+    r"""Decoder with Fourier features on $\gamma$ before the MLP.
+
+    Maps $\gamma$ to ``[gamma, sin(pi k gamma), cos(pi k gamma)]`` for
+    ``k = 1 .. n_frequencies`` and feeds those ``1 + 2*n_frequencies`` features
+    to an MLP. The Fourier features give the network the high-frequency capacity
+    to represent sharp or self-intersecting tracks (e.g. multi-petal curves)
+    that a plain :class:`TrackNet` tends to over-smooth. ``sin/cos(pi k gamma)``
+    complete one period over a unit-width $\gamma$-range, so ``n_frequencies``
+    controls how sharp a curve the decoder can render.
+
+    Parameters
+    ----------
+    out_size : int
+        Number of spatial dimensions.
+    n_frequencies : int
+        Number of Fourier modes ``k``. Higher captures sharper structure.
+    width_size, depth : int
+        MLP hidden-layer size and number of hidden layers.
+    key : PRNGKeyArray
+        JAX random key for initialization.
+
+    Examples
+    --------
+    Create a Fourier decoder for 2D tracks:
+
+    >>> import jax.random as jr
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+
+    >>> # Create a decoder mapping gamma to 2D positions
+    >>> decoder = pcf.nn.FourierTrackNet(
+    ...     out_size=2, n_frequencies=8, width_size=128, depth=3, key=jr.key(0)
+    ... )
+    >>> decoder.out_size
+    2
+
+    Decode a single position from the ordering parameter:
+
+    >>> # Evaluate decoder at gamma=0.5 (middle of track)
+    >>> gamma_val = jnp.array(0.5)
+    >>> position = decoder(gamma_val)
+    >>> position.shape
+    (2,)
+
+    The Fourier embedding converts ``gamma`` to higher-dimensional features
+    before the MLP, allowing sharp / multi-petal structure:
+
+    >>> # Inspect the Fourier features
+    >>> features = decoder.features(jnp.array(0.3))
+    >>> features.shape  # (1 + 2 * 8,)
+    (17,)
+
+    Compute the tangent vector (velocity) for the tangent/momentum loss:
+
+    >>> import jax
+    >>> gamma = jnp.array(0.5)
+    >>> position, tangent = jax.jvp(decoder, (gamma,), (jnp.array(1.0),))
+    >>> tangent.shape  # Tangent vector in position space
+    (2,)
+
+    Use with ``PathAutoencoder.make()`` to build a complete autoencoder
+    with Fourier decoding instead of the default plain MLP:
+
+    >>> positions = {"x": jnp.linspace(0, 1, 20), "y": jnp.linspace(0, 1, 20)}
+    >>> velocities = {"x": jnp.ones(20), "y": jnp.ones(20)}
+    >>> normalizer = pcf.nn.StandardScalerNormalizer(positions, velocities)
+
+    >>> # Create decoder with specific parameters for sharp tracks
+    >>> decoder_sharp = pcf.nn.FourierTrackNet(
+    ...     out_size=2, n_frequencies=16, width_size=256, depth=4, key=jr.key(1)
+    ... )
+    >>> autoencoder = pcf.nn.PathAutoencoder.make(
+    ...     normalizer, gamma_range=(0.0, 1.0), decoder=decoder_sharp, key=jr.key(2)
+    ... )
+    >>> isinstance(autoencoder.decoder, pcf.nn.FourierTrackNet)
+    True
+
+    """
+
+    mlp: eqx.nn.MLP
+
+    out_size: int = eqx.field(static=True)
+    n_frequencies: int = eqx.field(static=True)
+    width_size: int = eqx.field(static=True)
+    depth: int = eqx.field(static=True)
+
+    def __init__(
+        self,
+        out_size: int = 3,
+        n_frequencies: int = 8,
+        width_size: int = 128,
+        depth: int = 3,
+        *,
+        key: PRNGKeyArray,
+    ) -> None:
+        self.out_size = out_size
+        self.n_frequencies = n_frequencies
+        self.width_size = width_size
+        self.depth = depth
+        self.mlp = eqx.nn.MLP(
+            in_size=1 + 2 * n_frequencies,
+            out_size=out_size,
+            width_size=width_size,
+            depth=depth,
+            activation=jax.nn.tanh,
+            scan=depth > 1,  # scan-over-layers needs >1 hidden layer
+            key=key,
+        )
+
+    def features(self, gamma: RSz0, /) -> Float[Array, " {1 + 2 * self.n_frequencies}"]:
+        """Fourier-feature embedding of the scalar ordering parameter."""
+        gamma = jnp.asarray(gamma)
+        ks = jnp.arange(1, self.n_frequencies + 1, dtype=gamma.dtype)
+        ang = jnp.pi * ks * gamma
+        return jnp.concatenate([jnp.atleast_1d(gamma), jnp.sin(ang), jnp.cos(ang)])
+
+    @ft.partial(eqx.filter_jit)
+    def __call__(
+        self, gamma: RSz0, /, key: PRNGKeyArray | None = None
+    ) -> Float[Array, " {self.out_size}"]:
+        """Forward pass: Fourier-embed ``gamma``, then MLP to a position."""
+        return self.mlp(self.features(gamma), key=key)
 
 
 # ===================================================================

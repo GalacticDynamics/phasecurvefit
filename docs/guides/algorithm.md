@@ -3,6 +3,16 @@
 This page explains the mathematical foundations and implementation details of
 the phase flow walking algorithm.
 
+```{note}
+The walk described here is one of the pluggable **orderers**. The examples below
+run it via `pcf.order` with a
+{class}`~phasecurvefit.orderers.LocalFlowOrderer`. The walk *follows* the
+velocity field, so it covers only one arm of a **near-closed loop** whose
+velocity reverses at a progenitor. For that case the
+{class}`~phasecurvefit.orderers.MSTOrderer` backbone orders the loop tip-to-tip
+without a start point — see the [Orderers guide](orderers.md).
+```
+
 ## Mathematical Foundation
 
 ### Walking Algorithm (Metric-Agnostic)
@@ -194,11 +204,15 @@ vel = {
 }
 
 # Forward walk (default)
-result_forward = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+result_forward = pcf.order(
+    pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 
 # Reverse walk from the same starting point
-result_reverse = pcf.walk_local_flow(
-    pos, vel, start_idx=0, metric_scale=1.0, direction="backward"
+result_reverse = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0, direction="backward"),
 )
 ```
 
@@ -214,11 +228,15 @@ combines the results of two separate walks into a single coherent ordering:
 
 ```python
 # Run forward and reverse walks separately
-result_forward = pcf.walk_local_flow(
-    pos, vel, start_idx=2, metric_scale=1.0, direction="forward"
+result_forward = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(start_idx=2, metric_scale=1.0, direction="forward"),
 )
-result_reverse = pcf.walk_local_flow(
-    pos, vel, start_idx=2, metric_scale=1.0, direction="backward"
+result_reverse = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(start_idx=2, metric_scale=1.0, direction="backward"),
 )
 
 # Combine the results
@@ -230,7 +248,11 @@ result = pcf.combine_results(result_forward, result_reverse)
 This can be simplified to:
 
 ```python
-result = pcf.walk_local_flow(pos, vel, start_idx=2, metric_scale=1.0, direction="both")
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(start_idx=2, metric_scale=1.0, direction="both"),
+)
 ```
 
 This is particularly useful for:
@@ -266,8 +288,10 @@ vel = {
     "y": 2 * jnp.pi * jnp.cos(jnp.linspace(0, 2 * jnp.pi, 50)) / (2 * jnp.pi),
 }
 
-# Run walk algorithm
-result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+# Run the walk via the orderer interface
+result = pcf.order(
+    pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 
 # Interpolate positions at specific gamma values
 gamma_values = jnp.array([0.0, 0.25, 0.5, 0.75, 1.0])

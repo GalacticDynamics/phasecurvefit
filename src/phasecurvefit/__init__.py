@@ -71,18 +71,21 @@ __all__: tuple[str, ...] = (
     "w",
     "metrics",
     "strats",
+    "orderers",
     # Algorithm
     "walk_local_flow",
     "combine_results",
     "WalkLocalFlowResult",
     "StateMetadata",
+    # Orderers
+    "order",
     # Query configuration
     "WalkConfig",
     # Result accessor
     "order_w",
 )
 
-from . import metrics, nn, strats, w
+from . import metrics, nn, orderers, strats, w
 from ._src.algorithm import (
     StateMetadata,
     WalkLocalFlowResult,
@@ -90,6 +93,7 @@ from ._src.algorithm import (
     order_w,
     walk_local_flow,
 )
+from ._src.orderers.base import order
 from ._src.query_config import WalkConfig
 from ._version import version as __version__
 

@@ -12,6 +12,7 @@ sd_hide_title: true
 guides/quickstart
 guides/metrics
 guides/algorithm
+guides/orderers
 guides/nn
 guides/jax-integration
 ```
@@ -30,6 +31,14 @@ tutorials/index
 :caption: 🔌 API Reference
 
 api/index
+```
+
+```{toctree}
+:maxdepth: 1
+:hidden:
+:caption: 🔀 Migration
+
+migration
 ```
 
 ```{toctree}

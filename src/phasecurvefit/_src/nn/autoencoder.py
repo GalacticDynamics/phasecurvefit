@@ -26,10 +26,16 @@ from .order_net import (
     train_ordering_net,
 )
 from .result import AutoencoderResult
-from .track_net import TrackNet, TrackTrainingConfig, decoder_loss, train_track_net
+from .track_net import (
+    AbstractTrackNet,
+    TrackNet,
+    TrackTrainingConfig,
+    decoder_loss,
+    train_track_net,
+)
 from .utils import shuffle_and_batch
-from phasecurvefit._src.algorithm import WalkLocalFlowResult
 from phasecurvefit._src.custom_types import FLikeSz0, FSz0, FSzN
+from phasecurvefit._src.orderers.result import OrderingResult
 
 Gamma: TypeAlias = FSzN  # noqa: UP040
 
@@ -50,7 +56,7 @@ class PathAutoencoder(AbstractAutoencoder):
     """
 
     encoder: OrderingNet
-    decoder: TrackNet
+    decoder: AbstractTrackNet
     normalizer: AbstractNormalizer
 
     __citation__: ClassVar[str] = (
@@ -72,6 +78,7 @@ class PathAutoencoder(AbstractAutoencoder):
         ordering_depth: int = 2,
         track_width_size: int = 128,
         track_depth: int = 3,
+        decoder: AbstractTrackNet | None = None,
         key: PRNGKeyArray,
     ) -> "PathAutoencoder":
         key_encode, key_decode = jr.split(key)
@@ -82,12 +89,19 @@ class PathAutoencoder(AbstractAutoencoder):
             gamma_range=gamma_range,
             key=key_encode,
         )
-        decoder = TrackNet(
-            out_size=normalizer.n_spatial_dims,
-            width_size=track_width_size,
-            depth=track_depth,
-            key=key_decode,
-        )
+        if decoder is None:
+            decoder = TrackNet(
+                out_size=normalizer.n_spatial_dims,
+                width_size=track_width_size,
+                depth=track_depth,
+                key=key_decode,
+            )
+        elif decoder.out_size != normalizer.n_spatial_dims:
+            msg = (
+                f"decoder.out_size ({decoder.out_size}) must match "
+                f"normalizer.n_spatial_dims ({normalizer.n_spatial_dims})."
+            )
+            raise ValueError(msg)
         return cls(encoder=encoder, decoder=decoder, normalizer=normalizer)
 
 
@@ -740,33 +754,46 @@ def train_autoencoder(
     # ===========================================
     # Train Decoder on the running mean
 
-    # Use the trained encoder to compute gamma values for all member samples
+    # Use the trained encoder to compute membership for all samples.
     # TODO: this happens outside of JIT. Speed up.
     # TODO: add an optional exclusion for the progenitor
-    gamma, prob = jax.jit(jax.vmap(model.encoder, in_axes=(0, None)))(all_ws, keys[1])
+    _, prob = jax.jit(jax.vmap(model.encoder, in_axes=(0, None)))(all_ws, keys[1])
     is_member = prob > config.member_threshold
 
-    # Then compute the running mean decoder targets for the member samples. This
-    # gives us a denoised target for the decoder to train on, which is
-    # especially important in the early stages of training when the encoder is
-    # still noisy.
+    # Denoise the decoder target over the ORDERING coordinate, not the (locally
+    # noisy) encoder gamma. The encoder gamma is globally monotone but jittery at
+    # the running-mean window scale, so a window in encoder-gamma averages
+    # spatially-scattered points and blurs the target off the track. The ordering
+    # gamma (rank along the walk) is exact, so its running mean is a clean
+    # centerline. The decoder is therefore trained in the ordering's own gamma; at
+    # inference the encoder maps points into (approximately) that same coordinate.
+    gmin, gmax = model.encoder.gamma_range
+    visited = ordering_indices >= 0
+    ordering = ordering_indices[visited]  # point indices, in visit order
+    gamma_ord = jnp.full(ordering_indices.shape, gmin, dtype=prob.dtype)
+    gamma_ord = gamma_ord.at[ordering].set(
+        jnp.linspace(gmin, gmax, ordering.shape[0], dtype=prob.dtype)
+    )
+    # Only ordered members train the decoder; unvisited tracers are gaps to fill.
+    decoder_mask = is_member & visited
+
     D = all_ws.shape[1] // 2
     all_qs = all_ws[:, :D]
     mean_fn = RunningMeanDecoder(
         window_size=0.05,
-        gamma_train=gamma,
+        gamma_train=gamma_ord,
         positions_train=all_qs,
-        member_train=is_member,
+        member_train=decoder_mask,
     )
-    mean_qs = jax.vmap(mean_fn, (0, None))(gamma, keys[2])
+    mean_qs = jax.vmap(mean_fn, (0, None))(gamma_ord, keys[2])
 
-    # Train the decoder to reconstruct the running mean positions from gamma.
+    # Train the decoder to reconstruct the running-mean positions from gamma.
     config_decoder = config.decoderonly_config()
     decoder, decoder_opt_state, decoder_losses = train_track_net(
         model.decoder,
-        gamma=gamma,
+        gamma=gamma_ord,
         qs_mean=mean_qs,
-        mask=is_member,
+        mask=decoder_mask,
         config=config_decoder,
         key=keys[2],
     )
@@ -825,7 +852,7 @@ def train_autoencoder(
 @plum.dispatch
 def train_autoencoder(
     model: AbstractAutoencoder,
-    walk_results: WalkLocalFlowResult,
+    walk_results: OrderingResult,
     /,
     *,
     config: TrainingConfig | None = None,
