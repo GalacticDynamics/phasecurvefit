@@ -38,10 +38,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
-all     = ["phasecurvefit[interop,kdtree,mst]"]
+all     = ["phasecurvefit[interop,kdtree]"]
 interop = ["unxt>=1.10.4"]
 kdtree  = ["jaxkd>=0.0.5"]
-mst     = ["scipy>=1.11"]
 
 [project.urls]
 "Bug Tracker" = "https://github.com/GalacticDynamics/phasecurvefit/issues"
@@ -81,7 +80,6 @@ docs = [
   "sphinxext-opengraph>=0.9.2",
   "jaxkd>=0.0.5",
   "galax",
-  "scipy>=1.11",
 ]
 lint = ["cz-conventional-gitmoji>=0.6.1", "pre-commit>=4.1.0", "pylint>=3.3.8"]
 nox = ["nox>=2024.10.9", "nox-uv>=0.6.3"]
@@ -102,7 +100,6 @@ test = [
   "sybil[pytest]>=8.0.0",
   "unxt>=1.10.4",
   "jaxkd>=0.0.5",
-  "scipy>=1.11",
 ]
 
 

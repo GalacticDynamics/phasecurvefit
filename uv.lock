@@ -1908,7 +1908,6 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "jaxkd" },
-    { name = "scipy" },
     { name = "unxt" },
 ]
 interop = [
@@ -1916,9 +1915,6 @@ interop = [
 ]
 kdtree = [
     { name = "jaxkd" },
-]
-mst = [
-    { name = "scipy" },
 ]
 
 [package.dev-dependencies]
@@ -1949,7 +1945,6 @@ dev = [
     { name = "pytest-randomly" },
     { name = "pytest-timeout" },
     { name = "pytz" },
-    { name = "scipy" },
     { name = "sphinx" },
     { name = "sphinx-autobuild" },
     { name = "sphinx-autodoc-typehints" },
@@ -1969,7 +1964,6 @@ docs = [
     { name = "myst-parser" },
     { name = "nbsphinx" },
     { name = "pytz" },
-    { name = "scipy" },
     { name = "sphinx" },
     { name = "sphinx-autobuild" },
     { name = "sphinx-autodoc-typehints" },
@@ -2005,7 +1999,6 @@ test = [
     { name = "pytest-mpl" },
     { name = "pytest-randomly" },
     { name = "pytest-timeout" },
-    { name = "scipy" },
     { name = "sybil", extra = ["pytest"] },
     { name = "unxt" },
 ]
@@ -2024,13 +2017,11 @@ requires-dist = [
     { name = "plum-dispatch", specifier = ">=2.6.1" },
     { name = "quax", specifier = ">=0.2.1" },
     { name = "scipy", specifier = ">=1.11" },
-    { name = "scipy", marker = "extra == 'all'", specifier = ">=1.11" },
-    { name = "scipy", marker = "extra == 'mst'", specifier = ">=1.11" },
     { name = "unxt", marker = "extra == 'all'", specifier = ">=1.10.4" },
     { name = "unxt", marker = "extra == 'interop'", specifier = ">=1.10.4" },
     { name = "zeroth", specifier = ">=1.0.1" },
 ]
-provides-extras = ["all", "interop", "kdtree", "mst"]
+provides-extras = ["all", "interop", "kdtree"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2062,7 +2053,6 @@ dev = [
     { name = "pytest-randomly", specifier = ">=3.16.0" },
     { name = "pytest-timeout", specifier = ">=2.3.1" },
     { name = "pytz", specifier = ">=2024.2" },
-    { name = "scipy", specifier = ">=1.11" },
     { name = "sphinx", specifier = ">=8.1.3" },
     { name = "sphinx-autobuild", specifier = ">=2024.10.3" },
     { name = "sphinx-autodoc-typehints", specifier = ">=2.6.1" },
@@ -2082,7 +2072,6 @@ docs = [
     { name = "myst-parser", specifier = ">=4.0.0" },
     { name = "nbsphinx", specifier = ">=0.9.3" },
     { name = "pytz", specifier = ">=2024.2" },
-    { name = "scipy", specifier = ">=1.11" },
     { name = "sphinx", specifier = ">=8.1.3" },
     { name = "sphinx-autobuild", specifier = ">=2024.10.3" },
     { name = "sphinx-autodoc-typehints", specifier = ">=2.6.1" },
@@ -2118,7 +2107,6 @@ test = [
     { name = "pytest-mpl", specifier = ">=0.17.0" },
     { name = "pytest-randomly", specifier = ">=3.16.0" },
     { name = "pytest-timeout", specifier = ">=2.3.1" },
-    { name = "scipy", specifier = ">=1.11" },
     { name = "sybil", extras = ["pytest"], specifier = ">=8.0.0" },
     { name = "unxt", specifier = ">=1.10.4" },
 ]
