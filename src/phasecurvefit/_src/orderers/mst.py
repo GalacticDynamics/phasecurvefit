@@ -32,6 +32,13 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 import plum
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import (
+    connected_components,
+    minimum_spanning_tree,
+    shortest_path,
+)
+from scipy.spatial import cKDTree
 
 from .base import AbstractOrderer
 from .result import OrderingResult
@@ -40,35 +47,6 @@ from phasecurvefit._src.custom_types import VectorComponents
 
 OnDisconnected = Literal["raise", "warn", "largest"]
 _TINY = 1e-12
-
-
-def _load_scipy() -> tuple:
-    """Import scipy lazily so it is only needed when MSTOrderer actually runs.
-
-    scipy is an optional dependency (``phasecurvefit[mst]``); importing it here
-    rather than at module load keeps ``import phasecurvefit`` working without it.
-    """
-    try:
-        from scipy.sparse import csr_matrix  # noqa: PLC0415
-        from scipy.sparse.csgraph import (  # noqa: PLC0415
-            connected_components,
-            minimum_spanning_tree,
-            shortest_path,
-        )
-        from scipy.spatial import cKDTree  # noqa: PLC0415
-    except ImportError:
-        msg = (
-            "MSTOrderer requires the optional 'scipy' dependency. "
-            "Install with: pip install 'phasecurvefit[mst]'."
-        )
-        raise ImportError(msg) from None
-    return (
-        cKDTree,
-        csr_matrix,
-        connected_components,
-        minimum_spanning_tree,
-        shortest_path,
-    )
 
 
 def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
@@ -88,7 +66,6 @@ def _backbone_on_component(
     order, the original indices of the backbone vertices, and the tip-to-tip
     backbone polyline coordinates.
     """
-    cKDTree, _, _, _, shortest_path = _load_scipy()
     sub = tree[nodes][:, nodes]
     # graph diameter via double shortest-path: farthest node a, then farthest b
     d0 = shortest_path(sub, method="D", indices=0)
@@ -134,7 +111,6 @@ def _mst_backbone(
     if n < 2:
         return np.arange(n), P.copy()
 
-    cKDTree, csr_matrix, connected_components, minimum_spanning_tree, _ = _load_scipy()
     k_eff = int(min(k, n - 1))
     nn_d, nn_i = cKDTree(P).query(P, k=k_eff + 1)
     nn_d = np.atleast_2d(nn_d)

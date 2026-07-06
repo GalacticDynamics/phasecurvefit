@@ -65,7 +65,6 @@ phasecurvefit has optional dependencies for extended functionality:
 
 - **unxt**: Physical units support for phase-space calculations
 - **tree (jaxkd)**: Spatial KD-tree queries for large datasets
-- **mst (scipy)**: The `MSTOrderer` backbone orderer
 
 Install with optional dependencies:
 
@@ -73,7 +72,6 @@ Install with optional dependencies:
 # pip install phasecurvefit[all]  # Install with all extras
 pip install phasecurvefit[interop]  # Install with unxt for unit support
 pip install phasecurvefit[kdtree]  # Install with jaxkd for KD-tree strategy
-pip install phasecurvefit[mst]  # Install with scipy for the MST orderer
 ```
 
 Or with uv:
@@ -82,7 +80,6 @@ Or with uv:
 # uv add phasecurvefit --extra all  # installs all extras
 uv add phasecurvefit --extra interop
 uv add phasecurvefit --extra kdtree
-uv add phasecurvefit --extra mst
 ```
 
 ## Quick Start

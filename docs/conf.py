@@ -7,6 +7,7 @@ https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 __all__: tuple[str, ...] = ()
 
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -58,6 +59,9 @@ python_use_unqualified_type_names = True
 
 # Use a known lexer for notebook code cells to avoid Pygments warnings.
 nbsphinx_codecell_lexer = "python"
+# On ReadTheDocs, don't execute notebooks (no kernel available)
+# Locally, execute them to update outputs
+nbsphinx_execute = "never" if os.environ.get("READTHEDOCS") else "always"
 pygments_lexers = {"ipython3": PythonLexer()}
 
 exclude_patterns = [

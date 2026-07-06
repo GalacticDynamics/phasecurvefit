@@ -3,12 +3,9 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
+from scipy.spatial import cKDTree
 
 import phasecurvefit as pcf
-
-pytest.importorskip("scipy")
-from scipy.spatial import cKDTree
 
 
 def _epitrochoid(n=2048, noise=6.0, seed=1, scale=120.0, R=5.0, r=1.0, d=4.5):
