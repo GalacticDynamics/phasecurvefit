@@ -1901,6 +1901,7 @@ dependencies = [
     { name = "optional-dependencies" },
     { name = "plum-dispatch" },
     { name = "quax" },
+    { name = "scipy" },
     { name = "zeroth" },
 ]
 
@@ -2022,6 +2023,7 @@ requires-dist = [
     { name = "optional-dependencies", specifier = ">=0.4.0" },
     { name = "plum-dispatch", specifier = ">=2.6.1" },
     { name = "quax", specifier = ">=0.2.1" },
+    { name = "scipy", specifier = ">=1.11" },
     { name = "scipy", marker = "extra == 'all'", specifier = ">=1.11" },
     { name = "scipy", marker = "extra == 'mst'", specifier = ">=1.11" },
     { name = "unxt", marker = "extra == 'all'", specifier = ">=1.10.4" },

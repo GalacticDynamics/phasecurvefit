@@ -250,11 +250,9 @@ class FullPhaseSpaceDistanceMetric(AbstractDistanceMetric):
     d = \sqrt{d_0^2 + (\tau \cdot d_v)^2}
     $$
 
-    where:
-    - $d_0$ is the Euclidean distance in position space
-    - $d_v$ is the Euclidean distance in velocity space
-    - $\tau$ is the time parameter (metric_scale) that converts velocity to
-      position units
+    where $d_0$ is the Euclidean distance in position space, $d_v$ is the
+    Euclidean distance in velocity space, and $\tau$ is the time parameter
+    (metric_scale) that converts velocity to position units.
 
     This metric treats position and velocity symmetrically in phase space,
     without directional bias from momentum alignment. The `metric_scale`
