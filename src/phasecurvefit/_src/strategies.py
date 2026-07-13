@@ -153,8 +153,10 @@ class KDTree(AbstractQueryStrategy):
         Parameters
         ----------
         k : int, optional
-            Number of nearest spatial neighbors to query. Default: 50.
-            Increase for more thorough searches; decrease for speed.
+            Number of candidate spatial neighbors to consider at each step,
+            *excluding* the current point itself. Default: 50. Increase for
+            more thorough searches; decrease for speed. Values larger than the
+            number of points are clamped to consider every other point.
 
         """
         self.k = k
@@ -180,7 +182,7 @@ class KDTree(AbstractQueryStrategy):
         pos_arrays = [positions[k] for k in sorted(positions.keys())]
         pos_flat = jnp.stack(pos_arrays, axis=-1)
         tree = self._jaxkd.build_tree(pos_flat)
-        return {"tree": tree}
+        return {"tree": tree, "n_points": pos_flat.shape[0]}
 
     def query(
         self,
@@ -203,11 +205,17 @@ class KDTree(AbstractQueryStrategy):
             [current_pos[k] for k in sorted(current_pos.keys())]
         )
 
-        # Query k nearest neighbors using jaxkd top-level API
+        # Query one extra neighbor so we can drop the current point itself,
+        # which the tree always returns first (distance 0). Without this drop,
+        # ``k`` yields only ``k - 1`` usable candidates and small ``k`` can
+        # deadlock the walk: the sole non-self neighbor may already be visited,
+        # leaving no candidate and terminating the walk prematurely. Clamp to
+        # the point count since jaxkd errors when ``k`` exceeds the tree size.
+        n_query = min(self.k + 1, kd_state["n_points"])
         indices, _ = self._jaxkd.query_neighbors(
-            kd_state["tree"], current_pos_arr[None, :], k=self.k
+            kd_state["tree"], current_pos_arr[None, :], k=n_query
         )
-        indices = indices[0]  # (k,)
+        indices = indices[0, 1:]  # drop self (nearest, distance 0)
 
         # Compute metric distances to all points
         distances_metric = metric_fn(
