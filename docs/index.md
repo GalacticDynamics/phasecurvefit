@@ -135,9 +135,9 @@ vel = {
     "y": jnp.array([0.5, 0.5, 0.5, 0.5, 0.5]),
 }
 
-# Order observations using walk_local_flow
+# Order observations using pcf.order
 config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=3))
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 
 # Train autoencoder for gap filling
 key = jax.random.key(0)
@@ -205,7 +205,7 @@ Example using KD-tree (requires `jaxkd`):
 import phasecurvefit as pcf
 
 config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2))
-result = pcf.walk_local_flow(pos, vel, config=config)
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
 
 ## Data Format

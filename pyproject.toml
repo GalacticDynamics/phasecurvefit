@@ -334,7 +334,7 @@ filterwarnings = [
 ]
 log_level = "INFO"
 minversion = "8.3"
-norecursedirs = [".*", "__pycache__", "docs/_build"]
+norecursedirs = [".*", "__pycache__", "docs/_build", "docs/superpowers"]
 testpaths = ["README.md", "docs", "src/", "tests/"]
 xfail_strict = true
 

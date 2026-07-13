@@ -48,11 +48,17 @@ class AbstractOrderer(eqx.Module):
 def order(
     positions: VectorComponents,
     velocities: VectorComponents,
-    orderer: AbstractOrderer,
+    orderer: AbstractOrderer | None = None,
     *,
     metadata: StateMetadata | None = None,
 ) -> AbstractResult:
-    """Functional façade mirroring ``walk_local_flow``: run ``orderer`` on data.
+    """Order tracers with ``orderer`` -- the primary ordering entry point.
+
+    ``orderer`` defaults to :class:`~phasecurvefit.orderers.LocalFlowOrderer`, so
+    ``order(positions, velocities)`` runs the velocity-following local-flow walk
+    (equivalent to the deprecated ``walk_local_flow(positions, velocities)``).
+    Pass any :class:`AbstractOrderer` (e.g. ``MSTOrderer``) to select a different
+    algorithm.
 
     Examples
     --------
@@ -60,9 +66,22 @@ def order(
     >>> import phasecurvefit as pcf
     >>> q = {"x": jnp.array([0.0, 1.0, 2.0])}
     >>> p = {"x": jnp.array([1.0, 1.0, 1.0])}
+
+    The default orderer is the local-flow walk:
+
+    >>> pcf.order(q, p).indices
+    Array([0, 1, 2], dtype=int32)
+
+    Or pass an orderer explicitly:
+
     >>> res = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(metric_scale=1.0))
     >>> res.indices
     Array([0, 1, 2], dtype=int32)
 
     """
+    if orderer is None:
+        # Lazy import: localflow imports AbstractOrderer from this module.
+        from phasecurvefit._src.orderers import localflow  # noqa: PLC0415
+
+        orderer = localflow.LocalFlowOrderer()
     return orderer.order(positions, velocities, metadata=metadata)

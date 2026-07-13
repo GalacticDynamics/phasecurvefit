@@ -74,8 +74,11 @@ class TestLocalFlowUnxt:
             metric_scale=u.Q(1.0, "kpc"), start_idx=0
         )
         res = orderer.order(q, p, metadata=StateMetadata(usys=usys))
-        direct = pcf.walk_local_flow(
-            q, p, start_idx=0, metric_scale=u.Q(1.0, "kpc"), usys=usys
+        direct = pcf.order(
+            q,
+            p,
+            pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(1.0, "kpc")),
+            metadata=pcf.StateMetadata(usys=usys),
         )
         assert jnp.array_equal(res.indices, direct.indices)
         assert isinstance(res.positions["x"], u.AbstractQuantity)
