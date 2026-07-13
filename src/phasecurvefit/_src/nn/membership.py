@@ -393,9 +393,9 @@ def membership_rampup(
         Total number of epochs. Must be static.
     warmup_frac : float
         Fraction of training spent ramping, in ``[0, 1)``. ``w`` rises linearly
-        from 0 to 1 across the first ``warmup_frac * num_epochs`` epochs and
-        stays at 1 thereafter. ``0`` disables the ramp (full mixture from epoch
-        zero) -- don't, unless you have a good reason.
+        from 0 to 1 across the first ``warmup_frac * (num_epochs - 1)`` epochs
+        and stays at 1 thereafter. ``0`` disables the ramp (full mixture from
+        epoch zero) -- don't, unless you have a good reason.
 
     Returns
     -------
@@ -418,7 +418,7 @@ def membership_rampup(
     ...and rises linearly in between:
 
     >>> round(float(membership_rampup(2, 10, warmup_frac=0.5)), 3)
-    0.4
+    0.444
 
     ``warmup_frac=0`` means no warm-up at all:
 

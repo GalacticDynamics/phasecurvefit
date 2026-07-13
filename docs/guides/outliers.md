@@ -13,6 +13,7 @@ This guide explains why, and how the mixture-model membership fixes it.
 
 Phase 1 trains the encoder's membership head as a *classifier*:
 
+<!-- skip: next -->
 ```{code-block} python
 prob_ordered_penalty = masked_mean((1.0 - prob_pred_ordered) ** 2, mask)  # p -> 1
 prob_random_penalty  = masked_mean(prob_pred_random ** 2, mask)           # p -> 0
@@ -92,6 +93,7 @@ of justifiable modeling"*.
 Membership modelling is **opt-in**. Passing `membership=None` (the default)
 leaves the existing behaviour bit-for-bit unchanged.
 
+<!-- skip: next -->
 ```{code-block} python
 import phasecurvefit as pcf
 
@@ -111,6 +113,7 @@ result, model, *_ = pcf.nn.train_autoencoder(model, walkresult, config=config, k
 Then get **calibrated** membership out — note this is *not* the encoder's raw
 `prob`:
 
+<!-- skip: next -->
 ```{code-block} python
 q = pcf.nn.stream_membership(model, ws)   # posterior, in [0, 1]
 members = q > 0.5
