@@ -47,6 +47,15 @@ from phasecurvefit._src.custom_types import VectorComponents
 
 OnDisconnected = Literal["raise", "warn", "largest"]
 _TINY = 1e-12
+# An edge must be at least this multiple of the median length to be a clip
+# candidate. Floors the (multiplicative) threshold so a uniformly-sampled
+# backbone -- where the robust spread collapses to ~0 -- is not shredded by
+# microscopic edge-length variation.
+_EDGE_CLIP_MIN_RATIO = 2.0
+# After cutting, a component is an outlier clump (rejected) only if it holds
+# fewer than this fraction of the working points. Larger pieces are kept and
+# reconnected, so cutting a genuine sparse-region edge never discards stream.
+_EDGE_CLIP_SMALL_FRAC = 0.01
 
 
 def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
@@ -91,6 +100,63 @@ def _backbone_on_component(
     return nodes[order_local], backbone_nodes, Cb
 
 
+def _sigma_clip_edges(
+    tree: csr_matrix,
+    P: np.ndarray,
+    nodes: np.ndarray,
+    *,
+    sigma: float,
+    max_iters: int,
+) -> np.ndarray:
+    """Reject outlier nodes by robust, iterated MST edge-length clipping.
+
+    Works on the *spatial* edge lengths (not the possibly velocity-augmented
+    graph weights) in *log* space -- a multiplicative rule, since lengths are
+    positive and heavy-tailed. Each iteration:
+
+    1. cut every edge longer than
+       ``median(L) * exp(sigma * 1.4826 * MAD(log L))``, but never one shorter
+       than ``_EDGE_CLIP_MIN_RATIO * median(L)`` (the floor keeps a
+       uniformly-sampled backbone, where the robust spread is ~0, from being
+       shredded, and still catches a large jump when ``MAD`` is degenerate);
+    2. split the tree at the cut edges and **reject only the small components**
+       (< ``_EDGE_CLIP_SMALL_FRAC`` of the working points) -- the isolated
+       interlopers. Larger pieces are retained and reconnect through the intact
+       ``tree``, so cutting a genuine sparse-region edge cannot discard half the
+       stream;
+    3. recompute the statistic on the survivors and repeat, until nothing small
+       is split off (or ``max_iters``).
+
+    Returns the surviving node set (a subset of ``nodes``, in ascending order).
+    """
+    log_floor = np.log(_EDGE_CLIP_MIN_RATIO)
+    current = nodes
+    for _ in range(max_iters):
+        sub = tree[current][:, current].tocoo()
+        upper = sub.row < sub.col  # undirected edges, once each
+        ei, ej = sub.row[upper], sub.col[upper]
+        if ei.size == 0:
+            break
+        loglen = np.log(np.linalg.norm(P[current[ei]] - P[current[ej]], axis=1))
+        med = float(np.median(loglen))
+        scale = 1.4826 * float(np.median(np.abs(loglen - med)))
+        cut = loglen > med + max(sigma * scale, log_floor)
+        if not cut.any():
+            break
+        m = current.size
+        keep = ~cut
+        g = csr_matrix((np.ones(int(keep.sum())), (ei[keep], ej[keep])), shape=(m, m))
+        g = g.maximum(g.T)
+        _, labels = connected_components(g, directed=False)
+        sizes = np.bincount(labels)
+        size_min = max(2, int(np.ceil(_EDGE_CLIP_SMALL_FRAC * m)))
+        small = np.isin(labels, np.flatnonzero(sizes < size_min))
+        if not small.any():  # cuts split off nothing small (e.g. a sparse gap)
+            break
+        current = current[~small]
+    return current
+
+
 def _mst_backbone(
     P: np.ndarray,
     V: np.ndarray,
@@ -101,6 +167,8 @@ def _mst_backbone(
     sever_cos_threshold: float | None,
     orient_by_velocity: bool,
     on_disconnected: OnDisconnected,
+    edge_clip_sigma: float | None,
+    edge_clip_max_iters: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Order points along the MST longest-path backbone.
 
@@ -154,6 +222,11 @@ def _mst_backbone(
     else:
         nodes = np.arange(n)
 
+    if edge_clip_sigma is not None:  # optional: reject outliers by MST edge length
+        nodes = _sigma_clip_edges(
+            tree, P, nodes, sigma=edge_clip_sigma, max_iters=edge_clip_max_iters
+        )
+
     order_idx, backbone_nodes, Cb = _backbone_on_component(P, tree, nodes)
 
     if orient_by_velocity:  # Mechanism 3: orient gamma along mean velocity
@@ -192,6 +265,19 @@ class MSTOrderer(AbstractOrderer):
         Policy when the graph splits into multiple components: ``"raise"``
         (default), ``"warn"`` (order the largest component, warn, leave the rest
         unvisited), or ``"largest"`` (same, silently).
+    edge_clip_sigma
+        Optional outlier rejection by MST edge length. If not ``None``, robustly
+        sigma-clip the backbone's *spatial* edge lengths in log space: cut edges
+        longer than ``median * exp(edge_clip_sigma * 1.4826 * MAD(log L))``
+        (never shorter than twice the median), split off the small components
+        this isolates, and repeat (see ``edge_clip_max_iters``). Interlopers the
+        MST threads in along one long edge fall away and are left unvisited
+        (``indices == -1``); the rest of the stream is kept and reconnected, so a
+        sparse but continuous tail is not rejected. ``None`` (default) disables
+        clipping. Lower ``edge_clip_sigma`` clips more aggressively.
+    edge_clip_max_iters
+        Maximum sigma-clip iterations (default 5). Ignored when
+        ``edge_clip_sigma`` is ``None``.
 
     Examples
     --------
@@ -247,6 +333,18 @@ class MSTOrderer(AbstractOrderer):
     >>> orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=2.0, orient_by_velocity=True)
     >>> result = pcf.order(positions, velocities, orderer)
 
+    Reject an interloper by MST edge length with ``edge_clip_sigma``. Here a lone
+    point sits far off an otherwise clean line; clipping leaves it unvisited:
+
+    >>> xs = jnp.concatenate([jnp.linspace(0.0, 9.0, 40), jnp.array([30.0])])
+    >>> ys = jnp.concatenate([jnp.zeros(40), jnp.array([30.0])])
+    >>> pos = {"x": xs, "y": ys}
+    >>> vel = {"x": jnp.ones(41), "y": jnp.zeros(41)}
+    >>> clipper = pcf.orderers.MSTOrderer(k=10, jump_cap=50.0, edge_clip_sigma=3.0)
+    >>> result = pcf.order(pos, vel, clipper)
+    >>> int(result.n_skipped)  # the lone interloper is rejected
+    1
+
     """
 
     k: int = eqx.field(static=True, default=10)
@@ -255,15 +353,23 @@ class MSTOrderer(AbstractOrderer):
     sever_cos_threshold: float | None = eqx.field(static=True, default=None)
     orient_by_velocity: bool = eqx.field(static=True, default=False)
     on_disconnected: OnDisconnected = eqx.field(static=True, default="raise")
+    edge_clip_sigma: float | None = eqx.field(static=True, default=None)
+    edge_clip_max_iters: int = eqx.field(static=True, default=5)
 
     def __check_init__(self) -> None:
-        """Reject unknown disconnected-graph policies early, at construction."""
+        """Reject invalid configuration early, at construction."""
         allowed = ("raise", "warn", "largest")
         if self.on_disconnected not in allowed:
             msg = (
                 f"on_disconnected must be one of {allowed}; "
                 f"got {self.on_disconnected!r}."
             )
+            raise ValueError(msg)
+        if self.edge_clip_sigma is not None and self.edge_clip_sigma <= 0:
+            msg = f"edge_clip_sigma must be positive, got {self.edge_clip_sigma}."
+            raise ValueError(msg)
+        if self.edge_clip_max_iters < 1:
+            msg = f"edge_clip_max_iters must be >= 1, got {self.edge_clip_max_iters}."
             raise ValueError(msg)
 
     @plum.dispatch
@@ -296,6 +402,8 @@ class MSTOrderer(AbstractOrderer):
             sever_cos_threshold=self.sever_cos_threshold,
             orient_by_velocity=self.orient_by_velocity,
             on_disconnected=self.on_disconnected,
+            edge_clip_sigma=self.edge_clip_sigma,
+            edge_clip_max_iters=self.edge_clip_max_iters,
         )
 
         n = P.shape[0]

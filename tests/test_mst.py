@@ -170,3 +170,76 @@ class TestMSTDisconnected:
         """An unknown policy is rejected at construction, not treated as 'largest'."""
         with pytest.raises(ValueError, match="on_disconnected"):
             pcf.orderers.MSTOrderer(on_disconnected="nonsense")
+
+
+def _arc_with_interlopers(n_arc=200, n_out=15, seed=0):
+    """Build a noisy open arc plus interlopers scattered across its footprint.
+
+    Returns ``(pos, vel, is_outlier)`` with the interlopers appended after the
+    arc points, each carrying a velocity uncorrelated with the arc.
+    """
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0.0, 1.0, n_arc)
+    x = 10.0 * t + rng.normal(0.0, 0.02, n_arc)
+    y = np.sin(3.0 * t) + rng.normal(0.0, 0.02, n_arc)
+    xi = rng.uniform(x.min(), x.max(), n_out)
+    yi = rng.uniform(y.min() - 3.0, y.max() + 3.0, n_out)
+    pos = {"x": jnp.asarray(np.r_[x, xi]), "y": jnp.asarray(np.r_[y, yi])}
+    vel = {
+        "x": jnp.asarray(np.r_[np.ones(n_arc), rng.normal(0.0, 1.0, n_out)]),
+        "y": jnp.asarray(np.r_[3.0 * np.cos(3.0 * t), rng.normal(0.0, 1.0, n_out)]),
+    }
+    is_outlier = np.r_[np.zeros(n_arc, bool), np.ones(n_out, bool)]
+    return pos, vel, is_outlier
+
+
+class TestMSTEdgeClip:
+    """Optional sigma-clipping of MST edge lengths (``edge_clip_sigma``)."""
+
+    def test_none_is_a_noop(self):
+        """``edge_clip_sigma=None`` (default) leaves every point visited."""
+        pos, vel, _ = _arc_with_interlopers()
+        res = pcf.orderers.MSTOrderer(k=10, jump_cap=20.0).order(pos, vel)
+        assert int(res.n_skipped) == 0
+
+    def test_rejects_interlopers_keeps_stream(self):
+        """Clipping rejects the scattered interlopers, keeps the arc."""
+        pos, vel, is_outlier = _arc_with_interlopers(n_arc=200, n_out=15)
+        res = pcf.orderers.MSTOrderer(k=10, jump_cap=20.0, edge_clip_sigma=3.0).order(
+            pos, vel
+        )
+        rejected = np.asarray(res.indices)
+        visited = {int(i) for i in rejected if i >= 0}
+        rej = set(range(is_outlier.size)) - visited
+        n_out_rej = sum(is_outlier[i] for i in rej)
+        n_in_rej = sum(1 for i in rej if not is_outlier[i])
+        assert n_out_rej >= 0.6 * int(is_outlier.sum())  # most interlopers gone
+        assert n_in_rej <= 0.05 * int((~is_outlier).sum())  # few genuine cut
+
+    def test_clean_stream_not_clipped(self):
+        """A clean arc with no interlopers loses no genuine points."""
+        pos, vel, _t = _open_arc(n=200)
+        res = pcf.orderers.MSTOrderer(k=10, jump_cap=20.0, edge_clip_sigma=3.0).order(
+            pos, vel
+        )
+        assert int(res.n_skipped) == 0
+
+    def test_composes_with_velocity_weight(self):
+        """Clipping uses spatial length, so it still works with velocity weights."""
+        pos, vel, is_outlier = _arc_with_interlopers(n_arc=200, n_out=15)
+        res = pcf.orderers.MSTOrderer(
+            k=10, jump_cap=20.0, velocity_weight=1.0, edge_clip_sigma=3.0
+        ).order(pos, vel)
+        visited = {int(i) for i in np.asarray(res.indices) if i >= 0}
+        rej = set(range(is_outlier.size)) - visited
+        assert sum(is_outlier[i] for i in rej) >= 0.6 * int(is_outlier.sum())
+
+    def test_invalid_sigma_raises(self):
+        """A non-positive ``edge_clip_sigma`` is rejected at construction."""
+        with pytest.raises(ValueError, match="edge_clip_sigma"):
+            pcf.orderers.MSTOrderer(edge_clip_sigma=0.0)
+
+    def test_invalid_max_iters_raises(self):
+        """``edge_clip_max_iters < 1`` is rejected at construction."""
+        with pytest.raises(ValueError, match="edge_clip_max_iters"):
+            pcf.orderers.MSTOrderer(edge_clip_sigma=3.0, edge_clip_max_iters=0)
