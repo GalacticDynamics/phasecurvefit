@@ -33,7 +33,7 @@ Create phase-space data and run phase-flow walk:
 
 >>> pos = {"x": jnp.linspace(0, 5, 20), "y": jnp.sin(jnp.linspace(0, jnp.pi, 20))}
 >>> vel = {"x": jnp.ones(20), "y": jnp.cos(jnp.linspace(0, jnp.pi, 20))}
->>> walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+>>> walkresult = pcf.order(pos, vel)
 
 Train autoencoder to interpolate skipped tracers:
 

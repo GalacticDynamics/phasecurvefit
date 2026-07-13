@@ -282,7 +282,7 @@ class TestTrainAutoencoder:
         pos = {"x": t, "y": 0.5 * t}
         vel = {"x": jnp.ones(n_points), "y": 0.5 * jnp.ones(n_points)}
 
-        return pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+        return pcf.order(pos, vel)
 
     def test_loss_finite_when_encoder_claims_no_members(self, rng_key: PRNGKeyArray):
         """The joint loss stays finite when no star clears `member_threshold`.
@@ -424,8 +424,12 @@ class TestFillOrderingGaps:
 
         # Use max_dist to create gaps
         start_idx = int(jnp.argmax(pos["x"]))
-        return pcf.walk_local_flow(
-            pos, vel, start_idx=start_idx, metric_scale=3.0, max_dist=0.8
+        return pcf.order(
+            pos,
+            vel,
+            pcf.orderers.LocalFlowOrderer(
+                start_idx=start_idx, metric_scale=3.0, max_dist=0.8
+            ),
         )
 
     def test_fills_gaps(self, phasecurvefit_with_gaps, rng_key: PRNGKeyArray):
@@ -645,8 +649,10 @@ class Test3DData:
         }
 
         start_idx = int(jnp.argmin(pos["z"]))
-        walkresult = pcf.walk_local_flow(
-            pos, vel, start_idx=start_idx, metric_scale=3.0
+        walkresult = pcf.order(
+            pos,
+            vel,
+            pcf.orderers.LocalFlowOrderer(start_idx=start_idx, metric_scale=3.0),
         )
 
         normalizer = pcf.nn.StandardScalerNormalizer(
@@ -674,7 +680,7 @@ class TestEdgeCases:
         pos = {"x": jnp.array([0.0, 1.0]), "y": jnp.array([0.0, 1.0])}
         vel = {"x": jnp.array([1.0, 1.0]), "y": jnp.array([1.0, 1.0])}
 
-        walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+        walkresult = pcf.order(pos, vel)
 
         normalizer = pcf.nn.StandardScalerNormalizer(
             walkresult.positions, walkresult.velocities
@@ -702,7 +708,7 @@ class TestEdgeCases:
         pos = {"x": t, "y": jnp.zeros(n_points)}
         vel = {"x": jnp.ones(n_points), "y": jnp.zeros(n_points)}
 
-        walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+        walkresult = pcf.order(pos, vel)
 
         # All points should be ordered
         assert len(walkresult.indices) == n_points
