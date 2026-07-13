@@ -1,20 +1,27 @@
 """Autoencoder."""
 
-__all__: tuple[str, ...] = ("PathAutoencoder", "train_autoencoder", "TrainingConfig")
+__all__: tuple[str, ...] = (
+    "PathAutoencoder",
+    "PathAutoencoderTrainer",
+    "train_autoencoder",
+    "TrainingConfig",
+)
 
+import functools as ft
 from collections.abc import Mapping
 from dataclasses import KW_ONLY, dataclass
-from typing import ClassVar, TypeAlias, cast
+from typing import Any, ClassVar, TypeAlias, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 import jax.tree as jtu
-import jax_tqdm
 import optax
 import plum
 from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray, PyTree
+
+from jaxmore.nn import masked_mean
 
 from .abstractautoencoder import AbstractAutoencoder
 from .externaldecoder import RunningMeanDecoder
@@ -33,7 +40,7 @@ from .track_net import (
     decoder_loss,
     train_track_net,
 )
-from .utils import shuffle_and_batch
+from .trainer import AbstractEqxScanTrainer, EqxTrainCarry
 from phasecurvefit._src.custom_types import FLikeSz0, FSz0, FSzN
 from phasecurvefit._src.orderers.result import OrderingResult
 
@@ -485,13 +492,135 @@ def make_step(
 # ===================================================================
 
 
-BatchScanCarry: TypeAlias = tuple[eqx.Module, optax.OptState, PRNGKeyArray]  # noqa: UP040
-BatchScanInputs: TypeAlias = tuple[  # noqa: UP040
-    Bool[Array, " B"],  # batch_mask: True where batch has data, False where padded
-    Float[Array, " B TwoF"],  # batch_ws : ordered positions
-    Float[Array, " B"],  # batch_weights:
-    FSz0,  # lambda_p: scalar array
-]
+def _pad_to_multiple(
+    mask: Bool[Array, " N"],
+    *args: Float[Array, "N ..."],
+    batch_size: int,
+    pad_value: float,
+) -> tuple[Bool[Array, " M"], tuple[Float[Array, "M ..."], ...]]:
+    """Pad the dataset up to a whole number of batches, with `pad_value`.
+
+    Why this exists
+    ---------------
+    `jaxmore.nn.AbstractScanNNTrainer.run` calls `shuffle_and_batch` with the
+    default ``pad_value=0``; it does not (yet) expose the parameter. For this
+    loss that is *not* a neutral choice: `compute_decoder_loss` penalises
+    ``~mask`` rows as membership false-positives, and padding rows are ``~mask``.
+    Padding with zeros would therefore plant fabricated "non-member" points at
+    the origin of the normalised phase space -- i.e. right where the stream is --
+    and actively train the encoder to reject its own centre.
+
+    By padding here to an exact multiple of `batch_size`, `shuffle_and_batch`
+    finds nothing left to pad and `pad_value` is never consulted. The rows we add
+    carry the original ``pad_value=1`` and ``mask=False``, exactly as before.
+
+    Delete this once `run()` accepts `pad_value`.
+
+    """
+    n = len(mask)
+    n_batches = -(-n // batch_size)  # ceiling division
+    pad_amount = n_batches * batch_size - n
+    if pad_amount == 0:
+        return mask, args
+
+    padded_mask = jnp.pad(mask, (0, pad_amount), constant_values=False)
+    padded_args = tuple(
+        jnp.pad(
+            arr,
+            [(0, pad_amount)] + [(0, 0)] * (arr.ndim - 1),
+            constant_values=pad_value,
+        )
+        for arr in args
+    )
+    return padded_mask, padded_args
+
+
+def _autoencoder_step(
+    carry: EqxTrainCarry,
+    batch_inputs: tuple[Bool[Array, " B"], tuple[Array, ...]],
+    *,
+    optimizer: optax.GradientTransformation,
+    filter_spec: Any,
+    lambda_q: FLikeSz0,
+    member_threshold: float,
+    lambda_p: FLikeSz0,
+) -> tuple[FSz0, EqxTrainCarry]:
+    """Run one batch of joint encoder+decoder training.
+
+    `batch_inputs` is ``(mask, (ws, weights))``. `lambda_p` arrives via
+    `step_kw` and is recomputed each epoch by
+    `PathAutoencoderTrainer.prepare_step_kw`, which is how the ramp is applied.
+    """
+    model, opt_state, key = carry
+    mask, (ws, weights) = batch_inputs
+
+    # Gradients w.r.t. the dynamic half only. When `freeze_encoder` is set,
+    # `filter_spec` excludes the encoder, so it receives no updates.
+    model_dynamic, model_static = eqx.partition(model, filter_spec)
+
+    key, subkey = jr.split(key)
+    loss, model_dynamic, opt_state = make_step(
+        model_dynamic,
+        model_static,
+        ws=ws,
+        weights=weights,
+        mask=mask,
+        opt_state=opt_state,
+        optimizer=optimizer,
+        lambda_q=lambda_q,
+        lambda_p=lambda_p,
+        member_threshold=member_threshold,
+        key=subkey,
+    )
+
+    model = eqx.combine(model_dynamic, model_static)
+    return loss, (model, opt_state, key)
+
+
+@dataclass(frozen=True)
+class PathAutoencoderTrainer(AbstractEqxScanTrainer):
+    r"""Scan trainer for joint encoder + decoder training.
+
+    The velocity-alignment weight $\lambda_p$ is ramped linearly from
+    ``lambda_p[0]`` to ``lambda_p[1]`` across training: early epochs prioritise
+    spatial reconstruction, later ones increasingly enforce alignment with the
+    velocity field. `prepare_step_kw` computes it per epoch and forwards it to
+    the step function.
+
+    """
+
+    lambda_p_range: tuple[float, float] = (1.0, 5.0)
+    """``(start, stop)`` for the $\\lambda_p$ ramp."""
+
+    def init(  # type: ignore[override]
+        self,
+        model: PathAutoencoder,
+        /,
+        *,
+        all_ws: Float[Array, "N TwoF"],
+        weights: Float[Array, " N"],
+        mask: Bool[Array, " N"],
+        optimizer: optax.GradientTransformation,
+        key: PRNGKeyArray,
+    ) -> tuple[EqxTrainCarry, tuple[Bool[Array, " N"], tuple[Array, ...]]]:
+        """Build the initial carry and the epoch data."""
+        model_dynamic, _ = eqx.partition(model, self.filter_spec)
+        opt_state = optimizer.init(model_dynamic)
+        return (model, opt_state, key), (mask, (all_ws, weights))
+
+    def prepare_step_kw(
+        self,
+        /,
+        *,
+        epoch_idx: Int[Array, ""],
+        num_epochs: int,
+        epoch_key: PRNGKeyArray,
+    ) -> Mapping[str, Any]:
+        r"""Linearly ramp $\lambda_p$ from its start to its stop value."""
+        del epoch_key
+        lambda_p_min, lambda_p_max = self.lambda_p_range
+        frac = epoch_idx / (num_epochs - 1) if num_epochs > 1 else 0.0
+        return {"lambda_p": lambda_p_min + (lambda_p_max - lambda_p_min) * frac}
 
 
 def train_ordering_and_track_net(
@@ -550,132 +679,56 @@ def train_ordering_and_track_net(
     else:
         weights = compute_weights(model.encoder, all_ws)
 
-    # Model surgery: partition out static components of the model
+    # Model surgery: decide which parts of the model are trainable.
     if config.freeze_encoder:
-        # Create a filter that is True for arrays, but False for the encoder
-        # First apply is_array to the whole model
+        # True for arrays, but False everywhere in the encoder subtree, so that
+        # the encoder receives no gradient updates during this phase.
         filter_spec = jtu.map(eqx.is_array, model)
-        # Then replace encoder subtree with a tree of False values
         encoder_false = jtu.map(lambda _: False, model.encoder)
         filter_spec = eqx.tree_at(lambda m: m.encoder, filter_spec, encoder_false)
     else:
         filter_spec = eqx.is_array
-    model_dynamic, model_static = eqx.partition(model, filter_spec)
 
-    # Optimizer setup - initialize with the dynamic model only
+    # ----------------------------------------
+    # Train
+
     optimizer = config.optimizer
-    opt_state = optimizer.init(model_dynamic)
 
-    # ----------------------------------------
-    # Epoch Scan Function (per-epoch scan)
+    # Preserve the original ``pad_value=1``; see `_pad_to_multiple`.
+    padded_mask, (padded_ws, padded_weights) = _pad_to_multiple(
+        mask, all_ws, weights, batch_size=config.batch_size, pad_value=1
+    )
 
-    batch_size = config.batch_size
-    lambda_p_min, lambda_p_max = config.lambda_p
-
-    def epoch_scan_fn(
-        carry: BatchScanCarry, epoch_idx: int
-    ) -> tuple[BatchScanCarry, FSz0]:
-        # Unpack the carry
-        model_dyn, opt_state, key = carry
-
-        # Linearly ramp lambda_p from min to max over n_epochs
-        frac = epoch_idx / (config.n_epochs - 1) if config.n_epochs > 1 else 0.0
-        lambda_p = lambda_p_min + (lambda_p_max - lambda_p_min) * frac
-
-        # Shuffle and batch data
-        key, subkey = jr.split(key)
-        b_mask, (b_ws, b_weights) = shuffle_and_batch(
-            mask,
-            all_ws,
-            weights,
-            batch_size=batch_size,
-            key=subkey,
-            pad_value=1,
-        )
-
-        # Broadcast lambda_p to match number of batches
-        n_batches = b_ws.shape[0]
-        b_lambda_p = jnp.broadcast_to(lambda_p, (n_batches,))
-
-        # Scan over batches
-        carry = (model_dyn, opt_state, key)
-        carry, batch_losses = jax.lax.scan(
-            cond_batch_scan_fn, carry, (b_mask, b_ws, b_weights, b_lambda_p)
-        )
-
-        # Use mean loss across all batches for this epoch
-        avg_loss = jnp.mean(batch_losses)
-        return carry, avg_loss
-
-    # ----------------------------------------
-    # Conditionally Run Batch Scan Function
-
-    def cond_batch_scan_fn(
-        carry: BatchScanCarry, inputs: BatchScanInputs
-    ) -> tuple[BatchScanCarry, FSz0]:
-        """Run scanned batch step if there's data."""
-        mask = inputs[0]
-        return jax.lax.cond(
-            jnp.any(mask), batch_scan_fn, null_batch_scan_fn, carry, inputs
-        )
-
-    def null_batch_scan_fn(
-        carry: BatchScanCarry, inputs: BatchScanInputs
-    ) -> tuple[BatchScanCarry, FSz0]:
-        """Don't run scanned batch step."""
-        loss = jnp.array(0, dtype=jnp.result_type(*inputs[1:]))
-        return carry, loss
-
-    # ----------------------------------------
-    # Batch Scan Function (per-batch scan)
-
-    lambda_q = config.lambda_q
-    member_threshold = config.member_threshold
-
-    def batch_scan_fn(
-        carry: BatchScanCarry, inputs: BatchScanInputs
-    ) -> tuple[BatchScanCarry, FSz0]:
-        model_dyn, opt_state, key = carry
-        mask, ws, weights, lambda_p = inputs
-
-        # Single training step for this batch
-        key, subkey = jr.split(key)
-        loss, model_dyn, opt_state = make_step(
-            model_dyn,
-            model_static,
-            ws=ws,
-            weights=weights,
-            mask=mask,
-            opt_state=opt_state,
+    trainer = PathAutoencoderTrainer(
+        make_step=ft.partial(
+            _autoencoder_step,
             optimizer=optimizer,
-            lambda_q=lambda_q,
-            lambda_p=lambda_p,
-            member_threshold=member_threshold,
-            key=subkey,
-        )
+            filter_spec=filter_spec,
+            lambda_q=config.lambda_q,
+            member_threshold=config.member_threshold,
+        ),
+        loss_agg_fn=masked_mean,
+        filter_spec=filter_spec,
+        lambda_p_range=config.lambda_p,
+    )
+    initial_carry, epoch_data = trainer.init(
+        model,
+        all_ws=padded_ws,
+        weights=padded_weights,
+        mask=padded_mask,
+        optimizer=optimizer,
+        key=key,
+    )
+    (model, opt_state, _), epoch_losses = trainer.run(
+        initial_carry,
+        epoch_data,
+        num_epochs=config.n_epochs,
+        batch_size=config.batch_size,
+        key=key,
+        show_pbar=config.show_pbar,
+    )
 
-        return (model_dyn, opt_state, key), loss
-
-    # ----------------------------------------
-
-    # Optionally wrap the epoch scan with a progress bar
-    if config.show_pbar:
-        epoch_scan_wrapped = jax_tqdm.scan_tqdm(
-            config.n_epochs, desc="Training", unit="epoch", dynamic_ncols=True
-        )(epoch_scan_fn)
-    else:
-        epoch_scan_wrapped = epoch_scan_fn
-
-    # Prepare epoch indices and run scan over epochs, which scans over batches
-    carry = (model_dynamic, opt_state, key)
-    epoch_indices = jnp.arange(config.n_epochs)
-    carry, epoch_losses = jax.lax.scan(epoch_scan_wrapped, carry, epoch_indices)
-    model_dynamic, opt_state, _ = carry
-
-    # Reconstruct model
-    model = cast("PathAutoencoder", eqx.combine(model_dynamic, model_static))
-
-    return model, opt_state, epoch_losses
+    return cast("PathAutoencoder", model), opt_state, epoch_losses
 
 
 # ===================================================================

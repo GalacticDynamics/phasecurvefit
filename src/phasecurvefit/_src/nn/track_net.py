@@ -4,24 +4,26 @@ __all__: tuple[str, ...] = (
     "AbstractTrackNet",
     "TrackNet",
     "FourierTrackNet",
+    "TrackNetTrainer",
     "decoder_loss",
 )
 
 import abc
 import functools as ft
 from dataclasses import KW_ONLY, dataclass
-from typing import TypeAlias, cast
+from typing import Any, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-import jax_tqdm
 import optax
 from jaxtyping import Array, Bool, Float, PRNGKeyArray, Real
 
+from jaxmore.nn import masked_mean
+
 from .order_net import default_optimizer
-from .utils import masked_mean, shuffle_and_batch
+from .trainer import AbstractEqxScanTrainer, EqxTrainCarry
 from phasecurvefit._src.custom_types import FSz0, RSz0, RSzN
 
 
@@ -416,12 +418,62 @@ class TrackTrainingConfig:
     """Whether to show an epoch progress bar via tqdm."""
 
 
-BatchScanCarry: TypeAlias = tuple[eqx.Module, optax.OptState, PRNGKeyArray]  # noqa: UP040
-BatchScanInputs: TypeAlias = tuple[  # noqa: UP040
-    Bool[Array, " B"],  # mask
-    Float[Array, " B"],  # gamma
-    Real[Array, " B D"],  # qs_mean
-]
+def _track_step(
+    carry: EqxTrainCarry,
+    batch_inputs: tuple[Bool[Array, " B"], tuple[Array, ...]],
+    *,
+    optimizer: optax.GradientTransformation,
+    filter_spec: Any,
+) -> tuple[FSz0, EqxTrainCarry]:
+    """Run one batch of TrackNet training.
+
+    `batch_inputs` is ``(mask, (gamma, qs_mean))``.
+
+    `filter_spec` must be the same spec the trainer used to build `opt_state`
+    (see `TrackNetTrainer.init`), so that the step, the carry packing in
+    `AbstractEqxScanTrainer.pack_carry_state`, and the optimizer state all
+    agree on which leaves are trainable.
+    """
+    model, opt_state, key = carry
+    mask, (gamma, qs_mean) = batch_inputs
+
+    model_dynamic, model_static = eqx.partition(model, filter_spec)
+
+    key, subkey = jr.split(key)
+    loss, model_dynamic, opt_state = make_step(
+        model_dynamic,
+        model_static,
+        gamma=gamma,
+        qs_mean=qs_mean,
+        mask=mask,
+        opt_state=opt_state,
+        optimizer=optimizer,
+        key=subkey,
+    )
+
+    model = eqx.combine(model_dynamic, model_static)
+    return loss, (model, opt_state, key)
+
+
+@dataclass(frozen=True)
+class TrackNetTrainer(AbstractEqxScanTrainer):
+    """Scan trainer for `TrackNet`."""
+
+    def init(  # type: ignore[override]
+        self,
+        model: TrackNet,
+        /,
+        *,
+        gamma: Float[Array, " N"],
+        qs_mean: Real[Array, " N D"],
+        mask: Bool[Array, " N"],
+        optimizer: optax.GradientTransformation,
+        key: PRNGKeyArray,
+    ) -> tuple[EqxTrainCarry, tuple[Bool[Array, " N"], tuple[Array, ...]]]:
+        """Build the initial carry and the epoch data."""
+        model_dynamic, _ = eqx.partition(model, self.filter_spec)
+        opt_state = optimizer.init(model_dynamic)
+        return (model, opt_state, key), (mask, (gamma, qs_mean))
 
 
 def train_track_net(
@@ -433,111 +485,41 @@ def train_track_net(
     config: TrackTrainingConfig | None = None,
     key: PRNGKeyArray,
 ) -> tuple[TrackNet, optax.OptState, Float[Array, " n_epochs"]]:
-    """Train the TrackNet decoder using the provided data."""
+    """Train the TrackNet decoder using the provided data.
+
+    Notes
+    -----
+    `mask` is typically sparse here -- only ordered stream members train the
+    decoder. Because `shuffle_and_batch` sorts usable samples first, the
+    ignorable ones cluster into whole batches that contain no usable data at
+    all. Those batches are skipped, and (via `masked_mean`) excluded from the
+    epoch loss rather than being averaged in as zeros.
+
+    """
     if config is None:
         config = TrackTrainingConfig()
 
-    # Model surgery: partition out static components of the model
-    filter_spec = eqx.is_array
-    model_dynamic, model_static = eqx.partition(model, filter_spec)
-
-    # Optimizer setup
     optimizer = config.optimizer
-    opt_state = optimizer.init(model_dynamic)
 
-    # ----------------------------------------
-    # Epoch Scan Function (per-epoch scan)
+    # Single source of truth for what is trainable: the step, the carry packing,
+    # and `optimizer.init` must all partition the model the same way.
+    filter_spec: Any = eqx.is_array
 
-    batch_size = config.batch_size
+    trainer = TrackNetTrainer(
+        make_step=ft.partial(_track_step, optimizer=optimizer, filter_spec=filter_spec),
+        loss_agg_fn=masked_mean,
+        filter_spec=filter_spec,
+    )
+    initial_carry, epoch_data = trainer.init(
+        model, gamma=gamma, qs_mean=qs_mean, mask=mask, optimizer=optimizer, key=key
+    )
+    (model, opt_state, _), epoch_losses = trainer.run(
+        initial_carry,
+        epoch_data,
+        num_epochs=config.n_epochs,
+        batch_size=config.batch_size,
+        key=key,
+        show_pbar=config.show_pbar,
+    )
 
-    def epoch_scan_fn(carry: BatchScanCarry, _: int) -> tuple[BatchScanCarry, FSz0]:
-        """Run one scanned epoch (shuffle, batch, and train)."""
-        # Unpack the carry
-        model_dyn, opt_state, key = carry
-
-        # Split key for this epoch
-        key, subkey = jr.split(key, 2)
-
-        # Shuffle and batch data
-        b_mask, (b_gamma, b_qs_mean) = shuffle_and_batch(
-            mask, gamma, qs_mean, batch_size=batch_size, key=subkey
-        )
-
-        # Scan over batches
-        carry = (model_dyn, opt_state, key)
-        x = (b_mask, b_gamma, b_qs_mean)
-        carry, batch_losses = jax.lax.scan(cond_batch_scan_fn, carry, x)
-
-        # Use mean loss across all batches for this epoch
-        avg_loss = jnp.mean(batch_losses)
-        return carry, avg_loss
-
-    # ----------------------------------------
-    # Conditionally Run Batch Scan Function
-
-    def cond_batch_scan_fn(
-        carry: BatchScanCarry, inputs: BatchScanInputs
-    ) -> tuple[BatchScanCarry, FSz0]:
-        """Run scanned batch step if there's data."""
-        mask = inputs[0]
-        return jax.lax.cond(
-            jnp.any(mask), batch_scan_fn, null_batch_scan_fn, carry, inputs
-        )
-
-    def null_batch_scan_fn(
-        carry: BatchScanCarry, inputs: BatchScanInputs
-    ) -> tuple[BatchScanCarry, FSz0]:
-        """Don't run scanned batch step."""
-        loss = jnp.array(0, dtype=jnp.result_type(*inputs[1:]))
-        return carry, loss
-
-    # ----------------------------------------
-    # Batch Scan Function (per-batch scan)
-
-    def batch_scan_fn(
-        carry: BatchScanCarry, inputs: BatchScanInputs
-    ) -> tuple[BatchScanCarry, FSz0]:
-        """Run one scanned batch step.
-
-        Notes
-        -----
-        Uses a partitioned model to keep the scan carry as arrays-only where
-        possible, then re-combines with static structure for each step.
-
-        """
-        model_dyn, opt_state, key = carry
-        mask, gamma, qs_mean = inputs
-
-        # Single training step for this batch
-        key, subkey = jr.split(key)
-        loss, model_dyn, opt_state = make_step(
-            model_dyn,
-            model_static,
-            gamma=gamma,
-            qs_mean=qs_mean,
-            mask=mask,
-            opt_state=opt_state,
-            optimizer=optimizer,
-            key=subkey,
-        )
-
-        return (model_dyn, opt_state, key), loss
-
-    # Optionally wrap the epoch scan with a progress bar
-    if config.show_pbar:
-        epoch_scan_wrapped = jax_tqdm.scan_tqdm(
-            config.n_epochs, desc="Training", unit="epoch", dynamic_ncols=True
-        )(epoch_scan_fn)
-    else:
-        epoch_scan_wrapped = epoch_scan_fn
-
-    # Prepare epoch indices and run scan over epochs, which scans over batches
-    carry = (model_dynamic, opt_state, key)
-    epoch_indices = jnp.arange(config.n_epochs)
-    carry, epoch_losses = jax.lax.scan(epoch_scan_wrapped, carry, epoch_indices)
-    model_dynamic, opt_state, _ = carry
-
-    # Reconstruct model
-    model = cast("OrderingNet", eqx.combine(model_dynamic, model_static))
-
-    return model, opt_state, epoch_losses
+    return cast("TrackNet", model), opt_state, epoch_losses
