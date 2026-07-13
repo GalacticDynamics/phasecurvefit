@@ -1,7 +1,7 @@
 """Acceptance test: an MSTOrderer result feeds the autoencoder unchanged."""
 
-import jax
 import jax.numpy as jnp
+import jax.random as jr
 import numpy as np
 from scipy.spatial import cKDTree
 
@@ -36,7 +36,7 @@ def _clean_arc(n=80):
 
 def _train(mst, *, n_epochs, seed=0):
     normalizer = pcf.nn.StandardScalerNormalizer(mst.positions, mst.velocities)
-    k1, k2 = jax.random.split(jax.random.key(seed))
+    k1, k2 = jr.split(jr.key(seed))
     model = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=mst.gamma_range, key=k1)
     cfg = pcf.nn.TrainingConfig(
         n_epochs_encoder=n_epochs, n_epochs_both=n_epochs, show_pbar=False
@@ -86,7 +86,7 @@ class TestMSTAutoencoderIntegration:
         ).order(pos, vel)
 
         normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
-        k1, k2, k3 = jax.random.split(jax.random.key(0), 3)
+        k1, k2, k3 = jr.split(jr.key(0), 3)
         decoder = pcf.nn.FourierTrackNet(
             out_size=2, n_frequencies=10, width_size=128, depth=3, key=k1
         )

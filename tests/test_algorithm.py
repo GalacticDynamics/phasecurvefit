@@ -1,8 +1,8 @@
 """Tests for the phase flow walking algorithm."""
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
+import jax.random as jr
 import pytest
 
 import phasecurvefit as pcf
@@ -389,7 +389,7 @@ class TestAlgorithmIntegration:
 
     def test_noisy_stream(self):
         """Test algorithm on a stream with some noise."""
-        key = jax.random.key(42)
+        key = jr.key(42)
 
         # Base stream along x-axis
         n_points = 20
@@ -397,9 +397,9 @@ class TestAlgorithmIntegration:
         base_y = jnp.zeros(n_points)
 
         # Add small noise
-        key1, key2 = jax.random.split(key)
-        noise_x = jax.random.normal(key1, (n_points,)) * 0.1
-        noise_y = jax.random.normal(key2, (n_points,)) * 0.1
+        key1, key2 = jr.split(key)
+        noise_x = jr.normal(key1, (n_points,)) * 0.1
+        noise_y = jr.normal(key2, (n_points,)) * 0.1
 
         q = {"x": base_x + noise_x, "y": base_y + noise_y}
         p = {"x": jnp.ones(n_points), "y": jnp.zeros(n_points)}
