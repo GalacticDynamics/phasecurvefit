@@ -14,6 +14,7 @@ guides/metrics
 guides/algorithm
 guides/orderers
 guides/nn
+guides/outliers
 guides/jax-integration
 ```
 
@@ -245,6 +246,22 @@ The core algorithm originates from Nibauer et al. (2022). If you use **momentum-
   author={Nibauer, Jacob and others},
   journal={arXiv preprint arXiv:2201.12042},
   year={2022}
+}
+```
+
+If you use **mixture-model membership** for outlier rejection (see
+{doc}`guides/outliers`), please also cite Hogg, Bovy & Lang (2010), whose §3
+("Pruning outliers") is the model implemented there:
+
+```bibtex
+@article{hogg2010data,
+  title={Data analysis recipes: Fitting a model to data},
+  author={Hogg, David W. and Bovy, Jo and Lang, Dustin},
+  journal={arXiv preprint arXiv:1008.4686},
+  year={2010},
+  eprint={1008.4686},
+  archivePrefix={arXiv},
+  primaryClass={astro-ph.IM}
 }
 ```
 

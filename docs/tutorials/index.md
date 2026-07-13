@@ -5,6 +5,13 @@ This section contains practical examples demonstrating how to use phasecurvefit.
 ::::{grid} 1 2 2 3
 :gutter: 2
 
+:::{grid-item-card} Outlier Rejection
+:link: outlier_rejection
+:link-type: doc
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/outlier_rejection.ipynb)
+:::
+
 :::{grid-item-card} Stream Autoencoder
 :link: stream_autoencoder
 :link-type: doc
@@ -53,6 +60,7 @@ This section contains practical examples demonstrating how to use phasecurvefit.
 :maxdepth: 1
 :hidden:
 
+outlier_rejection
 stream_autoencoder
 stream_runningmean
 epitrochoid_autoencoder

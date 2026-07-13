@@ -13,8 +13,8 @@ try:
 except ImportError:
     HAS_UNXT = False
 
-import jax
 import jax.numpy as jnp
+import jax.random as jr
 
 import phasecurvefit as pcf
 from phasecurvefit._src.algorithm import StateMetadata
@@ -323,7 +323,7 @@ class TestEpitrochoidExample:
 
     def test_epitrochoid_stream_creation(self):
         """Test creating a self-intersecting epitrochoid stream with Quantities."""
-        key = jax.random.key(0)
+        key = jr.key(0)
 
         def make_epitrochoid_stream(key, n=120, noise_sigma=0.5, scale=120.0):
             """Create an OPEN epitrochoid curve with self-intersections."""
@@ -346,9 +346,9 @@ class TestEpitrochoidExample:
             dy0 = scale * ((R + r) * jnp.cos(t) - d * ratio * jnp.cos(ratio * t)) / 5.0
 
             # Optional small positional noise
-            kx, ky = jax.random.split(key)
-            x = x0 + noise_sigma * jax.random.normal(kx, (n,))
-            y = y0 + noise_sigma * jax.random.normal(ky, (n,))
+            kx, ky = jr.split(key)
+            x = x0 + noise_sigma * jr.normal(kx, (n,))
+            y = y0 + noise_sigma * jr.normal(ky, (n,))
 
             # Pack into unitful quantities
             pos = {"x": u.Q(x, "m"), "y": u.Q(y, "m")}
@@ -372,7 +372,7 @@ class TestEpitrochoidExample:
 
     def test_epitrochoid_walk_with_momentum(self):
         """Test walk_local_flow on epitrochoid with different momentum values."""
-        key = jax.random.key(0)
+        key = jr.key(0)
 
         # Create stream
         t_start = 5.0 * jnp.pi / 180.0
@@ -390,9 +390,9 @@ class TestEpitrochoidExample:
         dx0 = scale * (-(R + r) * jnp.sin(t) + d * ratio * jnp.sin(ratio * t)) / 5.0
         dy0 = scale * ((R + r) * jnp.cos(t) - d * ratio * jnp.cos(ratio * t)) / 5.0
 
-        kx, ky = jax.random.split(key)
-        x = x0 + 0.5 * jax.random.normal(kx, (n,))
-        y = y0 + 0.5 * jax.random.normal(ky, (n,))
+        kx, ky = jr.split(key)
+        x = x0 + 0.5 * jr.normal(kx, (n,))
+        y = y0 + 0.5 * jr.normal(ky, (n,))
 
         pos = {"x": u.Q(x, "m"), "y": u.Q(y, "m")}
         vel = {"x": u.Q(dx0, "m/s"), "y": u.Q(dy0, "m/s")}
@@ -430,7 +430,7 @@ class TestEpitrochoidExample:
 
     def test_epitrochoid_branch_jumps(self):
         """Test that momentum reduces branch jumps on self-intersecting stream."""
-        key = jax.random.key(0)
+        key = jr.key(0)
 
         # Create stream
         n = 100
@@ -448,9 +448,9 @@ class TestEpitrochoidExample:
         dx0 = scale * (-(R + r) * jnp.sin(t) + d * ratio * jnp.sin(ratio * t)) / 5.0
         dy0 = scale * ((R + r) * jnp.cos(t) - d * ratio * jnp.cos(ratio * t)) / 5.0
 
-        kx, ky = jax.random.split(key)
-        x = x0 + 0.5 * jax.random.normal(kx, (n,))
-        y = y0 + 0.5 * jax.random.normal(ky, (n,))
+        kx, ky = jr.split(key)
+        x = x0 + 0.5 * jr.normal(kx, (n,))
+        y = y0 + 0.5 * jr.normal(ky, (n,))
 
         pos = {"x": u.Q(x, "m"), "y": u.Q(y, "m")}
         vel = {"x": u.Q(dx0, "m/s"), "y": u.Q(dy0, "m/s")}

@@ -154,6 +154,40 @@ Neural network for interpolating skipped tracers. See [Autoencoder Guide](../gui
    :no-index:
 ```
 
+### Membership & Outlier Rejection
+
+Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
+{doc}`/guides/outliers`.
+
+```{eval-rst}
+.. autoclass:: phasecurvefit.nn.MixtureMembershipConfig
+   :no-index:
+   :members:
+
+.. autoclass:: phasecurvefit.nn.WidthNet
+   :no-index:
+   :members: __call__
+   :show-inheritance:
+
+.. autofunction:: phasecurvefit.nn.posterior_membership
+   :no-index:
+
+.. autofunction:: phasecurvefit.nn.mixture_membership_loss
+   :no-index:
+
+.. autofunction:: phasecurvefit.nn.membership_responsibility
+   :no-index:
+
+.. autofunction:: phasecurvefit.nn.sigma_ceiling
+   :no-index:
+
+.. autofunction:: phasecurvefit.nn.membership_rampup
+   :no-index:
+
+.. autofunction:: phasecurvefit.nn.uniform_background_density
+   :no-index:
+```
+
 ## Index
 
 ```{eval-rst}

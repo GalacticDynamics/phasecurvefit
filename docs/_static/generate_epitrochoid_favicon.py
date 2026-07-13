@@ -79,9 +79,9 @@ def make_self_intersecting_stream(
     dy0 = scale * ((R + r) * jnp.cos(t) - d * ratio * jnp.cos(ratio * t)) / 5.0
 
     # Add positional noise
-    kx, ky = jax.random.split(key)
-    x = x0 + noise_sigma * jax.random.normal(kx, (n,))
-    y = y0 + noise_sigma * jax.random.normal(ky, (n,))
+    kx, ky = jr.split(key)
+    x = x0 + noise_sigma * jr.normal(kx, (n,))
+    y = y0 + noise_sigma * jr.normal(ky, (n,))
 
     # Pack into unitful quantities
     pos = {"x": u.Q(x, usys["length"]), "y": u.Q(y, usys["length"])}
@@ -113,7 +113,7 @@ def main(
 
     # Generate epitrochoid data
     print("Generating epitrochoid curve...")
-    key, subkey = jax.random.split(key)
+    key, subkey = jr.split(key)
     t, pos, vel = make_self_intersecting_stream(subkey, n=2048, noise_sigma=6)
 
     # Shuffle data

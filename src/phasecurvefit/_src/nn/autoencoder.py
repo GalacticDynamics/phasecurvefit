@@ -3,6 +3,7 @@
 __all__: tuple[str, ...] = (
     "PathAutoencoder",
     "PathAutoencoderTrainer",
+    "posterior_membership",
     "train_autoencoder",
     "TrainingConfig",
 )
@@ -25,6 +26,15 @@ from jaxmore.nn import masked_mean
 
 from .abstractautoencoder import AbstractAutoencoder
 from .externaldecoder import RunningMeanDecoder
+from .membership import (
+    MixtureMembershipConfig,
+    WidthNet,
+    membership_rampup,
+    membership_responsibility,
+    mixture_membership_loss,
+    sigma_ceiling,
+    uniform_background_density,
+)
 from .normalize import AbstractNormalizer
 from .order_net import (
     OrderingNet,
@@ -65,6 +75,15 @@ class PathAutoencoder(AbstractAutoencoder):
     encoder: OrderingNet
     decoder: AbstractTrackNet
     normalizer: AbstractNormalizer
+
+    width: WidthNet | None = None
+    r"""Foreground half-width $\sigma(\gamma)$ (e.g. a stream's), or None.
+
+    Present only when the autoencoder was trained with mixture-model membership
+    (see `MixtureMembershipConfig`). It is kept on the model because it is needed
+    at *inference* to turn the encoder's prior membership $\pi$ into a calibrated
+    posterior; see `posterior_membership`.
+    """
 
     __citation__: ClassVar[str] = (
         "https://ui.adsabs.harvard.edu/abs/2022ApJ...940...22N/abstract"
@@ -241,7 +260,24 @@ class EncoderDecoderTrainingConfig:
     """Weight schedule (start, stop) for velocity alignment loss."""
 
     member_threshold: float = 0.5
-    """Membership p > threshold for identifying stream members."""
+    """Membership p > threshold for identifying stream members.
+
+    Only used by the legacy (classifier) membership loss. The mixture model
+    replaces this arbitrary cut with a calibrated posterior; see
+    `MixtureMembershipConfig`.
+    """
+
+    membership: MixtureMembershipConfig | None = None
+    r"""Opt in to mixture-model membership (outlier rejection).
+
+    ``None`` (the default) keeps the existing classifier-style membership loss,
+    bit-for-bit. Supply a `MixtureMembershipConfig` to model the data as a
+    stream + background mixture in the sense of Hogg, Bovy & Lang (2010), §3, so
+    that membership becomes a *posterior* driven by the reconstruction residual
+    rather than a label inherited from the orderer.
+
+    Use this if outliers survive as "members".
+    """
 
     freeze_encoder: bool = False
     """Whether to freeze the encoder during phase 2 training."""
@@ -309,6 +345,18 @@ class TrainingConfig:
     freeze_encoder_final_training: bool = EncoderDecoderTrainingConfig.freeze_encoder
     """Whether to freeze the encoder during phase 2 training."""
 
+    membership: MixtureMembershipConfig | None = None
+    r"""Opt in to mixture-model membership (outlier rejection).
+
+    ``None`` (the default) preserves the existing behaviour exactly. Supply a
+    `MixtureMembershipConfig` to model the field as a stream + background mixture
+    (Hogg, Bovy & Lang 2010, §3) so that membership is a calibrated posterior
+    driven by the distance from the fitted track.
+
+    Applies to phase 3 (joint encoder+decoder training), which is where the
+    decoder -- and therefore the residual -- exists.
+    """
+
     # =================================
 
     def __post_init__(self) -> None:
@@ -348,9 +396,172 @@ class TrainingConfig:
             lambda_q=self.lambda_q,
             lambda_p=self.lambda_p,
             member_threshold=self.member_threshold,
+            membership=self.membership,
             freeze_encoder=self.freeze_encoder_final_training,
             weight_by_density=self.weight_by_density,
         )
+
+
+@eqx.filter_jit
+def posterior_membership(
+    model: PathAutoencoder,
+    ws: Float[Array, "N TwoF"],
+    /,
+    *,
+    background_density: float | None = None,
+    key: PRNGKeyArray | None = None,
+) -> FSzN:
+    r"""Posterior probability that each point belongs to the foreground component.
+
+    The foreground is whatever the model fits a track through -- a stream is the
+    running example. This is the number you want when deciding which points are
+    members. It is
+    **not** the encoder's raw ``prob`` output: that is only the *prior* $\pi_n$,
+    formed from the star's phase-space coordinates before the model has looked at
+    how far the star actually landed from the fitted track. This function folds
+    in the residual, giving the posterior of Hogg, Bovy & Lang (2010), §3:
+
+    .. math::
+
+        \hat{q}_n = \frac{\pi_n \, \mathcal{N}(r_n; 0, \sigma^2(\gamma_n))}
+                         {\pi_n \, \mathcal{N}(r_n; 0, \sigma^2(\gamma_n))
+                          + (1 - \pi_n) \, \rho_{\mathrm{bg}}}
+
+    Requires a model trained with `MixtureMembershipConfig` (so that
+    ``model.width`` exists).
+
+    Parameters
+    ----------
+    model : PathAutoencoder
+        A model trained with mixture membership.
+    ws : Array, shape (N, 2D)
+        Phase-space coordinates, in the same normalised frame used for training.
+    background_density : float | None
+        $\rho_{\mathrm{bg}}$. If None, recomputed from the extent of ``ws``.
+        **Pass the same value used at training time** if you are scoring a
+        different field from the one you trained on -- otherwise the posterior is
+        calibrated against the wrong background.
+    key : PRNGKeyArray | None
+        Optional key for the (deterministic) networks.
+
+    Returns
+    -------
+    responsibility : Array, shape (N,)
+        Posterior membership in [0, 1]. Threshold at 0.5 for a hard cut, or keep
+        it as a weight -- Hogg et al. recommend the latter.
+
+    Raises
+    ------
+    ValueError
+        If the model was not trained with mixture membership.
+
+    """
+    if model.width is None:
+        msg = (
+            "posterior_membership requires a model trained with mixture membership "
+            "(TrainingConfig(membership=MixtureMembershipConfig(...))). "
+            "Without it there is no fitted stream width, and the encoder's `prob` "
+            "output is an uncalibrated classifier score, not a posterior."
+        )
+        raise ValueError(msg)
+
+    D = ws.shape[1] // 2
+    qs = ws[:, :D]
+
+    gamma, prob = jax.vmap(model.encoder, (0, None))(ws, key)
+    qs_pred = jax.vmap(model.decoder, (0, None))(gamma, key)
+    sigma = jax.vmap(model.width)(gamma)
+
+    r2 = jnp.sum(jnp.square(qs - qs_pred), axis=-1)
+
+    rho_bg = (
+        background_density
+        if background_density is not None
+        else uniform_background_density(qs)
+    )
+    return membership_responsibility(
+        prob, r2, sigma, log_bg_density=jnp.log(rho_bg), n_dims=D
+    )
+
+
+def _mixture_decoder_loss(
+    model: PathAutoencoder,
+    ws: Float[Array, " B TwoF"],
+    mask: Bool[Array, " B"],
+    *,
+    lambda_p: FLikeSz0,
+    lambda_velocity: float,
+    log_bg_density: float,
+    sigma_ceil: FSz0,
+    rampup: FSz0,
+    key: PRNGKeyArray,
+) -> FSz0:
+    r"""Mixture-model loss: reconstruction, membership, and width, jointly.
+
+    This is the opt-in alternative to the classifier-style membership of
+    `compute_decoder_loss`. It implements the "mixture" model of Hogg, Bovy &
+    Lang (2010), §3 -- see `phasecurvefit._src.nn.membership` for the full
+    argument.
+
+    Three things happen here that do not happen in the default loss:
+
+    1. **The membership probability is driven by the residual.** A star far from
+       the decoded track is explained by the background component, and its
+       $\pi$ is pushed down. In the default loss no gradient connects "far from
+       the track" to "not a member" at all.
+    2. **The stream width is fitted**, as a function of $\gamma$, under an
+       annealing ceiling that stops it inflating to absorb outliers.
+    3. **The velocity-alignment term is weighted by the posterior
+       responsibility**, so that a star the model has decided is background
+       cannot drag the track's tangent around. This is the M-step of EM: fit the
+       track using each star in proportion to how much it currently looks like a
+       member.
+
+    """
+    if model.width is None:  # pragma: no cover - guarded by the caller
+        msg = "mixture membership requires `model.width` to be a WidthNet."
+        raise ValueError(msg)
+
+    D = ws.shape[1] // 2
+    qs = ws[:, :D]
+
+    key, skey1, skey2 = jr.split(key, 3)
+    gamma, prob = jax.vmap(model.encoder, (0, None))(ws, skey1)
+    qs_pred = jax.vmap(model.decoder, (0, None))(gamma, skey2)
+
+    # Stream half-width at each star's gamma, capped by the annealing ceiling.
+    sigma = jnp.minimum(jax.vmap(model.width)(gamma), sigma_ceil)
+
+    nll, responsibility = mixture_membership_loss(
+        qs, qs_pred, prob, sigma, mask, log_bg_density=log_bg_density, rampup=rampup
+    )
+
+    if lambda_velocity == 0:
+        return nll
+
+    # ---- velocity alignment, weighted by posterior membership ----
+    ps = ws[:, D:]
+    ps_norm = jnp.linalg.norm(ps, axis=1, keepdims=True)
+    ps_hat = jnp.where(ps_norm > 0, ps / ps_norm, jnp.zeros_like(ps))
+
+    def decoder_tangent(g: FSz0) -> Float[Array, " D"]:
+        return jax.jvp(model.decoder, (g,), (jnp.ones_like(g),))[1]
+
+    gamma_sg = jax.lax.stop_gradient(gamma)
+    dq_dgamma = jax.lax.stop_gradient(jax.vmap(decoder_tangent)(gamma_sg))
+    t_norm = jnp.linalg.norm(dq_dgamma, axis=1, keepdims=True)
+    t_hat = jnp.where(t_norm > 0, dq_dgamma / t_norm, jnp.zeros_like(dq_dgamma))
+
+    sq_tangent = jnp.sum(jnp.square(t_hat - ps_hat), axis=1)
+
+    # Responsibilities are the E-step; treat them as fixed weights in the M-step.
+    resp = jax.lax.stop_gradient(responsibility) * mask
+    denom = jnp.sum(resp)
+    tangent_l2 = jnp.where(
+        denom > 0, jnp.sum(resp * sq_tangent) / jnp.maximum(denom, 1e-12), 0.0
+    )
+
+    return nll + lambda_velocity * lambda_p * tangent_l2
 
 
 @eqx.filter_value_and_grad
@@ -365,6 +576,10 @@ def compute_decoder_loss(
     lambda_p: FLikeSz0,
     member_threshold: float,
     key: PRNGKeyArray,
+    membership: MixtureMembershipConfig | None = None,
+    log_bg_density: float = 0.0,
+    sigma_ceil: FSz0 | float = 1.0,
+    rampup: FSz0 | float = 1.0,
 ) -> FSz0:
     r"""Compute decoder loss with gradients for Phase 2 training.
 
@@ -383,6 +598,20 @@ def compute_decoder_loss(
     normalized to unit length. This represents the predicted direction of the
     stream at each point.
 
+    Membership
+    ----------
+    By default membership is handled by `loss_mismember`, which penalises the
+    encoder for disagreeing with the `mask` it was given. Note that this `mask`
+    is itself derived from the encoder's own phase-1 predictions, so the term is
+    a *fixed point*: it hardens existing beliefs and cannot discover that a star
+    it called a member is in fact an outlier. See the module docstring of
+    `phasecurvefit._src.nn.membership` for why that matters.
+
+    Passing ``membership=MixtureMembershipConfig(...)`` swaps this for the
+    generative mixture model of Hogg, Bovy & Lang (2010) §3, in which membership
+    is a *posterior* driven by the reconstruction residual. That is the path you
+    want if outliers are a problem.
+
     """
     # Reconstruct full model from dynamic and static parts
     model = eqx.combine(model_dynamic, model_static)
@@ -392,6 +621,20 @@ def compute_decoder_loss(
         msg = "ord_w has the wrong shape"
         raise ValueError(msg)
     D = ws.shape[1] // 2
+
+    # ---- opt-in: generative mixture membership (Hogg, Bovy & Lang 2010, §3) ----
+    if membership is not None:
+        return _mixture_decoder_loss(
+            model,
+            ws,
+            mask,
+            lambda_p=lambda_p,
+            lambda_velocity=membership.lambda_velocity,
+            log_bg_density=log_bg_density,
+            sigma_ceil=jnp.asarray(sigma_ceil, dtype=float),
+            rampup=jnp.asarray(rampup, dtype=float),
+            key=key,
+        )
 
     # Unit velocity
     ps = ws[:, D:]
@@ -418,13 +661,12 @@ def compute_decoder_loss(
     # members (that would be an 'or' operation) and we penalize false positives
     # and negatives above, so this has a smaller effect.
     #
-    # It can, however, empty the mask entirely, and that is not hypothetical: the
-    # trainer only guarantees the *batch* mask has a usable sample (it skips
-    # batches that do not), while `is_member` is re-evaluated from the live
-    # encoder at every step. Mid-training the encoder can transiently drop every
-    # star in the batch below the threshold, and `masked_mean` is documented to
-    # return NaN on an empty mask -- which would poison the epoch loss. Hence the
-    # guard on `loss_path` below.
+    # It can, however, empty the mask entirely: the trainer only guarantees that
+    # the *batch* mask has a usable sample (it skips batches where it does not),
+    # and `is_member` is re-evaluated from the live encoder every step. If the
+    # encoder transiently drops every star in this batch below the threshold,
+    # `member_mask` is all-False, and `masked_mean` is documented to return NaN
+    # on an empty mask -- which would poison the epoch loss. See `_path_loss`.
     member_mask = mask & is_member
 
     # Compute dq/dgamma (Jacobian of decoder output w.r.t. gamma) elementwise
@@ -454,12 +696,11 @@ def compute_decoder_loss(
             lambda_p=lambda_p,
         )
 
-    # When `member_mask` is empty the model currently claims no member in this
-    # batch, so there is no track to fit: the path loss is zero and only
-    # `loss_mismember` supplies gradient, pushing the probabilities back up (as
-    # it in fact does -- the collapse is transient). `lax.cond` rather than
-    # `jnp.where`, because `where` evaluates both branches and its VJP would
-    # multiply the NaN branch's derivative by zero, giving a NaN *gradient*.
+    # If the encoder currently claims no member in this batch, there is no track
+    # constraint to impose, so the path loss is zero and only `loss_mismember`
+    # supplies gradient (pushing the probabilities back up). `lax.cond` -- not
+    # `jnp.where` -- because `where` would evaluate the NaN branch anyway and
+    # its VJP would multiply that NaN by zero, giving a NaN gradient.
     loss_path = jax.lax.cond(
         jnp.any(member_mask), _path_loss, lambda: jnp.zeros_like(loss_mismember)
     )
@@ -482,11 +723,20 @@ def make_step(
     lambda_p: FLikeSz0,
     member_threshold: float,
     key: PRNGKeyArray,
+    membership: MixtureMembershipConfig | None = None,
+    log_bg_density: float = 0.0,
+    sigma_ceil: FSz0 | float = 1.0,
+    rampup: FSz0 | float = 1.0,
 ) -> tuple[FSz0, PathAutoencoder, optax.OptState]:
     r"""Run a single optimization step for Phase 2 decoder training.
 
     Computes loss and gradients via `compute_decoder_loss`, then applies
     gradient updates to the dynamic model parameters.
+
+    The ``membership`` / ``log_bg_density`` / ``sigma_ceil`` / ``rampup``
+    arguments are forwarded to `compute_decoder_loss` and select the opt-in
+    mixture-model membership. ``sigma_ceil`` and ``rampup`` are epoch-dependent
+    schedules supplied by `PathAutoencoderTrainer.prepare_step_kw`.
 
     """
     # Compute the loss
@@ -500,6 +750,10 @@ def make_step(
         lambda_p=lambda_p,
         member_threshold=member_threshold,
         key=key,
+        membership=membership,
+        log_bg_density=log_bg_density,
+        sigma_ceil=sigma_ceil,
+        rampup=rampup,
     )
 
     # Update the dynamic components of the model
@@ -563,12 +817,17 @@ def _autoencoder_step(
     lambda_q: FLikeSz0,
     member_threshold: float,
     lambda_p: FLikeSz0,
+    membership: MixtureMembershipConfig | None = None,
+    log_bg_density: float = 0.0,
+    sigma_ceil: FSz0 | float = 1.0,
+    rampup: FSz0 | float = 1.0,
 ) -> tuple[FSz0, EqxTrainCarry]:
     """Run one batch of joint encoder+decoder training.
 
-    `batch_inputs` is ``(mask, (ws, weights))``. `lambda_p` arrives via
-    `step_kw` and is recomputed each epoch by
-    `PathAutoencoderTrainer.prepare_step_kw`, which is how the ramp is applied.
+    `batch_inputs` is ``(mask, (ws, weights))``. The epoch-dependent schedules --
+    `lambda_p`, and (for mixture membership) `sigma_ceil` and `rampup` -- arrive
+    via `step_kw` and are recomputed each epoch by
+    `PathAutoencoderTrainer.prepare_step_kw`.
     """
     model, opt_state, key = carry
     mask, (ws, weights) = batch_inputs
@@ -590,6 +849,10 @@ def _autoencoder_step(
         lambda_p=lambda_p,
         member_threshold=member_threshold,
         key=subkey,
+        membership=membership,
+        log_bg_density=log_bg_density,
+        sigma_ceil=sigma_ceil,
+        rampup=rampup,
     )
 
     model = eqx.combine(model_dynamic, model_static)
@@ -600,16 +863,26 @@ def _autoencoder_step(
 class PathAutoencoderTrainer(AbstractEqxScanTrainer):
     r"""Scan trainer for joint encoder + decoder training.
 
-    The velocity-alignment weight $\lambda_p$ is ramped linearly from
-    ``lambda_p[0]`` to ``lambda_p[1]`` across training: early epochs prioritise
-    spatial reconstruction, later ones increasingly enforce alignment with the
-    velocity field. `prepare_step_kw` computes it per epoch and forwards it to
-    the step function.
+    Owns the epoch-dependent schedules, all of which are computed in
+    `prepare_step_kw` and forwarded to the step function:
+
+    - $\lambda_p$, the velocity-alignment weight, ramped linearly from
+      ``lambda_p_range[0]`` to ``lambda_p_range[1]``. Early epochs prioritise
+      spatial reconstruction; later ones increasingly enforce alignment with the
+      velocity field.
+    - (mixture membership only) the **stream-width ceiling**, annealed
+      geometrically downward, and the **membership ramp**, raised from 0 to 1.
+      These two schedules bracket the mixture likelihood's two degenerate
+      optima -- width inflation and membership collapse. See
+      `phasecurvefit._src.nn.membership`.
 
     """
 
     lambda_p_range: tuple[float, float] = (1.0, 5.0)
     """``(start, stop)`` for the $\\lambda_p$ ramp."""
+
+    membership: MixtureMembershipConfig | None = None
+    """Mixture-model membership config, or None for the legacy classifier loss."""
 
     def init(  # type: ignore[override]
         self,
@@ -628,18 +901,26 @@ class PathAutoencoderTrainer(AbstractEqxScanTrainer):
         return (model, opt_state, key), (mask, (all_ws, weights))
 
     def prepare_step_kw(
-        self,
-        /,
-        *,
-        epoch_idx: Int[Array, ""],
-        num_epochs: int,
-        epoch_key: PRNGKeyArray,
+        self, /, *, epoch_idx: Int[Array, ""], num_epochs: int, epoch_key: PRNGKeyArray
     ) -> Mapping[str, Any]:
-        r"""Linearly ramp $\lambda_p$ from its start to its stop value."""
+        r"""Compute this epoch's schedules: $\lambda_p$, and the mixture ramps."""
         del epoch_key
         lambda_p_min, lambda_p_max = self.lambda_p_range
         frac = epoch_idx / (num_epochs - 1) if num_epochs > 1 else 0.0
-        return {"lambda_p": lambda_p_min + (lambda_p_max - lambda_p_min) * frac}
+        kw: dict[str, Any] = {
+            "lambda_p": lambda_p_min + (lambda_p_max - lambda_p_min) * frac
+        }
+
+        if self.membership is not None:
+            start, stop = self.membership.sigma_ceiling
+            kw["sigma_ceil"] = sigma_ceiling(
+                epoch_idx, num_epochs, start=start, stop=stop
+            )
+            kw["rampup"] = membership_rampup(
+                epoch_idx, num_epochs, warmup_frac=self.membership.warmup_frac
+            )
+
+        return kw
 
 
 def train_ordering_and_track_net(
@@ -698,6 +979,26 @@ def train_ordering_and_track_net(
     else:
         weights = compute_weights(model.encoder, all_ws)
 
+    # Mixture-model membership is opt-in. When enabled the model must carry a
+    # `WidthNet`, and the background density is fixed once, from the
+    # field.  This must happen *before* `filter_spec` is built, since a
+    # boolean-pytree filter has to match the model's structure exactly.
+    membership = config.membership
+    log_bg_density = 0.0
+    if membership is not None:
+        if model.width is None:
+            key, wkey = jr.split(key)
+            model = eqx.tree_at(
+                lambda m: m.width,
+                model,
+                membership.make_width_net(key=wkey),
+                is_leaf=lambda x: x is None,
+            )
+        D = all_ws.shape[1] // 2
+        log_bg_density = float(
+            jnp.log(membership.resolve_background_density(all_ws[:, :D]))
+        )
+
     # Model surgery: decide which parts of the model are trainable.
     if config.freeze_encoder:
         # True for arrays, but False everywhere in the encoder subtree, so that
@@ -725,10 +1026,13 @@ def train_ordering_and_track_net(
             filter_spec=filter_spec,
             lambda_q=config.lambda_q,
             member_threshold=config.member_threshold,
+            membership=membership,
+            log_bg_density=log_bg_density,
         ),
         loss_agg_fn=masked_mean,
         filter_spec=filter_spec,
         lambda_p_range=config.lambda_p,
+        membership=membership,
     )
     initial_carry, epoch_data = trainer.init(
         model,
@@ -833,12 +1137,13 @@ def train_autoencoder(
     is_member = prob > config.member_threshold
 
     # Denoise the decoder target over the ORDERING coordinate, not the (locally
-    # noisy) encoder gamma. The encoder gamma is globally monotone but jittery at
-    # the running-mean window scale, so a window in encoder-gamma averages
-    # spatially-scattered points and blurs the target off the track. The ordering
-    # gamma (rank along the walk) is exact, so its running mean is a clean
-    # centerline. The decoder is therefore trained in the ordering's own gamma; at
-    # inference the encoder maps points into (approximately) that same coordinate.
+    # noisy) encoder gamma. The encoder gamma is globally monotone but jittery
+    # at the running-mean window scale, so a window in encoder-gamma averages
+    # spatially-scattered points and blurs the target off the track. The
+    # ordering gamma (rank along the walk) is exact, so its running mean is a
+    # clean centerline. The decoder is therefore trained in the ordering's own
+    # gamma; at inference the encoder maps points into (approximately) that same
+    # coordinate.
     gmin, gmax = model.encoder.gamma_range
     visited = ordering_indices >= 0
     ordering = ordering_indices[visited]  # point indices, in visit order

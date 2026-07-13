@@ -56,6 +56,7 @@ from .abstractautoencoder import *
 from .autoencoder import *
 from .externalautoencoder import *
 from .externaldecoder import *
+from .membership import *
 from .normalize import *
 from .order_net import *
 from .result import *
