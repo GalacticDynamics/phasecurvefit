@@ -12,7 +12,7 @@ The ``WalkConfig`` class composes a strategy with a distance metric:
         metric=FullPhaseSpaceDistanceMetric(),
         strategy=KDTree(k=50),
     )
-    result = walk_local_flow(pos, vel, config=config, ...)
+    result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 """
 
 __all__: tuple[str, ...] = (

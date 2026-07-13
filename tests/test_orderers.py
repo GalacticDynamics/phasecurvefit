@@ -96,9 +96,7 @@ class TestLocalFlowOrdererRegression:
     def test_matches_walk_local_flow(self, data, direction):
         """Matches walk local flow."""
         q, p = data
-        direct = pcf.walk_local_flow(
-            q, p, start_idx=0, metric_scale=1.0, direction=direction
-        )
+        direct = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(direction=direction))
         orderer = pcf.orderers.LocalFlowOrderer(
             metric_scale=1.0, start_idx=0, direction=direction
         )

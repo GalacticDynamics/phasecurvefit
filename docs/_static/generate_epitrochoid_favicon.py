@@ -136,14 +136,15 @@ def main(
     metric_scale = u.Q(4, "s")
     max_dist = u.Q(40, "m")
 
-    walkresult = pcf.walk_local_flow(
+    walkresult = pcf.order(
         qs,
         ps,
-        start_idx=start_idx,
-        metric_scale=metric_scale,
-        max_dist=max_dist,
-        config=config,
-        direction="forward",
+        pcf.orderers.LocalFlowOrderer(
+            start_idx=start_idx,
+            metric_scale=metric_scale,
+            max_dist=max_dist,
+            config=config,
+        ),
         metadata=pcf.StateMetadata(usys=usys),
     )
 

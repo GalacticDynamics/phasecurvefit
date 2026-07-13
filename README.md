@@ -101,7 +101,7 @@ vel = {
 
 # Step 1: Order the observations (use KD-tree for spatial neighbor prefiltering)
 config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=3))  # k=3 for this small dataset
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 print(result.indices)  # Initial ordering
 
 # Step 2: Create normalizer and autoencoder
@@ -149,13 +149,11 @@ vel = {
 # Step 1: Order with units (units are preserved throughout)
 metric_scale = u.Q(1.0, "kpc")
 config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=3))
-result = pcf.walk_local_flow(
+result = pcf.order(
     pos,
     vel,
-    config=config,
-    start_idx=0,
-    metric_scale=metric_scale,
-    usys=u.unitsystems.galactic,
+    pcf.orderers.LocalFlowOrderer(config=config, metric_scale=metric_scale),
+    metadata=pcf.StateMetadata(usys=u.unitsystems.galactic),
 )
 
 # Step 2: Create normalizer and autoencoder (handles units automatically)
@@ -226,7 +224,7 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Use default metric (AlignedMomentumDistanceMetric)
 config = pcf.WalkConfig()
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
 
 ### Using Different Metrics
@@ -248,15 +246,13 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Pure spatial ordering (ignores velocity)
 config_spatial = pcf.WalkConfig(metric=pcf.metrics.SpatialDistanceMetric())
-result = pcf.walk_local_flow(
-    pos, vel, config=config_spatial, start_idx=0, metric_scale=0.0
+result = pcf.order(
+    pos, vel, pcf.orderers.LocalFlowOrderer(config=config_spatial, metric_scale=0.0)
 )
 
 # Full 6D phase-space distance
 config_phase = pcf.WalkConfig(metric=pcf.metrics.FullPhaseSpaceDistanceMetric())
-result = pcf.walk_local_flow(
-    pos, vel, config=config_phase, start_idx=0, metric_scale=1.0
-)
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config_phase))
 ```
 
 ### Custom Metrics
@@ -287,7 +283,7 @@ class WeightedPhaseSpaceMetric(pcf.metrics.AbstractDistanceMetric):
 
 # Use custom metric via WalkConfig
 config = pcf.WalkConfig(metric=WeightedPhaseSpaceMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
 
 See the
@@ -319,15 +315,11 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Default strategy (brute-force — no configuration needed)
 config_brute = pcf.WalkConfig(strategy=pcf.strats.BruteForce())
-result = pcf.walk_local_flow(
-    pos, vel, config=config_brute, start_idx=0, metric_scale=1.0
-)
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config_brute))
 
 # KD-tree strategy for faster neighbor queries (large datasets)
 config_kdtree = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2))
-result = pcf.walk_local_flow(
-    pos, vel, config=config_kdtree, start_idx=0, metric_scale=1.0
-)
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config_kdtree))
 ```
 
 ### Custom Query Strategies
@@ -380,7 +372,7 @@ class SmallestIndexStrategy(pcf.strats.AbstractQueryStrategy):
 
 # Use custom strategy via WalkConfig
 config = pcf.WalkConfig(strategy=SmallestIndexStrategy())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
 
 ## AI Usage Disclosure

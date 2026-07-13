@@ -35,12 +35,12 @@ class TestAbstractDistanceMetric:
         # Should work with algorithm
         pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
         vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
-        result = pcf.walk_local_flow(
+        result = pcf.order(
             pos,
             vel,
-            start_idx=0,
-            metric_scale=0.0,
-            config=pcf.WalkConfig(metric=metric),
+            pcf.orderers.LocalFlowOrderer(
+                metric_scale=0.0, config=pcf.WalkConfig(metric=metric)
+            ),
         )
         assert len(result.indices) == 3
 
@@ -167,12 +167,10 @@ class TestAlignedMomentumDistanceMetric:
         pos = {"x": jnp.array([0.0, 1.0, 2.0, 3.0])}
         vel = {"x": jnp.array([1.0, 1.0, 1.0, 1.0])}
 
-        result = pcf.walk_local_flow(
+        result = pcf.order(
             pos,
             vel,
-            start_idx=0,
-            metric_scale=1.0,
-            config=pcf.WalkConfig(metric=metric),
+            pcf.orderers.LocalFlowOrderer(config=pcf.WalkConfig(metric=metric)),
         )
 
         # Should follow the line in order
@@ -293,12 +291,12 @@ class TestSpatialDistanceMetric:
         pos = {"x": jnp.array([0.0, 1.0, 2.0, 3.0])}
         vel = {"x": jnp.array([-1.0, -1.0, -1.0, -1.0])}  # Velocity points backward
 
-        result = pcf.walk_local_flow(
+        result = pcf.order(
             pos,
             vel,
-            start_idx=0,
-            metric_scale=0.0,
-            config=pcf.WalkConfig(metric=metric),
+            pcf.orderers.LocalFlowOrderer(
+                metric_scale=0.0, config=pcf.WalkConfig(metric=metric)
+            ),
         )
 
         # Should still follow spatial order despite backward velocity
@@ -346,8 +344,8 @@ class TestMetricComparison:
         q = {"x": jnp.array([0.0, 1.0, 2.0, 3.0]), "y": jnp.array([0.0, 0.5, 1.0, 1.5])}
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5, 0.5])}
 
-        result = pcf.walk_local_flow(
-            q, p, start_idx=0, metric_scale=1.0, config=pcf.WalkConfig(metric=metric)
+        result = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(config=pcf.WalkConfig(metric=metric))
         )
 
         assert result.all_visited, metric_name
@@ -364,19 +362,23 @@ class TestMetricComparison:
             "y": jnp.array([0.0, 0.0, 0.0]),
         }
 
-        spatial_result = pcf.walk_local_flow(
+        spatial_result = pcf.order(
             q,
             p,
-            start_idx=0,
-            metric_scale=0.0,
-            config=pcf.WalkConfig(metric=pcf.metrics.SpatialDistanceMetric()),
+            pcf.orderers.LocalFlowOrderer(
+                metric_scale=0.0,
+                config=pcf.WalkConfig(metric=pcf.metrics.SpatialDistanceMetric()),
+            ),
         )
-        momentum_result = pcf.walk_local_flow(
+        momentum_result = pcf.order(
             q,
             p,
-            start_idx=0,
-            metric_scale=5.0,
-            config=pcf.WalkConfig(metric=pcf.metrics.AlignedMomentumDistanceMetric()),
+            pcf.orderers.LocalFlowOrderer(
+                metric_scale=5.0,
+                config=pcf.WalkConfig(
+                    metric=pcf.metrics.AlignedMomentumDistanceMetric()
+                ),
+            ),
         )
 
         # With high lambda, momentum should prefer point 1 (aligned) over point
@@ -557,12 +559,12 @@ class TestFullPhaseSpaceDistanceMetric:
         pos = {"x": jnp.array([0.0, 1.0, 2.0, 3.0])}
         vel = {"x": jnp.array([1.0, 2.0, 3.0, 4.0])}
 
-        result = pcf.walk_local_flow(
+        result = pcf.order(
             pos,
             vel,
-            start_idx=0,
-            metric_scale=0.5,
-            config=pcf.WalkConfig(metric=metric),
+            pcf.orderers.LocalFlowOrderer(
+                metric_scale=0.5, config=pcf.WalkConfig(metric=metric)
+            ),
         )
 
         # Should complete successfully

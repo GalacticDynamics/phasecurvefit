@@ -2,3 +2,6 @@ __pycache__
 /docs/_build
 /src/phasecurvefit/_version.py
 .mypy_cache
+
+# Local-only design/planning artifacts (superpowers)
+docs/superpowers/
