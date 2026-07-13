@@ -9,7 +9,7 @@ import phasecurvefit as pcf
 @pytest.mark.parametrize(
     "config",
     [
-        pcf.WalkConfig(strategy=pcf.BruteForce()),
+        pcf.WalkConfig(strategy=pcf.strats.BruteForce()),
         pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2)),
     ],
 )
