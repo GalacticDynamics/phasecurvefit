@@ -417,7 +417,15 @@ def compute_decoder_loss(
     # Modify the mask to avoid training on non-members. This actually can't add
     # members (that would be an 'or' operation) and we penalize false positives
     # and negatives above, so this has a smaller effect.
-    mask = mask & is_member
+    #
+    # It can, however, empty the mask entirely, and that is not hypothetical: the
+    # trainer only guarantees the *batch* mask has a usable sample (it skips
+    # batches that do not), while `is_member` is re-evaluated from the live
+    # encoder at every step. Mid-training the encoder can transiently drop every
+    # star in the batch below the threshold, and `masked_mean` is documented to
+    # return NaN on an empty mask -- which would poison the epoch loss. Hence the
+    # guard on `loss_path` below.
+    member_mask = mask & is_member
 
     # Compute dq/dgamma (Jacobian of decoder output w.r.t. gamma) elementwise
     # jax.jacobian gives us the derivative of decoder output w.r.t. its input
@@ -434,15 +442,26 @@ def compute_decoder_loss(
     t_norm = jnp.linalg.norm(dq_dgamma, axis=1, keepdims=True)
     t_hat = jnp.where(t_norm > 0, dq_dgamma / t_norm, jnp.zeros_like(dq_dgamma))
 
-    loss_path = decoder_loss(
-        qs_meas=ws[:, :D],
-        weights=weights,
-        qs_pred=q_predict,
-        t_hat=t_hat,
-        p_hat=ps_hat,
-        mask=mask,
-        lambda_q=lambda_q,
-        lambda_p=lambda_p,
+    def _path_loss() -> FSz0:
+        return decoder_loss(
+            qs_meas=ws[:, :D],
+            weights=weights,
+            qs_pred=q_predict,
+            t_hat=t_hat,
+            p_hat=ps_hat,
+            mask=member_mask,
+            lambda_q=lambda_q,
+            lambda_p=lambda_p,
+        )
+
+    # When `member_mask` is empty the model currently claims no member in this
+    # batch, so there is no track to fit: the path loss is zero and only
+    # `loss_mismember` supplies gradient, pushing the probabilities back up (as
+    # it in fact does -- the collapse is transient). `lax.cond` rather than
+    # `jnp.where`, because `where` evaluates both branches and its VJP would
+    # multiply the NaN branch's derivative by zero, giving a NaN *gradient*.
+    loss_path = jax.lax.cond(
+        jnp.any(member_mask), _path_loss, lambda: jnp.zeros_like(loss_mismember)
     )
 
     return loss_mismember + loss_path
