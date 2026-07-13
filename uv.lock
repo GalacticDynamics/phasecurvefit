@@ -1138,27 +1138,28 @@ wheels = [
 
 [[package]]
 name = "jaxmore"
-version = "0.2.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "equinox" },
     { name = "jax" },
+    { name = "jaxtyping" },
+    { name = "optional-dependencies" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/49/fb/487e7d0b23827dcd37e28bee8324936d4c5fd974055d1e1615f5fa468f72/jaxmore-0.2.0.tar.gz", hash = "sha256:f8dc5999622fdf7f6241875d1b43ffc9c615b9d809171efe297ed8ad40bddf4a", size = 158506, upload-time = "2026-02-26T21:33:22.014Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/99/91e358a0fc8f0445316ac8d7405cca70af33fd989ab93c3d9419a8eed795/jaxmore-0.4.0.tar.gz", hash = "sha256:2a27df81b7c7ec734c586aedeb7e487a5eb5cd9b90aea6de2e48a8417d698fdc", size = 202566, upload-time = "2026-07-13T01:13:46.523Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/7c/dc6861979b70f79683a7482a0e5e5cee27d0e657fd8a635a27f7f190da8c/jaxmore-0.2.0-py3-none-any.whl", hash = "sha256:b03d43dd98ecdfba637defa4d9597a077af1d91e34aa48a58c3a5159b25f7e9b", size = 13122, upload-time = "2026-02-26T21:33:20.689Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/52/bdb86d6286fc9847b1add5fbe227f8f1f9702775e51337aa9f67e63b79ea/jaxmore-0.4.0-py3-none-any.whl", hash = "sha256:bce27de0c758980eada7a6c0a89d71c5c39d000b16a707bccb7807ac9057adfb", size = 43103, upload-time = "2026-07-13T01:13:45.218Z" },
 ]
 
 [[package]]
 name = "jaxtyping"
-version = "0.3.5"
+version = "0.3.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "wadler-lindig" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/43/30/0e29eab664d33127a7a30aebd7a845a95fbfa1887ede692676769820acea/jaxtyping-0.3.5.tar.gz", hash = "sha256:8150ad5b72b62fa63f573d492a79e9e455f070abe3b260f7dc15270b3eb9bba6", size = 45482, upload-time = "2026-01-05T10:51:34.486Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/91/c1/091b8852bd7cbf50bd655543c8506033cf4029300c67f8c176c1286879a9/jaxtyping-0.3.11.tar.gz", hash = "sha256:b09c14acf6686feb9e0df5b0d8c6e7c5b6f8d36bf059ee54cd522a186c2ef050", size = 46489, upload-time = "2026-06-13T18:35:23.167Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/19/a29de61c7ada0edf4eacfc19355ab8560091b65ea5d2450bcb984e203259/jaxtyping-0.3.5-py3-none-any.whl", hash = "sha256:862c39fa2e526274e82dc96ee8dbe9369dadb651ab1e05d95bd685acb4e2ef02", size = 55824, upload-time = "2026-01-05T10:51:33.523Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/38/c66bbdc5047f4776c2bd3e47e5295a350e3fa44d5b8942105e71c2a876a0/jaxtyping-0.3.11-py3-none-any.whl", hash = "sha256:8a4bedc4e3f963fa82df41bd13c7ebc2bad925601eb48614c65798f21329d4e3", size = 56593, upload-time = "2026-06-13T18:35:22.01Z" },
 ]
 
 [[package]]
@@ -2010,7 +2011,7 @@ requires-dist = [
     { name = "jax-tqdm", specifier = ">=0.4.0" },
     { name = "jaxkd", marker = "extra == 'all'", specifier = ">=0.0.5" },
     { name = "jaxkd", marker = "extra == 'kdtree'", specifier = ">=0.0.5" },
-    { name = "jaxmore", specifier = ">=0.2.0" },
+    { name = "jaxmore", specifier = ">=0.4.0" },
     { name = "jaxtyping", specifier = ">=0.3.5" },
     { name = "optax", specifier = ">=0.2.4" },
     { name = "optional-dependencies", specifier = ">=0.4.0" },

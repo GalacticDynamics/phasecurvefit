@@ -1,5 +1,6 @@
 """Tests for the Autoencoder neural network for tracer interpolation."""
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -282,6 +283,49 @@ class TestTrainAutoencoder:
         vel = {"x": jnp.ones(n_points), "y": 0.5 * jnp.ones(n_points)}
 
         return pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+
+    def test_loss_finite_when_encoder_claims_no_members(self, rng_key: PRNGKeyArray):
+        """The joint loss stays finite when no star clears `member_threshold`.
+
+        `compute_decoder_loss` narrows the batch mask with the *live* encoder's
+        membership (``mask & is_member``). The trainer only guarantees the batch
+        mask is non-empty, so mid-training the encoder can transiently reject
+        every star in the batch. `masked_mean` returns NaN on an empty mask, so
+        without a guard the epoch loss goes NaN. Regression test for that.
+        """
+        from phasecurvefit._src.nn.autoencoder import compute_decoder_loss
+
+        key1, key2 = jr.split(rng_key)
+        n, d = 8, 2
+
+        normalizer = pcf.nn.StandardScalerNormalizer(
+            {"x": jnp.linspace(0, 1, n), "y": jnp.linspace(0, 1, n)},
+            {"x": jnp.ones(n), "y": jnp.ones(n)},
+        )
+        ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
+        dynamic, static = eqx.partition(ae, eqx.is_array)
+
+        ws = jr.normal(key2, (n, 2 * d))
+        weights = jnp.ones(n)
+        mask = jnp.ones(n, dtype=bool)
+
+        # `member_threshold > 1` makes `is_member` all-False, so the narrowed
+        # mask is empty -- exactly the transient state hit during training.
+        loss, grads = compute_decoder_loss(
+            dynamic,
+            static,
+            ws,
+            weights,
+            mask,
+            lambda_q=1.0,
+            lambda_p=1.0,
+            member_threshold=1.1,
+            key=rng_key,
+        )
+
+        assert jnp.isfinite(loss), f"loss is {loss} when no star is a member"
+        leaves = [x for x in jax.tree.leaves(grads) if eqx.is_array(x)]
+        assert all(jnp.all(jnp.isfinite(g)) for g in leaves), "non-finite gradient"
 
     def test_training_runs(self, simple_wlf_result, rng_key: PRNGKeyArray):
         """Test that training completes without errors."""
