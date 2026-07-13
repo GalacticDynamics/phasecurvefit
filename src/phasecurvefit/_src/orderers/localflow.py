@@ -11,7 +11,7 @@ from phasecurvefit._src.algorithm import (
     Direction,
     StateMetadata,
     WalkLocalFlowResult,
-    walk_local_flow,
+    _local_flow_walk,
 )
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.query_config import WalkConfig
@@ -20,15 +20,15 @@ from phasecurvefit._src.query_config import WalkConfig
 class LocalFlowOrderer(AbstractOrderer):
     """Order tracers with the velocity-following local-flow walk.
 
-    A thin wrapper around :func:`~phasecurvefit.walk_local_flow` so the walk is
-    usable through the uniform orderer interface. ``order()`` reproduces
-    ``walk_local_flow`` exactly (including ``direction="both"``, which the walk
-    stitches internally via ``combine_results``).
+    This is the primary way to run the walk, via the uniform orderer interface:
+    ``pcf.order(positions, velocities)`` uses it by default. ``order()`` handles
+    ``direction="both"`` internally via ``combine_results``. (The module-level
+    ``walk_local_flow`` is a deprecated alias for the same computation.)
 
     Parameters
     ----------
     metric_scale
-        Metric-dependent scale parameter (see ``walk_local_flow``).
+        Metric-dependent scale parameter.
     config
         Neighbor-query configuration (metric + strategy).
     start_idx
@@ -64,7 +64,7 @@ class LocalFlowOrderer(AbstractOrderer):
         kwargs: dict[str, object] = {}
         if metadata is not None:
             kwargs["metadata"] = metadata
-        return walk_local_flow(
+        return _local_flow_walk(
             positions,
             velocities,
             start_idx=self.start_idx,

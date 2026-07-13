@@ -15,7 +15,7 @@ Create some example phase-space data:
 
 Run the algorithm:
 
->>> result = walk_local_flow(pos, vel, start_idx=0, metric_scale=0.5)
+>>> result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(metric_scale=0.5))
 >>> result.ordering
 Array([0, 1, 2, 3], dtype=int32)
 
@@ -28,6 +28,7 @@ __all__: tuple[str, ...] = (
     "combine_results",
 )
 
+import warnings
 from collections.abc import Iterator, Set
 from typing import Literal, TypeAlias
 
@@ -175,7 +176,7 @@ class WalkLocalFlowResult(OrderingResult):
     ...     "y": jnp.sin(jnp.linspace(0, 2 * 3.14159, 20)),
     ... }
     >>> vel = {"x": jnp.ones(20), "y": jnp.cos(jnp.linspace(0, 2 * 3.14159, 20))}
-    >>> result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+    >>> result = pcf.order(pos, vel)
     >>> result.indices
     Array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16,
            17, 18, 19], dtype=int32)
@@ -267,7 +268,7 @@ State: TypeAlias = tuple[  # noqa: UP040
 
 
 @plum.dispatch
-def walk_local_flow(
+def _local_flow_walk(
     xs: VectorComponents,
     vs: VectorComponents,
     /,
@@ -282,6 +283,9 @@ def walk_local_flow(
     direction: Direction = "forward",
 ) -> WalkLocalFlowResult:
     r"""Find an ordered path through phase-space using the local flow.
+
+    The implementation behind `LocalFlowOrderer` and the (deprecated) public
+    `walk_local_flow`. Prefer ``pcf.order(positions, velocities)`` at call sites.
 
     Parameters
     ----------
@@ -349,14 +353,18 @@ def walk_local_flow(
 
     Run the algorithm starting from index 0:
 
-    >>> result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=0.5)
+    >>> result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(metric_scale=0.5))
     >>> result.ordering
     Array([0, 1, 2, 3, 4], dtype=int32)
 
     Walk in the backward direction:
 
-    >>> result_backward = pcf.walk_local_flow(
-    ...     pos, vel, start_idx=4, metric_scale=0.5, direction="backward"
+    >>> result_backward = pcf.order(
+    ...     pos,
+    ...     vel,
+    ...     pcf.orderers.LocalFlowOrderer(
+    ...         start_idx=4, metric_scale=0.5, direction="backward"
+    ...     ),
     ... )
     >>> result_backward.indices
     Array([4, 3, 2, 1, 0], dtype=int32)
@@ -372,8 +380,8 @@ def walk_local_flow(
             "config": config,
             "metadata": metadata,
         }
-        result_forward = walk_local_flow(xs, vs, **kwargs, direction="forward")
-        result_backward = walk_local_flow(xs, vs, **kwargs, direction="backward")
+        result_forward = _local_flow_walk(xs, vs, **kwargs, direction="forward")
+        result_backward = _local_flow_walk(xs, vs, **kwargs, direction="backward")
         return combine_results(result_forward, result_backward)
 
     # ---------------------------------------------------------------
@@ -514,6 +522,31 @@ def walk_local_flow(
     )
 
 
+def walk_local_flow(*args: object, **kwargs: object) -> WalkLocalFlowResult:
+    """Order tracers with the local-flow walk (deprecated; use `order`).
+
+    .. deprecated:: 0.3
+        ``walk_local_flow`` will be removed in v0.4. Use
+        ``pcf.order(positions, velocities)`` -- or
+        ``pcf.orderers.LocalFlowOrderer(...).order(...)`` for non-default walk
+        parameters -- which routes through the same implementation without a
+        warning.
+
+    Thin wrapper that emits a `DeprecationWarning` and forwards to the private
+    implementation (plain and Quantity dispatch), returning an unchanged
+    `WalkLocalFlowResult`.
+    """
+    warnings.warn(
+        "`walk_local_flow` is deprecated and will be removed in v0.4; use "
+        "`pcf.order(positions, velocities)` (or "
+        "`pcf.orderers.LocalFlowOrderer(...).order(...)` for non-default walk "
+        "parameters) instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _local_flow_walk(*args, **kwargs)
+
+
 def order_w(res: WalkLocalFlowResult, /) -> tuple[VectorComponents, VectorComponents]:
     """Get xs and vs in the ordered sequence from a WalkLocalFlowResult.
 
@@ -540,7 +573,8 @@ def order_w(res: WalkLocalFlowResult, /) -> tuple[VectorComponents, VectorCompon
     >>> import phasecurvefit as pcf
     >>> pos = {"x": jnp.array([3.0, 1.0, 2.0])}
     >>> vel = {"x": jnp.array([1.0, 1.0, 1.0])}
-    >>> result = pcf.walk_local_flow(pos, vel, start_idx=1, metric_scale=0.0)
+    >>> lfo = pcf.orderers.LocalFlowOrderer(start_idx=1, metric_scale=0.0)
+    >>> result = pcf.order(pos, vel, lfo)
     >>> ordered_pos, ordered_vel = pcf.order_w(result)
 
     """
@@ -651,10 +685,12 @@ def combine_results(
 
     Run forward and backward walks from the middle:
 
-    >>> result_fwd = pcf.walk_local_flow(pos, vel, start_idx=2, metric_scale=0.5)
-    >>> result_bwd = pcf.walk_local_flow(
-    ...     pos, vel, start_idx=2, metric_scale=0.5, direction="backward"
+    >>> fwd = pcf.orderers.LocalFlowOrderer(start_idx=2, metric_scale=0.5)
+    >>> bwd = pcf.orderers.LocalFlowOrderer(
+    ...     start_idx=2, metric_scale=0.5, direction="backward"
     ... )
+    >>> result_fwd = pcf.order(pos, vel, fwd)
+    >>> result_bwd = pcf.order(pos, vel, bwd)
 
     Combine the results:
 

@@ -123,7 +123,7 @@ def fill_ordering_gaps(
 
     >>> pos = {"x": jnp.linspace(0, 5, 20), "y": jnp.zeros(20)}
     >>> vel = {"x": jnp.ones(20), "y": jnp.zeros(20)}
-    >>> result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+    >>> result = pcf.order(pos, vel)
     >>> keys = jax.random.split(jax.random.key(0), 2)
     >>> normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
     >>> model = pcf.nn.PathAutoencoder.make(

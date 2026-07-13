@@ -16,7 +16,7 @@ class TestWalkLocalFlowResult:
         q = {"x": jnp.array([1.0, 2.0, 3.0]), "y": jnp.array([1.0, 2.0, 3.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.0, 0.0, 0.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=0.0)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(metric_scale=0.0))
 
         # Check that result has the expected attributes (NamedTuple)
         assert hasattr(result, "indices")
@@ -33,7 +33,9 @@ class TestWalkLocalFlowResult:
         q = {"x": jnp.array([3.0, 1.0, 2.0]), "y": jnp.array([30.0, 10.0, 20.0])}
         p = {"x": jnp.array([0.3, 0.1, 0.2]), "y": jnp.array([3.0, 1.0, 2.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=1, metric_scale=0.0)
+        result = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=1, metric_scale=0.0)
+        )
         ordered_pos, ordered_vel = pcf.order_w(result)
 
         # Order starts from index 1, then finds nearest neighbors
@@ -50,7 +52,7 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=1.0)
+        result = pcf.order(q, p)
 
         # Should follow the line in order
         assert jnp.array_equal(result.indices, jnp.array([0, 1, 2, 3, 4]))
@@ -62,7 +64,7 @@ class TestNearestNeighborsWithMomentum:
         p = {"x": jnp.array([-1.0, -1.0, -1.0, -1.0, -1.0])}
 
         # Start from middle, should go backward due to velocity
-        result = pcf.walk_local_flow(q, p, start_idx=2, metric_scale=1.0)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(start_idx=2))
         # With momentum, should prefer going in velocity direction (backward)
         # First step from 2: velocity points to -x, so prefer 1 over 3
         assert result.indices[1] == 1
@@ -74,13 +76,13 @@ class TestNearestNeighborsWithMomentum:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Forward walk from leftmost point should go toward higher indices
-        result_forward = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=1.0)
+        result_forward = pcf.order(q, p)
         # First step should be to index 1
         assert result_forward.indices[1] == 1
 
         # Reverse walk from rightmost point should go toward lower indices
-        result_backward = pcf.walk_local_flow(
-            q, p, start_idx=4, metric_scale=1.0, direction="backward"
+        result_backward = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=4, direction="backward")
         )
         # First step should be to index 3
         assert result_backward.indices[1] == 3
@@ -91,14 +93,14 @@ class TestNearestNeighborsWithMomentum:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Using backward parameter
-        result_backward_param = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="backward"
+        result_backward_param = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=2, direction="backward")
         )
 
         # Manually negating velocities
         p_neg = {"x": -p["x"]}
-        result_vel_negated = pcf.walk_local_flow(
-            q, p_neg, start_idx=2, metric_scale=1.0
+        result_vel_negated = pcf.order(
+            q, p_neg, pcf.orderers.LocalFlowOrderer(start_idx=2)
         )
 
         # Both should produce the same result
@@ -112,8 +114,8 @@ class TestNearestNeighborsWithMomentum:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Start from middle point
-        result = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="both"
+        result = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=2, direction="both")
         )
 
         assert result.all_visited
@@ -125,8 +127,8 @@ class TestNearestNeighborsWithMomentum:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Start from near one end
-        result = pcf.walk_local_flow(
-            q, p, start_idx=1, metric_scale=1.0, direction="both"
+        result = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=1, direction="both")
         )
 
         # Should visit all points
@@ -139,8 +141,10 @@ class TestNearestNeighborsWithMomentum:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Start from middle of left cluster
-        result = pcf.walk_local_flow(
-            q, p, start_idx=1, metric_scale=1.0, max_dist=2.0, direction="both"
+        result = pcf.order(
+            q,
+            p,
+            pcf.orderers.LocalFlowOrderer(start_idx=1, max_dist=2.0, direction="both"),
         )
 
         # Should visit points in left cluster but not right cluster
@@ -167,8 +171,8 @@ class TestNearestNeighborsWithMomentum:
             "y": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0]),
         }
 
-        result = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="both"
+        result = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=2, direction="both")
         )
 
         assert result.all_visited  # Should visit all points
@@ -178,16 +182,14 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
         # Using direction='both'
-        result_both = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="both"
+        result_both = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=2, direction="both")
         )
 
         # Manual combine
-        result_fwd = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="forward"
-        )
-        result_bwd = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="backward"
+        result_fwd = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(start_idx=2))
+        result_bwd = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=2, direction="backward")
         )
         result_combined = pcf.combine_results(result_fwd, result_bwd)
 
@@ -201,8 +203,8 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
-        result = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="both"
+        result = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=2, direction="both")
         )
 
         # Should contain all indices exactly once
@@ -215,14 +217,12 @@ class TestNearestNeighborsWithMomentum:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Start from leftmost point
-        result_left = pcf.walk_local_flow(
-            q, p, start_idx=0, metric_scale=1.0, direction="both"
-        )
+        result_left = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(direction="both"))
         assert result_left.all_visited  # Should still visit all points
 
         # Start from rightmost point
-        result_right = pcf.walk_local_flow(
-            q, p, start_idx=4, metric_scale=1.0, direction="both"
+        result_right = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=4, direction="both")
         )
         assert result_right.all_visited  # Should still visit all points
 
@@ -232,7 +232,7 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 2.0, 3.0]), "y": jnp.array([0.0, 1.0, 2.0, 3.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0]), "y": jnp.array([1.0, 1.0, 1.0, 1.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=1.0)
+        result = pcf.order(q, p)
 
         assert jnp.array_equal(result.indices, jnp.array([0, 1, 2, 3]))
 
@@ -242,7 +242,7 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, -1.0]), "y": jnp.array([0.0, 0.0, 0.0])}
         p = {"x": jnp.array([1.0, 0.0, 0.0]), "y": jnp.array([0.0, 0.0, 0.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=0.0)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(metric_scale=0.0))
 
         # With λ=0, it's pure distance, both are at distance 1
         # The algorithm will pick the first one found
@@ -257,7 +257,7 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, -1.0]), "y": jnp.array([0.0, 0.0, 0.0])}
         p = {"x": jnp.array([1.0, 0.0, 0.0]), "y": jnp.array([0.0, 0.0, 0.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=10.0)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(metric_scale=10.0))
 
         # With high λ, should strongly prefer point 1 (in velocity direction)
         assert result.indices[1] == 1
@@ -268,7 +268,9 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 10.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=0.0, max_dist=5.0)
+        result = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(metric_scale=0.0, max_dist=5.0)
+        )
 
         # Should stop before reaching point 2 (at x=10)
         assert not result.all_visited
@@ -281,7 +283,9 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 10.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=0.0, max_dist=5.0)
+        result = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(metric_scale=0.0, max_dist=5.0)
+        )
 
         # Point 2 should be skipped
         assert 2 in result.skipped_indices
@@ -297,7 +301,7 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 2.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=0.0)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(metric_scale=0.0))
 
         assert result.all_visited
 
@@ -306,7 +310,9 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=0.0, n_max=3)
+        result = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(metric_scale=0.0, n_max=3)
+        )
 
         assert not result.all_visited
         assert result.n_visited == 3
@@ -316,8 +322,8 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
-        result = pcf.walk_local_flow(
-            q, p, start_idx=0, metric_scale=0.0, terminate_indices={2}
+        result = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(metric_scale=0.0, terminate_indices={2})
         )
 
         # Should visit indices 0, 1, 2 and then stop
@@ -334,17 +340,17 @@ class TestNearestNeighborsWithMomentum:
         p = {"x": jnp.array([1.0, 1.0, 1.0])}
 
         with pytest.raises(ValueError, match="out of bounds"):
-            pcf.walk_local_flow(q, p, start_idx=10)
+            pcf.order(q, p, pcf.orderers.LocalFlowOrderer(start_idx=10))
 
         with pytest.raises(ValueError, match="out of bounds"):
-            pcf.walk_local_flow(q, p, start_idx=-1)
+            pcf.order(q, p, pcf.orderers.LocalFlowOrderer(start_idx=-1))
 
     def test_single_point(self):
         """Test with a single point."""
         q = {"x": jnp.array([1.0])}
         p = {"x": jnp.array([1.0])}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0)
+        result = pcf.order(q, p)
 
         assert jnp.array_equal(result.indices, jnp.array([0]))
 
@@ -355,7 +361,7 @@ class TestNearestNeighborsWithMomentum:
         # Tangent velocity
         p = {"x": -jnp.sin(t), "y": jnp.cos(t), "z": jnp.ones_like(t) / (4 * jnp.pi)}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=1.0)
+        result = pcf.order(q, p)
 
         # Should roughly follow the helix order
         # Check that we visit all points
@@ -377,7 +383,7 @@ class TestAlgorithmIntegration:
         # Tangent velocity (derivative of position)
         p = {"x": -jnp.sin(t), "y": jnp.cos(t)}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=2.0)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(metric_scale=2.0))
 
         # With momentum, should follow the arc correctly
         # Check that consecutive points are neighbors in the result
@@ -404,7 +410,7 @@ class TestAlgorithmIntegration:
         q = {"x": base_x + noise_x, "y": base_y + noise_y}
         p = {"x": jnp.ones(n_points), "y": jnp.zeros(n_points)}
 
-        result = pcf.walk_local_flow(q, p, start_idx=0, metric_scale=1.0)
+        result = pcf.order(q, p)
 
         # Should visit all points
         assert result.all_visited
@@ -426,13 +432,13 @@ class TestAlgorithmIntegration:
 
         # Start from beginning with forward velocity should find more points
         # forward
-        result_forward = pcf.walk_local_flow(
-            pos, vel_forward, start_idx=0, metric_scale=5.0
+        result_forward = pcf.order(
+            pos, vel_forward, pcf.orderers.LocalFlowOrderer(metric_scale=5.0)
         )
         # Start from beginning with backward velocity should still work (but
         # prefer backward)
-        result_backward = pcf.walk_local_flow(
-            pos, vel_backward, start_idx=0, metric_scale=5.0
+        result_backward = pcf.order(
+            pos, vel_backward, pcf.orderers.LocalFlowOrderer(metric_scale=5.0)
         )
 
         # Both should visit all points eventually
@@ -452,7 +458,7 @@ class TestAlgorithmIntegration:
             "z": jnp.array([1.0, 1.0, 1.0]),
         }
 
-        result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+        result = pcf.order(pos, vel)
 
         assert result.all_visited
         assert jnp.array_equal(result.indices, jnp.array([0, 1, 2]))
@@ -468,11 +474,9 @@ class TestCombineFlowWalks:
         vel = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Start from middle, run both walks
-        result_fwd = pcf.walk_local_flow(
-            pos, vel, start_idx=2, metric_scale=1.0, direction="forward"
-        )
-        result_bwd = pcf.walk_local_flow(
-            pos, vel, start_idx=2, metric_scale=1.0, direction="backward"
+        result_fwd = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=2))
+        result_bwd = pcf.order(
+            pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=2, direction="backward")
         )
         result = pcf.combine_results(result_fwd, result_bwd)
 
@@ -488,11 +492,9 @@ class TestCombineFlowWalks:
         vel = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Start from index 2 (middle)
-        result_fwd = pcf.walk_local_flow(
-            pos, vel, start_idx=2, metric_scale=1.0, direction="forward"
-        )
-        result_bwd = pcf.walk_local_flow(
-            pos, vel, start_idx=2, metric_scale=1.0, direction="backward"
+        result_fwd = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=2))
+        result_bwd = pcf.order(
+            pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=2, direction="backward")
         )
         result = pcf.combine_results(result_fwd, result_bwd)
 
@@ -504,11 +506,15 @@ class TestCombineFlowWalks:
         pos = {"x": jnp.array([0.0, 1.0, 2.0, 3.0])}
         vel = {"x": jnp.array([1.0, 1.0, 1.0, 1.0])}
 
-        result_fwd = pcf.walk_local_flow(
-            pos, vel, start_idx=1, metric_scale=0.5, direction="forward"
+        result_fwd = pcf.order(
+            pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=1, metric_scale=0.5)
         )
-        result_bwd = pcf.walk_local_flow(
-            pos, vel, start_idx=1, metric_scale=0.5, direction="backward"
+        result_bwd = pcf.order(
+            pos,
+            vel,
+            pcf.orderers.LocalFlowOrderer(
+                start_idx=1, metric_scale=0.5, direction="backward"
+            ),
         )
         result = pcf.combine_results(result_fwd, result_bwd)
 
@@ -523,12 +529,8 @@ class TestCombineFlowWalks:
         q = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.1, 0.1, 0.1])}
 
-        res_fwd = pcf.walk_local_flow(
-            q, p, start_idx=0, metric_scale=1.0, direction="forward"
-        )
-        res_bwd = pcf.walk_local_flow(
-            q, p, start_idx=0, metric_scale=1.0, direction="backward"
-        )
+        res_fwd = pcf.order(q, p)
+        res_bwd = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(direction="backward"))
         res = pcf.combine_results(res_fwd, res_bwd)
 
         # Original data should be preserved
@@ -542,11 +544,15 @@ class TestCombineFlowWalks:
         q = {"x": jnp.array([0.0, 1.0, 2.0, 3.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0])}
 
-        res_fwd = pcf.walk_local_flow(
-            q, p, start_idx=1, metric_scale=0.5, direction="forward"
+        res_fwd = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=1, metric_scale=0.5)
         )
-        res_bwd = pcf.walk_local_flow(
-            q, p, start_idx=1, metric_scale=0.5, direction="backward"
+        res_bwd = pcf.order(
+            q,
+            p,
+            pcf.orderers.LocalFlowOrderer(
+                start_idx=1, metric_scale=0.5, direction="backward"
+            ),
         )
         res = pcf.combine_results(res_fwd, res_bwd)
 
@@ -570,11 +576,9 @@ class TestCombineFlowWalks:
             "y": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0]),
         }
 
-        res_fwd = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="forward"
-        )
-        res_bwd = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="backward"
+        res_fwd = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(start_idx=2))
+        res_bwd = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=2, direction="backward")
         )
         res = pcf.combine_results(res_fwd, res_bwd)
 
@@ -587,20 +591,14 @@ class TestCombineFlowWalks:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Combine from index 0
-        res_fwd_0 = pcf.walk_local_flow(
-            q, p, start_idx=0, metric_scale=1.0, direction="forward"
-        )
-        res_bwd_0 = pcf.walk_local_flow(
-            q, p, start_idx=0, metric_scale=1.0, direction="backward"
-        )
+        res_fwd_0 = pcf.order(q, p)
+        res_bwd_0 = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(direction="backward"))
         res_0 = pcf.combine_results(res_fwd_0, res_bwd_0)
 
         # Combine from index 4
-        res_fwd_4 = pcf.walk_local_flow(
-            q, p, start_idx=4, metric_scale=1.0, direction="forward"
-        )
-        res_bwd_4 = pcf.walk_local_flow(
-            q, p, start_idx=4, metric_scale=1.0, direction="backward"
+        res_fwd_4 = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(start_idx=4))
+        res_bwd_4 = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=4, direction="backward")
         )
         res_4 = pcf.combine_results(res_fwd_4, res_bwd_4)
 
@@ -614,20 +612,22 @@ class TestCombineFlowWalks:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # With metric_scale=0 (pure nearest neighbor)
-        res_fwd_lam0 = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=0.0, direction="forward"
+        res_fwd_lam0 = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=2, metric_scale=0.0)
         )
-        res_bwd_lam0 = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=0.0, direction="backward"
+        res_bwd_lam0 = pcf.order(
+            q,
+            p,
+            pcf.orderers.LocalFlowOrderer(
+                start_idx=2, metric_scale=0.0, direction="backward"
+            ),
         )
         res_lam0 = pcf.combine_results(res_fwd_lam0, res_bwd_lam0)
 
         # With metric_scale=1.0 (balanced)
-        res_fwd_lam1 = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="forward"
-        )
-        res_bwd_lam1 = pcf.walk_local_flow(
-            q, p, start_idx=2, metric_scale=1.0, direction="backward"
+        res_fwd_lam1 = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(start_idx=2))
+        res_bwd_lam1 = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=2, direction="backward")
         )
         res_lam1 = pcf.combine_results(res_fwd_lam1, res_bwd_lam1)
 
@@ -641,11 +641,15 @@ class TestCombineFlowWalks:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # With max_dist=2, should not cross the gap
-        res_fwd = pcf.walk_local_flow(
-            q, p, start_idx=1, metric_scale=1.0, max_dist=2.0, direction="forward"
+        res_fwd = pcf.order(
+            q, p, pcf.orderers.LocalFlowOrderer(start_idx=1, max_dist=2.0)
         )
-        res_bwd = pcf.walk_local_flow(
-            q, p, start_idx=1, metric_scale=1.0, max_dist=2.0, direction="backward"
+        res_bwd = pcf.order(
+            q,
+            p,
+            pcf.orderers.LocalFlowOrderer(
+                start_idx=1, max_dist=2.0, direction="backward"
+            ),
         )
         res = pcf.combine_results(res_fwd, res_bwd)
 
@@ -661,12 +665,8 @@ class TestCombineFlowWalks:
         p2 = {"x": jnp.array([1.0, 1.0, 1.0])}
 
         # Create results with different positions
-        res1 = pcf.walk_local_flow(
-            q1, p1, start_idx=0, metric_scale=1.0, direction="forward"
-        )
-        res2 = pcf.walk_local_flow(
-            q2, p2, start_idx=0, metric_scale=1.0, direction="backward"
-        )
+        res1 = pcf.order(q1, p1)
+        res2 = pcf.order(q2, p2, pcf.orderers.LocalFlowOrderer(direction="backward"))
 
         # Should raise an error when combining
         with pytest.raises((eqx.EquinoxRuntimeError, ValueError)):

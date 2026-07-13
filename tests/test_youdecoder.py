@@ -316,9 +316,7 @@ class TestTrainEncoderExternalDecoder:
         positions = sample_data["positions"]
         velocities = sample_data["velocities"]
 
-        result = pcf.walk_local_flow(
-            positions, velocities, start_idx=0, metric_scale=1.0
-        )
+        result = pcf.order(positions, velocities)
 
         # Create model
         normalizer = pcf.nn.StandardScalerNormalizer(positions, velocities)
@@ -403,8 +401,8 @@ class TestIntegration:
         velocities = {"x": -jnp.sin(t), "y": jnp.cos(t)}
 
         # Run phase-flow walk (skip some points by using larger lambda)
-        result = pcf.walk_local_flow(
-            positions, velocities, start_idx=0, metric_scale=0.5
+        result = pcf.order(
+            positions, velocities, pcf.orderers.LocalFlowOrderer(metric_scale=0.5)
         )
 
         # Create normalizer
@@ -459,8 +457,8 @@ class TestIntegration:
         positions = {"x": jnp.linspace(0, 5, N), "y": jnp.zeros(N)}
         velocities = {"x": jnp.ones(N), "y": jnp.zeros(N)}
 
-        result = pcf.walk_local_flow(
-            positions, velocities, start_idx=0, metric_scale=0.3
+        result = pcf.order(
+            positions, velocities, pcf.orderers.LocalFlowOrderer(metric_scale=0.3)
         )
 
         normalizer = pcf.nn.StandardScalerNormalizer(positions, velocities)

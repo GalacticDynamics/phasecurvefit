@@ -597,11 +597,13 @@ def cosine_similarity(vel_a: ScalarQComponents, vel_b: ScalarQComponents, /) -> 
     return quax.quaxify(phasespace.cosine_similarity)(vel_a, vel_b)
 
 
-_walk_local_flow = algorithm.walk_local_flow.invoke(VectorComponents, VectorComponents)
+_local_flow_walk_plain = algorithm._local_flow_walk.invoke(  # noqa: SLF001
+    VectorComponents, VectorComponents
+)
 
 
 @plum.dispatch
-def walk_local_flow(
+def _local_flow_walk(
     positions: VectorQComponents,
     velocities: VectorQComponents,
     /,
@@ -664,6 +666,7 @@ def walk_local_flow(
     --------
     >>> import jax.numpy as jnp
     >>> import unxt as u
+    >>> import phasecurvefit as pcf
     >>> q = {
     ...     "x": u.Q(jnp.array([0.0, 1.0, 2.0]), "m"),
     ...     "y": u.Q(jnp.array([0.0, 0.5, 1.0]), "m"),
@@ -672,8 +675,11 @@ def walk_local_flow(
     ...     "x": u.Q(jnp.array([1.0, 1.0, 1.0]), "m/s"),
     ...     "y": u.Q(jnp.array([0.5, 0.5, 0.5]), "m/s"),
     ... }
-    >>> result = walk_local_flow(
-    ...     q, p, start_idx=0, metric_scale=u.Q(1.0, "m"), usys=u.unitsystems.si
+    >>> result = pcf.order(
+    ...     q,
+    ...     p,
+    ...     pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(1.0, "m")),
+    ...     metadata=pcf.StateMetadata(usys=u.unitsystems.si),
     ... )
     >>> result
     WalkLocalFlowResult(
@@ -710,7 +716,7 @@ def walk_local_flow(
     # Quaxify the walk_local_flow so Quantities are handled properly
     # by custom dispatches in the quax context. StateMetadata is part of init
     # so the scan_p handler can dispatch on it directly.
-    result: WalkLocalFlowResult = quax.quaxify(_walk_local_flow)(
+    result: WalkLocalFlowResult = quax.quaxify(_local_flow_walk_plain)(
         q_values,
         p_values,
         start_idx=start_idx,
@@ -825,7 +831,7 @@ def order(
     def _as_length_q(val: object) -> AbcQ:
         return val if isinstance(val, u.AbstractQuantity) else u.Q(val, usys["length"])
 
-    return algorithm.walk_local_flow(
+    return algorithm._local_flow_walk(  # noqa: SLF001
         positions,
         velocities,
         start_idx=self.start_idx,
