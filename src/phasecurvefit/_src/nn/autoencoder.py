@@ -3,7 +3,7 @@
 __all__: tuple[str, ...] = (
     "PathAutoencoder",
     "PathAutoencoderTrainer",
-    "stream_membership",
+    "posterior_membership",
     "train_autoencoder",
     "TrainingConfig",
 )
@@ -28,7 +28,7 @@ from .abstractautoencoder import AbstractAutoencoder
 from .externaldecoder import RunningMeanDecoder
 from .membership import (
     MixtureMembershipConfig,
-    StreamWidthNet,
+    WidthNet,
     membership_rampup,
     membership_responsibility,
     mixture_membership_loss,
@@ -76,13 +76,13 @@ class PathAutoencoder(AbstractAutoencoder):
     decoder: AbstractTrackNet
     normalizer: AbstractNormalizer
 
-    width: StreamWidthNet | None = None
-    r"""Stream half-width $\sigma(\gamma)$, or None.
+    width: WidthNet | None = None
+    r"""Foreground half-width $\sigma(\gamma)$ (e.g. a stream's), or None.
 
     Present only when the autoencoder was trained with mixture-model membership
     (see `MixtureMembershipConfig`). It is kept on the model because it is needed
     at *inference* to turn the encoder's prior membership $\pi$ into a calibrated
-    posterior; see `stream_membership`.
+    posterior; see `posterior_membership`.
     """
 
     __citation__: ClassVar[str] = (
@@ -403,7 +403,7 @@ class TrainingConfig:
 
 
 @eqx.filter_jit
-def stream_membership(
+def posterior_membership(
     model: PathAutoencoder,
     ws: Float[Array, "N TwoF"],
     /,
@@ -411,9 +411,11 @@ def stream_membership(
     background_density: float | None = None,
     key: PRNGKeyArray | None = None,
 ) -> FSzN:
-    r"""Posterior probability that each star belongs to the stream.
+    r"""Posterior probability that each point belongs to the foreground component.
 
-    This is the number you want when deciding which stars are members. It is
+    The foreground is whatever the model fits a track through -- a stream is the
+    running example. This is the number you want when deciding which points are
+    members. It is
     **not** the encoder's raw ``prob`` output: that is only the *prior* $\pi_n$,
     formed from the star's phase-space coordinates before the model has looked at
     how far the star actually landed from the fitted track. This function folds
@@ -456,7 +458,7 @@ def stream_membership(
     """
     if model.width is None:
         msg = (
-            "stream_membership requires a model trained with mixture membership "
+            "posterior_membership requires a model trained with mixture membership "
             "(TrainingConfig(membership=MixtureMembershipConfig(...))). "
             "Without it there is no fitted stream width, and the encoder's `prob` "
             "output is an uncalibrated classifier score, not a posterior."
@@ -517,7 +519,7 @@ def _mixture_decoder_loss(
 
     """
     if model.width is None:  # pragma: no cover - guarded by the caller
-        msg = "mixture membership requires `model.width` to be a StreamWidthNet."
+        msg = "mixture membership requires `model.width` to be a WidthNet."
         raise ValueError(msg)
 
     D = ws.shape[1] // 2
@@ -978,7 +980,7 @@ def train_ordering_and_track_net(
         weights = compute_weights(model.encoder, all_ws)
 
     # Mixture-model membership is opt-in. When enabled the model must carry a
-    # `StreamWidthNet`, and the background density is fixed once, from the
+    # `WidthNet`, and the background density is fixed once, from the
     # field.  This must happen *before* `filter_spec` is built, since a
     # boolean-pytree filter has to match the model's structure exactly.
     membership = config.membership

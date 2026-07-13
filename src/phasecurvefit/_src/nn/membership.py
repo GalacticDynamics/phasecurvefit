@@ -66,7 +66,7 @@ only a few stream-widths off the track, the likelihood is happier inflating
 $\sigma$ to swallow them than lowering their $\pi_n$ -- and you detect nothing.
 Two defences, both implemented here:
 
-- **$\sigma$ is a function of $\gamma$** (`StreamWidthNet`), so a stream that
+- **$\sigma$ is a function of $\gamma$** (`WidthNet`), so a stream that
   fans out towards its ends does not force a single compromise width that is too
   wide everywhere else.
 - **$\sigma$ is annealed from above** (`sigma_ceiling`). Training starts with a
@@ -88,7 +88,7 @@ Streams and Machine Learning." ApJ 940, 22.
 
 __all__: tuple[str, ...] = (
     "MixtureMembershipConfig",
-    "StreamWidthNet",
+    "WidthNet",
     "membership_rampup",
     "membership_responsibility",
     "mixture_membership_loss",
@@ -125,11 +125,12 @@ _LOG_SIGMA_MAX: float = 20.0
 _LOG_SIGMA_MIN: float = -20.0
 
 
-class StreamWidthNet(eqx.Module):
-    r"""Stream half-width $\sigma$ as a function of the ordering parameter.
+class WidthNet(eqx.Module):
+    r"""Width $\sigma$ of the foreground component along the ordering parameter.
 
-    Real streams are not of uniform width: they are typically narrow near the
-    progenitor and fan out towards the tidal tails. A single scalar $\sigma$
+    The foreground density need not have a uniform width. A stream, for example,
+    is typically narrow near the progenitor and fans out towards the tidal
+    tails; the same is true of many curved distributions. A single scalar $\sigma$
     forces one compromise, which is both a worse fit and -- more importantly --
     a worse *outlier detector*, because the compromise width is too generous
     wherever the stream is genuinely thin.
@@ -171,7 +172,7 @@ class StreamWidthNet(eqx.Module):
     >>> import jax.random as jr
     >>> import phasecurvefit as pcf
 
-    >>> width = pcf.nn.StreamWidthNet(sigma_init=0.2, key=jr.key(0))
+    >>> width = pcf.nn.WidthNet(sigma_init=0.2, key=jr.key(0))
 
     At initialisation the predicted width is close to ``sigma_init`` everywhere:
 
@@ -472,7 +473,7 @@ def uniform_background_density(
     rho_bg : Array, scalar
         Background density, in units of (length)^-D. Returned as a 0-d array so
         that it stays trace-transparent under ``jit`` (e.g. inside
-        `stream_membership`); use ``float(...)`` if you need a Python scalar.
+        `posterior_membership`); use ``float(...)`` if you need a Python scalar.
 
     Examples
     --------
@@ -504,7 +505,7 @@ def uniform_background_density(
     return 1.0 / jnp.prod(extent)
 
 
-def _log_stream_density(r2: FSzN, sigma: FSzN, n_dims: int) -> FSzN:
+def _log_foreground_density(r2: FSzN, sigma: FSzN, n_dims: int) -> FSzN:
     r"""Log isotropic Gaussian stream density, $\log \mathcal{N}(r; 0, \sigma^2 I)$."""
     return (
         -0.5 * r2 / jnp.square(sigma)
@@ -579,7 +580,7 @@ def membership_responsibility(
 
     """
     prob = jnp.clip(prob, _EPS, 1.0 - _EPS)
-    log_fg = jnp.log(prob) + _log_stream_density(r2, sigma, n_dims)
+    log_fg = jnp.log(prob) + _log_foreground_density(r2, sigma, n_dims)
     log_bg = jnp.log1p(-prob) + log_bg_density
     # exp(log_fg - logaddexp(log_fg, log_bg)) == sigmoid(log_fg - log_bg), but
     # the sigmoid form is the numerically stable one.
@@ -688,7 +689,7 @@ def mixture_membership_loss(
     prob_eff = 1.0 - jnp.asarray(rampup) * (1.0 - prob)
     prob_eff = jnp.clip(prob_eff, _EPS, 1.0 - _EPS)
 
-    log_fg = jnp.log(prob_eff) + _log_stream_density(r2, sigma, n_dims)
+    log_fg = jnp.log(prob_eff) + _log_foreground_density(r2, sigma, n_dims)
     log_bg = jnp.log1p(-prob_eff) + log_bg_density
 
     log_like = jnp.logaddexp(log_fg, log_bg)
@@ -724,7 +725,7 @@ class MixtureMembershipConfig:
     Attributes
     ----------
     sigma_init : float
-        Stream half-width the `StreamWidthNet` is initialised to predict. Set it
+        Stream half-width the `WidthNet` is initialised to predict. Set it
         to your best guess at the stream width, in the *normalised* coordinates
         the networks see (`StandardScalerNormalizer` makes this roughly "in units
         of the field's standard deviation").
@@ -750,7 +751,7 @@ class MixtureMembershipConfig:
         Passed to `uniform_background_density` when ``background_density`` is
         None. Increase if the observed stars do not fill the survey footprint.
     width_size, depth : int
-        Architecture of the `StreamWidthNet`.
+        Architecture of the `WidthNet`.
     lambda_velocity : float
         Weight on the velocity-alignment term, which is reweighted by the
         posterior responsibility so that outliers cannot drag the track's
@@ -815,9 +816,9 @@ class MixtureMembershipConfig:
             msg = f"warmup_frac must be in [0, 1), got {self.warmup_frac}."
             raise ValueError(msg)
 
-    def make_width_net(self, *, key: PRNGKeyArray) -> StreamWidthNet:
-        """Build the `StreamWidthNet` this config describes."""
-        return StreamWidthNet(
+    def make_width_net(self, *, key: PRNGKeyArray) -> WidthNet:
+        """Build the `WidthNet` this config describes."""
+        return WidthNet(
             width_size=self.width_size,
             depth=self.depth,
             sigma_init=self.sigma_init,

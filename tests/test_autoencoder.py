@@ -729,8 +729,8 @@ class TestEdgeCases:
         assert len(losses) == config.n_epochs
 
 
-class TestStreamMembership:
-    """Tests for the `stream_membership` posterior-membership API."""
+class TestPosteriorMembership:
+    """Tests for the `posterior_membership` inference API."""
 
     @staticmethod
     def _model_with_width(key: PRNGKeyArray) -> pcf.nn.PathAutoencoder:
@@ -767,7 +767,7 @@ class TestStreamMembership:
             normalizer, gamma_range=(0.0, 1.0), key=rng_key
         )
         with pytest.raises(ValueError, match="mixture membership"):
-            pcf.nn.stream_membership(ae, self._make_ws())
+            pcf.nn.posterior_membership(ae, self._make_ws())
 
     def test_default_background_density_under_jit(self, rng_key: PRNGKeyArray):
         """Default `background_density=None` must work under `filter_jit`.
@@ -777,7 +777,7 @@ class TestStreamMembership:
         tracer and makes the documented default unusable in compiled code.
         """
         model = self._model_with_width(rng_key)
-        q = pcf.nn.stream_membership(model, self._make_ws())
+        q = pcf.nn.posterior_membership(model, self._make_ws())
         assert q.shape == (8,)
         assert bool(jnp.all(q >= 0.0))
         assert bool(jnp.all(q <= 1.0))
@@ -785,7 +785,7 @@ class TestStreamMembership:
     def test_explicit_background_density(self, rng_key: PRNGKeyArray):
         """An explicit density gives a posterior of the same shape."""
         model = self._model_with_width(rng_key)
-        q = pcf.nn.stream_membership(model, self._make_ws(), background_density=0.5)
+        q = pcf.nn.posterior_membership(model, self._make_ws(), background_density=0.5)
         assert q.shape == (8,)
         assert bool(jnp.all(q >= 0.0))
         assert bool(jnp.all(q <= 1.0))

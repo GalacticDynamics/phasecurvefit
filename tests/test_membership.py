@@ -16,7 +16,7 @@ import pytest
 import phasecurvefit as pcf
 from phasecurvefit.nn import (
     MixtureMembershipConfig,
-    StreamWidthNet,
+    WidthNet,
     membership_rampup,
     membership_responsibility,
     mixture_membership_loss,
@@ -25,15 +25,15 @@ from phasecurvefit.nn import (
 )
 
 # ============================================================
-# StreamWidthNet
+# WidthNet
 
 
-class TestStreamWidthNet:
+class TestWidthNet:
     """The gamma-dependent stream width network."""
 
     def test_initialises_near_sigma_init(self) -> None:
         """The net is constructed to predict ~sigma_init everywhere."""
-        net = StreamWidthNet(sigma_init=0.25, key=jr.key(0))
+        net = WidthNet(sigma_init=0.25, key=jr.key(0))
         gammas = jnp.linspace(-1.0, 1.0, 32)
         sigmas = jax.vmap(net)(gammas)
 
@@ -42,7 +42,7 @@ class TestStreamWidthNet:
 
     def test_strictly_positive(self) -> None:
         """Widths must never be <= 0, whatever the weights."""
-        net = StreamWidthNet(sigma_init=0.1, sigma_min=1e-3, key=jr.key(1))
+        net = WidthNet(sigma_init=0.1, sigma_min=1e-3, key=jr.key(1))
         # Perturb the weights hard; positivity is structural (exp + floor).
         net = jax.tree_util.tree_map(lambda x: x - 50.0 if eqx.is_array(x) else x, net)
         sigmas = jax.vmap(net)(jnp.linspace(-5.0, 5.0, 64))
@@ -52,7 +52,7 @@ class TestStreamWidthNet:
 
     def test_can_vary_along_track(self) -> None:
         """After training, sigma(gamma) is genuinely gamma-dependent."""
-        net = StreamWidthNet(sigma_init=0.1, key=jr.key(2))
+        net = WidthNet(sigma_init=0.1, key=jr.key(2))
         gammas = jnp.linspace(-1.0, 1.0, 64)
         # Target: width doubles along the track (a fanning stream).
         target = 0.1 + 0.1 * (gammas + 1) / 2
@@ -75,7 +75,7 @@ class TestStreamWidthNet:
     def test_rejects_nonpositive_sigma_init(self, bad: float) -> None:
         """A non-positive initial width is meaningless."""
         with pytest.raises(ValueError, match="sigma_init must be positive"):
-            StreamWidthNet(sigma_init=bad, key=jr.key(0))
+            WidthNet(sigma_init=bad, key=jr.key(0))
 
 
 # ============================================================

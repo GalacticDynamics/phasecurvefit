@@ -164,12 +164,12 @@ Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
    :no-index:
    :members:
 
-.. autoclass:: phasecurvefit.nn.StreamWidthNet
+.. autoclass:: phasecurvefit.nn.WidthNet
    :no-index:
    :members: __call__
    :show-inheritance:
 
-.. autofunction:: phasecurvefit.nn.stream_membership
+.. autofunction:: phasecurvefit.nn.posterior_membership
    :no-index:
 
 .. autofunction:: phasecurvefit.nn.mixture_membership_loss

@@ -115,13 +115,13 @@ Then get **calibrated** membership out — note this is *not* the encoder's raw
 
 <!-- skip: next -->
 ```{code-block} python
-q = pcf.nn.stream_membership(model, ws)   # posterior, in [0, 1]
+q = pcf.nn.posterior_membership(model, ws)   # posterior, in [0, 1]
 members = q > 0.5
 ```
 
 `prob` is only the *prior* $\pi_n$: what the encoder believes from the star's
 coordinates alone, before seeing how far it landed from the track.
-`stream_membership` folds in the residual and returns the posterior $\hat{q}_n$.
+`posterior_membership` folds in the residual and returns the posterior $\hat{q}_n$.
 That is the number you want. Hogg et al. recommend keeping it as a weight rather
 than thresholding at all.
 
