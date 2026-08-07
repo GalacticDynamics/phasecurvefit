@@ -53,7 +53,11 @@ extensions = [
     "sphinx-prompt",
     "sphinxext.opengraph",
     "sphinx_togglebutton",
+    "sphinxcontrib.bibtex",
 ]
+
+bibtex_bibfiles = ["paper.bib"]
+bibtex_default_style = "plain"
 
 python_use_unqualified_type_names = True
 
