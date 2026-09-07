@@ -11,13 +11,8 @@ class TestMetricsAndStrategiesBenchmarks:
         pos, vel = simple_2d_stream
 
         # Default strategy is BruteForce, spatial metric via metric_scale=0
-        result = benchmark(
-            pcf.walk_local_flow,
-            pos,
-            vel,
-            start_idx=0,
-            metric_scale=0.0,
-        )
+        orderer = pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=0.0)
+        result = benchmark(orderer.order, pos, vel)
 
         assert result.indices.shape == (50,)
 
@@ -28,13 +23,8 @@ class TestMetricsAndStrategiesBenchmarks:
         pos, vel = simple_2d_stream
 
         # Full phase-space metric is the default with metric_scale > 0
-        result = benchmark(
-            pcf.walk_local_flow,
-            pos,
-            vel,
-            start_idx=0,
-            metric_scale=1.0,
-        )
+        orderer = pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+        result = benchmark(orderer.order, pos, vel)
 
         assert result.indices.shape == (50,)
 
@@ -43,13 +33,9 @@ class TestMetricsAndStrategiesBenchmarks:
         pos, vel = simple_2d_stream
 
         config = pcf.WalkConfig(metric=pcf.metrics.AlignedMomentumDistanceMetric())
-        result = benchmark(
-            pcf.walk_local_flow,
-            pos,
-            vel,
-            start_idx=0,
-            metric_scale=1.0,
-            config=config,
+        orderer = pcf.orderers.LocalFlowOrderer(
+            start_idx=0, metric_scale=1.0, config=config
         )
+        result = benchmark(orderer.order, pos, vel)
 
         assert result.indices.shape == (50,)
