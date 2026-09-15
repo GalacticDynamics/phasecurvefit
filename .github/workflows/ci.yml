@@ -22,7 +22,7 @@ env:
 
 jobs:
   pre-commit:
-    name: Pre-commit Checks
+    name: Prek Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5.5.0
@@ -33,7 +33,7 @@ jobs:
       - name: Install
         run: uv sync --no-default-groups --group nox --group lint --locked
 
-      - name: Run pre-commit
+      - name: Run prek
         run: uv run --frozen nox -s precommit
 
   tests:

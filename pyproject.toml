@@ -81,7 +81,7 @@ docs = [
   "jaxkd>=0.0.5",
   "galax",
 ]
-lint = ["cz-conventional-gitmoji>=0.6.1", "pre-commit>=4.1.0", "pylint>=3.3.8"]
+lint = ["cz-conventional-gitmoji>=0.6.1", "prek>=0.5.3", "pylint>=3.3.8"]
 nox = ["nox>=2024.10.9", "nox-uv>=0.6.3"]
 test = [
   "beartype>=0.21.0",
