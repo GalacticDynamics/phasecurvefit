@@ -55,6 +55,7 @@ from phasecurvefit._src.orderers.localflow import (
 )
 from phasecurvefit._src.orderers.mst import MSTOrderer
 from phasecurvefit._src.orderers.result import OrderingResult
+from phasecurvefit._src.orderers.som import SOMOrderer
 from phasecurvefit._src.query_config import WalkConfig
 
 RQSz0: TypeAlias = Real[AbcQ, " "]  # noqa: UP040
@@ -821,6 +822,44 @@ def order(
         velocities=dict(velocities),
         backbone=backbone,
         chord=u.uconvert(position_unit, u.Q(result.chord, length_unit)),
+    )
+
+
+@SOMOrderer.order.dispatch
+def order(
+    self: SOMOrderer,
+    positions: VectorQComponents,
+    velocities: VectorQComponents,
+    *,
+    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    init: AbstractResult | None = None,
+) -> OrderingResult:
+    """Order Quantity-valued tracers with the SOM.
+
+    Strips units into ``usys``, runs the SOM pipeline, and reattaches units:
+    ``positions``/``velocities`` keep their input units, while ``backbone`` and
+    ``chord`` -- both lengths along the track -- are returned in the position
+    units.
+    """
+    usys = _require_usys(metadata)
+    q_plain = {k: u.ustrip(usys, v) for k, v in positions.items()}
+    p_plain = {k: u.ustrip(usys, v) for k, v in velocities.items()}
+
+    result = self.order(q_plain, p_plain, metadata=metadata, init=init)
+
+    length_unit = usys["length"]
+    position_unit = positions[next(iter(sorted(positions)))].unit
+    backbone = {
+        k: u.uconvert(positions[k].unit, u.Q(v, length_unit))
+        for k, v in result.backbone.items()
+    }
+    chord = u.uconvert(position_unit, u.Q(result.chord, length_unit))
+    return dataclassish.replace(
+        result,
+        positions=dict(positions),
+        velocities=dict(velocities),
+        backbone=backbone,
+        chord=chord,
     )
 
 
