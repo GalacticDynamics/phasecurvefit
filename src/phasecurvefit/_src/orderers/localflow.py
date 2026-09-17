@@ -9,6 +9,7 @@ import plum
 import dataclassish
 
 from .base import AbstractOrderer, chord_along_ordering
+from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import (
     Direction,
     StateMetadata,
@@ -74,6 +75,7 @@ class LocalFlowOrderer(AbstractOrderer):
         velocities: VectorComponents,
         *,
         metadata: StateMetadata | None = None,
+        init: AbstractResult | None = None,  # noqa: ARG002
     ) -> WalkLocalFlowResult:
         """Run the local-flow walk and return its result."""
         kwargs: dict[str, object] = {}

@@ -40,8 +40,9 @@ from scipy.sparse.csgraph import (
 )
 from scipy.spatial import cKDTree
 
-from .base import AbstractOrderer, chord_along_ordering
+from .base import AbstractOrderer, _check_component_keys, chord_along_ordering
 from .result import OrderingResult
+from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
 
@@ -379,16 +380,10 @@ class MSTOrderer(AbstractOrderer):
         velocities: VectorComponents,
         *,
         metadata: StateMetadata | None = None,  # noqa: ARG002
+        init: AbstractResult | None = None,  # noqa: ARG002
     ) -> OrderingResult:
         """Order tracers along the MST backbone (host-side)."""
-        if set(positions) != set(velocities):
-            missing = sorted(set(positions) - set(velocities))
-            extra = sorted(set(velocities) - set(positions))
-            msg = (
-                "positions and velocities must have the same component keys; "
-                f"missing={missing}, extra={extra}."
-            )
-            raise ValueError(msg)
+        _check_component_keys(positions, velocities)
 
         comps = sorted(positions)
         P = np.stack([np.asarray(positions[c]) for c in comps], axis=1)
