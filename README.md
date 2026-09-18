@@ -375,6 +375,20 @@ config = pcf.WalkConfig(strategy=SmallestIndexStrategy())
 result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
 
+## Citation
+
+If you use `phasecurvefit` in published work, please cite the package (see the
+[GitHub repository](https://github.com/GalacticDynamics/phasecurvefit) for the
+current format) together with the paper behind whichever component you used:
+
+- **momentum-weighted ordering** — Nibauer et al. (2022),
+  [arXiv:2201.12042](https://arxiv.org/abs/2201.12042)
+- **mixture-model membership / outlier rejection** — Hogg, Bovy & Lang (2010),
+  [arXiv:1008.4686](https://arxiv.org/abs/1008.4686)
+
+Machine-readable metadata for all of these is in [`CITATION.cff`](CITATION.cff);
+BibTeX entries are in the [documentation](https://phasecurvefit.readthedocs.io).
+
 ## AI Usage Disclosure
 
 Portions of this codebase (including tests and documentation) were refactored
