@@ -182,3 +182,23 @@ def test_quantity_localflow_takes_its_start_from_init():
         | pcf.orderers.LocalFlowOrderer()
     ).order(q, p, metadata=md)
     assert int(np.asarray(chained.ordering)[0]) == int(np.asarray(prior.ordering)[0])
+
+
+@pytest.mark.parametrize(
+    ("scale", "expected"),
+    [(u.Q(4, "s"), True), (u.Q(0, "s"), False)],
+    ids=["non-zero", "zero"],
+)
+def test_quantity_localflow_reports_velocity_awareness(scale, expected):
+    """The Quantity path must set ``velocity_aware`` like the plain one.
+
+    It reaches ``_local_flow_walk`` directly rather than through the plain-array
+    dispatch, so the flag has to be set in both places or a chained SOMOrderer
+    silently drops back to position-only on unit-ful input.
+    """
+    q, p = _arc_quantity()
+    usys = u.unitsystems.galactic
+    result = pcf.orderers.LocalFlowOrderer(metric_scale=scale).order(
+        q, p, metadata=StateMetadata(usys=usys)
+    )
+    assert result.velocity_aware is expected

@@ -134,4 +134,17 @@ class LocalFlowOrderer(AbstractOrderer):
             direction=self.direction,
             **kwargs,
         )
-        return _with_chord(result)
+        # The walk steps along the flow, so any non-zero scale means velocity
+        # informed the ordering. ``velocity_aware`` is static, so it must hold a
+        # concrete bool: ``metric_scale`` is a differentiable leaf, and under
+        # ``jit``/``grad`` it is a tracer. Differentiating with respect to it
+        # means velocity is in play, so a tracer reads as velocity-aware.
+        try:
+            aware = bool(self.metric_scale != 0.0)
+        except TypeError:
+            aware = True
+        return dataclassish.replace(
+            result,
+            chord=chord_along_ordering(result.positions, result.indices),
+            velocity_aware=aware,
+        )

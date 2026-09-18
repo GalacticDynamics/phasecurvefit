@@ -1,5 +1,8 @@
 """Tests for SOMOrderer."""
 
+import warnings
+
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -213,19 +216,27 @@ def test_orient_by_velocity_keeps_backbone_and_ordering_in_step(sign):
     assert abs(hi - last_x) < abs(hi - first_x)
 
 
-def test_som_orderer_rejects_a_scale_the_default_metric_ignores():
-    """A non-zero scale with SpatialDistanceMetric is a silent no-op; fail loudly.
-
-    The default metric discards ``metric_scale`` outright, so a caller who sets
-    one is asking for velocity to participate and would get nothing.
-    """
+def test_som_orderer_rejects_a_scale_the_chosen_metric_ignores():
+    """A non-zero scale with an explicit SpatialDistanceMetric is a silent no-op."""
     with pytest.raises(ValueError, match="no effect with SpatialDistanceMetric"):
-        pcf.orderers.SOMOrderer(metric_scale=0.2)
+        pcf.orderers.SOMOrderer(
+            metric=pcf.metrics.SpatialDistanceMetric(), metric_scale=0.2
+        )
 
     # The documented remedy constructs fine.
     pcf.orderers.SOMOrderer(
         metric=pcf.metrics.FullPhaseSpaceDistanceMetric(), metric_scale=0.2
     )
+
+
+def test_a_bare_scale_selects_a_metric_that_uses_it():
+    """Ask for velocity with no metric; the scale must reach one that uses it."""
+    pos, vel = _arc()
+    metric, scale = pcf.orderers.SOMOrderer(metric_scale=0.2)._resolve_metric(
+        pos, vel, None
+    )
+    assert isinstance(metric, pcf.metrics.FullPhaseSpaceDistanceMetric)
+    assert scale == 0.2
 
 
 def _max_coverage_gap(proto, pos, keys=("x", "y")):
@@ -282,7 +293,7 @@ def test_fit_with_the_default_metric_covers_the_data():
         pp,
         pos,
         vel,
-        metric=orderer.metric,
+        metric=orderer._resolve_metric(pos, vel, None)[0],
         metric_scale=orderer.metric_scale,
         n_epochs=50,
     )
@@ -304,7 +315,8 @@ def test_som_orderer_default_metric_is_symmetric():
     ``AlignedMomentumDistanceMetric`` too and guards nothing.
     """
     orderer = pcf.orderers.SOMOrderer()
-    assert isinstance(orderer.metric, pcf.metrics.SpatialDistanceMetric)
+    resolved, _ = orderer._resolve_metric(*_arc(), None)
+    assert isinstance(resolved, pcf.metrics.SpatialDistanceMetric)
 
     a_pos = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
     a_vel = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
@@ -317,7 +329,7 @@ def test_som_orderer_default_metric_is_symmetric():
         bwd = float(metric(b_pos, b_vel, as_arr(a_pos), as_arr(a_vel), scale)[0])
         return fwd, bwd
 
-    for metric in (orderer.metric, pcf.metrics.FullPhaseSpaceDistanceMetric()):
+    for metric in (resolved, pcf.metrics.FullPhaseSpaceDistanceMetric()):
         fwd, bwd = probe(metric, 0.5)
         assert fwd == pytest.approx(bwd, rel=1e-6)
 
@@ -369,3 +381,168 @@ def test_chained_som_preserves_the_prior_ordering():
     ranks[order] = np.arange(order.shape[0])
     rho = spearmanr(ranks, truth).statistic
     assert abs(rho) > 0.95
+
+
+def _epitrochoid(n=700, noise=6.0, seed=3, scale=120.0, big=5.0, small=1.0, d=4.5):
+    """Build a self-intersecting epitrochoid: many lobes, crossing branches.
+
+    At a crossing the two branches are spatially coincident and differ only in
+    velocity, so a position-only metric cannot tell them apart.
+    """
+    rng = np.random.default_rng(seed)
+    t = np.linspace(np.deg2rad(5), np.deg2rad(355), n)
+    ratio = (big + small) / small
+    x = scale * ((big + small) * np.cos(t) - d * np.cos(ratio * t)) / 5.0
+    y = scale * ((big + small) * np.sin(t) - d * np.sin(ratio * t)) / 5.0
+    dx = scale * (-(big + small) * np.sin(t) + d * ratio * np.sin(ratio * t)) / 5.0
+    dy = scale * ((big + small) * np.cos(t) - d * ratio * np.cos(ratio * t)) / 5.0
+    x = x + rng.normal(0, noise, n)
+    y = y + rng.normal(0, noise, n)
+    perm = rng.permutation(n)
+    return (
+        {"x": jnp.asarray(x)[perm], "y": jnp.asarray(y)[perm]},
+        {"x": jnp.asarray(dx)[perm], "y": jnp.asarray(dy)[perm]},
+        t[perm],
+    )
+
+
+def _epitrochoid_mst():
+    """Return the epitrochoid with the velocity-aware MST it needs.
+
+    The jump cap is scaled to the data's own nearest-neighbour spacing.
+    """
+    from scipy.spatial import cKDTree
+
+    pos, vel, truth = _epitrochoid()
+    d = np.stack([np.asarray(pos["x"]), np.asarray(pos["y"])], axis=1)
+    med = float(np.median(cKDTree(d).query(d, k=2)[0][:, 1]))
+    base = pcf.orderers.MSTOrderer(
+        k=16,
+        jump_cap=8.0 * med,
+        sever_cos_threshold=0.9,
+        orient_by_velocity=True,
+        on_disconnected="largest",
+    )
+    return pos, vel, truth, base
+
+
+class TestVelocityAwarePropagation:
+    """A velocity-aware prior stage must make the SOM velocity-aware too."""
+
+    def test_mst_reports_velocity_awareness(self):
+        """Only the settings that steer the ordering count, not orient_by_velocity."""
+        pos, vel = _arc()
+        plain = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0)
+        assert plain.order(pos, vel).velocity_aware is False
+        for kw in ({"sever_cos_threshold": 0.9}, {"velocity_weight": 0.5}):
+            orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, **kw)
+            assert orderer.order(pos, vel).velocity_aware is True
+        oriented = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, orient_by_velocity=True)
+        assert oriented.order(pos, vel).velocity_aware is False
+
+    def test_localflow_reports_velocity_awareness(self):
+        """The walk steps along the flow, so any non-zero scale is velocity-aware."""
+        pos, vel = _arc()
+        assert pcf.orderers.LocalFlowOrderer().order(pos, vel).velocity_aware is True
+        zero = pcf.orderers.LocalFlowOrderer(metric_scale=0.0)
+        assert zero.order(pos, vel).velocity_aware is False
+
+    def test_som_follows_a_velocity_aware_init(self):
+        """The resolved metric tracks ``init``, and an explicit choice still wins."""
+        pos, vel = _arc()
+        som = pcf.orderers.SOMOrderer(n_prototypes=20)
+        plain = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0).order(pos, vel)
+        velaware = pcf.orderers.MSTOrderer(
+            k=8, jump_cap=3.0, sever_cos_threshold=0.9
+        ).order(pos, vel)
+
+        metric, scale = som._resolve_metric(pos, vel, plain)
+        assert isinstance(metric, pcf.metrics.SpatialDistanceMetric)
+        assert scale == 0.0
+
+        metric, scale = som._resolve_metric(pos, vel, velaware)
+        assert isinstance(metric, pcf.metrics.FullPhaseSpaceDistanceMetric)
+        assert scale > 0.0
+
+        explicit = pcf.orderers.SOMOrderer(
+            n_prototypes=20, metric=pcf.metrics.SpatialDistanceMetric()
+        )
+        metric, scale = explicit._resolve_metric(pos, vel, velaware)
+        assert isinstance(metric, pcf.metrics.SpatialDistanceMetric)
+
+    def test_standalone_som_stays_position_only(self):
+        """With no ``init`` there is nothing to follow, so the default is unchanged."""
+        pos, vel = _arc()
+        som = pcf.orderers.SOMOrderer(n_prototypes=20)
+        metric, scale = som._resolve_metric(pos, vel, None)
+        assert isinstance(metric, pcf.metrics.SpatialDistanceMetric)
+        assert scale == 0.0
+
+    def test_velocity_awareness_survives_the_crossings(self):
+        """The whole point: the chain must not re-conflate the crossed branches."""
+        pos, vel, truth, base = _epitrochoid_mst()
+        rho_base = _spearman(base.order(pos, vel), truth)
+        chained = (base | pcf.orderers.SOMOrderer(n_prototypes=40)).order(pos, vel)
+        # Position-only is what the SOM did before it followed ``init``.
+        position_only = (
+            base
+            | pcf.orderers.SOMOrderer(
+                n_prototypes=40, metric=pcf.metrics.SpatialDistanceMetric()
+            )
+        ).order(pos, vel)
+        rho_auto = _spearman(chained, truth)
+        rho_pos = _spearman(position_only, truth)
+        assert rho_pos < rho_base - 0.2, "fixture no longer exercises the failure"
+        assert rho_auto > rho_pos + 0.2
+        assert rho_auto >= rho_base
+
+
+def _spearman(result, truth):
+    idx = np.asarray(result.ordering)
+    return abs(spearmanr(truth[idx], np.arange(idx.size)).statistic)
+
+
+def test_som_warns_when_it_overhauls_the_prior_ordering():
+    """A lattice too coarse for the curve tangles it; that must not be silent."""
+    pos, vel = _tight_helix()
+    base = pcf.orderers.MSTOrderer(
+        k=8, jump_cap=1.0, on_disconnected="largest", sever_cos_threshold=0.9
+    )
+    prior = base.order(pos, vel)
+    som = pcf.orderers.SOMOrderer(n_prototypes=3)
+    rng = np.random.default_rng(0)
+    lam = jnp.asarray(rng.permutation(int((prior.indices >= 0).sum())).astype(float))
+    sub = {k: v[prior.ordering] for k, v in pos.items()}
+    with pytest.warns(UserWarning, match="disagrees with the one it was given"):
+        som._warn_if_disagrees(lam, sub, prior)
+
+
+def test_som_is_quiet_when_it_agrees_with_the_prior_ordering():
+    """The warning must not fire on the ordinary case of a small refinement."""
+    pos, vel = _arc()
+    base = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, sever_cos_threshold=0.9)
+    prior = base.order(pos, vel)
+    som = pcf.orderers.SOMOrderer(n_prototypes=40)
+    sub = {k: v[prior.ordering] for k, v in pos.items()}
+    lam = jnp.arange(int((prior.indices >= 0).sum()), dtype=jnp.float32)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        som._warn_if_disagrees(lam, sub, prior)
+
+
+def test_velocity_aware_stays_concrete_under_grad():
+    """``metric_scale`` is differentiable, so the static flag must not trace it."""
+    pos = {"x": jnp.array([0.0, 1.0, 2.0, 3.0])}
+    vel = {"x": jnp.array([1.0, 1.1, 1.2, 1.3])}
+
+    def loss(metric_scale):
+        result = pcf.order(
+            pos,
+            vel,
+            pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=metric_scale),
+        )
+        return jnp.sum(result.indices.astype(jnp.float32))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        jax.grad(loss)(1.0)

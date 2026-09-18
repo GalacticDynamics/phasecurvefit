@@ -415,4 +415,8 @@ class MSTOrderer(AbstractOrderer):
             gamma_range=(-1.0, 1.0),
             backbone=backbone,
             chord=chord_along_ordering(qs, idx),
+            # ``orient_by_velocity`` only picks a direction; it does not make
+            # the ordering itself velocity-aware.
+            velocity_aware=self.velocity_weight > 0.0
+            or self.sever_cos_threshold is not None,
         )

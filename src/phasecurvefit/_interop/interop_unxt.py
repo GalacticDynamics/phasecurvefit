@@ -695,7 +695,8 @@ def _local_flow_walk(
       },
       indices=i32[3],
       gamma_range=(0.0, 1.0),
-      chord=Quantity(f32[3], unit='m')
+      chord=Quantity(f32[3], unit='m'),
+      velocity_aware=True
     )
 
     """
@@ -903,6 +904,15 @@ def order(
     chord = chord_along_ordering(
         {k: u.ustrip(usys, v) for k, v in result.positions.items()}, result.indices
     )
+    # ``velocity_aware`` is static so it must hold a concrete bool, and
+    # ``metric_scale`` is a differentiable leaf: under ``jit``/``grad`` it is a
+    # tracer, and differentiating with respect to it means velocity is in play.
+    try:
+        aware = bool(self.metric_scale != 0.0)
+    except TypeError:
+        aware = True
     return dataclassish.replace(
-        result, chord=u.uconvert(position_unit, u.Q(chord, usys["length"]))
+        result,
+        chord=u.uconvert(position_unit, u.Q(chord, usys["length"])),
+        velocity_aware=aware,
     )

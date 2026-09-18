@@ -21,6 +21,7 @@ produced here.
 
 __all__: tuple[str, ...] = ("SOMOrderer",)
 
+import warnings
 from typing import ClassVar
 
 import equinox as eqx
@@ -35,8 +36,13 @@ from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
+    FullPhaseSpaceDistanceMetric,
     SpatialDistanceMetric,
 )
+
+# Rank correlation between the prior ordering and the refined one, below which
+# the disagreement is worth a warning. Empirical; see ``_warn_if_disagrees``.
+_DISAGREE_WARN = 0.5
 
 
 @eqx.filter_jit
@@ -47,6 +53,8 @@ def _train_and_project(
     sub_q: VectorComponents,
     sub_p: VectorComponents,
     sigma_start: float | None,
+    metric: AbstractDistanceMetric,
+    metric_scale: float,
 ) -> tuple[VectorComponents, VectorComponents, "jnp.ndarray"]:
     """Run fit -> densify -> chord as one XLA program.
 
@@ -58,8 +66,8 @@ def _train_and_project(
     model = _som.SOM1D(
         proto_q,
         proto_p,
-        orderer.metric,
-        metric_scale=orderer.metric_scale,
+        metric,
+        metric_scale=metric_scale,
         n_epochs=orderer.n_epochs,
         sigma_start=sigma_start,
         sigma_end=orderer.sigma_end,
@@ -80,28 +88,36 @@ class SOMOrderer(AbstractOrderer):
         at the cost of following noise; the paper finds results insensitive to
         the exact value above roughly 10 per distinct segment of the curve.
     metric
-        Phase-space distance metric used for best-matching-unit search and for
-        backbone assignment.
-    metric_scale
-        Scale parameter handed to ``metric``. The default ``metric``,
-        :class:`~phasecurvefit.metrics.SpatialDistanceMetric`, ignores it
-        entirely, and passing a non-zero value with that metric is rejected at
-        construction. For
-        :class:`~phasecurvefit.metrics.FullPhaseSpaceDistanceMetric` it is a
-        *time*, converting velocity differences into position units -- so its
-        correct value depends on your unit system, and there is no
-        unit-independent default. Defaults to ``0.0``, i.e. pure position
-        distance. Set it to make velocity participate, choosing a time such
-        that ``metric_scale * dv`` is
-        comparable to the position separations you want it to compete with.
-        Too large and "nearest prototype" becomes "nearest in velocity", which
-        on a winding curve conflates points a whole turn apart.
+        Phase-space distance metric for the best-matching-unit search and the
+        backbone assignment. ``None`` (the default) follows ``init``: after a
+        stage that used velocity it is
+        :class:`~phasecurvefit.metrics.FullPhaseSpaceDistanceMetric`, and
+        otherwise :class:`~phasecurvefit.metrics.SpatialDistanceMetric`.
+
+        Ordering on position alone after a stage that used velocity undoes that
+        stage's work: at a self-crossing the two branches are spatially
+        coincident and only their velocities differ, so a position-only SOM
+        re-conflates exactly what the earlier stage separated.
 
         ``metric`` must be symmetric in the two points it compares.
         :class:`~phasecurvefit.metrics.AlignedMomentumDistanceMetric` is not:
         it scores "forward along the direction of travel", which is what a
         greedy walk step needs and not what nearest-prototype means. Passing it
         collapses the lattice toward the curve's head.
+    metric_scale
+        Scale handed to ``metric``. ``None`` (the default) derives it as
+        ``sigma_phys / (2 |v|)`` when following a velocity-aware ``init``, and
+        is ``0.0`` otherwise. The derived value makes the velocity term
+        separate anti-parallel branches by about the distance the lattice can
+        already resolve.
+
+        Set it explicitly to override. It is a *time*, converting velocity
+        differences into position units, so its right value depends on your
+        unit system. Too large and "nearest prototype" becomes "nearest in
+        velocity", which on a winding curve conflates points a whole turn
+        apart. A non-zero value with
+        :class:`~phasecurvefit.metrics.SpatialDistanceMetric`, which ignores
+        it, is rejected at construction.
     n_epochs
         Number of batch-Kohonen epochs.
     sigma_start, sigma_end
@@ -159,8 +175,8 @@ class SOMOrderer(AbstractOrderer):
     """
 
     n_prototypes: int = eqx.field(static=True, default=25)
-    metric: AbstractDistanceMetric = eqx.field(default_factory=SpatialDistanceMetric)
-    metric_scale: float = 0.0
+    metric: AbstractDistanceMetric | None = None
+    metric_scale: float | None = None
     n_epochs: int = eqx.field(static=True, default=10)
     sigma_start: float | None = eqx.field(static=True, default=None)
     sigma_end: float = eqx.field(static=True, default=0.7)
@@ -183,7 +199,9 @@ class SOMOrderer(AbstractOrderer):
         if self.sigma_end <= 0:
             msg = f"sigma_end must be positive, got {self.sigma_end}."
             raise ValueError(msg)
-        if self.metric_scale != 0.0 and isinstance(self.metric, SpatialDistanceMetric):
+        if self.metric_scale not in (None, 0.0) and isinstance(
+            self.metric, SpatialDistanceMetric
+        ):
             msg = (
                 f"metric_scale={self.metric_scale} has no effect with "
                 "SpatialDistanceMetric, which ignores it. For velocity to "
@@ -191,6 +209,91 @@ class SOMOrderer(AbstractOrderer):
                 "metric=FullPhaseSpaceDistanceMetric() as well."
             )
             raise ValueError(msg)
+
+    def _resolve_metric(
+        self,
+        sub_q: VectorComponents,
+        sub_p: VectorComponents,
+        init: AbstractResult | None,
+    ) -> tuple[AbstractDistanceMetric, float]:
+        """Pick the metric and scale, following ``init`` when unset.
+
+        A stage that orders on position alone, chained after one that used
+        velocity, re-conflates whatever the earlier stage separated with it: at
+        a self-crossing the two branches are spatially coincident and only
+        their velocities differ. So when ``init`` reports ``velocity_aware`` and
+        neither ``metric`` nor ``metric_scale`` was set explicitly, use the
+        phase-space metric with a scale derived from the data.
+
+        The derived scale is ``sigma_phys / (2 |v|)``: it makes the velocity
+        term separate anti-parallel branches by about the same distance the
+        lattice can already resolve. Larger and "nearest prototype" becomes
+        "nearest in velocity", which on a winding curve conflates points a whole
+        turn apart.
+        """
+        if self.metric is not None:
+            return self.metric, self.metric_scale or 0.0
+        # An explicit non-zero scale is a request for velocity to participate;
+        # honour it by picking the metric that can, rather than silently
+        # handing it to one that discards it.
+        if self.metric_scale:
+            return FullPhaseSpaceDistanceMetric(), self.metric_scale
+        if init is None or not getattr(init, "velocity_aware", False):
+            return SpatialDistanceMetric(), 0.0
+
+        comps = sorted(sub_q)
+        q = jnp.stack([sub_q[k] for k in comps], axis=-1)
+        v = jnp.stack([sub_p[k] for k in comps], axis=-1)
+        # ``sub_q`` is already in the prior stage's order, so consecutive
+        # differences are steps along the track.
+        length = jnp.sum(jnp.linalg.norm(jnp.diff(q, axis=0), axis=-1))
+        sigma_phys = self.sigma_end * length / (self.n_prototypes - 1)
+        speed = jnp.median(jnp.linalg.norm(v, axis=-1))
+        scale = jnp.where(speed > 0, sigma_phys / (2.0 * speed), 0.0)
+        return FullPhaseSpaceDistanceMetric(), float(scale)
+
+    def _warn_if_disagrees(
+        self, lam: "jnp.ndarray", sub_q: VectorComponents, init: AbstractResult | None
+    ) -> None:
+        """Warn when the refined ordering disagrees wholesale with its input.
+
+        A refinement stage normally keeps most of the order it is handed and
+        adjusts locally. Wholesale disagreement has two causes and this cannot
+        tell them apart: the prior ordering was poor and the SOM genuinely
+        overhauled it, or the lattice is too coarse for the curve and the SOM
+        has tangled a good ordering. Both are worth a look, so the warning
+        names the smoothing length and asks the caller to compare.
+
+        ``_DISAGREE_WARN`` is empirical. Measured on a self-intersecting
+        epitrochoid, a lattice that destroys the ordering scores 0.28 while
+        every lattice that improves it scores 0.89 or above.
+        """
+        if init is None or lam.shape[0] < 3:
+            return
+        # ``sub_q`` is in the prior stage's order, so the prior rank is just
+        # position in the array.
+        rank = jnp.argsort(jnp.argsort(lam)).astype(lam.dtype)
+        prior = jnp.arange(lam.shape[0], dtype=lam.dtype)
+        rho = float(jnp.abs(jnp.corrcoef(prior, rank)[0, 1]))
+        if rho >= _DISAGREE_WARN:
+            return
+        comps = sorted(sub_q)
+        q = jnp.stack([sub_q[k] for k in comps], axis=-1)
+        length = float(jnp.sum(jnp.linalg.norm(jnp.diff(q, axis=0), axis=-1)))
+        sigma_phys = self.sigma_end * length / (self.n_prototypes - 1)
+        warnings.warn(
+            f"SOMOrderer's ordering disagrees with the one it was given (rank "
+            f"correlation {rho:.2f}). Either the prior ordering was poor and this "
+            f"is a genuine overhaul, or the lattice is too coarse for the curve "
+            f"and has tangled a good ordering: n_prototypes={self.n_prototypes} "
+            f"gives a smoothing length of {sigma_phys:.3g}, "
+            f"{100 * sigma_phys / length:.1f}% of the track, and any structure "
+            f"finer than that is smoothed away. Compare the two orderings, and "
+            f"raise n_prototypes if the curve turns or self-approaches more "
+            f"tightly than the smoothing length.",
+            UserWarning,
+            stacklevel=3,
+        )
 
     @plum.dispatch
     def order(
@@ -236,9 +339,11 @@ class SOMOrderer(AbstractOrderer):
             if self.sigma_start is None and init is not None
             else self.sigma_start
         )
+        metric, metric_scale = self._resolve_metric(sub_q, sub_p, init)
         backbone_q, backbone_p, lam = _train_and_project(
-            self, proto_q, proto_p, sub_q, sub_p, sigma_start
+            self, proto_q, proto_p, sub_q, sub_p, sigma_start, metric, metric_scale
         )
+        self._warn_if_disagrees(lam, sub_q, init)
 
         if self.orient_by_velocity:
             # Flip so the chord runs along the mean velocity rather than
