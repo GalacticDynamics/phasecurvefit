@@ -2,6 +2,8 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
 [![Python versions](https://img.shields.io/pypi/pyversions/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
+[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
+[![CITATION.cff](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml)
 
 Construct paths through phase-Space points, supporting many different
 algorithms.
@@ -374,6 +376,27 @@ class SmallestIndexStrategy(pcf.strats.AbstractQueryStrategy):
 config = pcf.WalkConfig(strategy=SmallestIndexStrategy())
 result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
+
+## Citation
+
+If you use `phasecurvefit` in published work, please cite the package via its
+DOI, together with the paper behind whichever component you used.
+
+[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
+
+<details>
+  <summary>component papers</summary>
+
+- **momentum-weighted ordering** — Nibauer et al. (2022),
+  [arXiv:2201.12042](https://arxiv.org/abs/2201.12042)
+- **mixture-model membership / outlier rejection** — Hogg, Bovy & Lang (2010),
+  [arXiv:1008.4686](https://arxiv.org/abs/1008.4686)
+
+Machine-readable metadata for all of these is in
+[`CITATION.cff`](https://github.com/GalacticDynamics/phasecurvefit/blob/main/CITATION.cff);
+BibTeX entries are in the [documentation](https://phasecurvefit.readthedocs.io).
+
+</details>
 
 ## AI Usage Disclosure
 
