@@ -10,6 +10,7 @@ authors:
     family-names: Starkman
     orcid: 'https://orcid.org/0000-0003-3954-3291'
 repository-code: 'https://github.com/GalacticDynamics/phasecurvefit'
+doi: 10.5281/zenodo.18714340
 abstract: >-
   Construct paths through phase-space points, supporting many different
   algorithms.
@@ -25,8 +26,8 @@ references:
     notes: >-
       Cite if you use momentum-weighted ordering.
     identifiers:
-      - type: other
-        value: 'arXiv:2201.12042'
+      - type: url
+        value: 'https://arxiv.org/abs/2201.12042'
   - type: article
     title: 'Data analysis recipes: Fitting a model to data'
     authors:
@@ -40,5 +41,5 @@ references:
     notes: >-
       Cite if you use mixture-model membership / outlier rejection.
     identifiers:
-      - type: other
-        value: 'arXiv:1008.4686'
+      - type: url
+        value: 'https://arxiv.org/abs/1008.4686'
