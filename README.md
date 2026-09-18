@@ -378,9 +378,10 @@ result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 
 ## Citation
 
-If you use `phasecurvefit` in published work, please cite the package via its DOI
-— [![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
-— together with the paper behind whichever component you used.
+If you use `phasecurvefit` in published work, please cite the package via its
+DOI, together with the paper behind whichever component you used.
+
+[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
 
 <details>
   <summary>component papers</summary>
