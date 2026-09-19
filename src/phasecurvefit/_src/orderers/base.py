@@ -86,6 +86,20 @@ def chord_along_ordering(
     return out[:n_obs]
 
 
+def _check_component_keys(
+    positions: VectorComponents, velocities: VectorComponents
+) -> None:
+    """Reject mismatched component keys, naming both sides of the difference."""
+    if set(positions) != set(velocities):
+        missing = sorted(set(positions) - set(velocities))
+        extra = sorted(set(velocities) - set(positions))
+        msg = (
+            "positions and velocities must have the same component keys; "
+            f"missing={missing}, extra={extra}."
+        )
+        raise ValueError(msg)
+
+
 class AbstractOrderer(eqx.Module):
     """Base class for ordering algorithms.
 
@@ -99,9 +113,22 @@ class AbstractOrderer(eqx.Module):
         velocities: VectorComponents,
         *,
         metadata: StateMetadata | None = None,
+        init: AbstractResult | None = None,
     ) -> AbstractResult:
-        """Order the tracers and return a result the autoencoder can consume."""
+        """Order the tracers and return a result the autoencoder can consume.
+
+        ``init`` is an optional result from a previous ordering stage. Orderers
+        that can refine a prior ordering (e.g. ``SOMOrderer``) use it; the rest
+        accept and ignore it, so every orderer is chainable.
+        """
         ...
+
+    def __or__(self, other: "AbstractOrderer") -> "AbstractOrderer":
+        """Compose two orderers into a :class:`ChainOrderer`."""
+        # Lazy import: chain imports AbstractOrderer from this module.
+        from phasecurvefit._src.orderers.chain import ChainOrderer  # noqa: PLC0415
+
+        return ChainOrderer(self, other)
 
 
 def order(
@@ -110,6 +137,7 @@ def order(
     orderer: AbstractOrderer | None = None,
     *,
     metadata: StateMetadata | None = None,
+    init: AbstractResult | None = None,
 ) -> AbstractResult:
     """Order tracers with ``orderer`` -- the primary ordering entry point.
 
@@ -143,4 +171,7 @@ def order(
         from phasecurvefit._src.orderers import localflow  # noqa: PLC0415
 
         orderer = localflow.LocalFlowOrderer()
-    return orderer.order(positions, velocities, metadata=metadata)
+    if init is None:
+        # Omit ``init`` entirely so orderers predating it still work.
+        return orderer.order(positions, velocities, metadata=metadata)
+    return orderer.order(positions, velocities, metadata=metadata, init=init)
