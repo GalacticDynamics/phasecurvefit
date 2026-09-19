@@ -1,9 +1,12 @@
 """Tests for ChainOrderer and the ``init=`` ordering contract."""
 
 import jax.numpy as jnp
+import numpy as np
 import pytest
+from scipy.stats import spearmanr
 
 import phasecurvefit as pcf
+from phasecurvefit._src.orderers.localflow import _resolve_start_idx
 
 
 def _line(n: int = 20):
@@ -110,3 +113,72 @@ def test_legacy_orderer_fails_clearly_when_asked_to_refine():
     chain = pcf.orderers.LocalFlowOrderer() | _LegacyOrderer()
     with pytest.raises(TypeError, match="init"):
         pcf.order(pos, vel, chain)
+
+
+def _shuffled_arc(n=400, seed=3):
+    """Build an arc whose input order carries no ordering information.
+
+    Index 0 is somewhere in the middle, so a walk that starts there runs out of
+    curve in one direction and has to be told otherwise.
+    """
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0.0, 1.0, n)
+    ang = np.pi * t
+    x = 5 * np.cos(ang) + rng.normal(0, 0.03, n)
+    y = 5 * np.sin(ang) + rng.normal(0, 0.03, n)
+    perm = rng.permutation(n)
+    pos = {"x": jnp.asarray(x)[perm], "y": jnp.asarray(y)[perm]}
+    vel = {"x": jnp.asarray(-np.sin(ang))[perm], "y": jnp.asarray(np.cos(ang))[perm]}
+    return pos, vel, t[perm]
+
+
+def _rho(result, truth):
+    idx = np.asarray(result.ordering)
+    return abs(spearmanr(truth[idx], np.arange(idx.size)).statistic)
+
+
+class TestLocalFlowStartFromInit:
+    """The walk should take its start point from a prior stage."""
+
+    def test_chaining_after_mst_beats_the_arbitrary_default(self):
+        """Starting from a real tip is the whole point of chaining here."""
+        pos, vel, truth = _shuffled_arc()
+        walk = pcf.orderers.LocalFlowOrderer(direction="forward")
+        mst = pcf.orderers.MSTOrderer(k=10, jump_cap=3.0, on_disconnected="largest")
+
+        alone = _rho(walk.order(pos, vel), truth)
+        chained = _rho((mst | walk).order(pos, vel), truth)
+
+        assert alone < 0.9, "fixture no longer exercises a bad default start"
+        assert chained > 0.99
+        assert chained > alone
+
+    def test_start_idx_is_taken_from_the_prior_orderings_first_point(self):
+        """``init`` supplies the index; MST orders tip-to-tip so it is an end."""
+        pos, vel, _ = _shuffled_arc()
+        prior = pcf.orderers.MSTOrderer(
+            k=10, jump_cap=3.0, on_disconnected="largest"
+        ).order(pos, vel)
+        resolved = _resolve_start_idx(None, prior)
+        assert resolved == int(np.asarray(prior.ordering)[0])
+
+    def test_an_explicit_start_idx_still_wins(self):
+        """A caller who names an index must not have it overridden by chaining."""
+        pos, vel, _ = _shuffled_arc()
+        prior = pcf.orderers.MSTOrderer(
+            k=10, jump_cap=3.0, on_disconnected="largest"
+        ).order(pos, vel)
+        assert _resolve_start_idx(7, prior) == 7
+        assert _resolve_start_idx(7, None) == 7
+
+    def test_unchained_walk_keeps_the_old_default(self):
+        """Without a prior stage the walk starts at 0, as it always did."""
+        assert _resolve_start_idx(None, None) == 0
+
+    def test_an_empty_prior_ordering_falls_back(self):
+        """A prior stage that visited nothing must not produce a bad index."""
+        pos, vel, _ = _shuffled_arc(n=20)
+        empty = pcf.orderers.OrderingResult(
+            positions=pos, velocities=vel, indices=jnp.full(20, -1, dtype=jnp.int32)
+        )
+        assert _resolve_start_idx(None, empty) == 0
