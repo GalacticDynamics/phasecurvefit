@@ -196,8 +196,15 @@ start at 0".
 
 ### What a stage inherits
 
-A stage sees only what the previous stage visited, so points rejected upstream
-stay rejected. A stage that ignores `init` re-visits everything regardless of
-what came before, so an outlier that
-{class}`~phasecurvefit.orderers.MSTOrderer`'s `edge_clip_sigma` rejected is
-silently readmitted by a stage that does not consume `init`.
+Chaining does **not** narrow the data. Every stage is handed the full
+`(positions, velocities)`; `init` is additional context, and what a stage does
+with it is that stage's own business.
+{class}`~phasecurvefit.orderers.LocalFlowOrderer` reads one thing from it — the
+index to start walking from — and otherwise orders every observation it is
+given.
+
+So a stage does not inherit an upstream stage's rejections unless it is written
+to. An outlier that {class}`~phasecurvefit.orderers.MSTOrderer`'s
+`edge_clip_sigma` dropped is visited again by the next stage unless that stage
+restricts itself to `init.indices`. Check `n_visited` on the final result if
+rejection is meant to stick.
