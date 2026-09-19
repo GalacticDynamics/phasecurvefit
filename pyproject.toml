@@ -307,13 +307,20 @@ addopts = [
   "--showlocals",
   "--strict-config",
   "--strict-markers",
-  "-p no:doctest",                                       # using sybil
+  "-p no:doctest",              # using sybil
   "-ra",
-  "--timeout=300",                                       # 5 minute timeout per test
-  "--randomly-seed=0",                                   # Deterministic by default, but randomizes test order
-  "--randomly-dont-reorganize",                          # Keep test class/module structure, only shuffle within
-  "--ignore=tests/benchmarks/",                          # Exclude benchmark tests from normal runs
-  "--mpl-hash-library=tests/usage/baseline_hashes.json",
+  "--timeout=300",              # 5 minute timeout per test
+  "--randomly-seed=0",          # Deterministic by default, but randomizes test order
+  "--randomly-dont-reorganize", # Keep test class/module structure, only shuffle within
+  "--ignore=tests/benchmarks/", # Exclude benchmark tests from normal runs
+  # `--mpl` is deliberately NOT enabled here. The hash covers the rendered
+  # PNG, so it differs per platform and per matplotlib/freetype build: the
+  # same figure hashes differently on ubuntu, macOS and Windows, and even
+  # between two macOS machines. There is no single value the CI matrix can
+  # agree on, so this cannot gate merges. Run `pytest tests/usage --mpl`
+  # locally, against a baseline you generated on that same machine.
+  # Resolved relative to the test file's own directory, not the rootdir.
+  "--mpl-hash-library=baseline_hashes.json",
 ]
 filterwarnings = [
   "error",

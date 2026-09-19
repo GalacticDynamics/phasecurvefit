@@ -6,7 +6,9 @@ import equinox as eqx
 import jax.numpy as jnp
 import plum
 
-from .base import AbstractOrderer
+import dataclassish
+
+from .base import AbstractOrderer, chord_along_ordering
 from phasecurvefit._src.algorithm import (
     Direction,
     StateMetadata,
@@ -15,6 +17,19 @@ from phasecurvefit._src.algorithm import (
 )
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.query_config import WalkConfig
+
+
+def _with_chord(result: WalkLocalFlowResult) -> WalkLocalFlowResult:
+    """Attach the arc length along the walk path.
+
+    The walk has no separate backbone -- its curve is the path through the
+    visited observations -- so the chord is the cumulative distance along that
+    path. ``chord`` is not a static field but the result is built inside
+    ``_local_flow_walk``, so it is filled in afterwards.
+    """
+    return dataclassish.replace(
+        result, chord=chord_along_ordering(result.positions, result.indices)
+    )
 
 
 class LocalFlowOrderer(AbstractOrderer):
@@ -64,7 +79,7 @@ class LocalFlowOrderer(AbstractOrderer):
         kwargs: dict[str, object] = {}
         if metadata is not None:
             kwargs["metadata"] = metadata
-        return _local_flow_walk(
+        result = _local_flow_walk(
             positions,
             velocities,
             start_idx=self.start_idx,
@@ -76,3 +91,4 @@ class LocalFlowOrderer(AbstractOrderer):
             direction=self.direction,
             **kwargs,
         )
+        return _with_chord(result)

@@ -16,15 +16,74 @@ prefix of length ``n_visited``, with all remaining entries set to ``-1``;
 ``gamma_range`` is static.
 """
 
-__all__: tuple[str, ...] = ("AbstractOrderer", "order")
+__all__: tuple[str, ...] = ("AbstractOrderer", "chord_along_ordering", "order")
 
 import abc
 
 import equinox as eqx
+import jax.numpy as jnp
+from jaxtyping import Array, Float, Int
 
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
+
+
+def chord_along_ordering(
+    positions: VectorComponents, indices: Int[Array, " n_obs"]
+) -> Float[Array, " n_obs"]:
+    """Arc length along the ordered observations, in input order.
+
+    The chord contract is "distance travelled along the curve this result
+    represents". For an orderer whose curve *is* the path through the visited
+    observations -- the walk, the MST backbone -- that is the cumulative
+    distance between consecutive ordered points, which is what this computes.
+
+    An orderer that fits a separate smooth curve and projects onto it should not
+    use this: projecting is not the same as summing along the ordering, and such
+    an orderer has already paid for the projection.
+
+    Parameters
+    ----------
+    positions
+        Phase-space positions, full arrays in input order.
+    indices
+        The result's ``indices``: visited observations in order, ``-1``-padded.
+
+    Returns
+    -------
+    Array, shape (n_obs,)
+        Arc length per observation in **input order**. Unvisited observations
+        carry ``nan``, matching the ``chord`` field's contract.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> from phasecurvefit._src.orderers.base import chord_along_ordering
+
+    >>> pos = {"x": jnp.array([0.0, 1.0, 2.0, 9.0]), "y": jnp.zeros(4)}
+    >>> chord_along_ordering(pos, jnp.array([0, 1, 2, -1]))
+    Array([ 0.,  1.,  2., nan], dtype=float32)
+
+    """
+    indices = jnp.asarray(indices)
+    n_obs = indices.shape[0]
+    valid = indices >= 0
+    # Gather with the padding parked on index 0 rather than compacting: a
+    # boolean mask is not traceable, and `order()` is called under `jit`.
+    gather = jnp.where(valid, indices, 0)
+    comps = sorted(positions)
+    q = jnp.stack([jnp.asarray(positions[c])[gather] for c in comps], axis=-1)
+    step = jnp.linalg.norm(jnp.diff(q, axis=0), axis=-1)
+    # A step counts only between two genuinely visited observations, so the
+    # parked padding contributes nothing to the cumulative length.
+    step = jnp.where(valid[1:] & valid[:-1], step, 0.0)
+    s = jnp.concatenate([jnp.zeros(1, dtype=step.dtype), jnp.cumsum(step)])
+    # Scatter back to input order. Unvisited entries are sent to a scratch slot
+    # past the end, which is then dropped, so they cannot clobber index 0.
+    scatter = jnp.where(valid, indices, n_obs)
+    out = jnp.full(n_obs + 1, jnp.nan, dtype=s.dtype).at[scatter].set(s)
+    return out[:n_obs]
 
 
 class AbstractOrderer(eqx.Module):
