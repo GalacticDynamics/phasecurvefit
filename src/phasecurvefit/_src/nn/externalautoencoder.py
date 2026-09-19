@@ -84,6 +84,7 @@ def train_autoencoder(
     /,
     *,
     config: OrderingTrainingConfig | TrainingConfig | None = None,
+    chord: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[AutoencoderResult, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
     """Train the EncoderExternalDecoder encoder and create running-mean decoder.
@@ -107,6 +108,10 @@ def train_autoencoder(
         ordered tracers; -1 indicates skipped/unordered tracers.
     config : OrderingTrainingConfig, optional
         Training configuration for the encoder. If None, uses default config.
+    chord : Array, shape (N,) | None, keyword-only
+        The orderer's arc-length parameter (``OrderingResult.chord``), passed
+        through to the encoder's arclength target. The ``OrderingResult``
+        overload supplies this automatically.
     decoder_kwargs : Mapping, optional
         Keyword arguments passed to decoder function creation. For running-mean
         decoder, can include 'window_size'. If None, uses defaults.
@@ -163,7 +168,7 @@ def train_autoencoder(
         config = config.encoderonly_config()
 
     encoder, opt_state, losses = train_ordering_net(
-        model.encoder, all_ws, ordering_indices, config=config, key=key
+        model.encoder, all_ws, ordering_indices, config=config, chord=chord, key=key
     )
 
     # Update encoder in model

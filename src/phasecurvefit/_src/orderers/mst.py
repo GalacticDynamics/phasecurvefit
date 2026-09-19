@@ -40,7 +40,7 @@ from scipy.sparse.csgraph import (
 )
 from scipy.spatial import cKDTree
 
-from .base import AbstractOrderer
+from .base import AbstractOrderer, chord_along_ordering
 from .result import OrderingResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
@@ -411,10 +411,13 @@ class MSTOrderer(AbstractOrderer):
         idx_full[: order_idx.size] = order_idx
 
         backbone = {c: jnp.asarray(backbone_P[:, i]) for i, c in enumerate(comps)}
+        qs = {key: jnp.asarray(val) for key, val in positions.items()}
+        idx = jnp.asarray(idx_full)
         return OrderingResult(
-            positions={key: jnp.asarray(val) for key, val in positions.items()},
+            positions=qs,
             velocities={key: jnp.asarray(val) for key, val in velocities.items()},
-            indices=jnp.asarray(idx_full),
+            indices=idx,
             gamma_range=(-1.0, 1.0),
             backbone=backbone,
+            chord=chord_along_ordering(qs, idx),
         )

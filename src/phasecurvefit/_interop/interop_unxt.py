@@ -47,6 +47,7 @@ from phasecurvefit._src import algorithm, phasespace
 from phasecurvefit._src.algorithm import Direction, StateMetadata, WalkLocalFlowResult
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
+from phasecurvefit._src.orderers.base import chord_along_ordering
 from phasecurvefit._src.orderers.localflow import LocalFlowOrderer
 from phasecurvefit._src.orderers.mst import MSTOrderer
 from phasecurvefit._src.orderers.result import OrderingResult
@@ -688,7 +689,8 @@ def _local_flow_walk(
         'x': Quantity(f32[3], unit='m / s'), 'y': Quantity(f32[3], unit='m / s')
       },
       indices=i32[3],
-      gamma_range=(0.0, 1.0)
+      gamma_range=(0.0, 1.0),
+      chord=Quantity(f32[3], unit='m')
     )
 
     """
@@ -790,8 +792,9 @@ def order(
     """Order Quantity-valued tracers with the MST backbone.
 
     Strips units into ``usys`` (host-side), runs the MST pipeline, and reattaches
-    units: ``positions``/``velocities`` keep their input units and ``backbone``
-    is returned in the position units.
+    units: ``positions``/``velocities`` keep their input units, and ``backbone``
+    and ``chord`` -- both lengths along the track -- are returned in the position
+    units.
     """
     usys = _require_usys(metadata)
     q_plain = {k: u.ustrip(usys, v) for k, v in positions.items()}
@@ -800,6 +803,7 @@ def order(
     result = self.order(q_plain, p_plain)  # -> plain VectorComponents dispatch
 
     length_unit = usys["length"]
+    position_unit = positions[next(iter(sorted(positions)))].unit
     backbone = {
         k: u.uconvert(positions[k].unit, u.Q(v, length_unit))
         for k, v in result.backbone.items()
@@ -809,6 +813,7 @@ def order(
         positions=dict(positions),
         velocities=dict(velocities),
         backbone=backbone,
+        chord=u.uconvert(position_unit, u.Q(result.chord, length_unit)),
     )
 
 
@@ -831,7 +836,7 @@ def order(
     def _as_length_q(val: object) -> AbcQ:
         return val if isinstance(val, u.AbstractQuantity) else u.Q(val, usys["length"])
 
-    return algorithm._local_flow_walk(  # noqa: SLF001
+    result = algorithm._local_flow_walk(  # noqa: SLF001
         positions,
         velocities,
         start_idx=self.start_idx,
@@ -842,4 +847,15 @@ def order(
         config=self.config,
         direction=self.direction,
         usys=usys,
+    )
+    # Mirror the plain-array dispatch: this path reaches ``_local_flow_walk``
+    # directly, so the chord has to be attached here too or unit-ful callers
+    # silently get ``None``. Compute it on stripped arrays and reattach, so it
+    # comes back unit-ful like ``backbone`` does on the other orderers.
+    position_unit = positions[next(iter(sorted(positions)))].unit
+    chord = chord_along_ordering(
+        {k: u.ustrip(usys, v) for k, v in result.positions.items()}, result.indices
+    )
+    return dataclassish.replace(
+        result, chord=u.uconvert(position_unit, u.Q(chord, usys["length"]))
     )

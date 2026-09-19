@@ -1065,6 +1065,7 @@ def train_autoencoder(
     /,
     *,
     config: TrainingConfig | None = None,
+    chord: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[AutoencoderResult, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
     r"""Train the PathAutoencoder in two phases.
@@ -1089,6 +1090,10 @@ def train_autoencoder(
     ordering_indices : Int[Array, " N"]
         Ordering indices from walk algorithm. Valid indices (>= 0) indicate
         ordered tracers; -1 indicates skipped/unordered tracers.
+    chord : Array, shape (N,) | None, keyword-only
+        The orderer's arc-length parameter (``OrderingResult.chord``), passed
+        through to the encoder's arclength target. The ``OrderingResult``
+        overload supplies this automatically.
     config : TrainingConfig | None, optional
         Complete training configuration for both phases.
         If `None` (default), uses default configuration.
@@ -1121,7 +1126,12 @@ def train_autoencoder(
 
     # Train the encoder
     encoder, encoder_opt_state, encoder_losses = train_ordering_net(
-        model.encoder, all_ws, ordering_indices, config=config_encoder, key=keys[0]
+        model.encoder,
+        all_ws,
+        ordering_indices,
+        config=config_encoder,
+        chord=chord,
+        key=keys[0],
     )
 
     # Model surgery: put the updated encoder back into the model
@@ -1241,7 +1251,12 @@ def train_autoencoder(
 
     # Train the model
     result, opt_states, losses = train_autoencoder(
-        model, ws, walk_results.indices, config=config, key=key
+        model,
+        ws,
+        walk_results.indices,
+        config=config,
+        chord=walk_results.chord,
+        key=key,
     )
 
     return result, opt_states, losses
