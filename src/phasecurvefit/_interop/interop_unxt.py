@@ -44,11 +44,15 @@ from unxt import AbstractQuantity as AbcQ
 from unxt.quantity import AllowValue
 
 from phasecurvefit._src import algorithm, phasespace
+from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import Direction, StateMetadata, WalkLocalFlowResult
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
 from phasecurvefit._src.orderers.base import chord_along_ordering
-from phasecurvefit._src.orderers.localflow import LocalFlowOrderer
+from phasecurvefit._src.orderers.localflow import (
+    LocalFlowOrderer,
+    _resolve_start_idx,
+)
 from phasecurvefit._src.orderers.mst import MSTOrderer
 from phasecurvefit._src.orderers.result import OrderingResult
 from phasecurvefit._src.query_config import WalkConfig
@@ -770,8 +774,10 @@ def transform(
 # ==============================================================================
 
 
-def _require_usys(metadata: StateMetadata) -> u.AbstractUnitSystem:
-    usys = metadata.get("usys")
+def _require_usys(metadata: StateMetadata | None) -> u.AbstractUnitSystem:
+    # ``metadata`` is None whenever the caller omitted it: both the ``order``
+    # facade and ChainOrderer forward it unconditionally.
+    usys = metadata.get("usys") if metadata is not None else None
     if not isinstance(usys, u.AbstractUnitSystem):
         msg = (
             "`usys` must be provided for Quantity inputs, e.g. "
@@ -788,6 +794,7 @@ def order(
     velocities: VectorQComponents,
     *,
     metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    init: AbstractResult | None = None,
 ) -> OrderingResult:
     """Order Quantity-valued tracers with the MST backbone.
 
@@ -800,7 +807,7 @@ def order(
     q_plain = {k: u.ustrip(usys, v) for k, v in positions.items()}
     p_plain = {k: u.ustrip(usys, v) for k, v in velocities.items()}
 
-    result = self.order(q_plain, p_plain)  # -> plain VectorComponents dispatch
+    result = self.order(q_plain, p_plain, metadata=metadata, init=init)
 
     length_unit = usys["length"]
     position_unit = positions[next(iter(sorted(positions)))].unit
@@ -824,6 +831,7 @@ def order(
     velocities: VectorQComponents,
     *,
     metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    init: AbstractResult | None = None,
 ) -> WalkLocalFlowResult:
     """Order Quantity-valued tracers with the local-flow walk.
 
@@ -839,7 +847,7 @@ def order(
     result = algorithm._local_flow_walk(  # noqa: SLF001
         positions,
         velocities,
-        start_idx=self.start_idx,
+        start_idx=_resolve_start_idx(self.start_idx, init),
         metric_scale=_as_length_q(self.metric_scale),
         max_dist=_as_length_q(self.max_dist),
         terminate_indices=self.terminate_indices,
