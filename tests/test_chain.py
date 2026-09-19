@@ -175,6 +175,16 @@ class TestLocalFlowStartFromInit:
         """Without a prior stage the walk starts at 0, as it always did."""
         assert _resolve_start_idx(None, None) == 0
 
+    def test_padding_before_the_first_visited_point_is_skipped(self):
+        """The index is the first *visited* entry, not `indices[0]`."""
+        pos, vel, _ = _shuffled_arc(n=20)
+        padded = pcf.orderers.OrderingResult(
+            positions=pos,
+            velocities=vel,
+            indices=jnp.asarray([-1, -1, 7, 3, 5] + [-1] * 15, dtype=jnp.int32),
+        )
+        assert _resolve_start_idx(None, padded) == 7
+
     def test_an_empty_prior_ordering_falls_back(self):
         """A prior stage that visited nothing must not produce a bad index."""
         pos, vel, _ = _shuffled_arc(n=20)
@@ -182,3 +192,21 @@ class TestLocalFlowStartFromInit:
             positions=pos, velocities=vel, indices=jnp.full(20, -1, dtype=jnp.int32)
         )
         assert _resolve_start_idx(None, empty) == 0
+
+
+def test_order_facade_forwards_init():
+    """``pcf.order`` accepts ``init`` and passes it to the orderer.
+
+    The facade has two branches -- with and without ``init`` -- because an
+    orderer predating the parameter cannot be handed it at all.
+    """
+    pos, vel, _ = _shuffled_arc(n=120)
+    prior = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, on_disconnected="largest").order(
+        pos, vel
+    )
+    chained = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(), init=prior)
+    assert int(np.asarray(chained.ordering)[0]) == int(np.asarray(prior.ordering)[0])
+
+    # ... and without it, the walk falls back to its own default.
+    plain = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
+    assert int(np.asarray(plain.ordering)[0]) == 0

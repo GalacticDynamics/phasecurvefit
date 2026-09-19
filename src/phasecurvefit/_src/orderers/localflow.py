@@ -36,8 +36,14 @@ def _resolve_start_idx(start_idx: int | None, init: AbstractResult | None) -> in
     if init is None:
         return 0
     indices = jnp.asarray(init.indices)
-    visited = indices[indices >= 0]
-    return 0 if visited.shape[0] == 0 else int(visited[0])
+    visited = indices >= 0
+    # Reductions rather than `indices[visited]`: the mask would materialize a
+    # variable-length array and pull it to host just to read element 0.
+    # ``argmax`` on a boolean gives the first True, and is meaningless when
+    # there is none, hence the ``any`` guard.
+    if not bool(jnp.any(visited)):
+        return 0
+    return int(indices[jnp.argmax(visited)])
 
 
 def _with_chord(result: WalkLocalFlowResult) -> WalkLocalFlowResult:
