@@ -20,6 +20,32 @@ from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.query_config import WalkConfig
 
 
+def _resolve_start_idx(start_idx: int | None, init: AbstractResult | None) -> int:
+    """Pick where the walk starts, taking it from ``init`` when unset.
+
+    An explicit index always wins. Otherwise the first observation of the prior
+    stage's ordering is used: an ``MSTOrderer`` orders tip to tip along the
+    graph diameter, so its first observation is an endpoint of the curve --
+    which is what the walk needs and what the caller would otherwise have to
+    work out by hand.
+
+    Falls back to ``0`` with no prior stage, matching the old default.
+    """
+    if start_idx is not None:
+        return start_idx
+    if init is None:
+        return 0
+    indices = jnp.asarray(init.indices)
+    visited = indices >= 0
+    # Reductions rather than `indices[visited]`: the mask would materialize a
+    # variable-length array and pull it to host just to read element 0.
+    # ``argmax`` on a boolean gives the first True, and is meaningless when
+    # there is none, so the fallback is selected on device and only the answer
+    # crosses to host -- one synchronization rather than two.
+    first = indices[jnp.argmax(visited)]
+    return int(jnp.where(jnp.any(visited), first, 0))
+
+
 def _with_chord(result: WalkLocalFlowResult) -> WalkLocalFlowResult:
     """Attach the arc length along the walk path.
 
@@ -48,7 +74,22 @@ class LocalFlowOrderer(AbstractOrderer):
     config
         Neighbor-query configuration (metric + strategy).
     start_idx
-        Index of the starting observation.
+        Index of the starting observation. ``None`` (the default) takes the
+        start from ``init`` when the walk is chained after another orderer, and
+        falls back to ``0`` when it is not.
+
+        The walk has to be told where a curve *ends*, and picking that index by
+        hand means knowing the answer in advance. An
+        :class:`~phasecurvefit.orderers.MSTOrderer` finds the two tips itself --
+        its ordering is the graph diameter, tip to tip -- so its first ordered
+        observation is a genuine endpoint::
+
+            (
+                pcf.orderers.MSTOrderer(k=16, jump_cap=3.0)
+                | pcf.orderers.LocalFlowOrderer()
+            )
+
+        An explicit ``start_idx`` always wins, chained or not.
     direction
         ``"forward"``, ``"backward"``, or ``"both"``.
     max_dist
@@ -62,7 +103,7 @@ class LocalFlowOrderer(AbstractOrderer):
 
     metric_scale: float = 1.0
     config: WalkConfig = eqx.field(default_factory=WalkConfig)
-    start_idx: int = eqx.field(static=True, default=0)
+    start_idx: int | None = eqx.field(static=True, default=None)
     direction: Direction = eqx.field(static=True, default="forward")
     max_dist: float = jnp.inf
     terminate_indices: frozenset[int] | None = eqx.field(static=True, default=None)
@@ -75,7 +116,7 @@ class LocalFlowOrderer(AbstractOrderer):
         velocities: VectorComponents,
         *,
         metadata: StateMetadata | None = None,
-        init: AbstractResult | None = None,  # noqa: ARG002
+        init: AbstractResult | None = None,
     ) -> WalkLocalFlowResult:
         """Run the local-flow walk and return its result."""
         kwargs: dict[str, object] = {}
@@ -84,7 +125,7 @@ class LocalFlowOrderer(AbstractOrderer):
         result = _local_flow_walk(
             positions,
             velocities,
-            start_idx=self.start_idx,
+            start_idx=_resolve_start_idx(self.start_idx, init),
             metric_scale=self.metric_scale,
             max_dist=self.max_dist,
             terminate_indices=self.terminate_indices,

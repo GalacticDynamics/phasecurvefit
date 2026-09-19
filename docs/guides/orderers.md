@@ -140,3 +140,64 @@ the ordering parameter `gamma`: along the `backbone` polyline when one is presen
 (MST), otherwise along the ordered visited observations (walk). The historical
 `WalkLocalFlowResult` is a thin subclass of `OrderingResult`.
 ```
+
+## Chaining orderers
+
+Orderers compose with `|`. Each stage receives the previous stage's result as
+`init`; a stage that can use a prior ordering does, and one that cannot ignores
+the value.
+
+Accepting the parameter is what makes a stage chainable beyond the first
+position. An orderer written before `init` existed can still *lead* a chain,
+because the head is called without it, but raises `TypeError` if placed after
+another stage — loudly, rather than silently dropping the ordering it was
+handed.
+
+```python
+import jax.numpy as jnp
+
+import phasecurvefit as pcf
+
+ang = jnp.linspace(0.0, jnp.pi, 60)
+pos = {"x": 5.0 * jnp.cos(ang), "y": 5.0 * jnp.sin(ang)}
+vel = {"x": -jnp.sin(ang), "y": jnp.cos(ang)}
+
+chain = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0) | pcf.orderers.LocalFlowOrderer()
+result = pcf.order(pos, vel, chain)
+assert int(result.n_visited) == 60
+```
+
+`|` builds a {class}`~phasecurvefit.orderers.ChainOrderer` and flattens, so
+`a | b | c` is one three-stage chain rather than a nest. The explicit form is
+equivalent:
+
+```python
+chain = pcf.orderers.ChainOrderer(
+    pcf.orderers.MSTOrderer(k=8, jump_cap=3.0),
+    pcf.orderers.LocalFlowOrderer(),
+)
+assert len(chain.stages) == 2
+```
+
+### Letting the MST find the walk's start point
+
+The walk has to begin at an end of the curve. Naming that index by hand means
+knowing the answer before you have ordered anything, and `start_idx=0` is only
+right when the input happens to arrive already ordered.
+
+The MST has no such problem: it orders along the graph diameter, tip to tip, so
+its first observation *is* an endpoint. Chained, the walk takes its start from
+there — measured on a shuffled 400-point arc, `|rho|` goes from 0.68 walking
+from index 0 to 1.00 walking from the MST's tip.
+
+An explicit `start_idx` always wins, so this changes nothing for callers who
+already pass one; `start_idx=None` is the default and means "ask `init`, else
+start at 0".
+
+### What a stage inherits
+
+A stage sees only what the previous stage visited, so points rejected upstream
+stay rejected. A stage that ignores `init` re-visits everything regardless of
+what came before, so an outlier that
+{class}`~phasecurvefit.orderers.MSTOrderer`'s `edge_clip_sigma` rejected is
+silently readmitted by a stage that does not consume `init`.

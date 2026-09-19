@@ -82,3 +82,22 @@ class TestLocalFlowUnxt:
         )
         assert jnp.array_equal(res.indices, direct.indices)
         assert isinstance(res.positions["x"], u.AbstractQuantity)
+
+
+def test_quantity_localflow_takes_its_start_from_init():
+    """The Quantity path must resolve ``start_idx`` like the plain one.
+
+    It reaches ``_local_flow_walk`` directly, so an unresolved ``None`` would
+    arrive as a start index rather than being taken from ``init``.
+    """
+    q, p = _arc_quantity()
+    usys = u.unitsystems.galactic
+    md = StateMetadata(usys=usys)
+    prior = pcf.orderers.MSTOrderer(k=8, jump_cap=5.0, on_disconnected="largest").order(
+        q, p, metadata=md
+    )
+    chained = (
+        pcf.orderers.MSTOrderer(k=8, jump_cap=5.0, on_disconnected="largest")
+        | pcf.orderers.LocalFlowOrderer()
+    ).order(q, p, metadata=md)
+    assert int(np.asarray(chained.ordering)[0]) == int(np.asarray(prior.ordering)[0])

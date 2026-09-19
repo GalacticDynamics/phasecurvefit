@@ -49,7 +49,10 @@ from phasecurvefit._src.algorithm import Direction, StateMetadata, WalkLocalFlow
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
 from phasecurvefit._src.orderers.base import chord_along_ordering
-from phasecurvefit._src.orderers.localflow import LocalFlowOrderer
+from phasecurvefit._src.orderers.localflow import (
+    LocalFlowOrderer,
+    _resolve_start_idx,
+)
 from phasecurvefit._src.orderers.mst import MSTOrderer
 from phasecurvefit._src.orderers.result import OrderingResult
 from phasecurvefit._src.query_config import WalkConfig
@@ -844,7 +847,7 @@ def order(
     result = algorithm._local_flow_walk(  # noqa: SLF001
         positions,
         velocities,
-        start_idx=self.start_idx,
+        start_idx=_resolve_start_idx(self.start_idx, init),
         metric_scale=_as_length_q(self.metric_scale),
         max_dist=_as_length_q(self.max_dist),
         terminate_indices=self.terminate_indices,
