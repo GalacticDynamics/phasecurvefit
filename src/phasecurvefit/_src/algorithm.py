@@ -390,10 +390,16 @@ def _local_flow_walk(
     key0 = zeroth(xs)
     n_obs = jnp.shape(xs[key0])[0]
 
-    # Validate start_idx - use plain Python check if not traced
-    if start_idx < 0 or start_idx >= n_obs:
-        msg = f"start_idx {start_idx} out of bounds for data with {n_obs} observations."
-        raise ValueError(msg)
+    # Validate start_idx. A concrete index is checked in Python so the error
+    # arrives immediately; a traced one -- which is what a chained orderer
+    # supplies under `jit` -- is checked on device instead, since `if` on a
+    # tracer raises before it can report anything useful.
+    msg = f"start_idx {start_idx} out of bounds for data with {n_obs} observations."
+    if isinstance(start_idx, int):
+        if start_idx < 0 or start_idx >= n_obs:
+            raise ValueError(msg)
+    else:
+        start_idx = eqx.error_if(start_idx, (start_idx < 0) | (start_idx >= n_obs), msg)
 
     # Set n_max to n_obs if not provided
     n_max = n_obs if n_max is None else n_max
