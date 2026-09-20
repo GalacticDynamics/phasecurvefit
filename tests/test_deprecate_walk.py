@@ -10,6 +10,8 @@ import warnings
 import jax.numpy as jnp
 import pytest
 
+import unxt as u
+
 import phasecurvefit as pcf
 
 POS = {
@@ -73,8 +75,6 @@ class TestUnxtEquivalence:
     """The Quantity path behaves the same: order() equals the (warning) walk."""
 
     def _quantity_data(self):
-        import unxt as u
-
         q = {
             "x": u.Q(jnp.array([0.0, 1.0, 2.0]), "m"),
             "y": u.Q(jnp.array([0.0, 0.5, 1.0]), "m"),
@@ -84,8 +84,6 @@ class TestUnxtEquivalence:
 
     def test_quantity_order_equals_walk(self):
         """Quantity ``order()`` reproduces the deprecated Quantity walk."""
-        import unxt as u
-
         q, p, usys = self._quantity_data()
         got = pcf.order(
             q,
@@ -98,8 +96,6 @@ class TestUnxtEquivalence:
 
     def test_quantity_walk_warns(self):
         """The deprecated Quantity walk also warns."""
-        import unxt as u
-
         q, p, usys = self._quantity_data()
         with pytest.warns(DeprecationWarning, match="deprecated"):
             pcf.walk_local_flow(
