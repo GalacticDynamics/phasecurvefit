@@ -8,6 +8,7 @@ import pytest
 from jaxtyping import PRNGKeyArray
 
 import phasecurvefit as pcf
+from phasecurvefit._src.nn.autoencoder import compute_decoder_loss
 
 
 class TestOrderingNet:
@@ -293,8 +294,6 @@ class TestTrainAutoencoder:
         every star in the batch. `masked_mean` returns NaN on an empty mask, so
         without a guard the epoch loss goes NaN. Regression test for that.
         """
-        from phasecurvefit._src.nn.autoencoder import compute_decoder_loss
-
         key1, key2 = jr.split(rng_key)
         n, d = 8, 2
 

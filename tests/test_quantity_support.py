@@ -15,6 +15,7 @@ except ImportError:
 
 import jax.numpy as jnp
 import jax.random as jr
+import jax.tree_util as jtu
 
 import phasecurvefit as pcf
 from phasecurvefit._src.algorithm import StateMetadata
@@ -87,8 +88,6 @@ class TestStateMetadata:
 
     def test_metadata_as_pytree_leaf(self, unit_system):
         """Test that StateMetadata is preserved as a PyTree leaf."""
-        import jax.tree_util as jtu
-
         metadata = StateMetadata(usys=unit_system)
         state = (0, jnp.array([1, 2, 3]), metadata)
 
