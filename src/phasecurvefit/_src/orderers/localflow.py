@@ -5,6 +5,7 @@ __all__: tuple[str, ...] = ("LocalFlowOrderer",)
 import equinox as eqx
 import jax.numpy as jnp
 import plum
+from jaxtyping import Array, Int
 
 import dataclassish
 
@@ -20,7 +21,9 @@ from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.query_config import WalkConfig
 
 
-def _resolve_start_idx(start_idx: int | None, init: AbstractResult | None) -> int:
+def _resolve_start_idx(
+    start_idx: int | None, init: AbstractResult | None
+) -> int | Int[Array, ""]:
     """Pick where the walk starts, taking it from ``init`` when unset.
 
     An explicit index always wins. Otherwise the first observation of the prior
@@ -43,7 +46,10 @@ def _resolve_start_idx(start_idx: int | None, init: AbstractResult | None) -> in
     # there is none, so the fallback is selected on device and only the answer
     # crosses to host -- one synchronization rather than two.
     first = indices[jnp.argmax(visited)]
-    return int(jnp.where(jnp.any(visited), first, 0))
+    # Left as a JAX scalar rather than `int(...)`: under `jit` the prior stage's
+    # indices are traced, and concretizing here would make a chain unjittable.
+    # The walk accepts a traced start index.
+    return jnp.where(jnp.any(visited), first, 0)
 
 
 def _with_chord(result: WalkLocalFlowResult) -> WalkLocalFlowResult:

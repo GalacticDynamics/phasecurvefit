@@ -1,5 +1,6 @@
 """Tests for ChainOrderer and the ``init=`` ordering contract."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -206,3 +207,45 @@ def test_order_facade_forwards_init():
     # ... and without it, the walk falls back to its own default.
     plain = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
     assert int(np.asarray(plain.ordering)[0]) == 0
+
+
+class TestChainUnderJaxTransforms:
+    """A chain must survive `jit`, `grad` and `vmap`.
+
+    `start_idx` resolved from `init` is the risk: the prior stage's indices are
+    traced under a transform, so concretizing the index would make a chain
+    unjittable while a single orderer stayed fine.
+    """
+
+    @staticmethod
+    def _loss(metric_scale):
+        pos = {"x": jnp.array([0.0, 1.0, 2.0, 3.0]), "y": jnp.zeros(4)}
+        vel = {"x": jnp.ones(4), "y": jnp.zeros(4)}
+        chain = pcf.orderers.LocalFlowOrderer(
+            start_idx=0, metric_scale=metric_scale
+        ) | pcf.orderers.LocalFlowOrderer(metric_scale=metric_scale)
+        return jnp.sum(pcf.order(pos, vel, chain).indices.astype(jnp.float32))
+
+    def test_jit(self):
+        """A chain compiles and agrees with the eager result."""
+        assert float(jax.jit(self._loss)(1.0)) == float(self._loss(1.0))
+
+    def test_grad(self):
+        """Tracing completes under `grad`."""
+        # The ordering is integer-valued, so the gradient is zero -- the point
+        # is that tracing completes rather than raising.
+        assert float(jax.grad(self._loss)(1.0)) == 0.0
+
+    def test_vmap(self):
+        """A chain maps over a batched hyperparameter."""
+        out = jax.vmap(self._loss)(jnp.array([1.0, 2.0]))
+        assert out.shape == (2,)
+
+
+def test_out_of_bounds_start_idx_is_reported_under_jit():
+    """The bounds check must still fire when the index is traced."""
+    pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.zeros(3)}
+    vel = {"x": jnp.ones(3), "y": jnp.zeros(3)}
+
+    with pytest.raises(ValueError, match="out of bounds"):
+        pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=99))
