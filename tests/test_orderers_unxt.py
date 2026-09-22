@@ -101,3 +101,27 @@ def test_quantity_localflow_takes_its_start_from_init():
         | pcf.orderers.LocalFlowOrderer()
     ).order(q, p, metadata=md)
     assert int(np.asarray(chained.ordering)[0]) == int(np.asarray(prior.ordering)[0])
+
+
+@pytest.mark.parametrize(
+    ("metric", "expected"),
+    [
+        (pcf.metrics.AlignedMomentumDistanceMetric(), True),
+        (pcf.metrics.FullPhaseSpaceDistanceMetric(), True),
+        (pcf.metrics.SpatialDistanceMetric(), False),
+    ],
+    ids=["aligned-momentum", "full-phase-space", "spatial"],
+)
+def test_quantity_localflow_reports_velocity_awareness(metric, expected):
+    """The Quantity path must set ``velocity_aware`` like the plain one.
+
+    It reaches ``_local_flow_walk`` directly rather than through the plain-array
+    dispatch, so the flag has to be set in both places or a later stage silently
+    drops back to position-only on unit-ful input. The value follows the metric,
+    not ``metric_scale``.
+    """
+    q, p = _arc_quantity()
+    usys = u.unitsystems.galactic
+    orderer = pcf.orderers.LocalFlowOrderer(config=pcf.WalkConfig(metric=metric))
+    result = orderer.order(q, p, metadata=StateMetadata(usys=usys))
+    assert result.velocity_aware is expected

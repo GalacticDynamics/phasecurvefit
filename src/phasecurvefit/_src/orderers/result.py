@@ -57,6 +57,16 @@ class OrderingResult(AbstractResult):
         it is the natural affine parameter for a downstream fit. ``None`` when
         the orderer does not provide one, in which case consumers fall back to
         index-uniform spacing.
+    velocity_aware : bool
+        Whether velocity informed this ordering, as opposed to positions alone.
+        It reflects the *metric* the orderer was configured with -- see
+        ``AbstractDistanceMetric.uses_velocity`` -- not any scale parameter: a
+        zero scale makes a phase-space metric numerically position-only, but
+        the orderer is still configured to use velocity.
+        A later stage reads it off ``init`` to decide whether it too should let
+        velocity participate: a stage that drops velocity after one that used it
+        re-conflates whatever the earlier stage separated with it. Orderers that
+        order on position alone leave it ``False``.
 
     Examples
     --------
@@ -131,6 +141,7 @@ class OrderingResult(AbstractResult):
     gamma_range: tuple[float, float] = eqx.field(static=True, default=(0.0, 1.0))
     backbone: VectorComponents | None = None
     chord: FSzN | None = None
+    velocity_aware: bool = eqx.field(static=True, default=False)
 
     def __check_init__(self) -> None:
         """Reject a degenerate ``gamma_range`` (its width divides in ``__call__``)."""

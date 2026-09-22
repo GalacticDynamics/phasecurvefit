@@ -366,6 +366,12 @@ class MSTOrderer(AbstractOrderer):
                 f"got {self.on_disconnected!r}."
             )
             raise ValueError(msg)
+        if self.velocity_weight < 0.0:
+            # Only ``> 0.0`` engages the phase-space edge weights, so a negative
+            # value would do nothing at all -- and would make ``velocity_aware``
+            # read False on an orderer the caller thought used velocity.
+            msg = f"velocity_weight must be >= 0, got {self.velocity_weight}."
+            raise ValueError(msg)
         if self.edge_clip_sigma is not None and self.edge_clip_sigma <= 0:
             msg = f"edge_clip_sigma must be positive, got {self.edge_clip_sigma}."
             raise ValueError(msg)
@@ -415,4 +421,8 @@ class MSTOrderer(AbstractOrderer):
             gamma_range=(-1.0, 1.0),
             backbone=backbone,
             chord=chord_along_ordering(qs, idx),
+            # ``orient_by_velocity`` only picks a direction; it does not make
+            # the ordering itself velocity-aware.
+            velocity_aware=self.velocity_weight > 0.0
+            or self.sever_cos_threshold is not None,
         )
