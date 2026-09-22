@@ -29,6 +29,31 @@ references:
       - type: url
         value: 'https://arxiv.org/abs/2201.12042'
   - type: article
+    title: 'On the Fast Track: Rapid construction of stellar stream paths'
+    authors:
+      - family-names: Starkman
+        given-names: Nathaniel
+      - family-names: Bovy
+        given-names: Jo
+      - family-names: Webb
+        given-names: Jeremy J.
+      - family-names: Calvetti
+        given-names: Daniela
+      - family-names: Somersalo
+        given-names: Erkki
+    journal: Monthly Notices of the Royal Astronomical Society
+    volume: 522
+    issue: 4
+    start: 5022
+    end: 5036
+    year: 2023
+    doi: 10.1093/mnras/stad1166
+    notes: >-
+      Cite if you use the SOM ordering stage (SOMOrderer or phasecurvefit.som).
+    identifiers:
+      - type: url
+        value: 'https://arxiv.org/abs/2212.00949'
+  - type: article
     title: 'Data analysis recipes: Fitting a model to data'
     authors:
       - family-names: Hogg

@@ -22,6 +22,7 @@ ae, *_ = pcf.nn.train_autoencoder(model, result, config=cfg, key=key)
 |---|---|---|
 | {class}`~phasecurvefit.orderers.LocalFlowOrderer` | open streams; multi-petal / self-intersecting curves where a coherent velocity field can be *followed* | velocity-following greedy walk from a start point |
 | {class}`~phasecurvefit.orderers.MSTOrderer` | **near-closed loops** and streams with no known starting point, e.g. where the velocity field *reverses* at an unknown progenitor | kNN graph → minimum spanning tree → longest-path (diameter) backbone → arc-length ordering |
+| {class}`~phasecurvefit.orderers.SOMOrderer` | **refining** any initial ordering; producing a continuous chord parameter for the fit | 1-D self-organizing map → smooth backbone → arc-length projection |
 
 The two are complementary. The walk needs a start point and follows the flow;
 where the velocity reverses at a progenitor it must start *at* the progenitor and
@@ -137,9 +138,11 @@ length units.
 
 ## Result: `OrderingResult`
 
-Both orderers return one unified type. Its `__call__` interpolates positions from
-the ordering parameter `gamma`: along the `backbone` polyline when one is present
-(MST), otherwise along the ordered visited observations (walk). The historical
+Every built-in orderer returns this one type. Its `__call__` interpolates
+positions from the ordering parameter `gamma`: along the `backbone` polyline when
+one is present -- {class}`~phasecurvefit.orderers.MSTOrderer` and
+{class}`~phasecurvefit.orderers.SOMOrderer` both fit one -- and otherwise along
+the ordered visited observations, which is what the walk does. The historical
 `WalkLocalFlowResult` is a thin subclass of `OrderingResult`.
 
 ## Chaining orderers
@@ -209,3 +212,11 @@ to. An outlier that {class}`~phasecurvefit.orderers.MSTOrderer`'s
 `edge_clip_sigma` dropped is visited again by the next stage unless that stage
 restricts itself to `init.indices`. Check `n_visited` on the final result if
 rejection is meant to stick.
+
+{class}`~phasecurvefit.orderers.SOMOrderer` is a stage that does restrict
+itself: it works on exactly the set the previous stage visited, so rejections
+do stick through it.
+
+## SOMOrderer
+
+See the dedicated {doc}`som` guide.
