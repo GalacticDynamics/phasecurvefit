@@ -389,6 +389,8 @@ DOI, together with the paper behind whichever component you used.
 
 - **momentum-weighted ordering** — Nibauer et al. (2022),
   [arXiv:2201.12042](https://arxiv.org/abs/2201.12042)
+- **SOM ordering** — Starkman et al. (2023), MNRAS 522, 5022,
+  [arXiv:2212.00949](https://arxiv.org/abs/2212.00949)
 - **mixture-model membership / outlier rejection** — Hogg, Bovy & Lang (2010),
   [arXiv:1008.4686](https://arxiv.org/abs/1008.4686)
 
