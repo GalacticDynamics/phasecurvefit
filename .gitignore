@@ -5,3 +5,6 @@ __pycache__
 
 # Local-only design/planning artifacts (superpowers)
 docs/superpowers/
+
+# hypothesis example database
+.hypothesis/
