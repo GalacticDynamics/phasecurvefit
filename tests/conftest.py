@@ -40,6 +40,38 @@ def _shuffle(pos, vel, t, rng):
     )
 
 
+def _flat_velocity(n):
+    """Return unit speed along +x, for curves whose velocity is never read."""
+    return {"x": jnp.ones(n), "y": jnp.zeros(n)}
+
+
+@pytest.fixture
+def flat_vel():
+    """Return `_flat_velocity`, for a bespoke ``pos`` with a trivial ``vel``."""
+    return _flat_velocity
+
+
+@pytest.fixture
+def line():
+    """Build ``n`` points evenly spaced along +x over ``[0, length]``, in order.
+
+    Deliberately not :func:`straight`, which shuffles and carries the true
+    derivative so a velocity-aware metric weighs it correctly. These are the
+    closed-form cases for the SOM core -- the chord along a straight backbone
+    is just the x coordinate -- where the input order is load-bearing (the
+    prototypes are asserted monotone) and the velocity is never read, every
+    caller passing ``SpatialDistanceMetric``.
+
+    Returns ``(pos, vel)``, so it serves as data and as a backbone alike.
+    """
+
+    def make(n, length):
+        pos = {"x": jnp.linspace(0.0, length, n), "y": jnp.zeros(n)}
+        return pos, _flat_velocity(n)
+
+    return make
+
+
 @pytest.fixture
 def straight():
     """Build a straight line: the trivial case every orderer must get right."""

@@ -60,6 +60,12 @@ class AbstractDistanceMetric(eqx.Module):
     #: custom velocity-aware metric back to position-only in a chain.
     uses_velocity: ClassVar[bool] = True
 
+    #: Whether ``d(a, b) == d(b, a)``. Defaults to ``True``: a distance is
+    #: normally symmetric, so asymmetry is the special case and should say so.
+    #: Consumers that compare a point to a *set* -- nearest-prototype in the
+    #: SOM -- are only meaningful under a symmetric metric.
+    is_symmetric: ClassVar[bool] = True
+
     __citation__: ClassVar[str | None]
 
     @abstractmethod
@@ -131,7 +137,7 @@ class SpatialDistanceMetric(AbstractDistanceMetric):
 
     uses_velocity: ClassVar[bool] = False  # Position only: velocity is never read.
 
-    __citation__: ClassVar = None
+    __citation__: ClassVar[str | None] = None
 
     def __call__(
         self,
@@ -203,6 +209,10 @@ class AlignedMomentumDistanceMetric(AbstractDistanceMetric):
     uses_velocity: ClassVar[bool] = (
         True  # Scores alignment with the direction of travel.
     )
+
+    #: Scores "forward along the direction of travel", so swapping the two
+    #: points changes the answer.
+    is_symmetric: ClassVar[bool] = False
 
     __citation__: ClassVar[str] = (
         "https://ui.adsabs.harvard.edu/abs/2022ApJ...940...22N/abstract"
@@ -307,7 +317,7 @@ class FullPhaseSpaceDistanceMetric(AbstractDistanceMetric):
 
     uses_velocity: ClassVar[bool] = True  # Combines position and velocity separations.
 
-    __citation__: ClassVar = None
+    __citation__: ClassVar[str | None] = None
 
     def __call__(
         self,
