@@ -89,6 +89,30 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  benchmark_smoke:
+    name: Benchmark Smoke Test
+    runs-on: ubuntu-latest
+    needs: [pre-commit]
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5.5.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          uv sync --no-default-groups --group test --locked
+
+      # Correctness only: --benchmark-disable runs each benchmark body exactly
+      # once, so breakage surfaces without timing noise or meaningful CI time.
+      # (Timing lives in the CodSpeed `benchmark` job below.)
+      - name: Run benchmarks once
+        run: |
+          uv run --frozen --no-default-groups --group test pytest tests/benchmarks/ --benchmark-disable
+
   benchmark:
     name: Run Benchmarks
     runs-on: ubuntu-24.04
@@ -114,7 +138,7 @@ jobs:
   status:
     name: CI Pass
     runs-on: ubuntu-latest
-    needs: [pre-commit, tests, test_oldest]
+    needs: [pre-commit, tests, test_oldest, benchmark_smoke]
     if: always()
     steps:
       - name: All required jobs passed
