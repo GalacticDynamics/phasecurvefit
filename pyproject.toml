@@ -26,7 +26,7 @@ dependencies = [
   "optax>=0.2.4",
   "optional-dependencies>=0.4.0",
   "plum-dispatch>=2.6.1",
-  "quax>=0.2.1",
+  "quax>=0.4",
   "scipy>=1.11",
   "zeroth>=1.0.1",
 ]
