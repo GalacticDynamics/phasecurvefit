@@ -132,3 +132,76 @@ class TestConformance:
         # __call__ finite over the range
         out = res(jnp.linspace(lo, hi, 7))
         assert jnp.all(jnp.isfinite(out["x"]))
+
+
+class TestVelocityAwareness:
+    """An orderer's result says whether velocity informed the ordering."""
+
+    def test_metrics_declare_whether_they_read_velocity(self):
+        """It is a property of the metric type, not of any scale parameter."""
+        assert pcf.metrics.SpatialDistanceMetric.uses_velocity is False
+        assert pcf.metrics.AlignedMomentumDistanceMetric.uses_velocity is True
+        assert pcf.metrics.FullPhaseSpaceDistanceMetric.uses_velocity is True
+
+    def test_a_custom_metric_defaults_to_velocity_aware(self):
+        """The signature takes velocities, so ignoring them is the special case.
+
+        Defaulting the other way would silently drop a third-party
+        velocity-aware metric back to position-only inside a chain.
+        """
+
+        class _Custom(pcf.metrics.AbstractDistanceMetric):
+            def __call__(self, q, p, qs, ps, scale):  # noqa: ARG002
+                return jnp.zeros(next(iter(qs.values())).shape[0])
+
+        assert _Custom.uses_velocity is True
+
+    def test_localflow_reports_its_metrics_answer(self, arc):
+        """The flag follows the metric, not ``metric_scale``.
+
+        A zero scale makes a phase-space metric numerically position-only, but
+        the walk is still configured to follow the flow. Keying on the metric
+        also keeps the flag static: ``metric_scale`` is a differentiable leaf
+        and is a tracer under ``jit``/``grad``.
+        """
+        pos, vel, _ = arc()
+        assert pcf.orderers.LocalFlowOrderer().order(pos, vel).velocity_aware is True
+        zero = pcf.orderers.LocalFlowOrderer(metric_scale=0.0)
+        assert zero.order(pos, vel).velocity_aware is True
+        spatial = pcf.orderers.LocalFlowOrderer(
+            config=pcf.WalkConfig(metric=pcf.metrics.SpatialDistanceMetric())
+        )
+        assert spatial.order(pos, vel).velocity_aware is False
+
+    def test_the_deprecated_walk_reports_it_too(self, arc):
+        """The flag is set by the walk, not by the orderer wrapping it.
+
+        Direct callers of the walk -- including the deprecated
+        ``walk_local_flow`` -- get the same answer as ``order``, so a
+        downstream stage reading ``init.velocity_aware`` is not misled by
+        which entry point produced the result.
+        """
+        pos, vel, _ = arc()
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            assert pcf.walk_local_flow(pos, vel).velocity_aware is True
+
+    def test_mst_reports_velocity_awareness(self, arc):
+        """Only settings that steer the ordering count, not orient_by_velocity."""
+        pos, vel, _ = arc()
+        plain = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0)
+        assert plain.order(pos, vel).velocity_aware is False
+        for kw in ({"sever_cos_threshold": 0.9}, {"velocity_weight": 0.5}):
+            orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, **kw)
+            assert orderer.order(pos, vel).velocity_aware is True
+        oriented = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, orient_by_velocity=True)
+        assert oriented.order(pos, vel).velocity_aware is False
+
+
+def test_mst_rejects_a_negative_velocity_weight():
+    """Only ``> 0`` engages the phase-space edge weights.
+
+    A negative value silently did nothing, and reported ``velocity_aware``
+    False on an orderer the caller believed was using velocity.
+    """
+    with pytest.raises(ValueError, match="velocity_weight must be >= 0"):
+        pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, velocity_weight=-1.0)

@@ -39,6 +39,13 @@ class AbstractDistanceMetric(eqx.Module):
     Different metrics can implement different weighting schemes or use different
     phase-space representations.
 
+    Subclasses declare ``uses_velocity``: whether the metric reads velocity at
+    all. It is a property of the metric *type*, not of any scale parameter --
+    a scale of zero makes a phase-space metric numerically position-only, but
+    the metric still is one. An orderer reports that as its result's
+    ``velocity_aware``, so a later stage knows whether velocity informed the
+    ordering it is refining.
+
     Examples
     --------
     >>> import phasecurvefit as pcf
@@ -46,6 +53,12 @@ class AbstractDistanceMetric(eqx.Module):
     >>> # Use with walk_local_flow via metric parameter
 
     """
+
+    #: Whether this metric reads velocity at all. Defaults to ``True``: the
+    #: signature takes velocities, so a metric that ignores them is the special
+    #: case and should say so. Defaulting the other way would silently drop a
+    #: custom velocity-aware metric back to position-only in a chain.
+    uses_velocity: ClassVar[bool] = True
 
     __citation__: ClassVar[str | None]
 
@@ -116,6 +129,8 @@ class SpatialDistanceMetric(AbstractDistanceMetric):
 
     """
 
+    uses_velocity: ClassVar[bool] = False  # Position only: velocity is never read.
+
     __citation__: ClassVar = None
 
     def __call__(
@@ -184,6 +199,10 @@ class AlignedMomentumDistanceMetric(AbstractDistanceMetric):
     (3,)
 
     """
+
+    uses_velocity: ClassVar[bool] = (
+        True  # Scores alignment with the direction of travel.
+    )
 
     __citation__: ClassVar[str] = (
         "https://ui.adsabs.harvard.edu/abs/2022ApJ...940...22N/abstract"
@@ -285,6 +304,8 @@ class FullPhaseSpaceDistanceMetric(AbstractDistanceMetric):
     (3,)
 
     """
+
+    uses_velocity: ClassVar[bool] = True  # Combines position and velocity separations.
 
     __citation__: ClassVar = None
 

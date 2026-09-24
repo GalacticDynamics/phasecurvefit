@@ -14,6 +14,7 @@ from typing import NamedTuple
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from jaxtyping import Array
 from scipy.stats import spearmanr
 
 
@@ -24,8 +25,8 @@ class Curve(NamedTuple):
     measures how well an orderer recovered it.
     """
 
-    positions: dict
-    velocities: dict
+    positions: dict[str, Array]
+    velocities: dict[str, Array]
     t: np.ndarray
 
 

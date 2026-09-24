@@ -694,7 +694,8 @@ def _local_flow_walk(
       },
       indices=i32[3],
       gamma_range=(0.0, 1.0),
-      chord=Quantity(f32[3], unit='m')
+      chord=Quantity(f32[3], unit='m'),
+      velocity_aware=True
     )
 
     """
@@ -864,6 +865,9 @@ def order(
     chord = chord_along_ordering(
         {k: u.ustrip(usys, v) for k, v in result.positions.items()}, result.indices
     )
+    # ``velocity_aware`` is not set here: ``_local_flow_walk`` already derives
+    # it from the same ``config``, so overriding would only restate it.
     return dataclassish.replace(
-        result, chord=u.uconvert(position_unit, u.Q(chord, usys["length"]))
+        result,
+        chord=u.uconvert(position_unit, u.Q(chord, usys["length"])),
     )

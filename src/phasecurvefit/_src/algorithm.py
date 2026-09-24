@@ -520,11 +520,17 @@ def _local_flow_walk(
 
     # Package results into WalkLocalFlowResult. This is a NamedTuple, so can be
     # unpacked easily.
+    # Velocity-awareness is a property of the metric, not of ``metric_scale``: a
+    # zero scale makes a phase-space metric numerically position-only, but the
+    # walk is still configured to follow the flow. Set here rather than in
+    # `LocalFlowOrderer.order` so direct callers -- including the deprecated
+    # `walk_local_flow` -- report it too.
     return WalkLocalFlowResult(
         positions=dict(xs),
         velocities=dict(vs_original),
         indices=final_ordered,
         gamma_range=gamma_range,
+        velocity_aware=config.metric.uses_velocity,
     )
 
 
@@ -769,4 +775,8 @@ def combine_results(
         velocities=result_fwd.velocities,
         indices=indices,
         gamma_range=combined_gamma_range,
+        # Either walk having used velocity makes the combined ordering
+        # velocity-informed; taking only the forward result's flag would report
+        # a false negative on results built with different configs.
+        velocity_aware=result_fwd.velocity_aware or result_bwd.velocity_aware,
     )

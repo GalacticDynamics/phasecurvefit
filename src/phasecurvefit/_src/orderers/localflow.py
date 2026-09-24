@@ -57,8 +57,9 @@ def _with_chord(result: WalkLocalFlowResult) -> WalkLocalFlowResult:
 
     The walk has no separate backbone -- its curve is the path through the
     visited observations -- so the chord is the cumulative distance along that
-    path. ``chord`` is not a static field but the result is built inside
-    ``_local_flow_walk``, so it is filled in afterwards.
+    path. Attached here rather than inside ``_local_flow_walk`` because
+    ``chord_along_ordering`` lives in ``orderers.base``, which imports from
+    ``algorithm`` -- the walk cannot call it without a cycle.
     """
     return dataclassish.replace(
         result, chord=chord_along_ordering(result.positions, result.indices)
