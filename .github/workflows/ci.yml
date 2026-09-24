@@ -102,12 +102,16 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install
+        run: |
+          uv sync --no-default-groups --group test --locked
+
       # Correctness only: --benchmark-disable runs each benchmark body exactly
       # once, so breakage surfaces without timing noise or meaningful CI time.
       # (Timing lives in the CodSpeed `benchmark` job below.)
       - name: Run benchmarks once
         run: |
-          uv run --frozen --group test pytest tests/benchmarks/ --benchmark-disable
+          uv run --frozen --no-default-groups --group test pytest tests/benchmarks/ --benchmark-disable
 
   benchmark:
     name: Run Benchmarks
