@@ -102,8 +102,7 @@ class StateMetadata(quax.Value):
     def __iter__(self) -> Iterator:
         return iter(self._data)
 
-    @staticmethod
-    def aval() -> jax.core.ShapedArray:
+    def aval(self) -> jax.core.ShapedArray:
         """Return a placeholder abstract value so JAX tracing is satisfied."""
         return jax.core.ShapedArray((), jnp.dtype(bool))
 
