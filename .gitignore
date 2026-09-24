@@ -8,3 +8,8 @@ docs/superpowers/
 
 # hypothesis example database
 .hypothesis/
+
+# coverage.py data & reports
+.coverage
+.coverage.*
+htmlcov/
