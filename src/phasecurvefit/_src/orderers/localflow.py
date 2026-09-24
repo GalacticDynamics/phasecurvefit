@@ -5,8 +5,12 @@ __all__: tuple[str, ...] = ("LocalFlowOrderer",)
 import equinox as eqx
 import jax.numpy as jnp
 import plum
+from jaxtyping import Array, Int
 
-from .base import AbstractOrderer
+import dataclassish
+
+from .base import AbstractOrderer, chord_along_ordering
+from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import (
     Direction,
     StateMetadata,
@@ -15,6 +19,50 @@ from phasecurvefit._src.algorithm import (
 )
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.query_config import WalkConfig
+
+
+def _resolve_start_idx(
+    start_idx: int | None, init: AbstractResult | None
+) -> int | Int[Array, ""]:
+    """Pick where the walk starts, taking it from ``init`` when unset.
+
+    An explicit index always wins. Otherwise the first observation of the prior
+    stage's ordering is used: an ``MSTOrderer`` orders tip to tip along the
+    graph diameter, so its first observation is an endpoint of the curve --
+    which is what the walk needs and what the caller would otherwise have to
+    work out by hand.
+
+    Falls back to ``0`` with no prior stage, matching the old default.
+    """
+    if start_idx is not None:
+        return start_idx
+    if init is None:
+        return 0
+    indices = jnp.asarray(init.indices)
+    visited = indices >= 0
+    # Reductions rather than `indices[visited]`: the mask would materialize a
+    # variable-length array and pull it to host just to read element 0.
+    # ``argmax`` on a boolean gives the first True, and is meaningless when
+    # there is none, so the fallback is selected on device and only the answer
+    # crosses to host -- one synchronization rather than two.
+    first = indices[jnp.argmax(visited)]
+    # Left as a JAX scalar rather than `int(...)`: under `jit` the prior stage's
+    # indices are traced, and concretizing here would make a chain unjittable.
+    # The walk accepts a traced start index.
+    return jnp.where(jnp.any(visited), first, 0)
+
+
+def _with_chord(result: WalkLocalFlowResult) -> WalkLocalFlowResult:
+    """Attach the arc length along the walk path.
+
+    The walk has no separate backbone -- its curve is the path through the
+    visited observations -- so the chord is the cumulative distance along that
+    path. ``chord`` is not a static field but the result is built inside
+    ``_local_flow_walk``, so it is filled in afterwards.
+    """
+    return dataclassish.replace(
+        result, chord=chord_along_ordering(result.positions, result.indices)
+    )
 
 
 class LocalFlowOrderer(AbstractOrderer):
@@ -32,7 +80,22 @@ class LocalFlowOrderer(AbstractOrderer):
     config
         Neighbor-query configuration (metric + strategy).
     start_idx
-        Index of the starting observation.
+        Index of the starting observation. ``None`` (the default) takes the
+        start from ``init`` when the walk is chained after another orderer, and
+        falls back to ``0`` when it is not.
+
+        The walk has to be told where a curve *ends*, and picking that index by
+        hand means knowing the answer in advance. An
+        :class:`~phasecurvefit.orderers.MSTOrderer` finds the two tips itself --
+        its ordering is the graph diameter, tip to tip -- so its first ordered
+        observation is a genuine endpoint::
+
+            (
+                pcf.orderers.MSTOrderer(k=16, jump_cap=3.0)
+                | pcf.orderers.LocalFlowOrderer()
+            )
+
+        An explicit ``start_idx`` always wins, chained or not.
     direction
         ``"forward"``, ``"backward"``, or ``"both"``.
     max_dist
@@ -46,7 +109,7 @@ class LocalFlowOrderer(AbstractOrderer):
 
     metric_scale: float = 1.0
     config: WalkConfig = eqx.field(default_factory=WalkConfig)
-    start_idx: int = eqx.field(static=True, default=0)
+    start_idx: int | None = eqx.field(static=True, default=None)
     direction: Direction = eqx.field(static=True, default="forward")
     max_dist: float = jnp.inf
     terminate_indices: frozenset[int] | None = eqx.field(static=True, default=None)
@@ -59,15 +122,16 @@ class LocalFlowOrderer(AbstractOrderer):
         velocities: VectorComponents,
         *,
         metadata: StateMetadata | None = None,
+        init: AbstractResult | None = None,
     ) -> WalkLocalFlowResult:
         """Run the local-flow walk and return its result."""
         kwargs: dict[str, object] = {}
         if metadata is not None:
             kwargs["metadata"] = metadata
-        return _local_flow_walk(
+        result = _local_flow_walk(
             positions,
             velocities,
-            start_idx=self.start_idx,
+            start_idx=_resolve_start_idx(self.start_idx, init),
             metric_scale=self.metric_scale,
             max_dist=self.max_dist,
             terminate_indices=self.terminate_indices,
@@ -76,3 +140,4 @@ class LocalFlowOrderer(AbstractOrderer):
             direction=self.direction,
             **kwargs,
         )
+        return _with_chord(result)

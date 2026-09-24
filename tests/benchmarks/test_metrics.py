@@ -12,7 +12,7 @@ class TestMetricsAndStrategiesBenchmarks:
 
         # Default strategy is BruteForce, spatial metric via metric_scale=0
         orderer = pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=0.0)
-        result = benchmark(pcf.order, pos, vel, orderer)
+        result = benchmark(orderer.order, pos, vel)
 
         assert result.indices.shape == (50,)
 
@@ -24,7 +24,7 @@ class TestMetricsAndStrategiesBenchmarks:
 
         # Full phase-space metric is the default with metric_scale > 0
         orderer = pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
-        result = benchmark(pcf.order, pos, vel, orderer)
+        result = benchmark(orderer.order, pos, vel)
 
         assert result.indices.shape == (50,)
 
@@ -36,6 +36,6 @@ class TestMetricsAndStrategiesBenchmarks:
         orderer = pcf.orderers.LocalFlowOrderer(
             start_idx=0, metric_scale=1.0, config=config
         )
-        result = benchmark(pcf.order, pos, vel, orderer)
+        result = benchmark(orderer.order, pos, vel)
 
         assert result.indices.shape == (50,)

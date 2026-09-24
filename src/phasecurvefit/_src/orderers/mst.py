@@ -40,8 +40,9 @@ from scipy.sparse.csgraph import (
 )
 from scipy.spatial import cKDTree
 
-from .base import AbstractOrderer
+from .base import AbstractOrderer, _check_component_keys, chord_along_ordering
 from .result import OrderingResult
+from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
 
@@ -379,16 +380,10 @@ class MSTOrderer(AbstractOrderer):
         velocities: VectorComponents,
         *,
         metadata: StateMetadata | None = None,  # noqa: ARG002
+        init: AbstractResult | None = None,  # noqa: ARG002
     ) -> OrderingResult:
         """Order tracers along the MST backbone (host-side)."""
-        if set(positions) != set(velocities):
-            missing = sorted(set(positions) - set(velocities))
-            extra = sorted(set(velocities) - set(positions))
-            msg = (
-                "positions and velocities must have the same component keys; "
-                f"missing={missing}, extra={extra}."
-            )
-            raise ValueError(msg)
+        _check_component_keys(positions, velocities)
 
         comps = sorted(positions)
         P = np.stack([np.asarray(positions[c]) for c in comps], axis=1)
@@ -411,10 +406,13 @@ class MSTOrderer(AbstractOrderer):
         idx_full[: order_idx.size] = order_idx
 
         backbone = {c: jnp.asarray(backbone_P[:, i]) for i, c in enumerate(comps)}
+        qs = {key: jnp.asarray(val) for key, val in positions.items()}
+        idx = jnp.asarray(idx_full)
         return OrderingResult(
-            positions={key: jnp.asarray(val) for key, val in positions.items()},
+            positions=qs,
             velocities={key: jnp.asarray(val) for key, val in velocities.items()},
-            indices=jnp.asarray(idx_full),
+            indices=idx,
             gamma_range=(-1.0, 1.0),
             backbone=backbone,
+            chord=chord_along_ordering(qs, idx),
         )
