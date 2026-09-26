@@ -117,7 +117,7 @@ not installed. Falling back to cpu.
 Install JAX's CUDA-enabled build alongside phasecurvefit:
 
 ```bash
-pip install "phasecurvefit[all]" "jax[cuda12]"
+pip install --upgrade "phasecurvefit[all]" "jax[cuda12]"
 ```
 
 Or with uv:
@@ -127,8 +127,11 @@ uv add phasecurvefit --extra all
 uv add "jax[cuda12]"
 ```
 
-This pulls in self-contained NVIDIA CUDA/cuDNN wheels — no system CUDA toolkit
-install required. See the
+This pulls in self-contained NVIDIA CUDA/cuDNN wheels — you don't need the CUDA
+toolkit installed system-wide — but you do still need a
+[compatible NVIDIA driver](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for your GPU. `--upgrade` ensures pip actually swaps in the CUDA-enabled
+`jaxlib` even if a CPU-only one is already installed. See the
 [JAX GPU installation guide](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
 for other CUDA versions or platforms (TPU, ROCm), and verify the install with:
 
