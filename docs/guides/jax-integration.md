@@ -193,14 +193,22 @@ not installed. Falling back to cpu.
 
 Install JAX's CUDA-enabled build alongside phasecurvefit to fix this:
 
+::::{tab-set}
+
+:::{tab-item} pip
 ```bash
 pip install phasecurvefit[all] "jax[cuda12]"
 ```
+:::
 
+:::{tab-item} uv
 ```bash
 uv add phasecurvefit --extra all
 uv add "jax[cuda12]"
 ```
+:::
+
+::::
 
 This pulls in self-contained NVIDIA CUDA/cuDNN wheels — no system CUDA
 toolkit install required. See the
