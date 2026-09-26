@@ -22,6 +22,13 @@ uv add phasecurvefit
 
 ::::
 
+```{note}
+The plain pip/uv install above ships a **CPU-only** `jaxlib`. If you have an
+NVIDIA GPU and see phasecurvefit or JAX fall back to CPU, see
+[Installing for GPU](jax-integration.md#installing-for-gpu-nvidia-cuda) in
+the JAX Integration guide.
+```
+
 ## Basic Usage
 
 ### 1. Import the library
