@@ -19,15 +19,6 @@ contaminated data.
 ::::{grid} 1 2 2 3
 :gutter: 2
 
-:::{grid-item-card} Outlier Rejection
-:link: outlier_rejection
-:link-type: doc
-
-Reject interlopers with a stream-plus-background mixture model, and see why the orderers alone can't.
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/outlier_rejection.ipynb)
-:::
-
 :::{grid-item-card} Stream Autoencoder
 :link: stream_autoencoder
 :link-type: doc
@@ -44,6 +35,24 @@ Reject interlopers with a stream-plus-background mixture model, and see why the 
 A faster, training-free mean track for the same stream, and when it is accurate enough.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_runningmean.ipynb)
+:::
+
+:::{grid-item-card} Stream MST Backbone
+:link: stream_mst
+:link-type: doc
+
+Order a stream with no progenitor or start index, and reject injected interlopers.
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_mst.ipynb)
+:::
+
+:::{grid-item-card} Outlier Rejection
+:link: outlier_rejection
+:link-type: doc
+
+Reject interlopers with a stream-plus-background mixture model, and see why the orderers alone can't.
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/outlier_rejection.ipynb)
 :::
 
 :::{grid-item-card} Epitrochoid Autoencoder
@@ -64,15 +73,6 @@ Why a running mean cuts inside tight bends, and how the window size controls it.
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_runningmean.ipynb)
 :::
 
-:::{grid-item-card} Stream MST Backbone
-:link: stream_mst
-:link-type: doc
-
-Order a stream with no progenitor or start index, and reject injected interlopers.
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_mst.ipynb)
-:::
-
 :::{grid-item-card} Epitrochoid MST Backbone
 :link: epitrochoid_mst
 :link-type: doc
@@ -81,18 +81,17 @@ Why the MST needs velocities on a self-crossing curve, plus a Fourier-feature de
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_mst.ipynb)
 :::
-
 ::::
 
 ```{toctree}
 :maxdepth: 1
 :hidden:
 
-outlier_rejection
 stream_autoencoder
 stream_runningmean
+stream_mst
+outlier_rejection
 epitrochoid_autoencoder
 epitrochoid_runningmean
-stream_mst
 epitrochoid_mst
 ```
