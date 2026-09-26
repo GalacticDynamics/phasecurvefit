@@ -117,7 +117,7 @@ local_scheme = "no-local-version"
 
 
 [tool.codespell]
-ignore-words-list = "leary"
+ignore-words-list = "leary,som"
 skip              = ["uv.lock", "*.ipynb"]
 
 
@@ -189,6 +189,9 @@ ignore = [
 ]
 "src/phasecurvefit/_src/phasespace.py" = [
   "UP040", # TypeAlias is more explicit for Python 3.12
+]
+"src/phasecurvefit/_src/som.py" = [
+  "N803", # P, C are conventional names for the stacked phase-space matrices
 ]
 "src/phasecurvefit/_version.py" = ["ALL"]
 
