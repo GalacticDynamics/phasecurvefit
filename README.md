@@ -84,6 +84,25 @@ uv add phasecurvefit --extra interop
 uv add phasecurvefit --extra kdtree
 ```
 
+### Running the Tutorials
+
+The
+[tutorial notebooks](https://phasecurvefit.readthedocs.io/en/latest/tutorials/index.html)
+need packages beyond the runtime `[all]` extra — `matplotlib` for plotting and
+`galax` for the mock-stream examples. Install them with the `tutorials` extra:
+
+```bash
+pip install phasecurvefit[tutorials]
+```
+
+```bash
+uv add phasecurvefit --extra tutorials
+```
+
+Note `[all]` intentionally does not include `tutorials`: `all` covers optional
+_runtime_ functionality, while `tutorials` covers packages only needed to run
+the example notebooks.
+
 ## Quick Start
 
 ```python
