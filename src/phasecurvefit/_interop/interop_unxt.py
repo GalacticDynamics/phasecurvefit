@@ -55,6 +55,7 @@ from phasecurvefit._src.orderers.localflow import (
 )
 from phasecurvefit._src.orderers.mst import MSTOrderer
 from phasecurvefit._src.orderers.result import OrderingResult
+from phasecurvefit._src.orderers.som import SOMOrderer
 from phasecurvefit._src.query_config import WalkConfig
 
 RQSz0: TypeAlias = Real[AbcQ, " "]  # noqa: UP040
@@ -788,6 +789,21 @@ def _require_usys(metadata: StateMetadata | None) -> u.AbstractUnitSystem:
     return usys
 
 
+def _chord_unit(
+    positions: VectorQComponents, usys: u.AbstractUnitSystem
+) -> u.AbstractUnit:
+    """Pick the unit for ``chord``, which is one length for all components.
+
+    ``backbone`` is per-component and keeps each component's own unit, but the
+    chord is a single distance along the track, so there is no component to
+    take the unit from. When every component agrees, that shared unit is the
+    least surprising answer; when they differ there is no defensible choice
+    among them, so fall back to the unit system the walk ran in.
+    """
+    units = {v.unit for v in positions.values()}
+    return units.pop() if len(units) == 1 else usys["length"]
+
+
 @MSTOrderer.order.dispatch
 def order(
     self: MSTOrderer,
@@ -801,8 +817,9 @@ def order(
 
     Strips units into ``usys`` (host-side), runs the MST pipeline, and reattaches
     units: ``positions``/``velocities`` keep their input units, and ``backbone``
-    and ``chord`` -- both lengths along the track -- are returned in the position
-    units.
+    keeps each component's own unit. ``chord`` is a single length for all
+    components, so it comes back in the shared position unit when the components
+    agree, and in ``usys["length"]`` when they do not.
     """
     usys = _require_usys(metadata)
     q_plain = {k: u.ustrip(usys, v) for k, v in positions.items()}
@@ -811,7 +828,7 @@ def order(
     result = self.order(q_plain, p_plain, metadata=metadata, init=init)
 
     length_unit = usys["length"]
-    position_unit = positions[next(iter(sorted(positions)))].unit
+    chord_unit = _chord_unit(positions, usys)
     backbone = {
         k: u.uconvert(positions[k].unit, u.Q(v, length_unit))
         for k, v in result.backbone.items()
@@ -821,7 +838,46 @@ def order(
         positions=dict(positions),
         velocities=dict(velocities),
         backbone=backbone,
-        chord=u.uconvert(position_unit, u.Q(result.chord, length_unit)),
+        chord=u.uconvert(chord_unit, u.Q(result.chord, length_unit)),
+    )
+
+
+@SOMOrderer.order.dispatch
+def order(
+    self: SOMOrderer,
+    positions: VectorQComponents,
+    velocities: VectorQComponents,
+    *,
+    metadata: StateMetadata | None = None,
+    init: AbstractResult | None = None,
+) -> OrderingResult:
+    """Order Quantity-valued tracers with the SOM.
+
+    Strips units into ``usys``, runs the SOM pipeline, and reattaches units:
+    ``positions``/``velocities`` keep their input units, and ``backbone`` keeps
+    each component's own unit. ``chord`` is a single length for all components,
+    so it comes back in the shared position unit when the components agree, and
+    in ``usys["length"]`` when they do not.
+    """
+    usys = _require_usys(metadata)
+    q_plain = {k: u.ustrip(usys, v) for k, v in positions.items()}
+    p_plain = {k: u.ustrip(usys, v) for k, v in velocities.items()}
+
+    result = self.order(q_plain, p_plain, metadata=metadata, init=init)
+
+    length_unit = usys["length"]
+    chord_unit = _chord_unit(positions, usys)
+    backbone = {
+        k: u.uconvert(positions[k].unit, u.Q(v, length_unit))
+        for k, v in result.backbone.items()
+    }
+    chord = u.uconvert(chord_unit, u.Q(result.chord, length_unit))
+    return dataclassish.replace(
+        result,
+        positions=dict(positions),
+        velocities=dict(velocities),
+        backbone=backbone,
+        chord=chord,
     )
 
 
@@ -861,7 +917,7 @@ def order(
     # directly, so the chord has to be attached here too or unit-ful callers
     # silently get ``None``. Compute it on stripped arrays and reattach, so it
     # comes back unit-ful like ``backbone`` does on the other orderers.
-    position_unit = positions[next(iter(sorted(positions)))].unit
+    chord_unit = _chord_unit(positions, usys)
     chord = chord_along_ordering(
         {k: u.ustrip(usys, v) for k, v in result.positions.items()}, result.indices
     )
@@ -869,5 +925,5 @@ def order(
     # it from the same ``config``, so overriding would only restate it.
     return dataclassish.replace(
         result,
-        chord=u.uconvert(position_unit, u.Q(chord, usys["length"])),
+        chord=u.uconvert(chord_unit, u.Q(chord, usys["length"])),
     )

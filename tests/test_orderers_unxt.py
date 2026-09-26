@@ -125,3 +125,53 @@ def test_quantity_localflow_reports_velocity_awareness(metric, expected):
     orderer = pcf.orderers.LocalFlowOrderer(config=pcf.WalkConfig(metric=metric))
     result = orderer.order(q, p, metadata=StateMetadata(usys=usys))
     assert result.velocity_aware is expected
+
+
+def test_chord_value_matches_the_stripped_pipeline():
+    """The unit-ful chord must be the right *number*, not just the right label.
+
+    Every other assertion here is on ``.unit``. A dispatch that relabelled
+    instead of converting would return a chord 1000x too small while still
+    tagged ``pc``, and pass all of them.
+    """
+    q, p = _arc_quantity()
+    q = {k: u.uconvert("pc", v) for k, v in q.items()}
+    # galactic's length is kpc, deliberately not the data's pc, so a dispatch
+    # that ignored the unit system could not pass by coincidence.
+    usys = u.unitsystems.galactic
+    orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0)
+
+    got = orderer.order(q, p, metadata=StateMetadata(usys=usys)).chord
+
+    stripped = orderer.order(
+        {k: u.ustrip(usys, v) for k, v in q.items()},
+        {k: u.ustrip(usys, v) for k, v in p.items()},
+    ).chord
+
+    assert got.unit == u.unit("pc")
+    np.testing.assert_allclose(
+        np.asarray(u.ustrip("kpc", got)), np.asarray(stripped), rtol=1e-5, atol=1e-8
+    )
+
+
+@pytest.mark.parametrize(
+    ("x_unit", "y_unit", "expected"),
+    [("pc", "pc", "pc"), ("pc", "kpc", "kpc")],
+    ids=["shared", "mixed"],
+)
+def test_chord_unit_falls_back_when_components_disagree(x_unit, y_unit, expected):
+    """``chord`` must not take its unit from whichever component sorts first.
+
+    It is one length for all components, so there is no component to take a
+    unit from. With a shared position unit that unit is used -- ``pc`` here,
+    which is not the unit system's, so the assertion cannot pass by
+    coincidence. With mixed units there is no defensible choice among them, so
+    it comes back in the unit system's length (``kpc`` for galactic).
+    """
+    q, p = _arc_quantity()
+    q["x"] = u.uconvert(x_unit, q["x"])
+    q["y"] = u.uconvert(y_unit, q["y"])
+    result = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(
+        q, p, metadata=StateMetadata(usys=u.unitsystems.galactic)
+    )
+    assert result.chord.unit == u.unit(expected)

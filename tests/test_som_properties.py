@@ -200,3 +200,57 @@ class TestMetrics:
             metric(one(pos, -1), one(vel, -1), many(pos, 0), many(vel, 0), scale)[0]
         )
         assert ab == pytest.approx(ba, rel=1e-4, abs=1e-4)
+
+
+class TestOrdererContract:
+    """Invariants every orderer owes its caller, whatever the curve."""
+
+    @SETTINGS
+    @given(
+        n=st.integers(min_value=30, max_value=120),
+        turns=st.floats(min_value=0.25, max_value=1.0, width=32),
+        n_prototypes=st.integers(min_value=5, max_value=20),
+    )
+    def test_ordering_is_a_permutation_of_the_visited_set(
+        self, helix, n, turns, n_prototypes
+    ):
+        """No observation is dropped, duplicated, or invented."""
+        pos, vel, _ = helix(n=n, turns=turns)
+        result = pcf.order(pos, vel, pcf.orderers.SOMOrderer(n_prototypes=n_prototypes))
+        idx = np.asarray(result.ordering)
+        assert np.array_equal(np.sort(idx), np.unique(idx))
+        assert idx.min() >= 0
+        assert idx.max() < n
+        assert int(result.n_visited) == int((np.asarray(result.indices) >= 0).sum())
+
+    @SETTINGS
+    @given(
+        n=st.integers(min_value=30, max_value=120),
+        n_prototypes=st.integers(min_value=5, max_value=20),
+    )
+    def test_chord_is_finite_on_every_visited_observation(self, helix, n, n_prototypes):
+        """`chord` is `nan` only where a stage declined to visit."""
+        pos, vel, _ = helix(n=n)
+        result = pcf.order(pos, vel, pcf.orderers.SOMOrderer(n_prototypes=n_prototypes))
+        chord = np.asarray(result.chord)
+        visited = np.asarray(result.indices) >= 0
+        assert np.isfinite(chord[np.asarray(result.ordering)]).all()
+        assert not visited.all() or np.isfinite(chord).all()
+
+    @SETTINGS
+    @given(n=st.integers(min_value=40, max_value=120))
+    def test_backbone_spans_the_data(self, helix, n):
+        """The backbone lies within the data's bounding box, not off in space.
+
+        A prototype that no datum reaches used to be moved to the coordinate
+        origin, which dragged the spline through a point on no part of the
+        curve. This asserts the property that regression violated.
+        """
+        pos, vel, _ = helix(n=n, radius=3.0, height=5.0)
+        result = pcf.order(pos, vel, pcf.orderers.SOMOrderer(n_prototypes=12))
+        for key, data in pos.items():
+            lo, hi = float(jnp.min(data)), float(jnp.max(data))
+            span = hi - lo
+            bb = np.asarray(result.backbone[key])
+            assert bb.min() >= lo - 0.25 * span
+            assert bb.max() <= hi + 0.25 * span

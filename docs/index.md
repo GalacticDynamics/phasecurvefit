@@ -13,6 +13,7 @@ guides/quickstart
 guides/metrics
 guides/algorithm
 guides/orderers
+guides/som
 guides/nn
 guides/outliers
 guides/jax-integration
@@ -262,6 +263,28 @@ If you use **mixture-model membership** for outlier rejection (see
   eprint={1008.4686},
   archivePrefix={arXiv},
   primaryClass={astro-ph.IM}
+}
+```
+
+If you use the **SOM ordering stage** ({class}`~phasecurvefit.orderers.SOMOrderer`
+or the {mod}`phasecurvefit.som` module, see {doc}`guides/som`), please cite
+Starkman et al. (2023), whose §2.2 and Appendix A are the method implemented
+there:
+
+```bibtex
+@article{starkman2023fasttrack,
+  title={On the Fast Track: Rapid construction of stellar stream paths},
+  author={Starkman, Nathaniel and Bovy, Jo and Webb, Jeremy J. and
+          Calvetti, Daniela and Somersalo, Erkki},
+  journal={Monthly Notices of the Royal Astronomical Society},
+  volume={522},
+  number={4},
+  pages={5022--5036},
+  year={2023},
+  doi={10.1093/mnras/stad1166},
+  eprint={2212.00949},
+  archivePrefix={arXiv},
+  primaryClass={astro-ph.GA}
 }
 ```
 

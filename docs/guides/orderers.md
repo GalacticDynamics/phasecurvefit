@@ -20,10 +20,12 @@ ae, *_ = pcf.nn.train_autoencoder(model, result, config=cfg, key=key)
 
 | Orderer | Best for | Mechanism |
 |---|---|---|
-| {class}`~phasecurvefit.orderers.LocalFlowOrderer` | open streams; multi-petal / self-intersecting curves where a coherent velocity field can be *followed* | velocity-following greedy walk from a start point |
-| {class}`~phasecurvefit.orderers.MSTOrderer` | **near-closed loops** and self-overlapping streams where the velocity field *reverses* and a single walk cannot traverse the arc | kNN graph → minimum spanning tree → longest-path (diameter) backbone → arc-length ordering |
+| {class}`~phasecurvefit.orderers.LocalFlowOrderer` | open curves; multi-petal / self-intersecting curves where a coherent velocity field can be *followed* | velocity-following greedy walk from a start point |
+| {class}`~phasecurvefit.orderers.MSTOrderer` | **near-closed loops** and self-overlapping curves where the velocity field *reverses* and a single walk cannot traverse the arc | kNN graph → minimum spanning tree → longest-path (diameter) backbone → arc-length ordering |
+| {class}`~phasecurvefit.orderers.SOMOrderer` | **refining** any initial ordering; producing a continuous chord parameter for the fit | 1-D self-organizing map → smooth backbone → arc-length projection |
 
-The two are complementary. The walk needs a start point and follows the flow; it
+The walk and the MST are complementary. The walk needs a start point and
+follows the flow; it
 covers only one arm when the velocity reverses at a progenitor. The MST needs no
 progenitor — the graph diameter finds the two tips itself — and orders tip-to-tip
 with bounded per-step jumps, which is exactly what a near-closed loop needs.
@@ -66,7 +68,7 @@ The hyperparameters (carried by the orderer object) are:
 - **`terminate_indices`**, **`n_max`** — optional stopping conditions.
 
 Because the walk *follows* a coherent flow, it is the right choice for open
-streams and for self-intersecting curves where the velocity stays coherent
+curves and for self-intersecting curves where the velocity stays coherent
 through the crossings. Its one blind spot is a near-closed loop whose velocity
 **reverses** at a progenitor: a single walk then covers only one arm — which is
 exactly where the [MSTOrderer](#mstorderer) takes over. For the walk's
@@ -135,11 +137,12 @@ length units.
 
 ## Result: `OrderingResult`
 
-Both orderers return one unified type. Its `__call__` interpolates positions from
-the ordering parameter `gamma`: along the `backbone` polyline when one is present
-(MST), otherwise along the ordered visited observations (walk). The historical
+Every built-in orderer returns this one type. Its `__call__` interpolates
+positions from the ordering parameter `gamma`: along the `backbone` polyline when
+one is present -- {class}`~phasecurvefit.orderers.MSTOrderer` and
+{class}`~phasecurvefit.orderers.SOMOrderer` both fit one -- and otherwise along
+the ordered visited observations, which is what the walk does. The historical
 `WalkLocalFlowResult` is a thin subclass of `OrderingResult`.
-```
 
 ## Chaining orderers
 
@@ -208,3 +211,11 @@ to. An outlier that {class}`~phasecurvefit.orderers.MSTOrderer`'s
 `edge_clip_sigma` dropped is visited again by the next stage unless that stage
 restricts itself to `init.indices`. Check `n_visited` on the final result if
 rejection is meant to stick.
+
+{class}`~phasecurvefit.orderers.SOMOrderer` is a stage that does restrict
+itself: it works on exactly the set the previous stage visited, so rejections
+do stick through it.
+
+## SOMOrderer
+
+See the dedicated {doc}`som` guide.
