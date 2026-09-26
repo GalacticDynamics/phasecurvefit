@@ -61,7 +61,8 @@ ordered_all = result.indices
 3. **Phase 2 (decoder)**: With the encoder frozen, the decoder is fit to a running
    mean of the ordered tracers' positions — a warm start for the track
 4. **Phase 3 (joint)**: Both networks train together on spatial reconstruction plus
-   velocity alignment, with the alignment weight ramped over `lambda_p`
+   velocity alignment, with the alignment weight ramped linearly from
+   `lambda_p[0]` to `lambda_p[1]` over the phase
 
 Each phase optimizes a different objective, so the concatenated `losses` returned
 by `train_autoencoder` can only be compared within a phase, and the returned model
