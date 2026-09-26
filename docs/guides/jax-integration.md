@@ -224,6 +224,7 @@ Once installed, no code changes are needed:
 ```python
 import jax
 import jax.numpy as jnp
+import phasecurvefit as pcf
 
 position = {"x": jnp.array([0.0, 1.0, 2.0, 3.0])}
 velocity = {"x": jnp.array([1.0, 1.0, 1.0, 1.0])}
