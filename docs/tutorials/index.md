@@ -2,6 +2,13 @@
 
 This section contains practical examples demonstrating how to use phasecurvefit.
 
+Running these notebooks locally requires the `tutorials` extra, which adds
+`matplotlib` and `galax` on top of `phasecurvefit[all]`:
+
+```bash
+pip install phasecurvefit[tutorials]
+```
+
 ::::{grid} 1 2 2 3
 :gutter: 2
 
