@@ -1068,18 +1068,27 @@ def train_autoencoder(
     chord: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[AutoencoderResult, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
-    r"""Train the PathAutoencoder in two phases.
+    r"""Train the PathAutoencoder in three phases.
 
-    This function orchestrates the complete two-phase training procedure:
+    This function orchestrates the complete three-phase training procedure:
 
     **Phase 1 (OrderingNet/Encoder)**: Trains the encoder to predict $\gamma$
     (ordering parameter) and $p$ (membership probability) from phase-space
     coordinates. Uses the ordering from the walk algorithm as supervision.
 
-    **Phase 2 (TrackNet/Decoder)**: Trains the decoder to reconstruct spatial
-    positions from $\gamma$ while aligning with velocity directions. Uses the
-    trained encoder to filter stream members based on membership probability
-    threshold.
+    **Phase 2 (TrackNet/Decoder)**: Trains the decoder, with the encoder
+    frozen, to reproduce a running mean of member positions as a function of
+    $\gamma$. Uses the trained encoder to filter stream members based on the
+    membership probability threshold.
+
+    **Phase 3 (joint)**: Trains encoder and decoder together on spatial
+    reconstruction plus velocity alignment, with the velocity weight ramped
+    over ``config.lambda_p``. Skipped when ``config.n_epochs_both == 0``.
+
+    Each phase optimizes a different objective, so the concatenated ``losses``
+    are not comparable across phase boundaries. The returned model holds the
+    weights from the final epoch of the last phase that ran; no best-epoch
+    checkpoint is kept.
 
     Parameters
     ----------
@@ -1095,7 +1104,7 @@ def train_autoencoder(
         through to the encoder's arclength target. The ``OrderingResult``
         overload supplies this automatically.
     config : TrainingConfig | None, optional
-        Complete training configuration for both phases.
+        Complete training configuration for all three phases.
         If `None` (default), uses default configuration.
     key : PRNGKeyArray
         Random key for training (split internally for each phase).
@@ -1106,8 +1115,8 @@ def train_autoencoder(
         Result containing the fully trained autoencoder and ordering data.
     opt_states : dict[str, optax.OptState]
         Dictionary with 'encoder', 'decoder' and 'both' optimizer states.
-    losses : Array, shape (n_epochs_encoder + n_epochs_both,)
-        Concatenated training losses from both phases.
+    losses : Array, shape (n_epochs_encoder + n_epochs_decoder + n_epochs_both,)
+        Per-epoch training losses of the three phases, concatenated in order.
 
     """
     # Build default config if none provided
