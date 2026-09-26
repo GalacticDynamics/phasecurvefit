@@ -38,9 +38,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
-all     = ["phasecurvefit[interop,kdtree]"]
-interop = ["unxt>=1.10.4"]
-kdtree  = ["jaxkd>=0.0.5"]
+all       = ["phasecurvefit[interop,kdtree]"]
+interop   = ["unxt>=1.10.4"]
+kdtree    = ["jaxkd>=0.0.5"]
+tutorials = ["phasecurvefit[interop]", "galax", "matplotlib>=3.10.8"]
 
 [project.urls]
 "Bug Tracker" = "https://github.com/GalacticDynamics/phasecurvefit/issues"
