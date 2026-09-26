@@ -5,7 +5,7 @@ import abc
 __all__: tuple[str, ...] = ("AbstractExternalDecoder", "RunningMeanDecoder")
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, Literal, TypeAlias
 
 import equinox as eqx
 import jax
@@ -81,6 +81,13 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         Training positions (normalized).
     window_size : float
         Window size in gamma-space.
+    empty_window : {"nan", "nearest"}
+        What to return when no member star lies within ``window_size / 2`` of
+        the query gamma. ``"nan"`` (default) returns NaN in every coordinate,
+        so plots show a gap and downstream code can detect the missing value.
+        ``"nearest"`` returns the mean position of the member star(s) whose
+        gamma is closest to the query. If there are no members at all, NaN is
+        returned in either mode.
 
     """
 
@@ -88,6 +95,12 @@ class RunningMeanDecoder(AbstractExternalDecoder):
     gamma_train: Float[Array, " N"] | None = None
     positions_train: Float[Array, " N D"] | None = None
     member_train: Bool[Array, " N"] | None = None
+    empty_window: Literal["nan", "nearest"] = eqx.field(default="nan", static=True)
+
+    def __check_init__(self) -> None:
+        if self.empty_window not in ("nan", "nearest"):
+            msg = f"empty_window must be 'nan' or 'nearest', got {self.empty_window!r}"
+            raise ValueError(msg)
 
     def __call__(self, gamma: RSz0, /, key: PRNGKeyArray | None = None) -> FSz0:
         """Decode a single gamma value to position using running mean.
@@ -103,7 +116,10 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         Returns
         -------
         position : Array, shape (D,)
-            Reconstructed position.
+            Reconstructed position (normalized). If no member star lies within
+            ``window_size / 2`` of ``gamma``, this is NaN when
+            ``empty_window="nan"``, or the mean of the nearest member(s) in
+            gamma when ``empty_window="nearest"``.
 
         """
         del key  # Not used, but included for signature consistency
@@ -130,13 +146,22 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         # Find samples within the window
         in_window = jnp.abs(gamma_train - gamma) < (self.window_size / 2)
 
-        # Compute weighted mean (uniform weights within window)
-        weights = in_window.astype(q_train.dtype) * member_train.astype(q_train.dtype)
-        total_weight = jnp.sum(weights) + 1e-10
+        # Uniform weights for member stars within the window
+        weights = (in_window & member_train).astype(q_train.dtype)
 
-        # Weighted mean position
+        if self.empty_window == "nearest":
+            # For an empty window, fall back to the member(s) nearest in gamma.
+            dist = jnp.where(member_train, jnp.abs(gamma_train - gamma), jnp.inf)
+            nearest = (dist == jnp.min(dist)) & member_train
+            weights = jnp.where(
+                jnp.any(weights > 0), weights, nearest.astype(q_train.dtype)
+            )
+
+        # Weighted mean position; NaN where there is no weight at all.
+        total_weight = jnp.sum(weights)
         weighted_pos = jnp.sum(q_train * weights[:, None], axis=0)
-        return weighted_pos / total_weight
+        safe_total = jnp.where(total_weight > 0, total_weight, 1.0)
+        return jnp.where(total_weight > 0, weighted_pos / safe_total, jnp.nan)
 
     @classmethod
     def make(
@@ -150,6 +175,7 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         key: PRNGKeyArray | None = None,
         window_size: float = 0.05,
         member_threshold: float = 0.5,
+        empty_window: Literal["nan", "nearest"] = "nan",
     ) -> "RunningMeanDecoder":
         r"""Create a running-mean decoder for non-parametric position reconstruction.
 
@@ -158,9 +184,13 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         query $\gamma$, the decoder:
 
         1. Predicts $\gamma$ values for all training samples using the encoder
-        2. Finds samples whose $\gamma$ is within [$\gamma$ - window_size/2,
-           $\gamma$ + window_size/2]
+        2. Finds member samples whose $\gamma$ is within
+           [$\gamma$ - window_size/2, $\gamma$ + window_size/2]
         3. Returns the mean position of those samples
+
+        If the window contains no member samples, the result is controlled by
+        ``empty_window``: NaN (default) or the mean of the nearest member(s)
+        in $\gamma$.
 
         This provides a simple, non-parametric alternative to training a neural
         network decoder. It works well when the stream is smooth and well-sampled.
@@ -179,12 +209,17 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         key : PRNGKeyArray, optional
             Random key for any stochastic operations (not used here, but
             included for consistency).
-        window_size : float, default=0.1
+        window_size : float, default=0.05
             Window size in $\gamma$-space for computing running mean.  Smaller
             values give more localized (less smooth) reconstruction.
         member_threshold : float, default=0.5
             Membership probability threshold for including samples in the
             running mean.
+        empty_window : {"nan", "nearest"}, default="nan"
+            Behaviour when no member sample falls in the window. ``"nan"``
+            returns NaN (so plots show gaps and downstream code can detect
+            them); ``"nearest"`` returns the mean position of the member(s)
+            closest in $\gamma$.
 
         Returns
         -------
@@ -202,7 +237,8 @@ class RunningMeanDecoder(AbstractExternalDecoder):
                     {\sum_i \mathbb{1}_{|\gamma_i - \gamma| < w/2}}
         $$
 
-        where $w$ is the window size.
+        where $w$ is the window size and the sums run over member samples.
+        When the denominator is zero (an empty window), see ``empty_window``.
 
         The decoder stores the encoder and training data, so it can be used
         independently after creation.
@@ -274,6 +310,7 @@ class RunningMeanDecoder(AbstractExternalDecoder):
             positions_train=qs_norm,
             member_train=is_member,
             window_size=window_size,
+            empty_window=empty_window,
         )
 
     def update(
@@ -312,5 +349,6 @@ class RunningMeanDecoder(AbstractExternalDecoder):
             qs_norm,
             ps_norm,
             window_size=self.window_size,
+            empty_window=self.empty_window,
         )
         return decoder  # noqa: RET504

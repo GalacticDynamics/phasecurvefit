@@ -1173,6 +1173,9 @@ def train_autoencoder(
         member_train=decoder_mask,
     )
     mean_qs = jax.vmap(mean_fn, (0, None))(gamma_ord, keys[2])
+    # Masked-out points can have empty windows (NaN targets). They don't enter
+    # the loss, but NaN * 0 is still NaN, so zero them explicitly.
+    mean_qs = jnp.where(decoder_mask[:, None], mean_qs, 0.0)
 
     # Train the decoder to reconstruct the running-mean positions from gamma.
     config_decoder = config.decoderonly_config()

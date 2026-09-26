@@ -1,5 +1,6 @@
 """Tests for EncoderExternalDecoder with running-mean decoder."""
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -489,3 +490,67 @@ class TestIntegration:
 
         # Gamma ordering should make sense (monotonic for this simple case)
         assert jnp.corrcoef(gamma_simple, jnp.arange(N))[0, 1] > 0.7
+
+
+class TestRunningMeanDecoderEmptyWindow:
+    """Tests for RunningMeanDecoder behaviour when the window is empty."""
+
+    @pytest.fixture
+    def data(self):
+        """Training data with a gap in gamma between 0.3 and 0.7."""
+        gamma = jnp.array([0.0, 0.1, 0.2, 0.3, 0.7, 0.8, 0.9, 1.0])
+        positions = jnp.stack([gamma + 10.0, -gamma], axis=1)
+        member = jnp.array([True] * 7 + [False])
+        return gamma, positions, member
+
+    def _decoder(self, data, **kwargs):
+        gamma, positions, member = data
+        return pcf.nn.RunningMeanDecoder(
+            window_size=0.1,
+            gamma_train=gamma,
+            positions_train=positions,
+            member_train=member,
+            **kwargs,
+        )
+
+    def test_nonempty_window(self, data):
+        """A populated window returns the mean of its member stars."""
+        decoder = self._decoder(data)
+        out = eqx.filter_jit(decoder)(jnp.array(0.12))
+        assert jnp.allclose(out, jnp.array([10.1, -0.1]))
+
+    def test_empty_window_returns_nan(self, data):
+        """An empty window returns NaN, not the dataset mean (0)."""
+        decoder = self._decoder(data)
+        out = jax.jit(jax.vmap(decoder))(jnp.array([0.5, 0.12]))
+        assert jnp.all(jnp.isnan(out[0]))
+        assert jnp.all(jnp.isfinite(out[1]))
+
+    def test_window_with_only_nonmembers_returns_nan(self, data):
+        """Non-member stars in the window do not count."""
+        decoder = self._decoder(data)
+        out = decoder(jnp.array(1.0))
+        assert jnp.all(jnp.isnan(out))
+
+    def test_empty_window_nearest(self, data):
+        """``empty_window='nearest'`` falls back to the nearest member."""
+        decoder = self._decoder(data, empty_window="nearest")
+        out = jax.jit(jax.vmap(decoder))(jnp.array([0.45, 0.6, 1.0]))
+        # nearest member to 0.45 is gamma=0.3; to 0.6 is 0.7; to 1.0 is 0.9
+        # (gamma=1.0 is not a member).
+        expected = jnp.array([[10.3, -0.3], [10.7, -0.7], [10.9, -0.9]])
+        assert jnp.allclose(out, expected)
+
+    def test_nearest_no_members_returns_nan(self, data):
+        """With no members at all, even 'nearest' returns NaN."""
+        gamma, positions, _ = data
+        decoder = self._decoder(
+            (gamma, positions, jnp.zeros_like(gamma, dtype=bool)),
+            empty_window="nearest",
+        )
+        assert jnp.all(jnp.isnan(decoder(jnp.array(0.5))))
+
+    def test_invalid_empty_window(self, data):
+        """An unknown ``empty_window`` option raises."""
+        with pytest.raises(ValueError, match="empty_window"):
+            self._decoder(data, empty_window="zero")
