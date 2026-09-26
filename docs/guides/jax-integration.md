@@ -197,7 +197,7 @@ Install JAX's CUDA-enabled build alongside phasecurvefit to fix this:
 
 :::{tab-item} pip
 ```bash
-pip install phasecurvefit[all] "jax[cuda12]"
+pip install "phasecurvefit[all]" "jax[cuda12]"
 ```
 :::
 

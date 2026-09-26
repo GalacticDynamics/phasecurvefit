@@ -117,7 +117,7 @@ not installed. Falling back to cpu.
 Install JAX's CUDA-enabled build alongside phasecurvefit:
 
 ```bash
-pip install phasecurvefit[all] "jax[cuda12]"
+pip install "phasecurvefit[all]" "jax[cuda12]"
 ```
 
 Or with uv:
