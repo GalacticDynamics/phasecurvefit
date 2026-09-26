@@ -1,5 +1,8 @@
 """Tests for the phase flow walking algorithm."""
 
+import ast
+import pathlib
+
 import equinox as eqx
 import jax.numpy as jnp
 import jax.random as jr
@@ -671,3 +674,82 @@ class TestCombineFlowWalks:
         # Should raise an error when combining
         with pytest.raises((eqx.EquinoxRuntimeError, ValueError)):
             pcf.combine_results(res1, res2)
+
+
+def _names_state_metadata(func: ast.expr) -> bool:
+    """Whether ``func`` names ``StateMetadata``, bare or qualified.
+
+    Both spellings carry the identical hazard, so matching only ``ast.Name``
+    would let ``metadata=pcf.StateMetadata()`` reintroduce it unnoticed.
+    """
+    if isinstance(func, ast.Name):
+        return func.id == "StateMetadata"
+    return isinstance(func, ast.Attribute) and func.attr == "StateMetadata"
+
+
+def test_no_function_takes_a_state_metadata_default():
+    """``StateMetadata()`` as a default is one instance shared by every call.
+
+    Its *attributes* are frozen -- ``m["usys"] = ...`` raises -- but ``_data``
+    is an ordinary dict, so a mutation reaching through that private attribute
+    persists into every subsequent call that omits the argument. ``None`` plus
+    an in-body construction gives each call its own.
+
+    This sweeps the package source rather than the two sites that had the
+    defect, because the hazard is the construct, not the call site. It reads
+    the source instead of introspecting objects because these functions are
+    ``plum`` dispatches: the module attribute is a ``plum.Function``, which
+    ``inspect.isfunction`` rejects -- so an object-level sweep silently skips
+    exactly the functions at issue.
+    """
+    root = pathlib.Path(next(iter(pcf.__path__)))
+    offenders = []
+    for path in sorted(root.rglob("*.py")):
+        # Explicit utf-8, not the platform default: the package source
+        # carries non-ASCII (theta, lambda, pi, em dashes), which an
+        # ASCII default locale refuses outright and cp1252 silently
+        # mis-decodes. ``filename`` puts the real path in any SyntaxError.
+        source = path.read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(source, filename=str(path))):
+            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            args = node.args
+            defaults = [
+                *args.defaults,
+                *(d for d in args.kw_defaults if d is not None),
+            ]
+            offenders += [
+                f"{path.relative_to(root)}:{d.lineno} in {node.name}()"
+                for d in defaults
+                if isinstance(d, ast.Call) and _names_state_metadata(d.func)
+            ]
+
+    assert offenders == []
+
+
+class TestStateMetadataIsADict:
+    """``StateMetadata`` offers dict-like access, so it must convert like one.
+
+    It has ``__getitem__``, ``__contains__``, ``get`` and ``__iter__`` but had
+    no ``keys()``, so ``dict()`` silently took the iterable-of-pairs path over
+    the *keys* instead of the mapping path.
+    """
+
+    def test_dict_round_trips(self):
+        """``dict(metadata)`` returns the keys and values it was built with."""
+        md = pcf.StateMetadata(usys="SI", note="hello")
+        assert dict(md) == {"usys": "SI", "note": "hello"}
+
+    def test_double_star_unpacking_round_trips(self):
+        """``StateMetadata(**md)`` is how the interop dispatch carries keys."""
+        md = pcf.StateMetadata(usys="SI", note="hello")
+        assert dict(pcf.StateMetadata(**md)) == {"usys": "SI", "note": "hello"}
+
+    def test_a_two_character_key_is_not_silently_shredded(self):
+        """The quiet case, and the reason a crash test alone is not enough.
+
+        Keys of length != 2 raised a confusing ValueError, but a two-character
+        key unpacked into its own characters: ``StateMetadata(ab=1)`` became
+        ``{"a": "b"}`` -- wrong data, no error, value discarded entirely.
+        """
+        assert dict(pcf.StateMetadata(ab=1)) == {"ab": 1}
