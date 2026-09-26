@@ -103,6 +103,41 @@ Note `[all]` intentionally does not include `tutorials`: `all` covers optional
 _runtime_ functionality, while `tutorials` covers packages only needed to run
 the example notebooks.
 
+### GPU Support (NVIDIA CUDA)
+
+phasecurvefit runs on GPU through JAX, but a plain `pip install jax` (what
+phasecurvefit depends on) only ships a CPU-only `jaxlib`. If you have an NVIDIA
+GPU and see:
+
+```text
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is
+not installed. Falling back to cpu.
+```
+
+install JAX's CUDA-enabled build alongside phasecurvefit:
+
+```bash
+pip install phasecurvefit[all] "jax[cuda12]"
+```
+
+Or with uv:
+
+```bash
+uv add phasecurvefit --extra all
+uv add "jax[cuda12]"
+```
+
+This pulls in self-contained NVIDIA CUDA/cuDNN wheels — no system CUDA toolkit
+install required. See the
+[JAX GPU installation guide](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for other CUDA versions or platforms (TPU, ROCm), and verify the install with:
+
+```python
+import jax
+
+print(jax.devices())  # should list a CudaDevice, not just CpuDevice
+```
+
 ## Quick Start
 
 ```python

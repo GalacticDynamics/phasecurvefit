@@ -178,7 +178,36 @@ def batch_order(stacked_pos, stacked_vel):
 
 ## Hardware Acceleration
 
-The library works on GPU/TPU with no code changes:
+The library works on GPU/TPU with no code changes — but only once JAX itself
+can see the accelerator.
+
+### Installing for GPU (NVIDIA CUDA)
+
+A plain `pip install phasecurvefit` (or `jax`) installs a **CPU-only**
+`jaxlib`. If you have an NVIDIA GPU, you'll see JAX print:
+
+```text
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is
+not installed. Falling back to cpu.
+```
+
+Install JAX's CUDA-enabled build alongside phasecurvefit to fix this:
+
+```bash
+pip install phasecurvefit[all] "jax[cuda12]"
+```
+
+```bash
+uv add phasecurvefit --extra all
+uv add "jax[cuda12]"
+```
+
+This pulls in self-contained NVIDIA CUDA/cuDNN wheels — no system CUDA
+toolkit install required. See the
+[JAX GPU installation guide](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for other CUDA versions or platforms (TPU, ROCm).
+
+Once installed, no code changes are needed:
 
 ```python
 import jax
