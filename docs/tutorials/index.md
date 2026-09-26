@@ -5,9 +5,21 @@ This section contains practical examples demonstrating how to use phasecurvefit.
 Running these notebooks locally requires the `tutorials` extra, which adds
 `matplotlib` and `galax` on top of `phasecurvefit[all]`:
 
+::::{tab-set}
+
+:::{tab-item} pip
 ```bash
-pip install phasecurvefit[tutorials]
+pip install "phasecurvefit[tutorials]"
 ```
+:::
+
+:::{tab-item} uv
+```bash
+uv add phasecurvefit --extra tutorials
+```
+:::
+
+::::
 
 **Where to start:** new to `phasecurvefit`? Begin with the **Stream
 Autoencoder** tutorial, which introduces ordering, the autoencoder and how to read
