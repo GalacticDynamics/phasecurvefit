@@ -59,7 +59,7 @@ ordered_all = result.indices
    coordinates, and a membership probability $p$ to distinguish stream from
    background
 3. **Phase 2 (decoder)**: With the encoder frozen, the decoder is fit to a running
-   mean of the ordered tracers' positions — a warm start for the track
+   mean of the ordered member tracers' positions — a warm start for the track
 4. **Phase 3 (joint)**: Both networks train together on spatial reconstruction plus
    velocity alignment, with the alignment weight ramped linearly from
    `lambda_p[0]` to `lambda_p[1]` over the phase
@@ -93,7 +93,7 @@ result, _, losses = pcf.nn.train_autoencoder(
 ```
 
 **Key parameters**:
-- `lambda_p`: Higher maximum (100-150) enforces stronger velocity alignment in Phase 3
+- `lambda_p`: `(start, stop)` of the Phase 3 alignment ramp; a higher `lambda_p[1]` (100-150) enforces stronger velocity alignment
 - `n_epochs_encoder`: Should be ~200-500 for good initial interpolation
 - `batch_size`: Larger batches are more stable but require more memory
 - `lambda_q`: Weight for spatial reconstruction loss in Phase 3
