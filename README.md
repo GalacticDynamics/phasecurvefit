@@ -114,7 +114,7 @@ An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is
 not installed. Falling back to cpu.
 ```
 
-install JAX's CUDA-enabled build alongside phasecurvefit:
+Install JAX's CUDA-enabled build alongside phasecurvefit:
 
 ```bash
 pip install phasecurvefit[all] "jax[cuda12]"
