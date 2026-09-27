@@ -67,7 +67,9 @@ velocity = {
 ### 3. Run the algorithm
 
 The local-flow walk starts at one point and repeatedly steps to the unvisited
-point that is both **close** and **ahead of it** along its current velocity. It
+point that minimizes a distance combining closeness with a penalty for stepping
+away from its current velocity — so it favors points that are close and roughly
+**ahead of it**, but a sufficiently closer point off to the side can still win. It
 needs two choices from you:
 
 - **Where to start** (`start_idx`). Start at one end of the curve. For a stream
