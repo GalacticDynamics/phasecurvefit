@@ -73,7 +73,7 @@ class TestUnxtEquivalence:
     """The Quantity path behaves the same: order() equals the (warning) walk."""
 
     def _quantity_data(self):
-        import unxt as u
+        u = pytest.importorskip("unxt")
 
         q = {
             "x": u.Q(jnp.array([0.0, 1.0, 2.0]), "m"),
@@ -84,7 +84,7 @@ class TestUnxtEquivalence:
 
     def test_quantity_order_equals_walk(self):
         """Quantity ``order()`` reproduces the deprecated Quantity walk."""
-        import unxt as u
+        u = pytest.importorskip("unxt")
 
         q, p, usys = self._quantity_data()
         got = pcf.order(
@@ -98,7 +98,7 @@ class TestUnxtEquivalence:
 
     def test_quantity_walk_warns(self):
         """The deprecated Quantity walk also warns."""
-        import unxt as u
+        u = pytest.importorskip("unxt")
 
         q, p, usys = self._quantity_data()
         with pytest.warns(DeprecationWarning, match="deprecated"):
