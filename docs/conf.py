@@ -74,7 +74,7 @@ exclude_patterns = [
 ]
 
 source_suffix = {
-    ".md": "restructuredtext",
+    ".md": "markdown",
     ".rst": "restructuredtext",
 }
 
