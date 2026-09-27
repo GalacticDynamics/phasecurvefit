@@ -747,6 +747,9 @@ def init(
     /,
     **kwargs: object,
 ) -> None:
+    # Explicit two-arg form: this overload is defined outside the class body.
+    super(StandardScalerNormalizer, self).__init__(qs, ps)
+
     self.q_comps = list(qs.keys())
     xs = qnp.stack(list(qs.values()), axis=1)
     self.q_mean = qnp.mean(xs, axis=0)
