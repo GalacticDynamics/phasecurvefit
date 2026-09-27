@@ -94,6 +94,6 @@ result, _, losses = pcf.nn.train_autoencoder(
 
 **Key parameters**:
 - `lambda_p`: `(start, stop)` of the Phase 3 alignment ramp; a higher `lambda_p[1]` (100-150) enforces stronger velocity alignment
-- `n_epochs_encoder`: Should be ~200-500 for good initial interpolation
+- `n_epochs_encoder`: Default 800; fewer (a few hundred) gives a quicker, rougher fit
 - `batch_size`: Larger batches are more stable but require more memory
 - `lambda_q`: Weight for spatial reconstruction loss in Phase 3
