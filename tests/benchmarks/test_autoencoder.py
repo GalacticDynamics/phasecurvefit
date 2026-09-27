@@ -138,5 +138,5 @@ class TestAutoencoderTrainingBenchmarks:
         model = result.model
         if isinstance(model, pcf.nn.PathAutoencoder):
             assert getattr(model, "decoder", None) is not None
-        # encoder (5) + decoder (100 default) + both (5) = 110 total loss values
+        # encoder (5) + decoder (default epochs) + both (5) = 110 total loss values
         assert len(losses) == 110
