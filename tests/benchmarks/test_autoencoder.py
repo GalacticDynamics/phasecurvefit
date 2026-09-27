@@ -65,7 +65,7 @@ class TestAutoencoderTrainingBenchmarks:
         )
 
         assert result is not None
-        # Losses from: encoder (50) + decoder (100 default) + both (50) = 200
+        # Expected losses: encoder (50) + decoder (100, from default settings) + both (50) = 200
         assert len(losses) == 200
 
     def test_encoder_only_training_simple(
