@@ -2,6 +2,13 @@
 
 Get started with phasecurvefit in 5 minutes!
 
+phasecurvefit takes points in phase space (positions *and* velocities) whose
+order along a curve is unknown, and works out that order. This guide covers the
+first step, **ordering** the points with the local-flow walk, and the settings
+that control it. The [Autoencoder guide](nn.md) covers the next step: giving
+every point an ordering coordinate and fitting a smooth track. For worked
+examples on realistic data, see the [tutorials](../tutorials/index.md).
+
 ## Installation
 
 Install phasecurvefit using pip or uv:
@@ -59,6 +66,19 @@ velocity = {
 
 ### 3. Run the algorithm
 
+The local-flow walk starts at one point and repeatedly steps to the unvisited
+point that is both **close** and **ahead of it** along its current velocity. It
+needs two choices from you:
+
+- **Where to start** (`start_idx`). Start at one end of the curve. For a stream
+  that flows *away* from a central point, such as a tidal stream from its
+  progenitor, start at that point and walk both ways (`direction="both"`, below).
+  If you don't know either, an `MSTOrderer` can find an end for you: it orders
+  tip to tip, so the first index of its result (`result.indices[0]`) is an end
+  of the curve. See the [Orderers guide](orderers.md#mstorderer).
+- **How strongly to prefer "ahead"** (`metric_scale`), explained in
+  [Adjusting the Metric Scale](#adjusting-the-metric-scale).
+
 ```python
 result = pcf.order(
     position,
@@ -106,7 +126,25 @@ Calling the result, `result(gamma)`, interpolates positions along the ordering.
 
 ## Adjusting the Metric Scale
 
-The `metric_scale` parameter controls how the algorithm weighs different aspects of the data. Its interpretation depends on which distance metric you're using:
+The `metric_scale` parameter controls how the algorithm weighs different aspects
+of the data. Its meaning depends on the distance metric. With the default
+`AlignedMomentumDistanceMetric` it is a **length**, $\lambda$: a candidate point
+at angle $\theta$ from the current velocity costs an extra
+$\lambda\,(1 - \cos\theta)$ on top of its distance. So compare it with the
+typical spacing between neighbouring points:
+
+- $\lambda$ much smaller than the spacing: essentially nearest-neighbour; the walk
+  goes wherever the closest point is.
+- $\lambda$ about the spacing: a neighbour at 90° costs as much as a point twice as
+  far away straight ahead.
+- $\lambda$ much larger than the spacing: strongly directional; the walk keeps
+  going the way it is moving, taking longer strides and skipping points off to
+  the side. (The [stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb)
+  uses 100 kpc against steps of a few kpc at most.)
+
+Raise `metric_scale` if the walk jumps between neighbouring strands; lower it if
+it skips too much. See the [Metrics guide](metrics.md#choosing-metric_scale) for
+the other metrics.
 
 ```python
 # With the default metric, metric_scale=0 switches off the momentum penalty:
@@ -168,7 +206,12 @@ result = pcf.order(
 
 ## Handling Gaps with max_dist
 
-Use `max_dist` to stop when there's a gap in the data:
+Use `max_dist` to stop when there's a gap in the data. It is a plain spatial
+distance: the walk stops if the step it would take next is longer than
+`max_dist`, so it does not leap across a gap onto an unrelated part of the data.
+Set it to several times the typical spacing between neighbouring points. The
+points the walk never reaches are reported as skipped; the
+[autoencoder](nn.md) can assign them an ordering afterwards.
 
 ```python
 # Stop if next nearest point is more than 2 units away
@@ -268,6 +311,8 @@ Integration guide.
 
 ## Next Steps
 
+- [Tutorials](../tutorials/index.md) - Worked examples, starting with a simulated stellar stream
+- [Autoencoder](nn.md) - Order every point, including the ones the walk skipped, and fit a smooth track
 - [Algorithm Details](algorithm.md) - Understand the math
 - [Orderers](orderers.md) - Choose between the walk and the MST
 - [JAX Integration](jax-integration.md) - Advanced JAX usage
