@@ -13,13 +13,22 @@ that the decoder can be trained against.
 
 ## Problem and Solution
 
-**Problem**: walk inevitably skips tracers that don't align with the velocity direction.
+**Problem**: the walk follows a single thread through the data, so it leaves out
+many tracers: those off to the side of its path, and everything beyond a gap
+larger than `max_dist`. On the simulated stream in the
+[stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb), the walk
+orders 248 of 8000 stars. It also gives only an ordering, not a smooth track
+through the data.
 
 **Solution**: An autoencoder with two networks:
 - **Encoder**: $(x, v) \rightarrow (\gamma, p)$ — predicts ordering and membership probability
 - **Decoder**: $\gamma \rightarrow x$ — reconstructs position from ordering
 
 The encoder learns from the walk-ordered tracers and generalizes to predict $\gamma$ for skipped tracers.
+The decoder gives the smooth mean track $x(\gamma)$, which you can evaluate at
+any $\gamma$. If training time matters more than accuracy, a running-mean
+decoder can replace the trained one; see the
+[stream running-mean tutorial](../tutorials/stream_runningmean.ipynb).
 
 ## Quick Start
 
