@@ -85,8 +85,14 @@ The momentum weight $\lambda$ controls the balance between spatial and momentum 
   $$d \approx \lambda \cdot (1 - \cos\theta)$$
   Strongly favors points in the velocity direction, even if far away.
 
-- **$\lambda \approx 1$**: Balanced
-  Both spatial proximity and momentum alignment matter equally.
+- **$\lambda$ comparable to the spacing between neighbouring points**: balanced.
+  $\lambda$ is a length, so "balanced" is relative to the data: at $\lambda$ equal
+  to the typical spacing $s$, a neighbour at $90°$ and distance $s$ costs $2s$,
+  the same as a point straight ahead at distance $2s$.
+
+Larger $\lambda$ makes the walk take longer strides along the flow and skip points
+off to the side; that is often what you want for a thin stream, since the skipped
+points can be ordered later by the [autoencoder](nn.md).
 
 ### Physical Interpretation (Default Metric)
 

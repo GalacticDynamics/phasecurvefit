@@ -157,6 +157,33 @@ result = pcf.order(
 - `FullPhaseSpaceDistanceMetric`: Isotropic — treats all directions equally
 - Both reduce to `SpatialDistanceMetric` when `metric_scale=0`
 
+## Choosing `metric_scale`
+
+`metric_scale` means something different for each metric, and it carries units,
+so there is no universal good value. A way to pick it for each:
+
+- **`AlignedMomentumDistanceMetric`**: $\lambda$ is a **length**, the extra cost
+  of stepping at right angles to the current velocity. Compare it with the
+  typical spacing $s$ between neighbouring points: $\lambda \ll s$ behaves like
+  nearest-neighbour search, $\lambda \approx s$ weighs direction and distance
+  about equally, and $\lambda \gg s$ strongly favours continuing straight ahead,
+  which also means longer strides and more skipped points. The
+  [stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb) uses
+  $\lambda = 100$ kpc for a stream whose steps are at most a few kpc, so even a
+  step $15°$ off the velocity costs more than a 3 kpc step straight ahead.
+- **`FullPhaseSpaceDistanceMetric`**: $\tau$ is a **time**, converting a velocity
+  difference into an equivalent distance. Choose it so that $\tau\,\Delta v$
+  between points on *different* parts of the curve is much larger than the
+  spacing between neighbours on the *same* part. The
+  [epitrochoid autoencoder tutorial](../tutorials/epitrochoid_autoencoder.ipynb)
+  uses $\tau = 4$ s: where two strands cross, their velocities differ by at least
+  ~580 m/s, which puts the wrong strand over 2 km away against a ~3 m spacing.
+- **`SpatialDistanceMetric`**: ignored.
+
+In every case, check the result: if the ordering jumps between strands, the
+velocity term is too weak; if the walk stops early or skips most points, it may
+be too strong (or `max_dist` too small).
+
 ## Creating Custom Metrics
 
 Custom metrics enable alternative distance calculations for specific use cases. For example, you might want:
