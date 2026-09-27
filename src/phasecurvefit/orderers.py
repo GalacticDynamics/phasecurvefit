@@ -17,6 +17,9 @@ LocalFlowOrderer
 MSTOrderer
     MST longest-path backbone ordering for near-closed-loop / self-overlapping
     streams. Host-side (NumPy/SciPy).
+ChainOrderer
+    Runs orderers in sequence, threading each result into the next as
+    ``init``. Also built by ``a | b``.
 
 See Also
 --------
@@ -26,12 +29,14 @@ phasecurvefit.order : functional façade mirroring ``walk_local_flow``.
 
 __all__: tuple[str, ...] = (
     "AbstractOrderer",
+    "ChainOrderer",
     "LocalFlowOrderer",
     "MSTOrderer",
     "OrderingResult",
 )
 
 from ._src.orderers.base import AbstractOrderer
+from ._src.orderers.chain import ChainOrderer
 from ._src.orderers.localflow import LocalFlowOrderer
 from ._src.orderers.mst import MSTOrderer
 from ._src.orderers.result import OrderingResult

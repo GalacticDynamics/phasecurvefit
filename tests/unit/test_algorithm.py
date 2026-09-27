@@ -671,3 +671,31 @@ class TestCombineFlowWalks:
         # Should raise an error when combining
         with pytest.raises((eqx.EquinoxRuntimeError, ValueError)):
             pcf.combine_results(res1, res2)
+
+
+class TestStateMetadataIsADict:
+    """``StateMetadata`` offers dict-like access, so it must convert like one.
+
+    It has ``__getitem__``, ``__contains__``, ``get`` and ``__iter__`` but had
+    no ``keys()``, so ``dict()`` silently took the iterable-of-pairs path over
+    the *keys* instead of the mapping path.
+    """
+
+    def test_dict_round_trips(self):
+        """``dict(metadata)`` returns the keys and values it was built with."""
+        md = pcf.StateMetadata(usys="SI", note="hello")
+        assert dict(md) == {"usys": "SI", "note": "hello"}
+
+    def test_double_star_unpacking_round_trips(self):
+        """``StateMetadata(**md)`` is how the interop dispatch carries keys."""
+        md = pcf.StateMetadata(usys="SI", note="hello")
+        assert dict(pcf.StateMetadata(**md)) == {"usys": "SI", "note": "hello"}
+
+    def test_a_two_character_key_is_not_silently_shredded(self):
+        """The quiet case, and the reason a crash test alone is not enough.
+
+        Keys of length != 2 raised a confusing ValueError, but a two-character
+        key unpacked into its own characters: ``StateMetadata(ab=1)`` became
+        ``{"a": "b"}`` -- wrong data, no error, value discarded entirely.
+        """
+        assert dict(pcf.StateMetadata(ab=1)) == {"ab": 1}

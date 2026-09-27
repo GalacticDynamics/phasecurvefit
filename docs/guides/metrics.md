@@ -74,7 +74,7 @@ result = pcf.order(
 ### AlignedMomentumDistanceMetric
 
 The Nearest Neighbors with Momentum (NN+p) metric from [Nibauer et al.
-(2022)](https://arxiv.org/abs/2209.XXXXX).  This is the default metric.
+(2022)](https://arxiv.org/abs/2201.12042).  This is the default metric.
 
 **Mathematical formulation:**
 
@@ -111,7 +111,7 @@ result = pcf.order(
 
 ### FullPhaseSpaceDistanceMetric
 
-A true 6D Euclidean distance metric in full phase-space, treating position and velocity symmetrically. **This is the default metric.**
+A true 6D Euclidean distance metric in full phase-space, treating position and velocity symmetrically.
 
 **Mathematical formulation:**
 
@@ -141,7 +141,7 @@ Unlike `AlignedMomentumDistanceMetric`, this metric has no directional bias from
 ```python
 from phasecurvefit.metrics import FullPhaseSpaceDistanceMetric
 
-# Full 6D phase-space distance (this is the default)
+# Full 6D phase-space distance
 # metric_scale represents a time scale (e.g., if pos ~ kpc, vel ~ kpc/Myr, metric_scale ~ Myr)
 config = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
 result = pcf.order(
@@ -185,7 +185,9 @@ class CustomMetric(AbstractDistanceMetric):
 
 ### Example: 6D Cartesian Metric
 
-Here's a complete example of a metric that computes full 6D Cartesian distance:
+Here's a complete example of a metric that computes full 6D Cartesian distance.
+(This is what the built-in `FullPhaseSpaceDistanceMetric` does; it is written out
+here to show the interface.)
 
 ```python
 import equinox as eqx
@@ -322,8 +324,8 @@ result_6d = pcf.order(
 
 **When to use each:**
 
-- **FullPhaseSpaceDistanceMetric** (default): True 6D distance when position and velocity are equally important and you know the system's natural time scale. No directional preference.
-- **AlignedMomentumDistanceMetric**: For coherent flows (stellar streams, winds) where velocity alignment should bias the ordering.
+- **FullPhaseSpaceDistanceMetric**: True 6D distance when position and velocity are equally important and you know the system's natural time scale. No directional preference.
+- **AlignedMomentumDistanceMetric** (default): For coherent flows (stellar streams, winds) where velocity alignment should bias the ordering.
 - **SpatialDistanceMetric**: When velocity is unreliable or you want pure spatial clustering. Good baseline for comparison.
 
 

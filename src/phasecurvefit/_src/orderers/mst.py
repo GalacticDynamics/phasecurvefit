@@ -40,8 +40,9 @@ from scipy.sparse.csgraph import (
 )
 from scipy.spatial import cKDTree
 
-from .base import AbstractOrderer
+from .base import AbstractOrderer, _check_component_keys, chord_along_ordering
 from .result import OrderingResult
+from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
 
@@ -184,9 +185,12 @@ def _mst_backbone(
     nn_d = np.atleast_2d(nn_d)
     nn_i = np.atleast_2d(nn_i)
 
-    rows = np.repeat(np.arange(n), k_eff)
-    cols = nn_i[:, 1:].ravel()
-    d_edges = nn_d[:, 1:].ravel()  # spatial edge length
+    # Exclude self by index, not by dropping column 0: with coincident points
+    # cKDTree may list a duplicate before the point itself.
+    not_self = nn_i != np.arange(n)[:, None]
+    rows = np.nonzero(not_self)[0]
+    cols = nn_i[not_self]
+    d_edges = nn_d[not_self]  # spatial edge length
 
     # velocity alignment (only computed when a mechanism needs it)
     need_cos = velocity_weight > 0.0 or sever_cos_threshold is not None
@@ -365,6 +369,12 @@ class MSTOrderer(AbstractOrderer):
                 f"got {self.on_disconnected!r}."
             )
             raise ValueError(msg)
+        if self.velocity_weight < 0.0:
+            # Only ``> 0.0`` engages the phase-space edge weights, so a negative
+            # value would do nothing at all -- and would make ``velocity_aware``
+            # read False on an orderer the caller thought used velocity.
+            msg = f"velocity_weight must be >= 0, got {self.velocity_weight}."
+            raise ValueError(msg)
         if self.edge_clip_sigma is not None and self.edge_clip_sigma <= 0:
             msg = f"edge_clip_sigma must be positive, got {self.edge_clip_sigma}."
             raise ValueError(msg)
@@ -379,16 +389,10 @@ class MSTOrderer(AbstractOrderer):
         velocities: VectorComponents,
         *,
         metadata: StateMetadata | None = None,  # noqa: ARG002
+        init: AbstractResult | None = None,  # noqa: ARG002
     ) -> OrderingResult:
         """Order tracers along the MST backbone (host-side)."""
-        if set(positions) != set(velocities):
-            missing = sorted(set(positions) - set(velocities))
-            extra = sorted(set(velocities) - set(positions))
-            msg = (
-                "positions and velocities must have the same component keys; "
-                f"missing={missing}, extra={extra}."
-            )
-            raise ValueError(msg)
+        _check_component_keys(positions, velocities)
 
         comps = sorted(positions)
         P = np.stack([np.asarray(positions[c]) for c in comps], axis=1)
@@ -411,10 +415,17 @@ class MSTOrderer(AbstractOrderer):
         idx_full[: order_idx.size] = order_idx
 
         backbone = {c: jnp.asarray(backbone_P[:, i]) for i, c in enumerate(comps)}
+        qs = {key: jnp.asarray(val) for key, val in positions.items()}
+        idx = jnp.asarray(idx_full)
         return OrderingResult(
-            positions={key: jnp.asarray(val) for key, val in positions.items()},
+            positions=qs,
             velocities={key: jnp.asarray(val) for key, val in velocities.items()},
-            indices=jnp.asarray(idx_full),
+            indices=idx,
             gamma_range=(-1.0, 1.0),
             backbone=backbone,
+            chord=chord_along_ordering(qs, idx),
+            # ``orient_by_velocity`` only picks a direction; it does not make
+            # the ordering itself velocity-aware.
+            velocity_aware=self.velocity_weight > 0.0
+            or self.sever_cos_threshold is not None,
         )

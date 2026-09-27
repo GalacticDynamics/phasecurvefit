@@ -8,23 +8,6 @@ from scipy.spatial import cKDTree
 import phasecurvefit as pcf
 
 
-def _epitrochoid(n=2048, noise=6.0, seed=1, scale=120.0, R=5.0, r=1.0, d=4.5):
-    """Return a self-intersecting epitrochoid (5 internal loops per rotation)."""
-    rng = np.random.default_rng(seed)
-    t = np.linspace(np.deg2rad(5.0), np.deg2rad(355.0), n)
-    ratio = (R + r) / r
-    x = scale * ((R + r) * np.cos(t) - d * np.cos(ratio * t)) / 5.0
-    y = scale * ((R + r) * np.sin(t) - d * np.sin(ratio * t)) / 5.0
-    dx = scale * (-(R + r) * np.sin(t) + d * ratio * np.sin(ratio * t)) / 5.0
-    dy = scale * ((R + r) * np.cos(t) - d * ratio * np.cos(ratio * t)) / 5.0
-    pos = {
-        "x": jnp.asarray(x + rng.normal(0, noise, n)),
-        "y": jnp.asarray(y + rng.normal(0, noise, n)),
-    }
-    vel = {"x": jnp.asarray(dx), "y": jnp.asarray(dy)}
-    return pos, vel
-
-
 def _clean_arc(n=80):
     t = np.linspace(0.0, 1.0, n)
     x = 10.0 * t
@@ -66,14 +49,14 @@ class TestMSTAutoencoderIntegration:
         rho = np.corrcoef(np.arange(gamma_in_order.size), gamma_in_order)[0, 1]
         assert abs(rho) > 0.9
 
-    def test_decoder_traces_self_intersecting_curve(self):
+    def test_decoder_traces_self_intersecting_curve(self, epitrochoid):
         """The decoded mean path hugs the data on a self-intersecting rose.
 
         Regression for the Phase-2 target being denoised over the (locally noisy)
         encoder gamma instead of the ordering: the decoder faithfully learns a
         blurred target and the mean path sits far off the curve.
         """
-        pos, vel = _epitrochoid()
+        pos, vel, _ = epitrochoid(n=2048, seed=1, shuffle=False)
         P = np.stack([np.asarray(pos["x"]), np.asarray(pos["y"])], axis=1)
         tree = cKDTree(P)
         med = float(np.median(tree.query(P, k=2)[0][:, 1]))

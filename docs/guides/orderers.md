@@ -21,12 +21,13 @@ ae, *_ = pcf.nn.train_autoencoder(model, result, config=cfg, key=key)
 | Orderer | Best for | Mechanism |
 |---|---|---|
 | {class}`~phasecurvefit.orderers.LocalFlowOrderer` | open streams; multi-petal / self-intersecting curves where a coherent velocity field can be *followed* | velocity-following greedy walk from a start point |
-| {class}`~phasecurvefit.orderers.MSTOrderer` | **near-closed loops** and self-overlapping streams where the velocity field *reverses* and a single walk cannot traverse the arc | kNN graph → minimum spanning tree → longest-path (diameter) backbone → arc-length ordering |
+| {class}`~phasecurvefit.orderers.MSTOrderer` | **near-closed loops** and streams with no known starting point, e.g. where the velocity field *reverses* at an unknown progenitor | kNN graph → minimum spanning tree → longest-path (diameter) backbone → arc-length ordering |
 
-The two are complementary. The walk needs a start point and follows the flow; it
-covers only one arm when the velocity reverses at a progenitor. The MST needs no
-progenitor — the graph diameter finds the two tips itself — and orders tip-to-tip
-with bounded per-step jumps, which is exactly what a near-closed loop needs.
+The two are complementary. The walk needs a start point and follows the flow;
+where the velocity reverses at a progenitor it must start *at* the progenitor and
+walk both ways (`direction="both"`). The MST needs no progenitor — the graph
+diameter finds the two tips itself — and orders tip-to-tip with bounded per-step
+jumps, which is exactly what a near-closed loop needs.
 
 ## LocalFlowOrderer
 
@@ -67,9 +68,10 @@ The hyperparameters (carried by the orderer object) are:
 
 Because the walk *follows* a coherent flow, it is the right choice for open
 streams and for self-intersecting curves where the velocity stays coherent
-through the crossings. Its one blind spot is a near-closed loop whose velocity
-**reverses** at a progenitor: a single walk then covers only one arm — which is
-exactly where the [MSTOrderer](#mstorderer) takes over. For the walk's
+through the crossings. Its one requirement is a start point: on a near-closed
+loop whose velocity **reverses** at a progenitor, the walk has to start at the
+progenitor and use `direction="both"`. When that point is unknown, the
+[MSTOrderer](#mstorderer) orders the loop without one. For the walk's
 mathematics, the metric internals, and the `direction="both"` / `combine_results`
 machinery, see the [Algorithm guide](algorithm.md).
 
@@ -139,4 +141,71 @@ Both orderers return one unified type. Its `__call__` interpolates positions fro
 the ordering parameter `gamma`: along the `backbone` polyline when one is present
 (MST), otherwise along the ordered visited observations (walk). The historical
 `WalkLocalFlowResult` is a thin subclass of `OrderingResult`.
+
+## Chaining orderers
+
+Orderers compose with `|`. Each stage receives the previous stage's result as
+`init`; a stage that can use a prior ordering does, and one that cannot ignores
+the value.
+
+Accepting the parameter is what makes a stage chainable beyond the first
+position. An orderer written before `init` existed can still *lead* a chain,
+because the head is called without it, but raises `TypeError` if placed after
+another stage — loudly, rather than silently dropping the ordering it was
+handed.
+
+```python
+import jax.numpy as jnp
+
+import phasecurvefit as pcf
+
+ang = jnp.linspace(0.0, jnp.pi, 60)
+pos = {"x": 5.0 * jnp.cos(ang), "y": 5.0 * jnp.sin(ang)}
+vel = {"x": -jnp.sin(ang), "y": jnp.cos(ang)}
+
+chain = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0) | pcf.orderers.LocalFlowOrderer()
+result = pcf.order(pos, vel, chain)
+assert int(result.n_visited) == 60
 ```
+
+`|` builds a {class}`~phasecurvefit.orderers.ChainOrderer` and flattens, so
+`a | b | c` is one three-stage chain rather than a nest. The explicit form is
+equivalent:
+
+```python
+chain = pcf.orderers.ChainOrderer(
+    pcf.orderers.MSTOrderer(k=8, jump_cap=3.0),
+    pcf.orderers.LocalFlowOrderer(),
+)
+assert len(chain.stages) == 2
+```
+
+### Letting the MST find the walk's start point
+
+The walk has to begin at an end of the curve. Naming that index by hand means
+knowing the answer before you have ordered anything, and `start_idx=0` is only
+right when the input happens to arrive already ordered.
+
+The MST has no such problem: it orders along the graph diameter, tip to tip, so
+its first observation *is* an endpoint. Chained, the walk takes its start from
+there — measured on a shuffled 400-point arc, `|rho|` goes from 0.68 walking
+from index 0 to 1.00 walking from the MST's tip.
+
+An explicit `start_idx` always wins, so this changes nothing for callers who
+already pass one; `start_idx=None` is the default and means "ask `init`, else
+start at 0".
+
+### What a stage inherits
+
+Chaining does **not** narrow the data. Every stage is handed the full
+`(positions, velocities)`; `init` is additional context, and what a stage does
+with it is that stage's own business.
+{class}`~phasecurvefit.orderers.LocalFlowOrderer` reads one thing from it — the
+index to start walking from — and otherwise orders every observation it is
+given.
+
+So a stage does not inherit an upstream stage's rejections unless it is written
+to. An outlier that {class}`~phasecurvefit.orderers.MSTOrderer`'s
+`edge_clip_sigma` dropped is visited again by the next stage unless that stage
+restricts itself to `init.indices`. Check `n_visited` on the final result if
+rejection is meant to stick.
