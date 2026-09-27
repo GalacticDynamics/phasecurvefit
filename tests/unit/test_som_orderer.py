@@ -830,3 +830,75 @@ class TestDisagreementWarningIsBestEffort:
 
         expected = 100 * 0.7 / (8 - 1)
         assert f"{expected:.1f}% of the track" in str(record[0].message)
+
+
+class TestTracingAStandaloneVersusChainedStage:
+    """Standalone the orderer traces; chained it cannot, and must say why.
+
+    The working set is whatever a prior stage visited, so its size depends on
+    that stage's values. Under a transform ``init.indices`` is a tracer and no
+    shape fixed at trace time holds the result, so the chained case cannot
+    compile at all -- the point is that it fails *legibly*.
+    """
+
+    @staticmethod
+    def _curve(n=60):
+        t = jnp.linspace(0.0, 2.0, n)
+        return (
+            {"x": jnp.cos(t), "y": jnp.sin(t)},
+            {"x": -jnp.sin(t), "y": jnp.cos(t)},
+        )
+
+    def test_standalone_traces(self):
+        """The property the chained case is measured against."""
+        pos, vel = self._curve()
+        run = jax.jit(
+            lambda q, p: pcf.order(q, p, pcf.orderers.SOMOrderer(n_prototypes=8)).chord
+        )
+        assert run(pos, vel).shape == (60,)
+
+    def test_chained_under_jit_names_the_limit(self):
+        """A bare ``NonConcreteBooleanIndexError`` names neither cause nor cure.
+
+        ``match`` pins the remedy, not just the type: the whole value of the
+        guard is that it points somewhere.
+        """
+        pos, vel = self._curve()
+        chain = pcf.orderers.LocalFlowOrderer(
+            metric_scale=0.0
+        ) | pcf.orderers.SOMOrderer(n_prototypes=8)
+
+        with pytest.raises(TypeError, match="cannot be traced when chained"):
+            jax.jit(lambda q, p: pcf.order(q, p, chain).chord)(pos, vel)
+        with pytest.raises(TypeError, match=re.escape("outside `jit`")):
+            jax.jit(lambda q, p: pcf.order(q, p, chain).chord)(pos, vel)
+
+    def test_chaining_still_works_untraced(self):
+        """The guard must not cost the ordinary, documented usage."""
+        pos, vel = self._curve()
+        chain = pcf.orderers.LocalFlowOrderer(
+            metric_scale=0.0
+        ) | pcf.orderers.SOMOrderer(n_prototypes=8)
+
+        result = pcf.order(pos, vel, chain)
+        assert int(result.n_visited) == 60
+        assert np.isfinite(np.asarray(result.chord)).all()
+
+    def test_the_disagreement_warning_never_blocks_a_trace(self):
+        """It is a diagnostic, so under a transform it declines rather than raises.
+
+        ``_warn_if_disagrees`` concretises with ``float()``. Reached while
+        tracing it would abort the compile for the sake of a message no one
+        can act on at trace time.
+        """
+        orderer = pcf.orderers.SOMOrderer(n_prototypes=8)
+        pos, _ = self._curve(n=12)
+
+        class _Init:
+            velocity_aware = False
+
+        def traced(perm):
+            orderer._warn_if_disagrees(perm, pos, _Init())
+            return perm
+
+        jax.jit(traced)(jnp.arange(12))

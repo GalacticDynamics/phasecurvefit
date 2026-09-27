@@ -178,6 +178,18 @@ class SOMOrderer(AbstractOrderer):
         silently reverse that stage's choice. Default ``False``, matching
         ``MSTOrderer``.
 
+    Notes
+    -----
+    Standalone, ``order()`` is JAX-traceable: ``jit`` it, or build the orderer
+    inside one. **Chained after another stage it is not.** The working set is
+    whatever the prior stage visited, so its size depends on that stage's
+    values; under a transform ``init.indices`` is a tracer and no shape known
+    at trace time can hold the result. Chaining therefore raises rather than
+    compiling. Run the chain outside ``jit`` -- or order in two steps and hand
+    the second a concrete ``init``. The SOM *core* (``fit``, ``densify``,
+    ``chord``) is traceable either way, so this is a limit of the working-set
+    selection, not of the algorithm.
+
     Examples
     --------
     >>> import jax.numpy as jnp
@@ -379,7 +391,14 @@ class SOMOrderer(AbstractOrderer):
         n = perm.shape[0]
         prior = jnp.arange(n)
         rank = jnp.zeros(n, dtype=perm.dtype).at[perm].set(prior)
-        rho = float(jnp.abs(jnp.corrcoef(prior, rank)[0, 1]))
+        try:
+            rho = float(jnp.abs(jnp.corrcoef(prior, rank)[0, 1]))
+        except jax.errors.ConcretizationTypeError:
+            # Best-effort diagnostic. Under a transform the values are not
+            # available, and a warning is never worth failing a compile for --
+            # the same reason the track fraction below avoids dividing by a
+            # length that can be zero.
+            return
         if rho >= _DISAGREE_WARN:
             return
         comps = sorted(sub_q)
@@ -446,7 +465,22 @@ class SOMOrderer(AbstractOrderer):
                 f"Indices must be in [-1, n_obs) with n_obs={n_obs}, using -1 "
                 "and only -1 for unvisited.",
             )
-            work = prior[prior >= 0]
+            try:
+                work = prior[prior >= 0]
+            except jax.errors.NonConcreteBooleanIndexError:
+                # The visited subset has a data-dependent size, which no shape
+                # known at trace time can hold. Not fixable here: the mask would
+                # have to travel through the whole core so rejected points stay
+                # rejected without slicing. See the class docstring.
+                msg = (
+                    "SOMOrderer cannot be traced when chained after another "
+                    "stage: `init.indices` is a tracer, so the visited subset "
+                    "has a data-dependent shape. Run the chain outside `jit` "
+                    "(the SOM core -- fit/densify/chord -- is itself jittable, "
+                    "as is SOMOrderer standalone), or order in two steps and "
+                    "pass a concrete `init`."
+                )
+                raise TypeError(msg) from None
         sub_q = {k: v[work] for k, v in full_q.items()}
         sub_p = {k: v[work] for k, v in full_p.items()}
 

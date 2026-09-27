@@ -224,6 +224,39 @@ The warning cannot tell those two apart, so it asks you to compare. If the
 prior stage was doing well, raise `n_prototypes` until `sigma_phys` sits below
 the curve's tightest turn.
 
+## JAX tracing: standalone yes, chained no
+
+Standalone, `SOMOrderer.order()` is traceable — `jit` it, or build the orderer
+inside one:
+
+```python
+import jax
+import jax.numpy as jnp
+
+import phasecurvefit as pcf
+
+t = jnp.linspace(0.0, 2.0, 60)
+pos = {"x": jnp.cos(t), "y": jnp.sin(t)}
+vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
+
+chord = jax.jit(
+    lambda q, p: pcf.order(q, p, pcf.orderers.SOMOrderer(n_prototypes=8)).chord
+)(pos, vel)
+assert chord.shape == (60,)
+```
+
+**Chained after another stage it is not.** The working set is whatever the
+prior stage visited, so its size depends on that stage's *values*; under a
+transform `init.indices` is a tracer and no shape fixed at trace time can hold
+the result. Chaining under `jit` raises a `TypeError` saying so, rather than
+failing deep inside JAX. Run the chain outside `jit`, or order in two steps and
+hand the second stage a concrete `init`.
+
+This is a limit of selecting the working set, not of the algorithm: the SOM
+core ({func}`~phasecurvefit.som.fit`, {func}`~phasecurvefit.som.densify`,
+{func}`~phasecurvefit.som.chord`) is traceable either way, as the ensemble
+section below relies on.
+
 ## A note on ensembles
 
 {mod}`phasecurvefit.som` is `vmap`-able. An ensemble additionally needs a
