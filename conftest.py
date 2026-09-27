@@ -48,11 +48,11 @@ class OptDeps(OptionalDependencyEnum):  # pylint: disable=invalid-enum-extension
 
 collect_ignore_glob = []
 if not OptDeps.UNXT.installed:
-    collect_ignore_glob.append("tests/test_interop_unxt.py")
+    collect_ignore_glob.append("tests/unit/test_interop_unxt.py")
 if not OptDeps.MATPLOTLIB.installed:
     collect_ignore_glob.append("tests/usage/test_epitrochoid.py")
 if not OptDeps.KDTREE.installed:
-    collect_ignore_glob.append("tests/test_kdtree.py")
+    collect_ignore_glob.append("tests/unit/test_kdtree.py")
 
 
 def pytest_configure(config):
