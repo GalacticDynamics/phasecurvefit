@@ -96,20 +96,20 @@ def _scale_is_nonzero(scale: float | FSz0, /, *, remedy: str) -> bool:
     "Attempted boolean conversion of traced array with shape bool[]" --
     names neither the field nor the way out. Raise one that does.
 
-    ``grad`` is unaffected: a linearization tracer carries a concrete primal,
-    so the comparison resolves. Only ``jit`` (an abstract tracer) reaches the
-    error, and then only when the orderer is *built* inside the transform --
-    a Python ``float`` passed to ``filter_jit`` stays static.
+    The rule is "the value has to be knowable here", not "we are inside a
+    transform": ``jax.core.is_concrete`` is false only when there is genuinely
+    no value yet. A ``grad`` trace carries a concrete primal and passes; an
+    abstract ``jit`` trace does not. A Python ``float`` handed to
+    ``filter_jit`` stays static, so the ordinary path never reaches this.
     """
-    try:
-        return bool(scale != 0.0)
-    except jax.errors.TracerBoolConversionError:
+    if not jax.core.is_concrete(scale):
         msg = (
-            "metric_scale is traced, so whether it is zero is unknown while "
-            "tracing. That choice is static -- it selects a distance metric, "
-            f"not a number. {remedy}"
+            "metric_scale has no value while tracing, so whether it is zero "
+            "cannot be answered here. That choice is static -- it selects a "
+            f"distance metric, not a number. {remedy}"
         )
-        raise TypeError(msg) from None
+        raise TypeError(msg)
+    return bool(scale != 0.0)
 
 
 class SOMOrderer(AbstractOrderer):
@@ -391,14 +391,10 @@ class SOMOrderer(AbstractOrderer):
         n = perm.shape[0]
         prior = jnp.arange(n)
         rank = jnp.zeros(n, dtype=perm.dtype).at[perm].set(prior)
-        try:
-            rho = float(jnp.abs(jnp.corrcoef(prior, rank)[0, 1]))
-        except jax.errors.ConcretizationTypeError:
-            # Best-effort diagnostic. Under a transform the values are not
-            # available, and a warning is never worth failing a compile for --
-            # the same reason the track fraction below avoids dividing by a
-            # length that can be zero.
-            return
+        # No concreteness guard here: this returns above when ``init is None``,
+        # and with an ``init`` the working-set selection in ``order`` has
+        # already refused to trace. Nothing reaches this line without values.
+        rho = float(jnp.abs(jnp.corrcoef(prior, rank)[0, 1]))
         if rho >= _DISAGREE_WARN:
             return
         comps = sorted(sub_q)
@@ -465,22 +461,21 @@ class SOMOrderer(AbstractOrderer):
                 f"Indices must be in [-1, n_obs) with n_obs={n_obs}, using -1 "
                 "and only -1 for unvisited.",
             )
-            try:
-                work = prior[prior >= 0]
-            except jax.errors.NonConcreteBooleanIndexError:
-                # The visited subset has a data-dependent size, which no shape
-                # known at trace time can hold. Not fixable here: the mask would
-                # have to travel through the whole core so rejected points stay
-                # rejected without slicing. See the class docstring.
+            if not jax.core.is_concrete(prior):
+                # Without values the visited subset has no size, and no shape
+                # fixed at trace time can hold it. Not fixable here: the mask
+                # would have to travel through the whole core so rejected
+                # points stay rejected without slicing. See the class docstring.
                 msg = (
                     "SOMOrderer cannot be traced when chained after another "
-                    "stage: `init.indices` is a tracer, so the visited subset "
-                    "has a data-dependent shape. Run the chain outside `jit` "
-                    "(the SOM core -- fit/densify/chord -- is itself jittable, "
-                    "as is SOMOrderer standalone), or order in two steps and "
-                    "pass a concrete `init`."
+                    "stage: `init.indices` has no value while tracing, so the "
+                    "visited subset has a data-dependent shape. Run the chain "
+                    "outside `jit` (the SOM core -- fit/densify/chord -- is "
+                    "itself jittable, as is SOMOrderer standalone), or order "
+                    "in two steps and pass a concrete `init`."
                 )
-                raise TypeError(msg) from None
+                raise TypeError(msg)
+            work = prior[prior >= 0]
         sub_q = {k: v[work] for k, v in full_q.items()}
         sub_p = {k: v[work] for k, v in full_p.items()}
 

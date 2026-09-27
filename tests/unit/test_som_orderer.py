@@ -761,13 +761,20 @@ class TestTracedMetricScale:
             )
             return pcf.order(pos, vel, orderer).chord
 
-        with pytest.raises(TypeError, match="metric_scale is traced"):
+        with pytest.raises(TypeError, match="metric_scale has no value"):
             run(jnp.asarray(0.3))
         with pytest.raises(TypeError, match=re.escape(remedy)):
             run(jnp.asarray(0.3))
 
     def test_grad_is_unaffected(self):
-        """A linearization tracer carries a concrete primal, so it resolves."""
+        """The rule is "no value", not "inside a transform".
+
+        A ``grad`` trace carries a concrete primal, so the scale *does* have a
+        value and the guard lets it through. (That gradient is identically
+        zero -- ``metric_scale`` enters only through the best-matching-unit
+        argmin, which is piecewise constant -- but the guard is not the right
+        place to editorialise about that.)
+        """
         pos, vel = self._curve()
         base = pcf.orderers.SOMOrderer(n_prototypes=8, metric_scale=0.3)
 
@@ -883,22 +890,3 @@ class TestTracingAStandaloneVersusChainedStage:
         result = pcf.order(pos, vel, chain)
         assert int(result.n_visited) == 60
         assert np.isfinite(np.asarray(result.chord)).all()
-
-    def test_the_disagreement_warning_never_blocks_a_trace(self):
-        """It is a diagnostic, so under a transform it declines rather than raises.
-
-        ``_warn_if_disagrees`` concretises with ``float()``. Reached while
-        tracing it would abort the compile for the sake of a message no one
-        can act on at trace time.
-        """
-        orderer = pcf.orderers.SOMOrderer(n_prototypes=8)
-        pos, _ = self._curve(n=12)
-
-        class _Init:
-            velocity_aware = False
-
-        def traced(perm):
-            orderer._warn_if_disagrees(perm, pos, _Init())
-            return perm
-
-        jax.jit(traced)(jnp.arange(12))
