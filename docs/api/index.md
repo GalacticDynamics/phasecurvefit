@@ -119,7 +119,7 @@ Low-level functions for phase-space operations. Available in the `phasecurvefit.
 
 ## Autoencoder Module
 
-Neural network for interpolating skipped tracers. See [Autoencoder Guide](../guides/autoencoder.md) for details.
+Neural network for interpolating skipped tracers. See [Autoencoder Guide](../guides/nn.md) for details.
 
 ### Classes
 
