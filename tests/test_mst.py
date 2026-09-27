@@ -243,3 +243,35 @@ class TestMSTEdgeClip:
         """``edge_clip_max_iters < 1`` is rejected at construction."""
         with pytest.raises(ValueError, match="edge_clip_max_iters"):
             pcf.orderers.MSTOrderer(edge_clip_sigma=3.0, edge_clip_max_iters=0)
+
+
+def _with_copies(pos, vel, idx, n_copies):
+    """Append ``n_copies`` exact copies of the points at ``idx`` (repeat obs)."""
+    rep = np.repeat(np.atleast_1d(idx), n_copies)
+    pos = {k: jnp.concatenate([v, v[rep]]) for k, v in pos.items()}
+    vel = {k: jnp.concatenate([v, v[rep]]) for k, v in vel.items()}
+    return pos, vel
+
+
+class TestMSTDuplicates:
+    """Coincident points (zero-length edges) must stay in the graph."""
+
+    def test_clump_larger_than_k_stays_connected(self):
+        """More copies than ``k``: the clump's kNN edges are all zero-length."""
+        pos, vel, _ = _open_arc(n=100)
+        pos, vel = _with_copies(pos, vel, 50, n_copies=10)
+        res = pcf.orderers.MSTOrderer(k=8, jump_cap=20.0).order(pos, vel)
+        assert int(res.n_skipped) == 0
+
+    def test_edge_clip_with_duplicates(self):
+        """Zero-length edges neither poison the clip statistic nor get cut."""
+        pos, vel, is_outlier = _arc_with_interlopers(n_arc=200, n_out=15)
+        pos, vel = _with_copies(pos, vel, np.arange(0, 200, 2), n_copies=1)
+        is_outlier = np.r_[is_outlier, np.zeros(100, bool)]
+        res = pcf.orderers.MSTOrderer(k=10, jump_cap=20.0, edge_clip_sigma=3.0).order(
+            pos, vel
+        )
+        visited = {int(i) for i in np.asarray(res.indices) if i >= 0}
+        rej = set(range(is_outlier.size)) - visited
+        assert sum(is_outlier[i] for i in rej) >= 0.6 * int(is_outlier.sum())
+        assert sum(1 for i in rej if not is_outlier[i]) <= 0.05 * 300
