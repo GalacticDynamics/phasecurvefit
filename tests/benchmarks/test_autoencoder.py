@@ -27,7 +27,7 @@ class TestAutoencoderTrainingBenchmarks:
         )
 
         assert result is not None
-        # Losses from: encoder (10) + decoder (100 default) + both (10) = 120
+        # Expect 120 loss entries for this training configuration.
         assert len(losses) == 120
 
     def test_full_autoencoder_training_medium(
