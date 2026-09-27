@@ -14,8 +14,7 @@ algorithms.
 ## Why phasecurvefit?
 
 Many datasets are samples along a curve in phase space whose order along the
-curve is unknown: stars in a tidal stream, particles along an orbit, tracers
-along a flow. Before fitting a model to such a curve you need two things: an
+curve is unknown. Before fitting a model to such a curve you need two things: an
 ordering coordinate for every sample, and a smooth track through them. Doing
 this by hand, or with a position-only nearest-neighbor or clustering method,
 breaks down in exactly the cases that matter:
@@ -42,10 +41,10 @@ breaks down in exactly the cases that matter:
   every step of an MCMC
   ([running-mean tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_runningmean.html)).
 
-phasecurvefit packages the momentum-weighted ordering of Nibauer et al. (2022)
-as a reusable, tested library, and adds alternative orderers, gap filling,
-outlier rejection and optional physical units (via `unxt`). It was built for
-stellar streams but applies to any ordered phase-space data.
+phasecurvefit is a reusable, tested library for momentum-weighted ordering, with
+alternative orderers, gap filling, outlier rejection and optional physical units
+(via `unxt`). It was built for stellar streams but applies to any ordered
+phase-space data.
 
 ## Features
 
