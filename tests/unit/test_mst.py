@@ -275,3 +275,10 @@ class TestMSTDuplicates:
         rej = set(range(is_outlier.size)) - visited
         assert sum(is_outlier[i] for i in rej) >= 0.6 * int(is_outlier.sum())
         assert sum(1 for i in rej if not is_outlier[i]) <= 0.05 * 300
+
+    def test_edge_clip_all_coincident(self):
+        """Only zero-length edges: nothing to clip, every point kept."""
+        pos = {"x": jnp.ones(12), "y": jnp.zeros(12)}
+        vel = {"x": jnp.ones(12), "y": jnp.zeros(12)}
+        res = pcf.orderers.MSTOrderer(k=4, edge_clip_sigma=3.0).order(pos, vel)
+        assert int(res.n_skipped) == 0
