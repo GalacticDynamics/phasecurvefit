@@ -102,8 +102,7 @@ class StateMetadata(quax.Value):
     def __iter__(self) -> Iterator:
         return iter(self._data)
 
-    @staticmethod
-    def aval() -> jax.core.ShapedArray:
+    def aval(self) -> jax.core.ShapedArray:
         """Return a placeholder abstract value so JAX tracing is satisfied."""
         return jax.core.ShapedArray((), jnp.dtype(bool))
 
@@ -390,10 +389,16 @@ def _local_flow_walk(
     key0 = zeroth(xs)
     n_obs = jnp.shape(xs[key0])[0]
 
-    # Validate start_idx - use plain Python check if not traced
-    if start_idx < 0 or start_idx >= n_obs:
-        msg = f"start_idx {start_idx} out of bounds for data with {n_obs} observations."
-        raise ValueError(msg)
+    # Validate start_idx. A concrete index is checked in Python so the error
+    # arrives immediately; a traced one -- which is what a chained orderer
+    # supplies under `jit` -- is checked on device instead, since `if` on a
+    # tracer raises before it can report anything useful.
+    msg = f"start_idx {start_idx} out of bounds for data with {n_obs} observations."
+    if isinstance(start_idx, int):
+        if start_idx < 0 or start_idx >= n_obs:
+            raise ValueError(msg)
+    else:
+        start_idx = eqx.error_if(start_idx, (start_idx < 0) | (start_idx >= n_obs), msg)
 
     # Set n_max to n_obs if not provided
     n_max = n_obs if n_max is None else n_max
@@ -514,11 +519,17 @@ def _local_flow_walk(
 
     # Package results into WalkLocalFlowResult. This is a NamedTuple, so can be
     # unpacked easily.
+    # Velocity-awareness is a property of the metric, not of ``metric_scale``: a
+    # zero scale makes a phase-space metric numerically position-only, but the
+    # walk is still configured to follow the flow. Set here rather than in
+    # `LocalFlowOrderer.order` so direct callers -- including the deprecated
+    # `walk_local_flow` -- report it too.
     return WalkLocalFlowResult(
         positions=dict(xs),
         velocities=dict(vs_original),
         indices=final_ordered,
         gamma_range=gamma_range,
+        velocity_aware=config.metric.uses_velocity,
     )
 
 
@@ -763,4 +774,8 @@ def combine_results(
         velocities=result_fwd.velocities,
         indices=indices,
         gamma_range=combined_gamma_range,
+        # Either walk having used velocity makes the combined ordering
+        # velocity-informed; taking only the forward result's flag would report
+        # a false negative on results built with different configs.
+        velocity_aware=result_fwd.velocity_aware or result_bwd.velocity_aware,
     )

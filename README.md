@@ -2,6 +2,8 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
 [![Python versions](https://img.shields.io/pypi/pyversions/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
+[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
+[![CITATION.cff](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml)
 
 Construct paths through phase-Space points, supporting many different
 algorithms.
@@ -80,6 +82,63 @@ Or with uv:
 # uv add phasecurvefit --extra all  # installs all extras
 uv add phasecurvefit --extra interop
 uv add phasecurvefit --extra kdtree
+```
+
+### Running the Tutorials
+
+The
+[tutorial notebooks](https://phasecurvefit.readthedocs.io/en/latest/tutorials/index.html)
+need packages beyond the runtime `[all]` extra — `matplotlib` for plotting and
+`galax` for the mock-stream examples. Install them with the `tutorials` extra:
+
+```bash
+pip install phasecurvefit[tutorials]
+```
+
+```bash
+uv add phasecurvefit --extra tutorials
+```
+
+Note `[all]` intentionally does not include `tutorials`: `all` covers optional
+_runtime_ functionality, while `tutorials` covers packages only needed to run
+the example notebooks.
+
+### GPU Support (NVIDIA CUDA)
+
+phasecurvefit runs on GPU through JAX, but a plain `pip install jax` (what
+phasecurvefit depends on) only ships a CPU-only `jaxlib`. If you have an NVIDIA
+GPU and see:
+
+```text
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is
+not installed. Falling back to cpu.
+```
+
+Install JAX's CUDA-enabled build alongside phasecurvefit:
+
+```bash
+pip install --upgrade "phasecurvefit[all]" "jax[cuda12]"
+```
+
+Or with uv:
+
+```bash
+uv add phasecurvefit --extra all
+uv add "jax[cuda12]"
+```
+
+This pulls in self-contained NVIDIA CUDA/cuDNN wheels — you don't need the CUDA
+toolkit installed system-wide — but you do still need a
+[compatible NVIDIA driver](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for your GPU. `--upgrade` ensures pip actually swaps in the CUDA-enabled
+`jaxlib` even if a CPU-only one is already installed. See the
+[JAX GPU installation guide](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for other CUDA versions or platforms (TPU, ROCm), and verify the install with:
+
+```python
+import jax
+
+print(jax.devices())  # should list a CudaDevice, not just CpuDevice
 ```
 
 ## Quick Start
@@ -374,6 +433,27 @@ class SmallestIndexStrategy(pcf.strats.AbstractQueryStrategy):
 config = pcf.WalkConfig(strategy=SmallestIndexStrategy())
 result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
+
+## Citation
+
+If you use `phasecurvefit` in published work, please cite the package via its
+DOI, together with the paper behind whichever component you used.
+
+[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
+
+<details>
+  <summary>component papers</summary>
+
+- **momentum-weighted ordering** — Nibauer et al. (2022),
+  [arXiv:2201.12042](https://arxiv.org/abs/2201.12042)
+- **mixture-model membership / outlier rejection** — Hogg, Bovy & Lang (2010),
+  [arXiv:1008.4686](https://arxiv.org/abs/1008.4686)
+
+Machine-readable metadata for all of these is in
+[`CITATION.cff`](https://github.com/GalacticDynamics/phasecurvefit/blob/main/CITATION.cff);
+BibTeX entries are in the [documentation](https://phasecurvefit.readthedocs.io).
+
+</details>
 
 ## AI Usage Disclosure
 

@@ -90,6 +90,22 @@ where "all" enables unit support (through `unxt`) and kdtree support through `ja
 
 :::
 
+::::
+
+To run the [tutorials](tutorials/index), install the `tutorials` extra instead,
+which adds `matplotlib` (plotting) and `galax` (mock-stream generation) on top
+of `[all]`:
+
+```bash
+pip install phasecurvefit[tutorials]
+```
+
+`all` intentionally excludes `tutorials`: `all` is for optional *runtime*
+functionality, while `tutorials` is for packages only needed to run the
+example notebooks.
+
+::::{tab-set}
+
 :::{tab-item} source, via uv
 
 To install the latest development version of `phasecurvefit` directly from the
