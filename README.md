@@ -17,7 +17,7 @@ Many datasets are samples along a curve in phase space whose order along the
 curve is unknown: stars in a tidal stream, particles along an orbit, tracers
 along a flow. Before fitting a model to such a curve you need two things: an
 ordering coordinate for every sample, and a smooth track through them. Doing
-this by hand, or with a position-only nearest-neighbour or clustering method,
+this by hand, or with a position-only nearest-neighbor or clustering method,
 breaks down in exactly the cases that matter:
 
 - **Curves that cross or fold back on themselves.** Where two strands meet, the
@@ -25,7 +25,8 @@ breaks down in exactly the cases that matter:
   well as positions, so the ordering stays on the right strand (see the
   [epitrochoid tutorials](https://phasecurvefit.readthedocs.io/en/latest/tutorials/epitrochoid_autoencoder.html)).
 - **No known starting point.** The MST orderer finds the two ends of the curve
-  itself, so no progenitor position or hand-picked start index is needed.
+  itself, so no progenitor position or hand-picked start index is needed
+  ([MST tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_mst.html)).
 - **Incomplete orderings.** A conservative walk orders a reliable subset; an
   autoencoder then assigns an ordering coordinate γ to every sample and learns a
   smooth mean track through them
@@ -38,7 +39,8 @@ breaks down in exactly the cases that matter:
   distance metrics and the neural networks work with `jit`, `vmap` and `grad`
   and run on CPU or GPU. A training-free running-mean track is available when
   speed matters more than accuracy, for example inside a likelihood evaluated at
-  every step of an MCMC.
+  every step of an MCMC
+  ([running-mean tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_runningmean.html)).
 
 phasecurvefit packages the momentum-weighted ordering of Nibauer et al. (2022)
 as a reusable, tested library, and adds alternative orderers, gap filling,
