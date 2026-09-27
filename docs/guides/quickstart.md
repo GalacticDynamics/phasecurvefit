@@ -67,10 +67,12 @@ velocity = {
 ### 3. Run the algorithm
 
 The local-flow walk starts at one point and repeatedly steps to the unvisited
-point that minimizes a distance combining closeness with a penalty for stepping
-away from its current velocity — so it favors points that are close and roughly
-**ahead of it**, but a sufficiently closer point off to the side can still win. It
-needs two choices from you:
+point that minimizes a distance metric. With the default
+`AlignedMomentumDistanceMetric`, that distance combines closeness with a penalty
+for stepping away from the current velocity — so the walk favors points that are
+close and roughly **ahead of it**, but a sufficiently closer point off to the side
+can still win. (Other metrics have no such directional penalty; see the
+[Metrics guide](metrics.md).) It needs two choices from you:
 
 - **Where to start** (`start_idx`). Start at one end of the curve. For a stream
   that flows *away* from a central point, such as a tidal stream from its
