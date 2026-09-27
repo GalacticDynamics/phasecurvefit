@@ -32,4 +32,4 @@
 
 "⏱️ Benchmarks":
   - changed-files:
-      - any-glob-to-any-file: "tests/benchmark/**"
+      - any-glob-to-any-file: "tests/benchmarks/**"
