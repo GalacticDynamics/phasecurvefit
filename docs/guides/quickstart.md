@@ -95,9 +95,13 @@ print(ordered_pos["x"])
 
 `pcf.order` returns an `OrderingResult` (a `WalkLocalFlowResult` for the walk) with:
 
-- **`ordering`**: Array of indices of the discovered order
-- **`position`**: Original position dictionary
-- **`velocity`**: Original velocity dictionary
+- **`ordering`**: the indices of the visited observations, in walk order
+- **`indices`**: the same, padded with `-1` to the full length (a fixed shape, for JAX)
+- **`n_visited`** / **`n_skipped`**: how many observations the walk reached or left out
+- **`positions`**, **`velocities`**: the input data
+- **`gamma_range`**: the range of the ordering coordinate $\gamma$
+
+Calling the result, `result(gamma)`, interpolates positions along the ordering.
 
 
 ## Adjusting the Metric Scale
@@ -105,7 +109,8 @@ print(ordered_pos["x"])
 The `metric_scale` parameter controls how the algorithm weighs different aspects of the data. Its interpretation depends on which distance metric you're using:
 
 ```python
-# Pure nearest neighbor (spatial only) - metric_scale ignored
+# With the default metric, metric_scale=0 switches off the momentum penalty:
+# pure nearest neighbor
 result_spatial = pcf.order(
     position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=0.0)
 )
@@ -208,10 +213,11 @@ result = pcf.order(
 
 ## Bidirectional Walks (Forward and Reverse)
 
-For streams that extend in both directions from a starting point, run forward and reverse walks separately, then combine them:
+For streams that extend in both directions from a starting point, walk both ways
+from it with `direction="both"`:
 
 ```python
-# Run forward walk from starting point
+# Walk forward and backward from index 2, stitched into one ordering
 result = pcf.order(
     position,
     velocity,
@@ -229,8 +235,10 @@ This is particularly useful for:
 
 - Tracing complete stellar streams from a central progenitor
 - Exploring both tidal tails simultaneously
-- Verifying stream connectivity in both directions
-- Having different parameters for forward vs reverse walks
+
+To use different parameters in each direction (e.g. different `max_dist`), run the
+two walks separately and join them with `pcf.combine_results`; see the
+[Algorithm guide](algorithm.md#combining-forward-and-reverse-walks).
 
 ## JAX Integration
 
@@ -254,25 +262,12 @@ result = order_stream(position, velocity)
 
 ### Vectorization
 
-```python
-from jax import vmap
-
-# Position and velocity for a single stream
-position = {
-    "x": jnp.array([0.0, 1.0, 2.0, 3.0]),
-    "y": jnp.array([0.0, 0.5, 1.0, 1.5]),
-}
-velocity = {
-    "x": jnp.array([1.0, 1.0, 1.0, 1.0]),
-    "y": jnp.array([0.5, 0.5, 0.5, 0.5]),
-}
-
-# To process multiple streams, use vmap with careful handling of dictionaries
-# See the JAX integration guide for detailed examples
-```
+To order many streams at once, stack them along a leading axis and `vmap` over
+it; see [Vectorization](jax-integration.md#vectorization-vmap) in the JAX
+Integration guide.
 
 ## Next Steps
 
 - [Algorithm Details](algorithm.md) - Understand the math
-- [API Design](api-design.md) - Learn about the dict-based API
+- [Orderers](orderers.md) - Choose between the walk and the MST
 - [JAX Integration](jax-integration.md) - Advanced JAX usage
