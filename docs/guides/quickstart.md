@@ -109,7 +109,8 @@ Calling the result, `result(gamma)`, interpolates positions along the ordering.
 The `metric_scale` parameter controls how the algorithm weighs different aspects of the data. Its interpretation depends on which distance metric you're using:
 
 ```python
-# metric_scale=0 switches off the momentum penalty: pure nearest neighbor
+# With the default metric, metric_scale=0 switches off the momentum penalty:
+# pure nearest neighbor
 result_spatial = pcf.order(
     position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=0.0)
 )

@@ -140,6 +140,8 @@ Procedure:
 
         # Check early termination: max_dist is a *spatial* distance
         spatial[i] ← ||position[i] - current_pos||  (unvisited only)
+        if distances_masked[best_idx] is infinity:
+            Break  # No unvisited candidates remain
         if min(spatial) > max_dist OR spatial[best_idx] > max_dist:
             Break  # Gap detected, stop algorithm
 
