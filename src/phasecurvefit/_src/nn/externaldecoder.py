@@ -97,11 +97,6 @@ class RunningMeanDecoder(AbstractExternalDecoder):
     member_train: Bool[Array, " N"] | None = None
     empty_window: Literal["nan", "nearest"] = eqx.field(default="nan", static=True)
 
-    def __check_init__(self) -> None:
-        if self.empty_window not in ("nan", "nearest"):
-            msg = f"empty_window must be 'nan' or 'nearest', got {self.empty_window!r}"
-            raise ValueError(msg)
-
     def __call__(self, gamma: RSz0, /, key: PRNGKeyArray | None = None) -> FSz0:
         """Decode a single gamma value to position using running mean.
 

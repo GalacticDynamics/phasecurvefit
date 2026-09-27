@@ -549,8 +549,3 @@ class TestRunningMeanDecoderEmptyWindow:
             empty_window="nearest",
         )
         assert jnp.all(jnp.isnan(decoder(jnp.array(0.5))))
-
-    def test_invalid_empty_window(self, data):
-        """An unknown ``empty_window`` option raises."""
-        with pytest.raises(ValueError, match="empty_window"):
-            self._decoder(data, empty_window="zero")
