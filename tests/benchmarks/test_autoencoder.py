@@ -35,7 +35,7 @@ class TestAutoencoderTrainingBenchmarks:
     ):
         """Benchmark full autoencoder training on 100-point stream."""
         config = pcf.nn.TrainingConfig(
-            n_epochs_encoder=20, n_epochs_both=20, show_pbar=False
+            n_epochs_encoder=20, n_epochs_decoder=100, n_epochs_both=20, show_pbar=False
         )
         result, _, losses = benchmark(
             pcf.nn.train_autoencoder,
