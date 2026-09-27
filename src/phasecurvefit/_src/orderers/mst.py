@@ -185,9 +185,12 @@ def _mst_backbone(
     nn_d = np.atleast_2d(nn_d)
     nn_i = np.atleast_2d(nn_i)
 
-    rows = np.repeat(np.arange(n), k_eff)
-    cols = nn_i[:, 1:].ravel()
-    d_edges = nn_d[:, 1:].ravel()  # spatial edge length
+    # Exclude self by index, not by dropping column 0: with coincident points
+    # cKDTree may list a duplicate before the point itself.
+    not_self = nn_i != np.arange(n)[:, None]
+    rows = np.nonzero(not_self)[0]
+    cols = nn_i[not_self]
+    d_edges = nn_d[not_self]  # spatial edge length
 
     # velocity alignment (only computed when a mechanism needs it)
     need_cos = velocity_weight > 0.0 or sever_cos_threshold is not None
