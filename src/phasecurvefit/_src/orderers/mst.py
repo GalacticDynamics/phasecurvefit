@@ -135,12 +135,17 @@ def _sigma_clip_edges(
         sub = tree[current][:, current].tocoo()
         upper = sub.row < sub.col  # undirected edges, once each
         ei, ej = sub.row[upper], sub.col[upper]
-        if ei.size == 0:
+        length = np.linalg.norm(P[current[ei]] - P[current[ej]], axis=1)
+        # Zero-length edges join coincident points: they have no log length,
+        # carry no spacing information, and can never be too long to keep.
+        pos = length > 0.0
+        if not pos.any():
             break
-        loglen = np.log(np.linalg.norm(P[current[ei]] - P[current[ej]], axis=1))
+        loglen = np.log(length[pos])
         med = float(np.median(loglen))
         scale = 1.4826 * float(np.median(np.abs(loglen - med)))
-        cut = loglen > med + max(sigma * scale, log_floor)
+        cut = np.zeros_like(pos)
+        cut[pos] = loglen > med + max(sigma * scale, log_floor)
         if not cut.any():
             break
         m = current.size
@@ -198,6 +203,10 @@ def _mst_backbone(
     weights = d_edges.copy()
     if velocity_weight > 0.0:  # Mechanism 1: phase-space edge weights
         weights = d_edges + velocity_weight * (1.0 - cos)
+    # scipy's csgraph treats zero weights as missing edges, which would cut
+    # coincident points (repeat observations) out of the graph. Floor to the
+    # smallest positive float: still "free", but a real edge.
+    weights = np.maximum(weights, np.finfo(weights.dtype).tiny)
 
     keep = d_edges <= jump_cap  # sever long cross-loop edges (spatial)
     if sever_cos_threshold is not None:  # Mechanism 2: velocity-aware severing
