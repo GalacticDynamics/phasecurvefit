@@ -11,6 +11,41 @@
 Construct paths through phase-Space points, supporting many different
 algorithms.
 
+## Why phasecurvefit?
+
+Many datasets are samples along a curve in phase space whose order along the
+curve is unknown. Before fitting a model to such a curve you need two things: an
+ordering coordinate for every sample, and a smooth track through them. Doing
+this by hand, or with a position-only nearest-neighbor or clustering method,
+breaks down in exactly the cases that matter:
+
+- **Curves that cross or fold back on themselves.** Where two strands meet, the
+  nearest point is often on the wrong strand. phasecurvefit uses velocities as
+  well as positions, so the ordering stays on the right strand (see the
+  [epitrochoid tutorials](https://phasecurvefit.readthedocs.io/en/latest/tutorials/epitrochoid_autoencoder.html)).
+- **No known starting point.** The MST orderer finds the two ends of the curve
+  itself, so no progenitor position or hand-picked start index is needed
+  ([MST tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_mst.html)).
+- **Incomplete orderings.** A conservative walk orders a reliable subset; an
+  autoencoder then assigns an ordering coordinate γ to every sample and learns a
+  smooth mean track through them
+  ([stream autoencoder tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_autoencoder.html)).
+- **Contamination.** A stream-plus-background mixture model gives each sample a
+  calibrated membership probability, so interlopers can be down-weighted or
+  removed
+  ([outlier-rejection tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/outlier_rejection.html)).
+- **Use inside larger models.** phasecurvefit is built on JAX: the walk, the
+  distance metrics and the neural networks work with `jit`, `vmap` and `grad`
+  and run on CPU or GPU. A training-free running-mean track is available when
+  speed matters more than accuracy, for example inside a likelihood evaluated at
+  every step of an MCMC
+  ([running-mean tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_runningmean.html)).
+
+phasecurvefit is a reusable, tested library for momentum-weighted ordering, with
+alternative orderers, gap filling, outlier rejection and optional physical units
+(via `unxt`). It was built for stellar streams but applies to any ordered
+phase-space data.
+
 ## Features
 
 - **JAX-powered**: Fully compatible with JAX transformations (`jit`, `vmap`,
