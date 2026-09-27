@@ -21,12 +21,13 @@ ae, *_ = pcf.nn.train_autoencoder(model, result, config=cfg, key=key)
 | Orderer | Best for | Mechanism |
 |---|---|---|
 | {class}`~phasecurvefit.orderers.LocalFlowOrderer` | open streams; multi-petal / self-intersecting curves where a coherent velocity field can be *followed* | velocity-following greedy walk from a start point |
-| {class}`~phasecurvefit.orderers.MSTOrderer` | **near-closed loops** and self-overlapping streams where the velocity field *reverses* and a single walk cannot traverse the arc | kNN graph → minimum spanning tree → longest-path (diameter) backbone → arc-length ordering |
+| {class}`~phasecurvefit.orderers.MSTOrderer` | **near-closed loops** and streams with no known starting point, e.g. where the velocity field *reverses* at an unknown progenitor | kNN graph → minimum spanning tree → longest-path (diameter) backbone → arc-length ordering |
 
-The two are complementary. The walk needs a start point and follows the flow; it
-covers only one arm when the velocity reverses at a progenitor. The MST needs no
-progenitor — the graph diameter finds the two tips itself — and orders tip-to-tip
-with bounded per-step jumps, which is exactly what a near-closed loop needs.
+The two are complementary. The walk needs a start point and follows the flow;
+where the velocity reverses at a progenitor it must start *at* the progenitor and
+walk both ways (`direction="both"`). The MST needs no progenitor — the graph
+diameter finds the two tips itself — and orders tip-to-tip with bounded per-step
+jumps, which is exactly what a near-closed loop needs.
 
 ## LocalFlowOrderer
 
@@ -67,9 +68,10 @@ The hyperparameters (carried by the orderer object) are:
 
 Because the walk *follows* a coherent flow, it is the right choice for open
 streams and for self-intersecting curves where the velocity stays coherent
-through the crossings. Its one blind spot is a near-closed loop whose velocity
-**reverses** at a progenitor: a single walk then covers only one arm — which is
-exactly where the [MSTOrderer](#mstorderer) takes over. For the walk's
+through the crossings. Its one requirement is a start point: on a near-closed
+loop whose velocity **reverses** at a progenitor, the walk has to start at the
+progenitor and use `direction="both"`. When that point is unknown, the
+[MSTOrderer](#mstorderer) orders the loop without one. For the walk's
 mathematics, the metric internals, and the `direction="both"` / `combine_results`
 machinery, see the [Algorithm guide](algorithm.md).
 
@@ -139,4 +141,3 @@ Both orderers return one unified type. Its `__call__` interpolates positions fro
 the ordering parameter `gamma`: along the `backbone` polyline when one is present
 (MST), otherwise along the ordered visited observations (walk). The historical
 `WalkLocalFlowResult` is a thin subclass of `OrderingResult`.
-```
