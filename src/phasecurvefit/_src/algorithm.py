@@ -29,7 +29,7 @@ __all__: tuple[str, ...] = (
 )
 
 import warnings
-from collections.abc import Iterator, Set
+from collections.abc import Iterator, KeysView, Set
 from typing import Literal, TypeAlias
 
 import equinox as eqx
@@ -101,6 +101,19 @@ class StateMetadata(quax.Value):
 
     def __iter__(self) -> Iterator:
         return iter(self._data)
+
+    def keys(self) -> KeysView[str]:
+        """Return the metadata keys.
+
+        Required for ``dict(metadata)`` and ``**metadata`` to work. Without
+        it neither raises a missing-method error: ``dict`` falls back to the
+        iterable-of-pairs protocol, iterates the *keys*, and tries to unpack
+        each one as a 2-element pair. A key of any length but two raises an
+        opaque "dictionary update sequence element #0 has length 4", and a
+        two-character key silently unpacks into its own characters --
+        ``StateMetadata(ab=1)`` became ``{"a": "b"}``.
+        """
+        return self._data.keys()  # pylint: disable=no-member
 
     def aval(self) -> jax.core.ShapedArray:
         """Return a placeholder abstract value so JAX tracing is satisfied."""
@@ -279,7 +292,7 @@ def _local_flow_walk(
     terminate_indices: Set[int] | None = None,
     n_max: int | None = None,
     config: WalkConfig = WalkConfig(),  # noqa: B008
-    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    metadata: StateMetadata | None = None,
     direction: Direction = "forward",
 ) -> WalkLocalFlowResult:
     r"""Find an ordered path through phase-space using the local flow.
@@ -370,6 +383,13 @@ def _local_flow_walk(
     Array([4, 3, 2, 1, 0], dtype=int32)
 
     """
+    # ``None`` rather than a shared ``StateMetadata()``: the default would be
+    # a single instance created at definition time. Its *attributes* are
+    # frozen -- the declared base is ``quax.Value``, which subclasses
+    # ``equinox.Module`` -- but ``_data`` is an ordinary dict, so a mutation
+    # reaching through that attribute would leak into every later call.
+    metadata = StateMetadata() if metadata is None else metadata
+
     if direction == "both":
         kwargs = {
             "start_idx": start_idx,
