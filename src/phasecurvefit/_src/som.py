@@ -171,9 +171,14 @@ def init_prototypes(
     if ordering is None:
         q = _stack(positions, keys)
         centered = q - jnp.mean(q, axis=0)
-        # eigh returns ascending eigenvalues, so the last vector is the
-        # first principal axis.
-        axis = jnp.linalg.eigh(centered.T @ centered)[1][:, -1]
+        # SVD on the centred matrix directly, not eigh on its Gram
+        # (``centered.T @ centered``): the Gram squares the position
+        # magnitudes, which overflows float32 well within ordinary unit
+        # systems (1 kpc in SI is ~3e19 m; squared, that is past float32's
+        # ~3.4e38 ceiling) with no exception and no NaN in the result --
+        # just a wrong axis and a silently corrupted ordering. The first
+        # principal axis is the leading right-singular vector.
+        axis = jnp.linalg.svd(centered, full_matrices=False)[2][0]
         ordering = jnp.argsort(centered @ axis)
     ordering = jnp.asarray(ordering)
     if not jnp.issubdtype(ordering.dtype, jnp.integer):
