@@ -4,11 +4,13 @@ Mirrors ``walk_local_flow``'s Quantity-in / Quantity-out UX. Because MST is
 host-side, unit handling is a simple strip-in / reattach-out.
 """
 
-import dataclasses
-
+import equinox as eqx
 import jax.numpy as jnp
+import jax.tree as jt
 import numpy as np
 import pytest
+
+import dataclassish
 
 import phasecurvefit as pcf
 from phasecurvefit._src.algorithm import StateMetadata
@@ -129,32 +131,18 @@ def test_quantity_localflow_reports_velocity_awareness(metric, expected):
     assert result.velocity_aware is expected
 
 
-def _strip_for_comparison(value, usys):
-    """Reduce a result field to something ``==``/``allclose``-comparable.
-
-    Handles a dict of components (``positions``/``velocities``), a lone
-    Quantity (``chord``), and a plain scalar/array/tuple -- whichever shape a
-    field on ``WalkLocalFlowResult`` may take, present or future.
-    """
-    if isinstance(value, dict):
-        return {k: _strip_for_comparison(v, usys) for k, v in value.items()}
-    if isinstance(value, u.AbstractQuantity):
-        return np.asarray(u.ustrip(usys, value))
-    if hasattr(value, "shape"):
-        return np.asarray(value)
-    return value
-
-
 def test_localflow_quantity_agrees_with_plain_field_by_field():
     """Every field of the result must agree between the plain and Quantity paths.
 
     #71: ``velocity_aware`` (#56), ``chord`` (#67) and the ``init``-derived
     start index (#70) each silently diverged here in turn, because the
     Quantity dispatch reaches ``_local_flow_walk`` directly instead of
-    delegating to the plain one. Comparing generically over
-    ``dataclasses.fields`` rather than naming a fixed set means a *future*
-    field that goes missing from the Quantity path fails this test instead of
-    shipping silently, which is the actual acceptance criterion in #71.
+    delegating to the plain one. Comparing the whole result with
+    ``eqx.tree_equal`` -- which checks static fields (``gamma_range``,
+    ``velocity_aware``) as well as array leaves -- rather than naming a fixed
+    set of fields, means a *future* field that goes missing from the Quantity
+    path fails this test instead of shipping silently, which is the actual
+    acceptance criterion in #71.
     """
     q, p = _arc_quantity()
     usys = u.unitsystems.galactic
@@ -177,31 +165,40 @@ def test_localflow_quantity_agrees_with_plain_field_by_field():
     result_plain = orderer.order(q_plain, p_plain, init=init_plain)
     result_q = orderer.order(q, p, metadata=md, init=init_q)
 
-    for f in dataclasses.fields(result_plain):
-        plain_val = _strip_for_comparison(getattr(result_plain, f.name), usys)
-        q_val = _strip_for_comparison(getattr(result_q, f.name), usys)
-        if isinstance(plain_val, dict):
-            assert plain_val.keys() == q_val.keys(), f.name
-            for k in plain_val:
-                np.testing.assert_allclose(
-                    plain_val[k],
-                    q_val[k],
-                    rtol=1e-5,
-                    atol=1e-8,
-                    equal_nan=True,
-                    err_msg=f"{f.name}[{k}]",
-                )
-        elif isinstance(plain_val, np.ndarray):
-            # ``equal_nan=True``: ``chord``'s own contract is ``nan`` for
-            # unvisited observations, and this generic comparison has no way
-            # to know that's expected rather than a sign the two paths
-            # disagree -- without it, a nan here would fail even when both
-            # dispatches produce the identical nan.
-            np.testing.assert_allclose(
-                plain_val, q_val, rtol=1e-5, atol=1e-8, equal_nan=True, err_msg=f.name
-            )
-        else:
-            assert plain_val == q_val, f.name
+    # Strip result_q's Quantity-valued fields back to plain arrays so both
+    # results share one pytree structure -- only then can eqx.tree_equal walk
+    # them leaf-by-leaf together.
+    result_q_stripped = dataclassish.replace(
+        result_q,
+        positions={k: u.ustrip(usys, v) for k, v in result_q.positions.items()},
+        velocities={k: u.ustrip(usys, v) for k, v in result_q.velocities.items()},
+        chord=u.ustrip(usys, result_q.chord),
+    )
+
+    # tree_equal has no equal_nan option, and chord's own contract is nan for
+    # unvisited observations, so a matching nan on both sides must not read
+    # as a disagreement -- but nan_to_num alone would also let a genuine nan
+    # on one side and a coincidentally-equal finite value (e.g. 0.0) on the
+    # other silently pass. Checking the nan masks agree first, separately,
+    # is what tells those two cases apart: only once every nan is known to be
+    # in the same place on both sides is it safe to neutralise them and
+    # compare the rest numerically.
+    def _isnan(tree):
+        is_float = eqx.is_inexact_array
+        return jt.map(lambda x: jnp.isnan(x) if is_float(x) else False, tree)
+
+    def _denan(tree):
+        is_float = eqx.is_inexact_array
+        return jt.map(lambda x: jnp.nan_to_num(x) if is_float(x) else x, tree)
+
+    # Not under jit here, so these are concrete bools -- ``bool(...)`` is fine
+    # (the ``is True`` idiom in eqx.tree_equal's own docs guards against a
+    # tracer under jit, which does not apply outside one).
+    assert bool(eqx.tree_equal(_isnan(result_plain), _isnan(result_q_stripped)))
+    agree = eqx.tree_equal(
+        _denan(result_plain), _denan(result_q_stripped), rtol=1e-5, atol=1e-8
+    )
+    assert bool(agree)
 
 
 def test_chord_value_matches_the_stripped_pipeline():
