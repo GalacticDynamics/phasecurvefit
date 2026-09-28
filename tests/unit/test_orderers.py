@@ -1,5 +1,6 @@
 """Tests for the pluggable orderer abstraction (``pcf.orderers``)."""
 
+import jax
 import jax.numpy as jnp
 import pytest
 
@@ -172,6 +173,31 @@ class TestVelocityAwareness:
             config=pcf.WalkConfig(metric=pcf.metrics.SpatialDistanceMetric())
         )
         assert spatial.order(pos, vel).velocity_aware is False
+
+    def test_velocity_aware_stays_concrete_under_grad_and_jit(self, arc):
+        """Deriving the flag from the metric keeps it out of tracer territory.
+
+        #77: an earlier design (never merged past #56's own review) derived
+        ``velocity_aware`` from ``bool(metric_scale != 0.0)``, which is a
+        differentiable leaf and a tracer under ``jit``/``grad`` -- forcing a
+        ``try/except TypeError`` that silently always resolved to ``True``
+        while tracing. Since the flag instead reads ``config.metric.uses_velocity``,
+        a plain Python attribute of the metric type, ``metric_scale`` being
+        traced never enters into it: no exception to catch, and the answer is
+        the same traced or not.
+        """
+        pos, vel, _ = arc()
+
+        def run(scale: float) -> float:
+            orderer = pcf.orderers.LocalFlowOrderer(metric_scale=scale)
+            result = orderer.order(pos, vel)
+            assert result.velocity_aware is True
+            return jnp.sum(result.chord)
+
+        # Neither raises -- the historical failure mode was a TypeError from
+        # `bool()` on a tracer, masked by the try/except into a silent `True`.
+        jax.grad(run)(1.0)
+        jax.jit(run)(1.0)
 
     def test_the_deprecated_walk_reports_it_too(self, arc):
         """The flag is set by the walk, not by the orderer wrapping it.
