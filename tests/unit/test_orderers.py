@@ -188,16 +188,27 @@ class TestVelocityAwareness:
         """
         pos, vel, _ = arc()
 
-        def run(scale: float) -> float:
-            orderer = pcf.orderers.LocalFlowOrderer(metric_scale=scale)
+        def run(scale: float, *, metric, expected: bool) -> float:
+            orderer = pcf.orderers.LocalFlowOrderer(
+                metric_scale=scale, config=pcf.WalkConfig(metric=metric)
+            )
             result = orderer.order(pos, vel)
-            assert result.velocity_aware is True
+            assert result.velocity_aware is expected
             return jnp.sum(result.chord)
+
+        aligned = pcf.metrics.AlignedMomentumDistanceMetric()
+        spatial = pcf.metrics.SpatialDistanceMetric()
 
         # Neither raises -- the historical failure mode was a TypeError from
         # `bool()` on a tracer, masked by the try/except into a silent `True`.
-        jax.grad(run)(1.0)
-        jax.jit(run)(1.0)
+        # Checking both metrics, not just the velocity-aware default, is what
+        # actually distinguishes this from the old derivation: a try/except
+        # forcing `True` under any trace would still pass a True-only check,
+        # metric_scale traced or not, since it never sees `False` to get wrong.
+        jax.grad(lambda s: run(s, metric=aligned, expected=True))(1.0)
+        jax.jit(lambda s: run(s, metric=aligned, expected=True))(1.0)
+        jax.grad(lambda s: run(s, metric=spatial, expected=False))(1.0)
+        jax.jit(lambda s: run(s, metric=spatial, expected=False))(1.0)
 
     def test_the_deprecated_walk_reports_it_too(self, arc):
         """The flag is set by the walk, not by the orderer wrapping it.
