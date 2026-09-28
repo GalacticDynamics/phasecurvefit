@@ -35,7 +35,7 @@ from jaxtyping import Array, Float
 
 from zeroth import zeroth
 
-from phasecurvefit._src.custom_types import ISzN, VectorComponents
+from phasecurvefit._src.custom_types import FSz0, ISzN, VectorComponents
 from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
     SpatialDistanceMetric,
@@ -249,7 +249,7 @@ def init_prototypes(
 
 def _distance_matrix(
     metric: AbstractDistanceMetric,
-    metric_scale: float,
+    metric_scale: float | FSz0,
     positions: VectorComponents,
     velocities: VectorComponents,
     proto_positions: VectorComponents,
@@ -272,7 +272,7 @@ def fit(
     /,
     *,
     metric: AbstractDistanceMetric,
-    metric_scale: float = 0.0,
+    metric_scale: float | FSz0 = 0.0,
     n_epochs: int = 10,
     sigma_start: float | None = None,
     sigma_end: float = 0.7,
@@ -677,7 +677,7 @@ def chord(
     /,
     *,
     metric: AbstractDistanceMetric,
-    metric_scale: float = 0.0,
+    metric_scale: float | FSz0 = 0.0,
 ) -> Float[Array, " N"]:
     """Project data onto the backbone and return the arc-length chord parameter.
 
@@ -795,7 +795,7 @@ class SOM1D(eqx.Module):
     prototype_positions: VectorComponents
     prototype_velocities: VectorComponents
     metric: AbstractDistanceMetric
-    metric_scale: float = 0.0
+    metric_scale: float | FSz0 = 0.0
     n_epochs: int = eqx.field(static=True, default=10)
     sigma_start: float | None = eqx.field(static=True, default=None)
     sigma_end: float = eqx.field(static=True, default=0.7)

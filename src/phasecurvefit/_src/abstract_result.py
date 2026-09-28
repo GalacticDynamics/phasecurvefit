@@ -36,6 +36,13 @@ class AbstractResult(eqx.Module):
     gamma_range : tuple[float, float]
         Static keyword-only argument specifying the valid range of the
         ordering parameter in `__call__`. Default is (0.0, 1.0).
+    velocity_aware : bool
+        Whether velocity informed how this result was ordered, as opposed to
+        positions alone. A stage that can refine a prior result reads this off
+        ``init`` to decide whether it too should let velocity participate: one
+        that drops velocity after a stage that used it re-conflates whatever
+        the earlier stage separated with it. A result type that never has an
+        opinion leaves the default, ``False``.
 
     """
 
@@ -44,6 +51,7 @@ class AbstractResult(eqx.Module):
     indices: ISzN
     _: KW_ONLY
     gamma_range: tuple[float, float] = eqx.field(static=True, default=(0.0, 1.0))
+    velocity_aware: bool = eqx.field(static=True, default=False)
 
     @abc.abstractmethod
     def __call__(

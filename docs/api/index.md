@@ -188,6 +188,40 @@ Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
    :no-index:
 ```
 
+## SOM Module
+
+Self-Organizing Map ordering, after Starkman et al. (2023). See
+{doc}`/guides/som`.
+
+```{eval-rst}
+.. autoclass:: phasecurvefit.orderers.SOMOrderer
+   :no-index:
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.orderers.ChainOrderer
+   :no-index:
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.som.SOM1D
+   :no-index:
+   :members: make, fit, backbone, chord, n_prototypes
+   :show-inheritance:
+
+.. autofunction:: phasecurvefit.som.init_prototypes
+   :no-index:
+
+.. autofunction:: phasecurvefit.som.fit
+   :no-index:
+
+.. autofunction:: phasecurvefit.som.densify
+   :no-index:
+
+.. autofunction:: phasecurvefit.som.chord
+   :no-index:
+```
+
 ## Index
 
 ```{eval-rst}

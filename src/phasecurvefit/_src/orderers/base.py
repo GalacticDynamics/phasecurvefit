@@ -123,6 +123,13 @@ class AbstractOrderer(eqx.Module):
         from it -- and one that cannot should still accept and ignore it, since
         accepting ``init`` is what makes an orderer usable anywhere but the head
         of a chain.
+
+        An orderer that restricts itself to a subset of ``init`` (e.g. one that
+        works only on ``init.indices``, the visited observations) must not
+        reintroduce observations the prior stage rejected as outliers -- points
+        left unvisited (``-1`` in ``indices``) stay unvisited. There is nothing
+        in :class:`ChainOrderer` that enforces this; it is a convention every
+        implementation is responsible for keeping.
         """
         ...
 
