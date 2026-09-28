@@ -176,11 +176,9 @@ def order(
     Array([0, 1, 2], dtype=int32)
 
     """
-    if (
-        isinstance(positions, dict)
-        and isinstance(velocities, dict)
-        and not positions
-        and not velocities
+    msg = "positions and velocities cannot both be empty; there is nothing to order."
+    if (isinstance(positions, dict) and not positions) and (
+        isinstance(velocities, dict) and not velocities
     ):
         # An empty dict satisfies both the plain-array and Quantity dispatch
         # signatures equally, so plum cannot pick one and raises before any
@@ -191,9 +189,6 @@ def order(
         # dicts specifically -- ``not positions`` alone is also true for e.g.
         # ``None``, which is a different mistake and deserves its own error
         # rather than this one's misleading "both empty" message.
-        msg = (
-            "positions and velocities cannot both be empty; there is nothing to order."
-        )
         raise ValueError(msg)
     if orderer is None:
         # Lazy import: localflow imports AbstractOrderer from this module.
