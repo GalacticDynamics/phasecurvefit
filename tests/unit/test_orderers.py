@@ -20,6 +20,18 @@ class TestOrdererNamespace:
         """Order facade exists."""
         assert callable(pcf.order)
 
+    def test_order_facade_rejects_both_empty_with_a_clear_message(self):
+        """An empty dict satisfies every orderer's dispatch signature equally.
+
+        #129: ``plum`` cannot pick between the plain-array and Quantity
+        overloads for ``{}``, so it raises ``AmbiguousLookupError`` naming its
+        own internals rather than the caller's mistake -- before any
+        orderer's own body runs. ``pcf.order``, the primary documented entry
+        point, catches it here with a message about the actual problem.
+        """
+        with pytest.raises(ValueError, match="cannot both be empty"):
+            pcf.order({}, {})
+
 
 class TestOrderingResultUnification:
     """OrderingResult is unified; WalkLocalFlowResult subclasses it."""
