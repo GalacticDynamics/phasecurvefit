@@ -12,13 +12,14 @@ The ``WalkConfig`` class composes a strategy with a distance metric:
         metric=FullPhaseSpaceDistanceMetric(),
         strategy=KDTree(k=50),
     )
-    result = walk_local_flow(pos, vel, config=config, ...)
+    result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 """
 
 __all__: tuple[str, ...] = (
     "AbstractQueryStrategy",
     "BruteForce",
     "KDTree",
+    "QueryResult",
 )
 
 from abc import ABC, abstractmethod
@@ -152,8 +153,10 @@ class KDTree(AbstractQueryStrategy):
         Parameters
         ----------
         k : int, optional
-            Number of nearest spatial neighbors to query. Default: 50.
-            Increase for more thorough searches; decrease for speed.
+            Number of candidate spatial neighbors to consider at each step,
+            *excluding* the current point itself. Default: 50. Increase for
+            more thorough searches; decrease for speed. Values larger than the
+            number of points are clamped to consider every other point.
 
         """
         self.k = k
@@ -179,7 +182,7 @@ class KDTree(AbstractQueryStrategy):
         pos_arrays = [positions[k] for k in sorted(positions.keys())]
         pos_flat = jnp.stack(pos_arrays, axis=-1)
         tree = self._jaxkd.build_tree(pos_flat)
-        return {"tree": tree}
+        return {"tree": tree, "n_points": pos_flat.shape[0]}
 
     def query(
         self,
@@ -202,11 +205,21 @@ class KDTree(AbstractQueryStrategy):
             [current_pos[k] for k in sorted(current_pos.keys())]
         )
 
-        # Query k nearest neighbors using jaxkd top-level API
+        # Query one extra neighbor to make room for the current point itself.
+        # Otherwise ``k`` yields only ``k - 1`` usable candidates and small
+        # ``k`` can deadlock the walk: the sole non-self neighbor may already
+        # be visited, leaving no candidate and terminating the walk
+        # prematurely. Self is NOT dropped positionally: with coincident points
+        # the tree may return a duplicate before self, so slicing off slot 0
+        # would drop an unvisited duplicate and keep self. Instead self stays
+        # in the candidate set and is excluded by index via the walk's visited
+        # mask (the current point is always visited). Clamp to the point count
+        # since jaxkd errors when ``k`` exceeds the tree size.
+        n_query = min(self.k + 1, kd_state["n_points"])
         indices, _ = self._jaxkd.query_neighbors(
-            kd_state["tree"], current_pos_arr[None, :], k=self.k
+            kd_state["tree"], current_pos_arr[None, :], k=n_query
         )
-        indices = indices[0]  # (k,)
+        indices = indices[0]
 
         # Compute metric distances to all points
         distances_metric = metric_fn(

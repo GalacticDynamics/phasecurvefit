@@ -1,14 +1,23 @@
 # Distance Metrics Guide
 
-The `walk_local_flow` algorithm uses distance metrics to determine how to select
-the next point in a phase-space trajectory. This guide explains the metric
-system and shows how to use and create custom metrics.
+The local-flow walk uses distance metrics to determine how to select the next
+point in a phase-space trajectory. This guide explains the metric system and
+shows how to use and create custom metrics.
 
 ## Overview
 
 A distance metric defines how the algorithm measures "closeness" between the
 current point and candidate next points in phase-space. Different metrics enable
 different physical interpretations and behaviors.
+
+```{note}
+Metrics configure the {class}`~phasecurvefit.orderers.LocalFlowOrderer`. The same
+velocity-alignment idea — the
+`cos θ` term below — also powers the opt-in velocity mechanisms of the
+{class}`~phasecurvefit.orderers.MSTOrderer` (`velocity_weight`,
+`sever_cos_threshold`), which reuse `cos(v_i, v_j)` on graph edges. See the
+[Orderers guide](orderers.md).
+```
 
 Metrics are configured via `WalkConfig`, which composes a metric with a query
 strategy (discussed in a separate guide):
@@ -22,7 +31,11 @@ pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 config = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+)
 ```
 
 ## Built-in Metrics
@@ -51,13 +64,17 @@ from phasecurvefit.metrics import SpatialDistanceMetric
 
 # Pure nearest-neighbor search in position space
 config = pcf.WalkConfig(metric=SpatialDistanceMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=0.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=0.0),
+)
 ```
 
 ### AlignedMomentumDistanceMetric
 
 The Nearest Neighbors with Momentum (NN+p) metric from [Nibauer et al.
-(2022)](https://arxiv.org/abs/2209.XXXXX).  This is the default metric.
+(2022)](https://arxiv.org/abs/2201.12042).  This is the default metric.
 
 **Mathematical formulation:**
 
@@ -85,12 +102,16 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 # Aligned momentum metric
 config = pcf.WalkConfig(metric=AlignedMomentumDistanceMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+)
 ```
 
 ### FullPhaseSpaceDistanceMetric
 
-A true 6D Euclidean distance metric in full phase-space, treating position and velocity symmetrically. **This is the default metric.**
+A true 6D Euclidean distance metric in full phase-space, treating position and velocity symmetrically.
 
 **Mathematical formulation:**
 
@@ -120,10 +141,14 @@ Unlike `AlignedMomentumDistanceMetric`, this metric has no directional bias from
 ```python
 from phasecurvefit.metrics import FullPhaseSpaceDistanceMetric
 
-# Full 6D phase-space distance (this is the default)
+# Full 6D phase-space distance
 # metric_scale represents a time scale (e.g., if pos ~ kpc, vel ~ kpc/Myr, metric_scale ~ Myr)
 config = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+)
 ```
 
 **Comparison with momentum metric:**
@@ -131,6 +156,33 @@ result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=
 - `AlignedMomentumDistanceMetric`: Directional — favors points along velocity direction
 - `FullPhaseSpaceDistanceMetric`: Isotropic — treats all directions equally
 - Both reduce to `SpatialDistanceMetric` when `metric_scale=0`
+
+## Choosing `metric_scale`
+
+`metric_scale` means something different for each metric, and it carries units,
+so there is no universal good value. A way to pick it for each:
+
+- **`AlignedMomentumDistanceMetric`**: $\lambda$ is a **length**, the extra cost
+  of stepping at right angles to the current velocity. Compare it with the
+  typical spacing $s$ between neighbouring points: $\lambda \ll s$ behaves like
+  nearest-neighbour search, $\lambda \approx s$ weighs direction and distance
+  about equally, and $\lambda \gg s$ strongly favours continuing straight ahead,
+  which also means longer strides and more skipped points. The
+  [stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb) uses
+  $\lambda = 100$ kpc for a stream whose steps are at most a few kpc, so even a
+  step $15°$ off the velocity costs more than a 3 kpc step straight ahead.
+- **`FullPhaseSpaceDistanceMetric`**: $\tau$ is a **time**, converting a velocity
+  difference into an equivalent distance. Choose it so that $\tau\,\Delta v$
+  between points on *different* parts of the curve is much larger than the
+  spacing between neighbours on the *same* part. The
+  [epitrochoid autoencoder tutorial](../tutorials/epitrochoid_autoencoder.ipynb)
+  uses $\tau = 4$ s: where two strands cross, their velocities differ by at least
+  ~580 m/s, which puts the wrong strand over 2 km away against a ~3 m spacing.
+- **`SpatialDistanceMetric`**: ignored.
+
+In every case, check the result: if the ordering jumps between strands, the
+velocity term is too weak; if the walk stops early or skips most points, it may
+be too strong (or `max_dist` too small).
 
 ## Creating Custom Metrics
 
@@ -160,7 +212,9 @@ class CustomMetric(AbstractDistanceMetric):
 
 ### Example: 6D Cartesian Metric
 
-Here's a complete example of a metric that computes full 6D Cartesian distance:
+Here's a complete example of a metric that computes full 6D Cartesian distance.
+(This is what the built-in `FullPhaseSpaceDistanceMetric` does; it is written out
+here to show the interface.)
 
 ```python
 import equinox as eqx
@@ -203,7 +257,11 @@ pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
 config = pcf.WalkConfig(metric=Full6DMetric())
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+)
 ```
 
 ### Example: Weighted Position Metric
@@ -232,7 +290,11 @@ class WeightedPositionMetric(AbstractDistanceMetric):
 # Use with custom weights (ignore y-coordinate)
 metric = WeightedPositionMetric(weights={"x": 1.0, "y": 0.1})
 config = pcf.WalkConfig(metric=metric)
-result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=0.0)
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=0.0),
+)
 ```
 
 ## Units and Metrics
@@ -252,26 +314,30 @@ vel = {"x": u.Q([1.0, 1.0, 1.0], "km/s"), "y": u.Q([0.5, 0.5, 0.5], "km/s")}
 
 # metric_scale must have units of distance for AlignedMomentumDistanceMetric
 config = pcf.WalkConfig(metric=AlignedMomentumDistanceMetric())
-result = pcf.walk_local_flow(
+result = pcf.order(
     pos,
     vel,
-    config=config,
-    start_idx=0,
-    metric_scale=u.Q(100.0, "kpc"),  # Momentum weight in distance units
-    usys=u.unitsystems.galactic,  # Required when using Quantities
+    pcf.orderers.LocalFlowOrderer(
+        config=config,
+        start_idx=0,
+        metric_scale=u.Q(100.0, "kpc"),  # Momentum weight in distance units
+    ),
+    metadata=pcf.StateMetadata(usys=u.unitsystems.galactic),  # Required for Quantities
 )
 
 # For FullPhaseSpaceDistanceMetric, metric_scale has units of time
 config_6d = pcf.WalkConfig(metric=FullPhaseSpaceDistanceMetric())
-result_6d = pcf.walk_local_flow(
+result_6d = pcf.order(
     pos,
     vel,
-    config=config_6d,
-    start_idx=0,
-    metric_scale=u.Q(
-        1.0, "Gyr"
-    ),  # Time to convert velocity distance to spatial distance
-    usys=u.unitsystems.galactic,  # Required when using Quantities
+    pcf.orderers.LocalFlowOrderer(
+        config=config_6d,
+        start_idx=0,
+        metric_scale=u.Q(
+            1.0, "Gyr"
+        ),  # Time to convert velocity distance to spatial distance
+    ),
+    metadata=pcf.StateMetadata(usys=u.unitsystems.galactic),  # Required for Quantities
 )
 ```
 
@@ -285,8 +351,8 @@ result_6d = pcf.walk_local_flow(
 
 **When to use each:**
 
-- **FullPhaseSpaceDistanceMetric** (default): True 6D distance when position and velocity are equally important and you know the system's natural time scale. No directional preference.
-- **AlignedMomentumDistanceMetric**: For coherent flows (stellar streams, winds) where velocity alignment should bias the ordering.
+- **FullPhaseSpaceDistanceMetric**: True 6D distance when position and velocity are equally important and you know the system's natural time scale. No directional preference.
+- **AlignedMomentumDistanceMetric** (default): For coherent flows (stellar streams, winds) where velocity alignment should bias the ordering.
 - **SpatialDistanceMetric**: When velocity is unreliable or you want pure spatial clustering. Good baseline for comparison.
 
 
@@ -321,7 +387,11 @@ metrics = {
 
 for name, metric in metrics.items():
     config = pcf.WalkConfig(metric=metric)
-    result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+    result = pcf.order(
+        pos,
+        vel,
+        pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+    )
     n_visited = len([i for i in result.indices if i >= 0])
     print(f"{name}: {n_visited}/100 points ordered")
 ```

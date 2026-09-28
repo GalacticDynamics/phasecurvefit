@@ -1,3 +1,15 @@
 __pycache__
 /docs/_build
 /src/phasecurvefit/_version.py
+.mypy_cache
+
+# Local-only design/planning artifacts (superpowers)
+docs/superpowers/
+
+# hypothesis example database
+.hypothesis/
+
+# coverage.py data & reports
+.coverage
+.coverage.*
+htmlcov/

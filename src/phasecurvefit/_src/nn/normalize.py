@@ -81,6 +81,10 @@ class StandardScalerNormalizer(AbstractNormalizer):
         /,
         **_: object,
     ) -> None:
+        # Resolves to the plain no-op ``AbstractNormalizer.__init__`` (next in
+        # the MRO), not back into this plum dispatch. Kept for static checkers.
+        super().__init__(qs, ps)
+
         # Positions
         self.q_comps = list(qs.keys())
         xs = jnp.stack(list(qs.values()), axis=1)

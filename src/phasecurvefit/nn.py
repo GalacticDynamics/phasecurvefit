@@ -16,7 +16,7 @@ Examples
 
 >>> pos = {"x": jnp.linspace(0, 5, 20), "y": jnp.zeros(20)}
 >>> vel = {"x": jnp.ones(20), "y": jnp.zeros(20)}
->>> result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+>>> result = pcf.order(pos, vel)
 
 >>> keys = jax.random.split(jax.random.key(0), 2)
 >>> normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
@@ -31,7 +31,9 @@ Examples
 __all__: tuple[str, ...] = (
     # Network components
     "OrderingNet",
+    "AbstractTrackNet",
     "TrackNet",
+    "FourierTrackNet",
     "AbstractAutoencoder",
     "PathAutoencoder",
     "AbstractExternalDecoder",
@@ -42,6 +44,15 @@ __all__: tuple[str, ...] = (
     "train_ordering_net",
     "TrainingConfig",
     "OrderingTrainingConfig",
+    # Membership / outlier rejection (Hogg, Bovy & Lang 2010, sec. 3)
+    "MixtureMembershipConfig",
+    "WidthNet",
+    "posterior_membership",
+    "membership_responsibility",
+    "mixture_membership_loss",
+    "membership_rampup",
+    "sigma_ceiling",
+    "uniform_background_density",
     # Loss functions
     "encoder_loss",
     # Results
@@ -57,8 +68,11 @@ from ._src.nn import (
     AbstractAutoencoder,
     AbstractExternalDecoder,
     AbstractNormalizer,
+    AbstractTrackNet,
     AutoencoderResult,
     EncoderExternalDecoder,
+    FourierTrackNet,
+    MixtureMembershipConfig,
     OrderingNet,
     OrderingTrainingConfig,
     PathAutoencoder,
@@ -66,8 +80,15 @@ from ._src.nn import (
     StandardScalerNormalizer,
     TrackNet,
     TrainingConfig,
+    WidthNet,
     encoder_loss,
     fill_ordering_gaps,
+    membership_rampup,
+    membership_responsibility,
+    mixture_membership_loss,
+    posterior_membership,
+    sigma_ceiling,
     train_autoencoder,
     train_ordering_net,
+    uniform_background_density,
 )

@@ -28,14 +28,12 @@ class WalkConfig(eqx.Module):
     >>> import jax.numpy as jnp
     >>> import phasecurvefit as pcf
 
-    Default configuration (brute-force with full phase-space metric):
+    Default configuration (brute-force with aligned-momentum metric):
 
     >>> config = pcf.WalkConfig()
     >>> pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
     >>> vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
-    >>> result = pcf.walk_local_flow(
-    ...     pos, vel, config=config, start_idx=0, metric_scale=1.0
-    ... )
+    >>> result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 
     KD-tree strategy with aligned momentum metric:
 

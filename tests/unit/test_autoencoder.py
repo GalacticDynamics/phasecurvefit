@@ -1,5 +1,6 @@
 """Tests for the Autoencoder neural network for tracer interpolation."""
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -7,6 +8,7 @@ import pytest
 from jaxtyping import PRNGKeyArray
 
 import phasecurvefit as pcf
+from phasecurvefit._src.nn.autoencoder import compute_decoder_loss
 
 
 class TestOrderingNet:
@@ -41,7 +43,7 @@ class TestOrderingNet:
 
         # Batch of 10 points in 2D phase-space (4 features: x, y, vx, vy)
         key, subkey = jr.split(key)
-        w = jax.random.normal(subkey, (10, 4))
+        w = jr.normal(subkey, (10, 4))
         gamma, prob = jax.vmap(net)(w)
 
         assert gamma.shape == (10,)
@@ -53,7 +55,7 @@ class TestOrderingNet:
         net = pcf.nn.OrderingNet(in_size=4, key=subkey)
 
         key, subkey = jr.split(key)
-        w = jax.random.normal(subkey, (100, 4))
+        w = jr.normal(subkey, (100, 4))
         gamma, _ = jax.vmap(net)(w)
 
         assert jnp.all(gamma >= 0.0)
@@ -65,7 +67,7 @@ class TestOrderingNet:
         net = pcf.nn.OrderingNet(in_size=4, key=subkey)
 
         key, subkey = jr.split(key)
-        w = jax.random.normal(subkey, (100, 4))
+        w = jr.normal(subkey, (100, 4))
         _, prob = jax.vmap(net)(w)
 
         assert jnp.all(prob >= 0.0)
@@ -77,7 +79,7 @@ class TestOrderingNet:
         net = pcf.nn.OrderingNet(in_size=4, key=subkey)
 
         key, subkey = jr.split(key)
-        w = jax.random.normal(subkey, (4,))
+        w = jr.normal(subkey, (4,))
         gamma, prob = net(w)
 
         assert gamma.shape == ()
@@ -281,14 +283,55 @@ class TestTrainAutoencoder:
         pos = {"x": t, "y": 0.5 * t}
         vel = {"x": jnp.ones(n_points), "y": 0.5 * jnp.ones(n_points)}
 
-        return pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+        return pcf.order(pos, vel)
+
+    def test_loss_finite_when_encoder_claims_no_members(self, rng_key: PRNGKeyArray):
+        """The joint loss stays finite when no star clears `member_threshold`.
+
+        `compute_decoder_loss` narrows the batch mask with the *live* encoder's
+        membership (``mask & is_member``). The trainer only guarantees the batch
+        mask is non-empty, so mid-training the encoder can transiently reject
+        every star in the batch. `masked_mean` returns NaN on an empty mask, so
+        without a guard the epoch loss goes NaN. Regression test for that.
+        """
+        key1, key2 = jr.split(rng_key)
+        n, d = 8, 2
+
+        normalizer = pcf.nn.StandardScalerNormalizer(
+            {"x": jnp.linspace(0, 1, n), "y": jnp.linspace(0, 1, n)},
+            {"x": jnp.ones(n), "y": jnp.ones(n)},
+        )
+        ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
+        dynamic, static = eqx.partition(ae, eqx.is_array)
+
+        ws = jr.normal(key2, (n, 2 * d))
+        weights = jnp.ones(n)
+        mask = jnp.ones(n, dtype=bool)
+
+        # `member_threshold > 1` makes `is_member` all-False, so the narrowed
+        # mask is empty -- exactly the transient state hit during training.
+        loss, grads = compute_decoder_loss(
+            dynamic,
+            static,
+            ws,
+            weights,
+            mask,
+            lambda_q=1.0,
+            lambda_p=1.0,
+            member_threshold=1.1,
+            key=rng_key,
+        )
+
+        assert jnp.isfinite(loss), f"loss is {loss} when no star is a member"
+        leaves = [x for x in jax.tree.leaves(grads) if eqx.is_array(x)]
+        assert all(jnp.all(jnp.isfinite(g)) for g in leaves), "non-finite gradient"
 
     def test_training_runs(self, simple_wlf_result, rng_key: PRNGKeyArray):
         """Test that training completes without errors."""
         normalizer = pcf.nn.StandardScalerNormalizer(
             simple_wlf_result.positions, simple_wlf_result.velocities
         )
-        key1, key2 = jax.random.split(rng_key)
+        key1, key2 = jr.split(rng_key)
         ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         # Use minimal epochs for fast testing
@@ -308,7 +351,7 @@ class TestTrainAutoencoder:
         normalizer = pcf.nn.StandardScalerNormalizer(
             simple_wlf_result.positions, simple_wlf_result.velocities
         )
-        key1, key2 = jax.random.split(rng_key)
+        key1, key2 = jr.split(rng_key)
         ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         # Use more epochs for phase 1 to see loss reduction
@@ -338,7 +381,7 @@ class TestTrainAutoencoder:
         normalizer = pcf.nn.StandardScalerNormalizer(
             simple_wlf_result.positions, simple_wlf_result.velocities
         )
-        key1, key2 = jax.random.split(rng_key)
+        key1, key2 = jr.split(rng_key)
         ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         config = pcf.nn.TrainingConfig(
@@ -363,11 +406,11 @@ class TestFillOrderingGaps:
     def phasecurvefit_with_gaps(self):
         """Create a simple phase-flow walk result with skipped tracers."""
         n_points = 30
-        key = jax.random.key(42)
+        key = jr.key(42)
 
         # Create a curved stream
         theta = jnp.linspace(0, jnp.pi, n_points)
-        shuffle_idx = jax.random.permutation(key, n_points)
+        shuffle_idx = jr.permutation(key, n_points)
 
         pos = {
             "x": jnp.cos(theta)[shuffle_idx],
@@ -380,8 +423,12 @@ class TestFillOrderingGaps:
 
         # Use max_dist to create gaps
         start_idx = int(jnp.argmax(pos["x"]))
-        return pcf.walk_local_flow(
-            pos, vel, start_idx=start_idx, metric_scale=3.0, max_dist=0.8
+        return pcf.order(
+            pos,
+            vel,
+            pcf.orderers.LocalFlowOrderer(
+                start_idx=start_idx, metric_scale=3.0, max_dist=0.8
+            ),
         )
 
     def test_fills_gaps(self, phasecurvefit_with_gaps, rng_key: PRNGKeyArray):
@@ -393,7 +440,7 @@ class TestFillOrderingGaps:
         normalizer = pcf.nn.StandardScalerNormalizer(
             phasecurvefit_with_gaps.positions, phasecurvefit_with_gaps.velocities
         )
-        key1, key2 = jax.random.split(rng_key)
+        key1, key2 = jr.split(rng_key)
         ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         config = pcf.nn.TrainingConfig(
@@ -415,7 +462,7 @@ class TestFillOrderingGaps:
         normalizer = pcf.nn.StandardScalerNormalizer(
             phasecurvefit_with_gaps.positions, phasecurvefit_with_gaps.velocities
         )
-        key1, key2 = jax.random.split(rng_key)
+        key1, key2 = jr.split(rng_key)
         ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         config = pcf.nn.TrainingConfig(
@@ -437,7 +484,7 @@ class TestFillOrderingGaps:
         normalizer = pcf.nn.StandardScalerNormalizer(
             phasecurvefit_with_gaps.positions, phasecurvefit_with_gaps.velocities
         )
-        key1, key2 = jax.random.split(rng_key)
+        key1, key2 = jr.split(rng_key)
         ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         config = pcf.nn.TrainingConfig(
@@ -510,12 +557,12 @@ class TestJAXIntegration:
         """Test that encoder works with vmap."""
         # Create batch data - 10 points in 2D
         pos = {
-            "x": jax.random.normal(jax.random.key(1), (10,)),
-            "y": jax.random.normal(jax.random.key(2), (10,)),
+            "x": jr.normal(jr.key(1), (10,)),
+            "y": jr.normal(jr.key(2), (10,)),
         }
         vel = {
-            "x": jax.random.normal(jax.random.key(3), (10,)),
-            "y": jax.random.normal(jax.random.key(4), (10,)),
+            "x": jr.normal(jr.key(3), (10,)),
+            "y": jr.normal(jr.key(4), (10,)),
         }
         normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
         ae = pcf.nn.PathAutoencoder.make(
@@ -530,12 +577,12 @@ class TestJAXIntegration:
     def test_grad_encoder(self, rng_key: PRNGKeyArray):
         """Test that gradients can be computed through encoder."""
         pos = {
-            "x": jax.random.normal(jax.random.key(1), (10,)),
-            "y": jax.random.normal(jax.random.key(2), (10,)),
+            "x": jr.normal(jr.key(1), (10,)),
+            "y": jr.normal(jr.key(2), (10,)),
         }
         vel = {
-            "x": jax.random.normal(jax.random.key(3), (10,)),
-            "y": jax.random.normal(jax.random.key(4), (10,)),
+            "x": jr.normal(jr.key(3), (10,)),
+            "y": jr.normal(jr.key(4), (10,)),
         }
         normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
         ae = pcf.nn.PathAutoencoder.make(
@@ -601,14 +648,16 @@ class Test3DData:
         }
 
         start_idx = int(jnp.argmin(pos["z"]))
-        walkresult = pcf.walk_local_flow(
-            pos, vel, start_idx=start_idx, metric_scale=3.0
+        walkresult = pcf.order(
+            pos,
+            vel,
+            pcf.orderers.LocalFlowOrderer(start_idx=start_idx, metric_scale=3.0),
         )
 
         normalizer = pcf.nn.StandardScalerNormalizer(
             walkresult.positions, walkresult.velocities
         )
-        key1, key2 = jax.random.split(rng_key)
+        key1, key2 = jr.split(rng_key)
         ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
 
         config = pcf.nn.TrainingConfig(
@@ -630,12 +679,12 @@ class TestEdgeCases:
         pos = {"x": jnp.array([0.0, 1.0]), "y": jnp.array([0.0, 1.0])}
         vel = {"x": jnp.array([1.0, 1.0]), "y": jnp.array([1.0, 1.0])}
 
-        walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+        walkresult = pcf.order(pos, vel)
 
         normalizer = pcf.nn.StandardScalerNormalizer(
             walkresult.positions, walkresult.velocities
         )
-        key1, key2 = jax.random.split(rng_key)
+        key1, key2 = jr.split(rng_key)
         ae = pcf.nn.PathAutoencoder.make(
             normalizer, gamma_range=walkresult.gamma_range, key=key1
         )
@@ -658,7 +707,7 @@ class TestEdgeCases:
         pos = {"x": t, "y": jnp.zeros(n_points)}
         vel = {"x": jnp.ones(n_points), "y": jnp.zeros(n_points)}
 
-        walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+        walkresult = pcf.order(pos, vel)
 
         # All points should be ordered
         assert len(walkresult.indices) == n_points
@@ -667,7 +716,7 @@ class TestEdgeCases:
         normalizer = pcf.nn.StandardScalerNormalizer(
             walkresult.positions, walkresult.velocities
         )
-        key1, key2 = jax.random.split(rng_key)
+        key1, key2 = jr.split(rng_key)
         model = pcf.nn.PathAutoencoder.make(
             normalizer, gamma_range=walkresult.gamma_range, key=key1
         )
@@ -683,3 +732,65 @@ class TestEdgeCases:
         # preserve all of them without filtering by prob_threshold
         assert len(result.indices) == n_points
         assert len(losses) == config.n_epochs
+
+
+class TestPosteriorMembership:
+    """Tests for the `posterior_membership` inference API."""
+
+    @staticmethod
+    def _model_with_width(key: PRNGKeyArray) -> pcf.nn.PathAutoencoder:
+        """Build a model with a fitted-width net attached (as training does)."""
+        pos = {"x": jnp.linspace(0.0, 1.0, 8), "y": jnp.linspace(0.0, 1.0, 8)}
+        vel = {"x": jnp.ones(8), "y": jnp.ones(8) * 0.5}
+        normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+        key1, key2 = jr.split(key)
+        ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
+        return eqx.tree_at(
+            lambda m: m.width,
+            ae,
+            pcf.nn.MixtureMembershipConfig().make_width_net(key=key2),
+            is_leaf=lambda x: x is None,
+        )
+
+    @staticmethod
+    def _make_ws() -> jnp.ndarray:
+        return jnp.concatenate(
+            [
+                jnp.stack([jnp.linspace(0.0, 1.0, 8), jnp.linspace(0.0, 1.0, 8)], -1),
+                jnp.stack([jnp.ones(8), jnp.ones(8) * 0.5], -1),
+            ],
+            axis=-1,
+        )
+
+    def test_requires_width(self, rng_key: PRNGKeyArray):
+        """A model without mixture membership cannot give a posterior."""
+        normalizer = pcf.nn.StandardScalerNormalizer(
+            {"x": jnp.array([0.0, 1.0]), "y": jnp.array([0.0, 1.0])},
+            {"x": jnp.array([1.0, 1.0]), "y": jnp.array([1.0, 1.0])},
+        )
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(0.0, 1.0), key=rng_key
+        )
+        with pytest.raises(ValueError, match="mixture membership"):
+            pcf.nn.posterior_membership(ae, self._make_ws())
+
+    def test_default_background_density_under_jit(self, rng_key: PRNGKeyArray):
+        """Default `background_density=None` must work under `filter_jit`.
+
+        `uniform_background_density` is derived from the (traced) positions, so
+        it must stay trace-transparent -- a `float()` cast here concretizes a
+        tracer and makes the documented default unusable in compiled code.
+        """
+        model = self._model_with_width(rng_key)
+        q = pcf.nn.posterior_membership(model, self._make_ws())
+        assert q.shape == (8,)
+        assert bool(jnp.all(q >= 0.0))
+        assert bool(jnp.all(q <= 1.0))
+
+    def test_explicit_background_density(self, rng_key: PRNGKeyArray):
+        """An explicit density gives a posterior of the same shape."""
+        model = self._model_with_width(rng_key)
+        q = pcf.nn.posterior_membership(model, self._make_ws(), background_density=0.5)
+        assert q.shape == (8,)
+        assert bool(jnp.all(q >= 0.0))
+        assert bool(jnp.all(q <= 1.0))

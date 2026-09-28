@@ -70,9 +70,9 @@ def make_self_intersecting_stream(
     dy0 = scale * ((R + r) * jnp.cos(t) - d * ratio * jnp.cos(ratio * t)) / 5.0
 
     # Optional small positional noise
-    kx, ky = jax.random.split(key)
-    x = x0 + noise_sigma * jax.random.normal(kx, (n,))
-    y = y0 + noise_sigma * jax.random.normal(ky, (n,))
+    kx, ky = jr.split(key)
+    x = x0 + noise_sigma * jr.normal(kx, (n,))
+    y = y0 + noise_sigma * jr.normal(ky, (n,))
 
     # Pack into unitful quantities
     pos = {"x": u.Q(x, usys["length"]), "y": u.Q(y, usys["length"])}
@@ -122,14 +122,15 @@ def test_epitrochoid_autoencoder_fit() -> plt.Figure:
     max_dist = u.Q(40, "m")
 
     # Perform walk
-    walkresult = pcf.walk_local_flow(
+    walkresult = pcf.order(
         qs,
         ps,
-        start_idx=start_idx,
-        metric_scale=metric_scale,
-        max_dist=max_dist,
-        config=config,
-        direction="forward",
+        pcf.orderers.LocalFlowOrderer(
+            start_idx=start_idx,
+            metric_scale=metric_scale,
+            max_dist=max_dist,
+            config=config,
+        ),
         metadata=pcf.StateMetadata(usys=usys),
     )
 

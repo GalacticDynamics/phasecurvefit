@@ -2,15 +2,33 @@
 
 The walk algorithm skips some tracers due to the momentum condition. This guide explains how to use an autoencoder to assign ordering values ($\gamma$) to these skipped tracers.
 
+```{note}
+The examples below start from a walk, but `train_autoencoder` accepts **any**
+orderer's output — it dispatches on the unified
+{class}`~phasecurvefit.orderers.OrderingResult`. An
+{class}`~phasecurvefit.orderers.MSTOrderer` result feeds the autoencoder the same
+way (see the [Orderers guide](orderers.md)); the MST even supplies a `backbone`
+that the decoder can be trained against.
+```
+
 ## Problem and Solution
 
-**Problem**: walk inevitably skips tracers that don't align with the velocity direction.
+**Problem**: the walk follows a single thread through the data, so it leaves out
+many tracers: those off to the side of its path, and everything beyond a gap
+larger than `max_dist`. On the simulated stream in the
+[stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb), the walk
+orders 248 of 8000 stars. It also gives only an ordering, not a smooth track
+through the data.
 
 **Solution**: An autoencoder with two networks:
 - **Encoder**: $(x, v) \rightarrow (\gamma, p)$ — predicts ordering and membership probability
 - **Decoder**: $\gamma \rightarrow x$ — reconstructs position from ordering
 
 The encoder learns from the walk-ordered tracers and generalizes to predict $\gamma$ for skipped tracers.
+The decoder gives the smooth mean track $x(\gamma)$, which you can evaluate at
+any $\gamma$. If training time matters more than accuracy, a running-mean
+decoder can replace the trained one; see the
+[stream running-mean tutorial](../tutorials/stream_runningmean.ipynb).
 
 ## Quick Start
 
@@ -19,10 +37,12 @@ import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
 
-# Get initial ordering from walk
+# Get an initial ordering from the local-flow walk
 pos = {"x": jnp.linspace(0, 5, 50), "y": jnp.sin(jnp.linspace(0, jnp.pi, 50))}
 vel = {"x": jnp.ones(50), "y": jnp.cos(jnp.linspace(0, jnp.pi, 50))}
-walkresult = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+walkresult = pcf.order(
+    pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 
 # Create normalizer and autoencoder
 key = jax.random.key(0)
@@ -44,9 +64,20 @@ ordered_all = result.indices
 ## How It Works
 
 1. **Initialization**: Walk assigns $\gamma \in [-1, 1]$ to ordered tracers
-2. **Phase 1**: Encoder learns to predict $\gamma$ from phase-space coordinates
-3. **Phase 2**: Both networks train together with momentum constraint — ensures velocity alignment
-4. **Membership**: Network outputs probability $p$ to distinguish stream from background
+2. **Phase 1 (encoder)**: Encoder learns to predict $\gamma$ from phase-space
+   coordinates, and a membership probability $p$ to distinguish stream from
+   background
+3. **Phase 2 (decoder)**: With the encoder frozen, the decoder is fit to a running
+   mean of the ordered member tracers' positions — a warm start for the track
+4. **Phase 3 (joint)**: Both networks train together on spatial reconstruction plus
+   velocity alignment, with the alignment weight ramped linearly from
+   `lambda_p[0]` to `lambda_p[1]` over the phase
+
+Each phase optimizes a different objective, so the concatenated `losses` returned
+by `train_autoencoder` can only be compared within a phase, and the returned model
+holds the final-epoch weights. The
+[stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb) walks through
+reading the loss curve and checking the final model with a fixed measure.
 
 ## Customizing Training
 
@@ -71,7 +102,7 @@ result, _, losses = pcf.nn.train_autoencoder(
 ```
 
 **Key parameters**:
-- `lambda_p`: Higher maximum (100-150) enforces stronger velocity alignment in Phase 2
-- `n_epochs_encoder`: Should be ~200-500 for good initial interpolation
+- `lambda_p`: `(start, stop)` of the Phase 3 alignment ramp; a higher `lambda_p[1]` (100-150) enforces stronger velocity alignment
+- `n_epochs_encoder`: Default 800; fewer (a few hundred) gives a quicker, rougher fit
 - `batch_size`: Larger batches are more stable but require more memory
-- `lambda_q`: Weight for spatial reconstruction loss in Phase 2
+- `lambda_q`: Weight for spatial reconstruction loss in Phase 3

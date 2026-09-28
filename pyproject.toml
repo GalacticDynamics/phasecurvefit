@@ -18,18 +18,16 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "equinox>=0.11.0",
-  "galax",
+  "equinox>=0.13.5",
   "jax>=0.7.2",
-  "jax-bounded-while>=0.1",
+  "jaxmore>=0.4.0",
   "jax-tqdm>=0.4.0",
   "jaxtyping>=0.3.5",
   "optax>=0.2.4",
   "optional-dependencies>=0.4.0",
-  "orbax-checkpoint>=0.11.32",
   "plum-dispatch>=2.6.1",
-  "quax>=0.2.1",
-  "unxt",
+  "quax>=0.4",
+  "scipy>=1.11",
   "zeroth>=1.0.1",
 ]
 description = "Walk through phase-space observations"
@@ -40,8 +38,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
-interop = ["unxt>=1.10.0"]
-kdtree  = ["jaxkd>=0.0.5"]
+all       = ["phasecurvefit[interop,kdtree]"]
+interop   = ["unxt>=1.10.4"]
+kdtree    = ["jaxkd>=0.0.5"]
+tutorials = ["phasecurvefit[all]", "galax>=0.0.3", "matplotlib>=3.10.8"]
 
 [project.urls]
 "Bug Tracker" = "https://github.com/GalacticDynamics/phasecurvefit/issues"
@@ -62,6 +62,8 @@ dev = [
   { include-group = "nox" },
   { include-group = "test" },
   "ipywidgets>=8.1.8",
+  "cz-conventional-gitmoji>=0.7.0",
+  "commitizen>=4.11.3",
 ]
 docs = [
   "myst-parser>=4.0.0",
@@ -80,10 +82,11 @@ docs = [
   "jaxkd>=0.0.5",
   "galax",
 ]
-lint = ["cz-conventional-gitmoji>=0.6.1", "pre-commit>=4.1.0", "pylint>=3.3.8"]
+lint = ["cz-conventional-gitmoji>=0.6.1", "prek>=0.5.3", "pylint>=3.3.8"]
 nox = ["nox>=2024.10.9", "nox-uv>=0.6.3"]
 test = [
   "beartype>=0.21.0",
+  "hypothesis[numpy]>=6.138.14",
   "matplotlib>=3.8",
   "pytest>=9.0.2",
   "pytest-arraydiff>=0.6.1",
@@ -96,7 +99,7 @@ test = [
   "pytest-randomly>=3.16.0",
   "pytest-timeout>=2.3.1",
   "sybil[pytest]>=8.0.0",
-  "unxt>=1.10.0",
+  "unxt>=1.10.4",
   "jaxkd>=0.0.5",
 ]
 
@@ -115,7 +118,7 @@ local_scheme = "no-local-version"
 
 
 [tool.codespell]
-ignore-words-list = "leary"
+ignore-words-list = "leary,som"
 skip              = ["uv.lock", "*.ipynb"]
 
 
@@ -159,7 +162,6 @@ ignore = [
   "E731",
   "INP001",
   "N803",
-  "PLC0415",
   "RUF059",
   "S101",
   "SLF001",
@@ -182,15 +184,23 @@ ignore = [
   "RUF003", # Greek letters are intentional in math code
   "RUF059", # Unpacked variable 'keys' used for structure
 ]
+"src/phasecurvefit/_src/orderers/mst.py" = [
+  "N803", # P, V are conventional names for the point / velocity matrices
+  "N806", # Cb is the conventional name for the backbone coordinate matrix
+]
 "src/phasecurvefit/_src/phasespace.py" = [
   "UP040", # TypeAlias is more explicit for Python 3.12
+]
+"src/phasecurvefit/_src/som.py" = [
+  "N803", # P, C are conventional names for the stacked phase-space matrices
 ]
 "src/phasecurvefit/_version.py" = ["ALL"]
 
 [tool.ruff.lint.flake8-import-conventions.aliases]
-equinox       = "eqx"
-"jax.numpy"   = "jnp"
-phasecurvefit = "pcf"
+equinox                 = "eqx"
+"hypothesis.strategies" = "st"
+"jax.numpy"             = "jnp"
+phasecurvefit           = "pcf"
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
@@ -198,7 +208,7 @@ extra-standard-library = ["typing_extensions"]
 known-first-party = [
   "dataclassish",
   "is_annotated",
-  "jax-bounded-while",
+  "jaxmore",
   "optional_dependencies",
   "quaxed",
   "unxt",
@@ -242,6 +252,7 @@ ignore_missing_imports = true
 module = [
   "equinox.*",
   "flax.*",
+  "hypothesis.*",
   "jax.*",
   "jax_tqdm.*",
   "jaxtyping.*",
@@ -299,22 +310,31 @@ addopts = [
   "--showlocals",
   "--strict-config",
   "--strict-markers",
-  "-p no:doctest",                                       # using sybil
+  "-p no:doctest",              # using sybil
   "-ra",
-  "--timeout=300",                                       # 5 minute timeout per test
-  "--randomly-seed=0",                                   # Deterministic by default, but randomizes test order
-  "--randomly-dont-reorganize",                          # Keep test class/module structure, only shuffle within
-  "--ignore=tests/benchmarks/",                          # Exclude benchmark tests from normal runs
-  "--mpl-hash-library=tests/usage/baseline_hashes.json",
+  "--timeout=300",              # 5 minute timeout per test
+  "--randomly-seed=0",          # Deterministic by default, but randomizes test order
+  "--randomly-dont-reorganize", # Keep test class/module structure, only shuffle within
+  "--ignore=tests/benchmarks/", # Exclude benchmark tests from normal runs
+  # `--mpl` is deliberately NOT enabled here. The hash covers the rendered
+  # PNG, so it differs per platform and per matplotlib/freetype build: the
+  # same figure hashes differently on ubuntu, macOS and Windows, and even
+  # between two macOS machines. There is no single value the CI matrix can
+  # agree on, so this cannot gate merges. Run `pytest tests/usage --mpl`
+  # locally, against a baseline you generated on that same machine.
+  # Resolved relative to the test file's own directory, not the rootdir.
+  "--mpl-hash-library=baseline_hashes.json",
 ]
 filterwarnings = [
   "error",
   # pytest
   "ignore:The hookimpl.*uses old-style configuration options:pytest.PytestDeprecationWarning",
-  # jax
-  "ignore:jax\\.core\\.pp_eqn_rules is deprecated:DeprecationWarning",
-  "ignore:jax\\.core\\.Primitive is deprecated:DeprecationWarning",
-  "ignore:jax\\.interpreters\\.batching\\.NotMapped is deprecated:DeprecationWarning",
+  # jax (restrict to relevant modules: equinox and jax use these deprecated APIs)
+  "ignore:jax\\.core\\.pp_eqn_rules is deprecated:DeprecationWarning:(jax|equinox)(\\.|_)",
+  "ignore:jax\\._src\\.interpreters\\.mlir\\.Primitive is deprecated:DeprecationWarning:(jax|equinox)(\\.|_)",
+  "ignore:jax\\.core\\.mapped_aval is deprecated:DeprecationWarning:(jax|equinox)(\\.|_)",
+  "ignore:jax\\.core\\.unmapped_aval is deprecated:DeprecationWarning:(jax|equinox)(\\.|_)",
+  "ignore:jax\\.core\\.NotMapped is deprecated:DeprecationWarning:(jax|equinox)(\\.|_)",
   "ignore:The numpy\\.array_function protocol:DeprecationWarning",
   "ignore:numpy\\.ndarray size changed:RuntimeWarning",
   # matplotlib
@@ -324,7 +344,7 @@ filterwarnings = [
 ]
 log_level = "INFO"
 minversion = "8.3"
-norecursedirs = [".*", "__pycache__", "docs/_build"]
+norecursedirs = [".*", "__pycache__", "docs/_build", "docs/superpowers"]
 testpaths = ["README.md", "docs", "src/", "tests/"]
 xfail_strict = true
 

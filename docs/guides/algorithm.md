@@ -3,6 +3,17 @@
 This page explains the mathematical foundations and implementation details of
 the phase flow walking algorithm.
 
+```{note}
+The walk described here is one of the pluggable **orderers**. The examples below
+run it via `pcf.order` with a
+{class}`~phasecurvefit.orderers.LocalFlowOrderer`. The walk *follows* the
+velocity field from a start point; on a **near-closed loop** whose velocity
+reverses at a progenitor it must start at the progenitor and walk both ways
+(`direction="both"`, below). When no start point is known, the
+{class}`~phasecurvefit.orderers.MSTOrderer` backbone orders the loop tip-to-tip
+without one — see the [Orderers guide](orderers.md).
+```
+
 ## Mathematical Foundation
 
 ### Walking Algorithm (Metric-Agnostic)
@@ -74,8 +85,14 @@ The momentum weight $\lambda$ controls the balance between spatial and momentum 
   $$d \approx \lambda \cdot (1 - \cos\theta)$$
   Strongly favors points in the velocity direction, even if far away.
 
-- **$\lambda \approx 1$**: Balanced
-  Both spatial proximity and momentum alignment matter equally.
+- **$\lambda$ comparable to the spacing between neighbouring points**: balanced.
+  $\lambda$ is a length, so "balanced" is relative to the data: at $\lambda$ equal
+  to the typical spacing $s$, a neighbour at $90°$ and distance $s$ costs $2s$,
+  the same as a point straight ahead at distance $2s$.
+
+Larger $\lambda$ makes the walk take longer strides along the flow and skip points
+off to the side; that is often what you want for a thin stream, since the skipped
+points can be ordered later by the [autoencoder](nn.md).
 
 ### Physical Interpretation (Default Metric)
 
@@ -124,12 +141,14 @@ Procedure:
         # Mask visited points with infinity
         distances_masked[i] ← visited_mask[i] > 0.5 ? distances[i] : infinity
 
-        # Find nearest unvisited neighbor
-        min_dist ← min(distances_masked)
+        # Best unvisited candidate under the metric
         best_idx ← argmin(distances_masked)
 
-        # Check early termination
-        if min_dist > max_dist:
+        # Check early termination: max_dist is a *spatial* distance
+        spatial[i] ← ||position[i] - current_pos||  (unvisited only)
+        if distances_masked[best_idx] is infinity:
+            Break  # No unvisited candidates remain
+        if min(spatial) > max_dist OR spatial[best_idx] > max_dist:
             Break  # Gap detected, stop algorithm
 
         # Update state
@@ -150,11 +169,12 @@ Due to the momentum condition, the walk algorithm inevitably skips some tracers.
 To assign $\gamma$ values to these skipped particles, an **autoencoder neural
 network** can interpolate based on phase-space location:
 
-1. **Interpolation Network**: Learns $(x, v) \rightarrow (\gamma, p)$ from ordered tracers
-2. **Param-Net**: Reconstructs positions from $\gamma$ values
-3. **Momentum condition**: Ensures alignment with velocity field
+1. **Encoder**: learns $(x, v) \rightarrow (\gamma, p)$ from the ordered tracers
+2. **Decoder**: learns the mean track $\gamma \rightarrow x$
+3. **Joint training**: refines both, with a velocity-alignment term that keeps the
+   track's direction consistent with the stars' velocities
 
-See [Autoencoder for Gap Filling](autoencoder.md) for details.
+See [Autoencoder for Gap Filling](nn.md) for details.
 
 ## Extensions and Variants
 
@@ -194,11 +214,15 @@ vel = {
 }
 
 # Forward walk (default)
-result_forward = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+result_forward = pcf.order(
+    pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 
 # Reverse walk from the same starting point
-result_reverse = pcf.walk_local_flow(
-    pos, vel, start_idx=0, metric_scale=1.0, direction="backward"
+result_reverse = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0, direction="backward"),
 )
 ```
 
@@ -214,11 +238,15 @@ combines the results of two separate walks into a single coherent ordering:
 
 ```python
 # Run forward and reverse walks separately
-result_forward = pcf.walk_local_flow(
-    pos, vel, start_idx=2, metric_scale=1.0, direction="forward"
+result_forward = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(start_idx=2, metric_scale=1.0, direction="forward"),
 )
-result_reverse = pcf.walk_local_flow(
-    pos, vel, start_idx=2, metric_scale=1.0, direction="backward"
+result_reverse = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(start_idx=2, metric_scale=1.0, direction="backward"),
 )
 
 # Combine the results
@@ -230,7 +258,11 @@ result = pcf.combine_results(result_forward, result_reverse)
 This can be simplified to:
 
 ```python
-result = pcf.walk_local_flow(pos, vel, start_idx=2, metric_scale=1.0, direction="both")
+result = pcf.order(
+    pos,
+    vel,
+    pcf.orderers.LocalFlowOrderer(start_idx=2, metric_scale=1.0, direction="both"),
+)
 ```
 
 This is particularly useful for:
@@ -266,8 +298,10 @@ vel = {
     "y": 2 * jnp.pi * jnp.cos(jnp.linspace(0, 2 * jnp.pi, 50)) / (2 * jnp.pi),
 }
 
-# Run walk algorithm
-result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+# Run the walk via the orderer interface
+result = pcf.order(
+    pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+)
 
 # Interpolate positions at specific gamma values
 gamma_values = jnp.array([0.0, 0.25, 0.5, 0.75, 1.0])

@@ -84,3 +84,22 @@ request meets the requirements for inclusion in the package:
 - Is there any information needed to be added to the docs to describe the
   function?
 - Does the documentation build without errors or warnings?
+
+## Usage of Generative AI
+
+`phasecurvefit` maintainers welcome contributions, including those developed
+with the assistance of generative AI tools. However, the use of such tools does
+not change our expectations for contributor responsibility, engagement, or code
+quality. The following apply to all contributions.
+
+**Human ownership and accountability:** Contributors are responsible for all
+submitted content, regardless of whether generative AI tools were used.
+Contributors must be able to explain all changes during review.
+
+**Authentic engagement:** The pull request process is collaborative and
+iterative. Contributors are expected to actively engage with reviewer feedback.
+
+**Consistency with `phasecurvefit` conventions and existing style:** In the
+context of generative AI, this particularly means conveying information
+(comments, documentation, etc.) in a style consistent with the `phasecurvefit`
+codebase.

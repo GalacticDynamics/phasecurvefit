@@ -44,7 +44,7 @@ Create phase-space observations as dictionaries:
 
 Order the observations:
 
->>> result = pcf.walk_local_flow(pos, vel, start_idx=0, metric_scale=1.0)
+>>> result = pcf.order(pos, vel)
 >>> result.indices
 Array([0, 1, 2], dtype=int32)
 
@@ -54,7 +54,7 @@ Configure with custom metric and strategy:
 ...     metric=pcf.metrics.AlignedMomentumDistanceMetric(),
 ...     strategy=pcf.strats.KDTree(k=3),
 ... )
->>> result = pcf.walk_local_flow(pos, vel, config=config, start_idx=0, metric_scale=1.0)
+>>> result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 
 References
 ----------
@@ -70,19 +70,23 @@ __all__: tuple[str, ...] = (
     "nn",
     "w",
     "metrics",
+    "som",
     "strats",
+    "orderers",
     # Algorithm
     "walk_local_flow",
     "combine_results",
     "WalkLocalFlowResult",
     "StateMetadata",
+    # Orderers
+    "order",
     # Query configuration
     "WalkConfig",
     # Result accessor
     "order_w",
 )
 
-from . import metrics, nn, strats, w
+from . import metrics, nn, orderers, som, strats, w
 from ._src.algorithm import (
     StateMetadata,
     WalkLocalFlowResult,
@@ -90,6 +94,7 @@ from ._src.algorithm import (
     order_w,
     walk_local_flow,
 )
+from ._src.orderers.base import order
 from ._src.query_config import WalkConfig
 from ._version import version as __version__
 

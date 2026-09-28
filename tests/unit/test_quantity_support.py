@@ -13,8 +13,9 @@ try:
 except ImportError:
     HAS_UNXT = False
 
-import jax
 import jax.numpy as jnp
+import jax.random as jr
+import jax.tree_util as jtu
 
 import phasecurvefit as pcf
 from phasecurvefit._src.algorithm import StateMetadata
@@ -87,8 +88,6 @@ class TestStateMetadata:
 
     def test_metadata_as_pytree_leaf(self, unit_system):
         """Test that StateMetadata is preserved as a PyTree leaf."""
-        import jax.tree_util as jtu
-
         metadata = StateMetadata(usys=unit_system)
         state = (0, jnp.array([1, 2, 3]), metadata)
 
@@ -107,8 +106,10 @@ class TestWalkLocalFlowWithPlainArrays:
 
     def test_walk_local_flow_plain_arrays(self, plain_positions, plain_velocities):
         """Test pcf.walk_local_flow works with plain array inputs."""
-        result = pcf.walk_local_flow(
-            plain_positions, plain_velocities, start_idx=0, metric_scale=0.5
+        result = pcf.order(
+            plain_positions,
+            plain_velocities,
+            pcf.orderers.LocalFlowOrderer(metric_scale=0.5),
         )
 
         # Should visit all 4 points in order
@@ -128,12 +129,10 @@ class TestWalkLocalFlowWithPlainArrays:
         # Create WalkConfig with KDTree strategy (k=3 neighbors)
         config = pcf.WalkConfig(strategy=KDTree(k=3))
 
-        result = pcf.walk_local_flow(
+        result = pcf.order(
             plain_positions,
             plain_velocities,
-            start_idx=0,
-            metric_scale=0.5,
-            config=config,
+            pcf.orderers.LocalFlowOrderer(metric_scale=0.5, config=config),
         )
 
         # Should still visit all 4 points
@@ -151,12 +150,11 @@ class TestWalkLocalFlowWithQuantities:
         """Test pcf.walk_local_flow works with Quantity inputs."""
         lam_quantity = u.Q(0.5, "m")
 
-        result = pcf.walk_local_flow(
+        result = pcf.order(
             quantity_positions,
             quantity_velocities,
-            start_idx=0,
-            metric_scale=lam_quantity,
-            usys=unit_system,
+            pcf.orderers.LocalFlowOrderer(metric_scale=lam_quantity),
+            metadata=pcf.StateMetadata(usys=unit_system),
         )
 
         # Should visit all 4 points in order
@@ -170,12 +168,11 @@ class TestWalkLocalFlowWithQuantities:
         """Test that pcf.walk_local_flow preserves Quantity units in output."""
         lam_quantity = u.Q(0.5, "m")
 
-        result = pcf.walk_local_flow(
+        result = pcf.order(
             quantity_positions,
             quantity_velocities,
-            start_idx=0,
-            metric_scale=lam_quantity,
-            usys=unit_system,
+            pcf.orderers.LocalFlowOrderer(metric_scale=lam_quantity),
+            metadata=pcf.StateMetadata(usys=unit_system),
         )
 
         # Check that positions have units preserved
@@ -203,17 +200,18 @@ class TestWalkLocalFlowWithQuantities:
         lam_quantity = u.Q(0.5, "m")
 
         # Run with plain arrays
-        result_plain = pcf.walk_local_flow(
-            plain_positions, plain_velocities, start_idx=0, metric_scale=lam_plain
+        result_plain = pcf.order(
+            plain_positions,
+            plain_velocities,
+            pcf.orderers.LocalFlowOrderer(metric_scale=lam_plain),
         )
 
         # Run with quantities
-        result_quantity = pcf.walk_local_flow(
+        result_quantity = pcf.order(
             quantity_positions,
             quantity_velocities,
-            start_idx=0,
-            metric_scale=lam_quantity,
-            usys=unit_system,
+            pcf.orderers.LocalFlowOrderer(metric_scale=lam_quantity),
+            metadata=pcf.StateMetadata(usys=unit_system),
         )
 
         # Ordered indices should match
@@ -238,12 +236,11 @@ class TestWalkLocalFlowWithQuantities:
         # Test with higher lambda value (more momentum-dependent)
         lam_quantity = u.Q(2.0, "m")
 
-        result = pcf.walk_local_flow(
+        result = pcf.order(
             quantity_positions,
             quantity_velocities,
-            start_idx=0,
-            metric_scale=lam_quantity,
-            usys=unit_system,
+            pcf.orderers.LocalFlowOrderer(metric_scale=lam_quantity),
+            metadata=pcf.StateMetadata(usys=unit_system),
         )
 
         # Should still produce valid results
@@ -257,13 +254,11 @@ class TestWalkLocalFlowWithQuantities:
         lam_quantity = u.Q(0.5, "m")
         max_dist = u.Q(1.5, "m")
 
-        result = pcf.walk_local_flow(
+        result = pcf.order(
             quantity_positions,
             quantity_velocities,
-            start_idx=0,
-            metric_scale=lam_quantity,
-            max_dist=max_dist,
-            usys=unit_system,
+            pcf.orderers.LocalFlowOrderer(metric_scale=lam_quantity, max_dist=max_dist),
+            metadata=pcf.StateMetadata(usys=unit_system),
         )
 
         # With small max_dist, might not visit all points
@@ -285,13 +280,11 @@ class TestWalkLocalFlowWithQuantities:
         config = pcf.WalkConfig(strategy=KDTree(k=3))
 
         # Test WITH KDTree strategy and Quantities
-        result = pcf.walk_local_flow(
+        result = pcf.order(
             quantity_positions,
             quantity_velocities,
-            start_idx=0,
-            metric_scale=lam_quantity,
-            config=config,
-            usys=unit_system,
+            pcf.orderers.LocalFlowOrderer(metric_scale=lam_quantity, config=config),
+            metadata=pcf.StateMetadata(usys=unit_system),
         )
 
         # Should visit all 4 points
@@ -323,7 +316,7 @@ class TestEpitrochoidExample:
 
     def test_epitrochoid_stream_creation(self):
         """Test creating a self-intersecting epitrochoid stream with Quantities."""
-        key = jax.random.key(0)
+        key = jr.key(0)
 
         def make_epitrochoid_stream(key, n=120, noise_sigma=0.5, scale=120.0):
             """Create an OPEN epitrochoid curve with self-intersections."""
@@ -346,9 +339,9 @@ class TestEpitrochoidExample:
             dy0 = scale * ((R + r) * jnp.cos(t) - d * ratio * jnp.cos(ratio * t)) / 5.0
 
             # Optional small positional noise
-            kx, ky = jax.random.split(key)
-            x = x0 + noise_sigma * jax.random.normal(kx, (n,))
-            y = y0 + noise_sigma * jax.random.normal(ky, (n,))
+            kx, ky = jr.split(key)
+            x = x0 + noise_sigma * jr.normal(kx, (n,))
+            y = y0 + noise_sigma * jr.normal(ky, (n,))
 
             # Pack into unitful quantities
             pos = {"x": u.Q(x, "m"), "y": u.Q(y, "m")}
@@ -372,7 +365,7 @@ class TestEpitrochoidExample:
 
     def test_epitrochoid_walk_with_momentum(self):
         """Test walk_local_flow on epitrochoid with different momentum values."""
-        key = jax.random.key(0)
+        key = jr.key(0)
 
         # Create stream
         t_start = 5.0 * jnp.pi / 180.0
@@ -390,29 +383,27 @@ class TestEpitrochoidExample:
         dx0 = scale * (-(R + r) * jnp.sin(t) + d * ratio * jnp.sin(ratio * t)) / 5.0
         dy0 = scale * ((R + r) * jnp.cos(t) - d * ratio * jnp.cos(ratio * t)) / 5.0
 
-        kx, ky = jax.random.split(key)
-        x = x0 + 0.5 * jax.random.normal(kx, (n,))
-        y = y0 + 0.5 * jax.random.normal(ky, (n,))
+        kx, ky = jr.split(key)
+        x = x0 + 0.5 * jr.normal(kx, (n,))
+        y = y0 + 0.5 * jr.normal(ky, (n,))
 
         pos = {"x": u.Q(x, "m"), "y": u.Q(y, "m")}
         vel = {"x": u.Q(dx0, "m/s"), "y": u.Q(dy0, "m/s")}
 
         # Test with no momentum (metric_scale=0)
-        result_no_mom = pcf.walk_local_flow(
+        result_no_mom = pcf.order(
             pos,
             vel,
-            start_idx=0,
-            metric_scale=u.Q(0.0, "m"),
-            usys=u.unitsystems.galactic,
+            pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(0.0, "m")),
+            metadata=pcf.StateMetadata(usys=u.unitsystems.galactic),
         )
 
         # Test with momentum
-        result_with_mom = pcf.walk_local_flow(
+        result_with_mom = pcf.order(
             pos,
             vel,
-            start_idx=0,
-            metric_scale=u.Q(400.0, "m"),
-            usys=u.unitsystems.galactic,
+            pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(400.0, "m")),
+            metadata=pcf.StateMetadata(usys=u.unitsystems.galactic),
         )
 
         # Both should produce valid results
@@ -430,7 +421,7 @@ class TestEpitrochoidExample:
 
     def test_epitrochoid_branch_jumps(self):
         """Test that momentum reduces branch jumps on self-intersecting stream."""
-        key = jax.random.key(0)
+        key = jr.key(0)
 
         # Create stream
         n = 100
@@ -448,29 +439,27 @@ class TestEpitrochoidExample:
         dx0 = scale * (-(R + r) * jnp.sin(t) + d * ratio * jnp.sin(ratio * t)) / 5.0
         dy0 = scale * ((R + r) * jnp.cos(t) - d * ratio * jnp.cos(ratio * t)) / 5.0
 
-        kx, ky = jax.random.split(key)
-        x = x0 + 0.5 * jax.random.normal(kx, (n,))
-        y = y0 + 0.5 * jax.random.normal(ky, (n,))
+        kx, ky = jr.split(key)
+        x = x0 + 0.5 * jr.normal(kx, (n,))
+        y = y0 + 0.5 * jr.normal(ky, (n,))
 
         pos = {"x": u.Q(x, "m"), "y": u.Q(y, "m")}
         vel = {"x": u.Q(dx0, "m/s"), "y": u.Q(dy0, "m/s")}
 
         # Walk with no momentum
-        result_no_mom = pcf.walk_local_flow(
+        result_no_mom = pcf.order(
             pos,
             vel,
-            start_idx=0,
-            metric_scale=u.Q(0.0, "m"),
-            usys=u.unitsystems.galactic,
+            pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(0.0, "m")),
+            metadata=pcf.StateMetadata(usys=u.unitsystems.galactic),
         )
 
         # Walk with momentum
-        result_with_mom = pcf.walk_local_flow(
+        result_with_mom = pcf.order(
             pos,
             vel,
-            start_idx=0,
-            metric_scale=u.Q(400.0, "m"),
-            usys=u.unitsystems.galactic,
+            pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(400.0, "m")),
+            metadata=pcf.StateMetadata(usys=u.unitsystems.galactic),
         )
 
         # Count big jumps in parameter t

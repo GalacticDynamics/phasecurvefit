@@ -6,6 +6,7 @@ __all__: tuple[str, ...] = (
     # Training functions
     "train_ordering_net",
     "make_step",
+    "OrderingNetTrainer",
     "OrderingTrainingConfig",
     # Loss functions
     "encoder_loss",
@@ -14,18 +15,18 @@ __all__: tuple[str, ...] = (
 
 import functools as ft
 from dataclasses import KW_ONLY, dataclass
-from typing import ClassVar, TypeAlias, cast
+from typing import Any, ClassVar, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-import jax_tqdm
 import optax
 from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
-from .scanmlp import ScanOverMLP
-from .utils import masked_mean, shuffle_and_batch
+from jaxmore.nn import masked_mean
+
+from .trainer import AbstractEqxScanTrainer, EqxTrainCarry
 from phasecurvefit._src.custom_types import FSz0, FSzN
 
 
@@ -61,7 +62,7 @@ class OrderingNet(eqx.Module):
 
     """
 
-    mlp: ScanOverMLP
+    mlp: eqx.nn.MLP
     gamma_head: eqx.nn.Linear
     prob_head: eqx.nn.Linear
 
@@ -93,7 +94,7 @@ class OrderingNet(eqx.Module):
 
         # MLP backbone: input -> hidden layers -> (hidden_size,) The output of
         # this MLP has size hidden_size, which feeds to both output heads
-        self.mlp = ScanOverMLP(
+        self.mlp = eqx.nn.MLP(
             in_size=in_size,
             width_size=width_size,
             out_size=width_size,  # Output fed to the two heads
@@ -102,6 +103,7 @@ class OrderingNet(eqx.Module):
             final_activation=jax.nn.tanh,
             use_bias=True,
             use_final_bias=True,
+            scan=True,
             key=keys[0],
         )
 
@@ -375,13 +377,113 @@ class OrderingTrainingConfig:
     """Show an epoch progress bar via tqdm."""
 
 
-BatchScanCarry: TypeAlias = tuple[eqx.Module, optax.OptState, PRNGKeyArray]  # noqa: UP040
-BatchScanInputs: TypeAlias = tuple[  # noqa: UP040
-    Bool[Array, " B"],  # batch_mask: True where batch has data, False where padded
-    Float[Array, "B 2D"],  # batch_ws: ordered phase-space samples
-    Float[Array, " B"],  # batch_gamma: target ordering parameter for batch_ws
-    Float[Array, "B 2D"],  # batch_rand_ws: random phase-space samples
-]
+def _ordering_step(
+    carry: EqxTrainCarry,
+    batch_inputs: tuple[Bool[Array, " B"], tuple[Array, ...]],
+    *,
+    optimizer: optax.GradientTransformation,
+    filter_spec: Any,
+    lambda_prob: float,
+) -> tuple[FSz0, EqxTrainCarry]:
+    """Run one batch of OrderingNet training.
+
+    `batch_inputs` is ``(mask, (ord_ws, ord_gamma, rand_ws))``, as produced by
+    `shuffle_and_batch` from the epoch data assembled in `OrderingNetTrainer.init`
+    and `OrderingNetTrainer.prepare_data_args`.
+
+    `filter_spec` must be the same spec the trainer used to build `opt_state`,
+    so that the step, the carry packing, and the optimizer state all agree on
+    which leaves are trainable.
+    """
+    model, opt_state, key = carry
+    mask, (ord_ws, ord_gamma, rand_ws) = batch_inputs
+
+    # Gradients are taken w.r.t. the dynamic half only; the static half carries
+    # any frozen parameters and the non-array structure.
+    model_dynamic, model_static = eqx.partition(model, filter_spec)
+
+    key, subkey = jr.split(key)
+    loss, model_dynamic, opt_state = make_step(
+        model_dynamic,
+        model_static,
+        ord_ws=ord_ws,
+        ord_gamma=ord_gamma,
+        rand_ws=rand_ws,
+        mask=mask,
+        opt_state=opt_state,
+        optimizer=optimizer,
+        lambda_prob=lambda_prob,
+        key=subkey,
+    )
+
+    model = eqx.combine(model_dynamic, model_static)
+    return loss, (model, opt_state, key)
+
+
+@dataclass(frozen=True)
+class OrderingNetTrainer(AbstractEqxScanTrainer):
+    """Scan trainer for `OrderingNet`.
+
+    Fresh random (off-stream) phase-space samples are drawn every epoch, so that
+    the membership head sees new negatives each pass rather than memorising a
+    fixed set. That is what `prepare_data_args` is for.
+
+    """
+
+    random_ws_shape: tuple[int, ...] = ()
+    """Shape of the random negative samples: ``(n_ordered, 2 * n_dims)``."""
+
+    ws_min: FSzN | None = None
+    """Lower bound of the phase-space box the negatives are drawn from."""
+
+    ws_max: FSzN | None = None
+    """Upper bound of the phase-space box the negatives are drawn from."""
+
+    def init(  # type: ignore[override]
+        self,
+        model: OrderingNet,
+        /,
+        *,
+        ordered_ws: Float[Array, "N TwoF"],
+        gamma_target: Float[Array, " N"],
+        mask: Bool[Array, " N"],
+        optimizer: optax.GradientTransformation,
+        key: PRNGKeyArray,
+    ) -> tuple[EqxTrainCarry, tuple[Bool[Array, " N"], tuple[Array, ...]]]:
+        """Build the initial carry and the epoch data.
+
+        The third data array is a placeholder for the random negatives; it is
+        replaced every epoch by `prepare_data_args`. It is present here only so
+        the pytree structure that `jax.lax.scan` sees is fixed from the start.
+        """
+        model_dynamic, _ = eqx.partition(model, self.filter_spec)
+        opt_state = optimizer.init(model_dynamic)
+        initial_carry = (model, opt_state, key)
+
+        placeholder_rand_ws = jnp.zeros(self.random_ws_shape, dtype=ordered_ws.dtype)
+        epoch_data = (mask, (ordered_ws, gamma_target, placeholder_rand_ws))
+        return initial_carry, epoch_data
+
+    def prepare_data_args(
+        self,
+        carry: EqxTrainCarry,
+        data_args: tuple[Array, ...],
+        /,
+        *,
+        epoch_idx: Int[Array, ""],
+        num_epochs: int,
+        epoch_key: PRNGKeyArray,
+    ) -> tuple[Array, ...]:
+        """Draw fresh random negatives for this epoch."""
+        del carry, epoch_idx, num_epochs
+        ordered_ws, gamma_target, _ = data_args
+        random_ws = jr.uniform(
+            epoch_key,
+            shape=self.random_ws_shape,
+            minval=self.ws_min,
+            maxval=self.ws_max,
+        )
+        return (ordered_ws, gamma_target, random_ws)
 
 
 def train_ordering_net(
@@ -391,6 +493,7 @@ def train_ordering_net(
     /,
     config: OrderingTrainingConfig | None = None,
     *,
+    chord: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[OrderingNet, optax.OptState, Float[Array, "E"]]:
     r"""Train the interpolation network on ordered stream tracers.
@@ -405,6 +508,12 @@ def train_ordering_net(
         The interpolation network to train.
     all_ws : Array, shape (N, 2*n_dims)
         Phase-space coordinates from the walk algorithm.
+    chord : Array, shape (N,) | None, keyword-only
+        The orderer's arc-length parameter per observation, in input order
+        (``OrderingResult.chord``). When given it supplies the arclength target
+        that ``arclength_alpha`` blends toward; when ``None`` that target is
+        approximated by summing straight-line steps between consecutive ordered
+        observations, which is noisier and lives in normalized space.
     ordering_indices : Array, shape (N,)
         Indices representing the ordering of tracers.  Unvisited tracers have
         indices of -1.
@@ -458,16 +567,23 @@ def train_ordering_net(
     gmin, gmax = model.gamma_range
     gamma_lin = jnp.linspace(gmin, gmax, n_total)
 
-    # Optional arclength-like target (computed from positions of ordered
-    # tracers) This mitigates tanh-compression in gamma by encouraging gamma to
-    # track cumulative arclength rather than index.
-    D = ordered_ws.shape[1] // 2
-    qs_ord = ordered_ws[:, :D]
-
-    # Cumulative arclength proxy s
-    dqs = qs_ord[1:] - qs_ord[:-1]
-    ds = jnp.linalg.norm(dqs, axis=1)
-    s = jnp.concatenate([jnp.zeros((1,), dtype=ds.dtype), jnp.cumsum(ds)])
+    # Arclength-like target. This mitigates tanh-compression in gamma by
+    # encouraging gamma to track cumulative arclength rather than index.
+    #
+    # ``chord`` is the orderer's own along-track coordinate, measured along the
+    # curve it fitted and in physical position units. Prefer it: the fallback
+    # below sums straight-line steps between consecutive *observations* in
+    # normalized space, so it carries their scatter and weights each component
+    # by its spread.
+    if chord is not None:
+        s = jnp.asarray(chord)[ordering_indices[ordering_indices >= 0]]
+        s = s - s[0]
+    else:
+        D = ordered_ws.shape[1] // 2
+        qs_ord = ordered_ws[:, :D]
+        dqs = qs_ord[1:] - qs_ord[:-1]
+        ds = jnp.linalg.norm(dqs, axis=1)
+        s = jnp.concatenate([jnp.zeros((1,), dtype=ds.dtype), jnp.cumsum(ds)])
     s_tot = s[-1]
 
     # Map s -> gamma_range, guarding against degenerate s_tot
@@ -478,121 +594,46 @@ def train_ordering_net(
     alpha = jnp.clip(alpha, 0.0, 1.0)
     gamma_target = (1.0 - alpha) * gamma_lin + alpha * gamma_arc
 
-    # Model surgery: partition out static components of the model
-    filter_spec = eqx.is_array
-    model_dynamic, model_static = eqx.partition(model, filter_spec)
+    # ----------------------------------------
+    # Train
 
-    # Optimizer setup
     optimizer = config.optimizer
-    opt_state = optimizer.init(model_dynamic)
+    # Every row of `ordered_ws` is a real ordered tracer, so all are usable.
+    # Padding introduced by batching is still masked out by `shuffle_and_batch`.
+    ordered_mask = jnp.ones(n_total, dtype=bool)
 
-    # ----------------------------------------
-    # Epoch Scan Function (per-epoch scan)
+    # Single source of truth for what is trainable: the step, the carry packing,
+    # and `optimizer.init` must all partition the model the same way.
+    filter_spec: Any = eqx.is_array
 
-    batch_size = config.batch_size
-    ordered_mask = jnp.ones(n_total, dtype=bool)  # True since using ordered_ws
-
-    def epoch_scan_fn(carry: BatchScanCarry, _: int) -> tuple[BatchScanCarry, FSz0]:
-        """Run one scanned epoch (shuffle, batch, and train)."""
-        # Unpack the carry
-        model_dyn, opt_state, key = carry
-
-        # Split key for this epoch
-        key, skey1, skey2 = jr.split(key, 3)
-
-        # Make random ws within bounds of ordered_ws
-        random_ws = jr.uniform(skey1, shape=shape, minval=ws_min, maxval=ws_max)
-
-        # Shuffle and batch data
-        b_mask, (b_ordered_ws, b_gamma, b_random_ws) = shuffle_and_batch(
-            ordered_mask,
-            ordered_ws,
-            gamma_target,
-            random_ws,
-            batch_size=batch_size,
-            key=skey2,
-        )
-
-        # Scan over batches
-        carry = (model_dyn, opt_state, key)
-        carry, batch_losses = jax.lax.scan(
-            cond_batch_scan_fn, carry, (b_mask, b_ordered_ws, b_gamma, b_random_ws)
-        )
-
-        # Use mean loss across all batches for this epoch
-        avg_loss = jnp.mean(batch_losses)
-        return carry, avg_loss
-
-    # ----------------------------------------
-    # Conditionally Run Batch Scan Function
-
-    def cond_batch_scan_fn(
-        carry: BatchScanCarry, inputs: BatchScanInputs
-    ) -> tuple[BatchScanCarry, FSz0]:
-        """Run scanned batch step if there's data."""
-        mask = inputs[0]
-        return jax.lax.cond(
-            jnp.any(mask), batch_scan_fn, null_batch_scan_fn, carry, inputs
-        )
-
-    def null_batch_scan_fn(
-        carry: BatchScanCarry, inputs: BatchScanInputs
-    ) -> tuple[BatchScanCarry, FSz0]:
-        """Don't run scanned batch step."""
-        loss = jnp.array(0, dtype=jnp.result_type(*inputs[1:]))
-        return carry, loss
-
-    # ----------------------------------------
-    # Batch Scan Function (per-batch scan)
-
-    lambda_prob = config.lambda_prob
-
-    def batch_scan_fn(
-        carry: BatchScanCarry, inputs: BatchScanInputs
-    ) -> tuple[BatchScanCarry, FSz0]:
-        """Run one scanned batch step.
-
-        Notes
-        -----
-        Uses a partitioned model to keep the scan carry as arrays-only where
-        possible, then re-combines with static structure for each step.
-
-        """
-        model_dyn, opt_state, key = carry
-        mask, ord_ws, ord_gamma, rand_ws = inputs
-
-        # Single training step for this batch
-        key, subkey = jr.split(key)
-        loss, model_dyn, opt_state = make_step(
-            model_dyn,
-            model_static,
-            ord_ws=ord_ws,
-            ord_gamma=ord_gamma,
-            rand_ws=rand_ws,
-            mask=mask,
-            opt_state=opt_state,
+    trainer = OrderingNetTrainer(
+        make_step=ft.partial(
+            _ordering_step,
             optimizer=optimizer,
-            lambda_prob=lambda_prob,
-            key=subkey,
-        )
+            filter_spec=filter_spec,
+            lambda_prob=config.lambda_prob,
+        ),
+        loss_agg_fn=masked_mean,
+        filter_spec=filter_spec,
+        random_ws_shape=shape,
+        ws_min=ws_min,
+        ws_max=ws_max,
+    )
+    initial_carry, epoch_data = trainer.init(
+        model,
+        ordered_ws=ordered_ws,
+        gamma_target=gamma_target,
+        mask=ordered_mask,
+        optimizer=optimizer,
+        key=key,
+    )
+    (model, opt_state, _), epoch_losses = trainer.run(
+        initial_carry,
+        epoch_data,
+        num_epochs=config.n_epochs,
+        batch_size=config.batch_size,
+        key=key,
+        show_pbar=config.show_pbar,
+    )
 
-        return (model_dyn, opt_state, key), loss
-
-    # Optionally wrap the epoch scan with a progress bar
-    if config.show_pbar:
-        epoch_scan_wrapped = jax_tqdm.scan_tqdm(
-            config.n_epochs, desc="Training", unit="epoch", dynamic_ncols=True
-        )(epoch_scan_fn)
-    else:
-        epoch_scan_wrapped = epoch_scan_fn
-
-    # Prepare epoch indices and run scan over epochs, which scans over batches
-    carry = (model_dynamic, opt_state, key)
-    epoch_indices = jnp.arange(config.n_epochs)
-    carry, epoch_losses = jax.lax.scan(epoch_scan_wrapped, carry, epoch_indices)
-    model_dynamic, opt_state, _ = carry
-
-    # Reconstruct model
-    model = cast("OrderingNet", eqx.combine(model_dynamic, model_static))
-
-    return model, opt_state, epoch_losses
+    return cast("OrderingNet", model), opt_state, epoch_losses

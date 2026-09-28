@@ -12,7 +12,9 @@ sd_hide_title: true
 guides/quickstart
 guides/metrics
 guides/algorithm
+guides/orderers
 guides/nn
+guides/outliers
 guides/jax-integration
 ```
 
@@ -30,6 +32,14 @@ tutorials/index
 :caption: 🔌 API Reference
 
 api/index
+```
+
+```{toctree}
+:maxdepth: 1
+:hidden:
+:caption: 🔀 Migration
+
+migration
 ```
 
 ```{toctree}
@@ -55,6 +65,37 @@ The core approach combines:
 
 This is particularly useful for coherent trajectories in phase-space, such as stellar streams, but works well for many other ordered-walk problems.
 
+## Why phasecurvefit?
+
+Many datasets are samples along a curve in phase space whose order along the
+curve is unknown. Before fitting a model to such a curve you need two things: an
+ordering coordinate for every sample, and a smooth track through them. Doing
+this by hand, or with a position-only nearest-neighbor or clustering method,
+breaks down in exactly the cases that matter:
+
+- **Curves that cross or fold back on themselves.** Where two strands meet, the
+  nearest point is often on the wrong strand. phasecurvefit uses velocities as
+  well as positions, so the ordering stays on the right strand
+  (see the [epitrochoid tutorials](tutorials/epitrochoid_autoencoder.ipynb)).
+- **No known starting point.** The MST orderer finds the two ends of the curve
+  itself, so no progenitor position or hand-picked start index is needed ([MST tutorial](tutorials/stream_mst.ipynb)).
+- **Incomplete orderings.** A conservative walk orders a reliable subset; an
+  autoencoder then assigns an ordering coordinate $\gamma$ to every sample and
+  learns a smooth mean track through them ([stream autoencoder tutorial](tutorials/stream_autoencoder.ipynb)).
+- **Contamination.** A stream-plus-background mixture model gives each sample a
+  calibrated membership probability, so interlopers can be down-weighted or
+  removed ([outlier-rejection tutorial](tutorials/outlier_rejection.ipynb)).
+- **Use inside larger models.** phasecurvefit is built on JAX: the walk, the
+  distance metrics and the neural networks work with `jit`, `vmap` and `grad`
+  and run on CPU or GPU. A training-free running-mean track is available when
+  speed matters more than accuracy, for example inside a likelihood evaluated at
+  every step of an MCMC ([running-mean tutorial](tutorials/stream_runningmean.ipynb)).
+
+phasecurvefit is a reusable, tested library for momentum-weighted ordering, with
+alternative orderers, gap filling, outlier rejection and optional physical units
+(via `unxt`). It was built for stellar streams but applies to any ordered
+phase-space data.
+
 ---
 
 ## Installation
@@ -64,18 +105,38 @@ This is particularly useful for coherent trajectories in phase-space, such as st
 :::{tab-item} pip
 
 ```bash
-pip install phasecurvefit
+pip install phasecurvefit[all]
 ```
+
+where "all" enables unit support (through `unxt`) and kdtree support through `jaxkd`.
 
 :::
 
 :::{tab-item} uv
 
 ```bash
-uv add phasecurvefit
+uv add phasecurvefit --extra all
 ```
 
+where "all" enables unit support (through `unxt`) and kdtree support through `jaxkd`.
+
 :::
+
+::::
+
+To run the [tutorials](tutorials/index), install the `tutorials` extra instead,
+which adds `matplotlib` (plotting) and `galax` (mock-stream generation) on top
+of `[all]`:
+
+```bash
+pip install phasecurvefit[tutorials]
+```
+
+`all` intentionally excludes `tutorials`: `all` is for optional *runtime*
+functionality, while `tutorials` is for packages only needed to run the
+example notebooks.
+
+::::{tab-set}
 
 :::{tab-item} source, via uv
 
@@ -108,24 +169,37 @@ uv pip install -e .  # editable mode
 ## Quick Example
 
 ```python
+import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
 
-# Define phase-space data as dictionaries
-position = {
-    "x": jnp.array([0.0, 1.0, 2.0, 3.0]),
-    "y": jnp.array([0.0, 0.5, 1.0, 1.5]),
+# Create phase-space observations as dictionaries
+pos = {
+    "x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0]),
+    "y": jnp.array([0.0, 0.5, 1.0, 1.5, 2.0]),
 }
-velocity = {
-    "x": jnp.array([1.0, 1.0, 1.0, 1.0]),
-    "y": jnp.array([0.5, 0.5, 0.5, 0.5]),
+vel = {
+    "x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0]),
+    "y": jnp.array([0.5, 0.5, 0.5, 0.5, 0.5]),
 }
 
-# Run the algorithm
-result = pcf.walk_local_flow(position, velocity, start_idx=0, metric_scale=1.0)
+# Order observations using pcf.order
+config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=3))
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 
-result.indices
-# Array([0, 1, 2, 3])
+# Train autoencoder for gap filling
+key = jax.random.key(0)
+normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+autoencoder = pcf.nn.PathAutoencoder.make(
+    normalizer, gamma_range=result.gamma_range, key=key
+)
+
+train_cfg = pcf.nn.TrainingConfig(
+    n_epochs_encoder=100, n_epochs_both=50, show_pbar=False
+)
+result, _, _ = pcf.nn.train_autoencoder(autoencoder, result, config=train_cfg, key=key)
+
+print(result.indices)  # Array([0, 1, 2, 3, 4])
 ```
 
 ## Features
@@ -173,13 +247,13 @@ For the mathematical background on momentum-weighted ordering, refer to the [NN+
         - Install optional dependency: `uv add phasecurvefit[kdtree]`
         - Uses [jaxkd](https://github.com/dodgebc/jaxkd)
 
-Example using KD-tree:
+Example using KD-tree (requires `jaxkd`):
 
 ```python
 import phasecurvefit as pcf
 
 config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2))
-result = pcf.walk_local_flow(position, velocity, config=config)
+result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
 
 ## Data Format
@@ -220,6 +294,22 @@ The core algorithm originates from Nibauer et al. (2022). If you use **momentum-
   author={Nibauer, Jacob and others},
   journal={arXiv preprint arXiv:2201.12042},
   year={2022}
+}
+```
+
+If you use **mixture-model membership** for outlier rejection (see
+{doc}`guides/outliers`), please also cite Hogg, Bovy & Lang (2010), whose §3
+("Pruning outliers") is the model implemented there:
+
+```bibtex
+@article{hogg2010data,
+  title={Data analysis recipes: Fitting a model to data},
+  author={Hogg, David W. and Bovy, Jo and Lang, Dustin},
+  journal={arXiv preprint arXiv:1008.4686},
+  year={2010},
+  eprint={1008.4686},
+  archivePrefix={arXiv},
+  primaryClass={astro-ph.IM}
 }
 ```
 

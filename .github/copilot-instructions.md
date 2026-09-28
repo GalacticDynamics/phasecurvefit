@@ -141,7 +141,7 @@ uv run pre-commit run -a # Run all pre-commit hooks
 - Use `pytest` for all test suites
 - Add unit tests for every new function or class
 - Test JAX compatibility (`jit`, `vmap`, `grad`) where applicable
-- Tests for Quantity support in `tests/test_quantity_support.py`
+- Tests for Quantity support in `tests/unit/test_quantity_support.py`
 - Assertions should be atomic (no `assert a and b`, use separate asserts)
 
 ## Architecture Notes

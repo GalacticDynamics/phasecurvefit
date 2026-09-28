@@ -1,0 +1,89 @@
+"""Acceptance test: an MSTOrderer result feeds the autoencoder unchanged."""
+
+import jax.numpy as jnp
+import jax.random as jr
+import numpy as np
+from scipy.spatial import cKDTree
+
+import phasecurvefit as pcf
+
+
+def _clean_arc(n=80):
+    t = np.linspace(0.0, 1.0, n)
+    x = 10.0 * t
+    y = 2.0 * np.sin(3.0 * t)
+    pos = {"x": jnp.asarray(x), "y": jnp.asarray(y)}
+    vel = {"x": jnp.ones(n), "y": jnp.asarray(6.0 * np.cos(3.0 * t))}
+    return pos, vel
+
+
+def _train(mst, *, n_epochs, seed=0):
+    normalizer = pcf.nn.StandardScalerNormalizer(mst.positions, mst.velocities)
+    k1, k2 = jr.split(jr.key(seed))
+    model = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=mst.gamma_range, key=k1)
+    cfg = pcf.nn.TrainingConfig(
+        n_epochs_encoder=n_epochs, n_epochs_both=n_epochs, show_pbar=False
+    )
+    result, *_ = pcf.nn.train_autoencoder(model, mst, config=cfg, key=k2)
+    return result
+
+
+class TestMSTAutoencoderIntegration:
+    """Tests for MST autoencoder integration."""
+
+    def test_mst_result_feeds_autoencoder(self):
+        """MST result feeds autoencoder."""
+        pos, vel = _clean_arc()
+        mst = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(pos, vel)
+        result = _train(mst, n_epochs=5)
+        assert result is not None
+        assert result.gamma.shape == (len(pos["x"]),)
+        assert jnp.all(jnp.isfinite(result.gamma))
+
+    def test_encoder_gamma_monotone_in_arclength(self):
+        """Encoder gamma monotone in arclength."""
+        pos, vel = _clean_arc(n=80)
+        mst = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(pos, vel)
+        result = _train(mst, n_epochs=200)
+        gamma_in_order = np.asarray(result.gamma)[np.asarray(mst.ordering)]
+        rho = np.corrcoef(np.arange(gamma_in_order.size), gamma_in_order)[0, 1]
+        assert abs(rho) > 0.9
+
+    def test_decoder_traces_self_intersecting_curve(self, epitrochoid):
+        """The decoded mean path hugs the data on a self-intersecting rose.
+
+        Regression for the Phase-2 target being denoised over the (locally noisy)
+        encoder gamma instead of the ordering: the decoder faithfully learns a
+        blurred target and the mean path sits far off the curve.
+        """
+        pos, vel, _ = epitrochoid(n=2048, seed=1, shuffle=False)
+        P = np.stack([np.asarray(pos["x"]), np.asarray(pos["y"])], axis=1)
+        tree = cKDTree(P)
+        med = float(np.median(tree.query(P, k=2)[0][:, 1]))
+        mst = pcf.orderers.MSTOrderer(
+            k=16,
+            jump_cap=8.0 * med,
+            sever_cos_threshold=0.9,
+            orient_by_velocity=True,
+            on_disconnected="largest",
+        ).order(pos, vel)
+
+        normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+        k1, k2, k3 = jr.split(jr.key(0), 3)
+        decoder = pcf.nn.FourierTrackNet(
+            out_size=2, n_frequencies=10, width_size=128, depth=3, key=k1
+        )
+        model = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=mst.gamma_range, decoder=decoder, key=k2
+        )
+        cfg = pcf.nn.TrainingConfig(
+            n_epochs_encoder=500, n_epochs_decoder=800, n_epochs_both=0, show_pbar=False
+        )
+        result, *_ = pcf.nn.train_autoencoder(model, mst, config=cfg, key=k3)
+
+        path = result(jnp.linspace(*result.gamma_range, 1000))
+        A = np.stack([np.asarray(path["x"]), np.asarray(path["y"])], axis=1)
+        hug = float(np.median(tree.query(A)[0]))
+        assert hug < 4.0 * med, (
+            f"decoder mean path {hug:.1f} too far (spacing {med:.1f})"
+        )
