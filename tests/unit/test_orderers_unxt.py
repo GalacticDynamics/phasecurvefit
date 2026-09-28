@@ -175,16 +175,26 @@ def test_localflow_quantity_agrees_with_plain_field_by_field():
         chord=u.ustrip(usys, result_q.chord),
     )
 
-    # nan_to_num first: chord's own contract is nan for unvisited
-    # observations, and tree_equal has no equal_nan option -- without this a
-    # matching nan on both sides would read as a disagreement.
+    # tree_equal has no equal_nan option, and chord's own contract is nan for
+    # unvisited observations, so a matching nan on both sides must not read
+    # as a disagreement -- but nan_to_num alone would also let a genuine nan
+    # on one side and a coincidentally-equal finite value (e.g. 0.0) on the
+    # other silently pass. Checking the nan masks agree first, separately,
+    # is what tells those two cases apart: only once every nan is known to be
+    # in the same place on both sides is it safe to neutralise them and
+    # compare the rest numerically.
+    def _isnan(tree):
+        is_float = eqx.is_inexact_array
+        return jt.map(lambda x: jnp.isnan(x) if is_float(x) else False, tree)
+
     def _denan(tree):
         is_float = eqx.is_inexact_array
         return jt.map(lambda x: jnp.nan_to_num(x) if is_float(x) else x, tree)
 
-    # Not under jit here, so this is a concrete bool -- ``bool(...)`` is fine
+    # Not under jit here, so these are concrete bools -- ``bool(...)`` is fine
     # (the ``is True`` idiom in eqx.tree_equal's own docs guards against a
     # tracer under jit, which does not apply outside one).
+    assert bool(eqx.tree_equal(_isnan(result_plain), _isnan(result_q_stripped)))
     agree = eqx.tree_equal(
         _denan(result_plain), _denan(result_q_stripped), rtol=1e-5, atol=1e-8
     )
