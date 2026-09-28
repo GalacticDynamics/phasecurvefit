@@ -105,6 +105,25 @@ def test_som_orderer_rejects_bad_hyperparameters():
         pcf.orderers.SOMOrderer(densify_factor=0)
 
 
+def test_som_orderer_chained_below_default_n_prototypes_raises_clearly():
+    """Chaining with fewer visited points than the default ``n_prototypes=25``.
+
+    ``docs/guides/som.md`` and the tutorials chain ``MSTOrderer() |
+    SOMOrderer()`` with no override, so this is the exact path a reader would
+    hit on a dataset small enough (or clipped enough) to drop the visited
+    count below 25. Every other chained test in this file lowers
+    ``n_prototypes`` to fit its fixture, so this crash path itself had no
+    coverage -- this asserts it fails with the core's own clear message
+    rather than, say, silently misbehaving.
+    """
+    n = 20
+    pos = {"x": jnp.linspace(0.0, 10.0, n), "y": jnp.zeros(n)}
+    vel = {"x": jnp.ones(n), "y": jnp.zeros(n)}
+    chain = pcf.orderers.MSTOrderer(k=5, jump_cap=2.0) | pcf.orderers.SOMOrderer()
+    with pytest.raises(ValueError, match="binning needs at least n_prototypes"):
+        pcf.order(pos, vel, chain)
+
+
 def test_som_orderer_citation_is_set():
     assert pcf.orderers.SOMOrderer.__citation__ == "https://arxiv.org/abs/2212.00949"
 
@@ -655,6 +674,28 @@ def test_som_orderer_rejects_init_indices_outside_the_contract(label, make):
         positions=pos, velocities=vel, indices=make(n), velocity_aware=True
     )
     with pytest.raises(eqx.EquinoxRuntimeError, match=r"outside \[-1, n_obs\)"):
+        pcf.orderers.SOMOrderer(n_prototypes=6).order(pos, vel, init=init)
+
+
+def test_som_orderer_rejects_a_repeated_visited_index():
+    """A repeat in `init.indices` must be caught here, not left to slip past.
+
+    `sub_ordering` is a synthetic `arange` once chained (the subset is already
+    in the prior stage's order), so `init_prototypes`'s own repeat guard never
+    sees the real indices and can never catch this -- the check has to live in
+    `order()` itself, against `init.indices` directly.
+    """
+    n = 40
+    pos = {"x": jnp.linspace(0.0, 10.0, n), "y": jnp.zeros(n)}
+    vel = {"x": jnp.ones(n), "y": jnp.zeros(n)}
+    # Index 1 repeated; index 2 never appears.
+    indices = jnp.concatenate(
+        [jnp.array([0, 1, 1, 3]), jnp.arange(4, n - 4), jnp.full(4, -1)]
+    )
+    init = pcf.orderers.OrderingResult(
+        positions=pos, velocities=vel, indices=indices, velocity_aware=True
+    )
+    with pytest.raises(eqx.EquinoxRuntimeError, match="repeated visited index"):
         pcf.orderers.SOMOrderer(n_prototypes=6).order(pos, vel, init=init)
 
 

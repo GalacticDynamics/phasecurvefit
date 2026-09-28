@@ -695,8 +695,8 @@ def _local_flow_walk(
       },
       indices=i32[3],
       gamma_range=(0.0, 1.0),
-      chord=Quantity(f32[3], unit='m'),
-      velocity_aware=True
+      velocity_aware=True,
+      chord=Quantity(f32[3], unit='m')
     )
 
     """
@@ -817,28 +817,28 @@ def _chord_unit(
     return units.pop() if len(units) == 1 else usys["length"]
 
 
-@MSTOrderer.order.dispatch
-def order(
-    self: MSTOrderer,
+def _order_with_backbone_and_chord(
+    orderer: MSTOrderer | SOMOrderer,
     positions: VectorQComponents,
     velocities: VectorQComponents,
     *,
-    metadata: StateMetadata | None = None,
-    init: AbstractResult | None = None,
+    metadata: StateMetadata | None,
+    init: AbstractResult | None,
 ) -> OrderingResult:
-    """Order Quantity-valued tracers with the MST backbone.
+    """Shared body for orderers whose Quantity dispatch returns a backbone and chord.
 
-    Strips units into ``usys`` (host-side), runs the MST pipeline, and reattaches
-    units: ``positions``/``velocities`` keep their input units, and ``backbone``
-    keeps each component's own unit. ``chord`` is a single length for all
-    components, so it comes back in the shared position unit when the components
-    agree, and in ``usys["length"]`` when they do not.
+    Currently ``MSTOrderer`` and ``SOMOrderer``. Strips units into ``usys``
+    (host-side), runs the orderer's plain-array pipeline, and reattaches units:
+    ``positions``/``velocities`` keep their input units, and ``backbone`` keeps
+    each component's own unit. ``chord`` is a single length for all
+    components, so it comes back in the shared position unit when the
+    components agree, and in ``usys["length"]`` when they do not.
     """
     usys = _require_usys(metadata)
     q_plain = {k: u.ustrip(usys, v) for k, v in positions.items()}
     p_plain = {k: u.ustrip(usys, v) for k, v in velocities.items()}
 
-    result = self.order(q_plain, p_plain, metadata=metadata, init=init)
+    result = orderer.order(q_plain, p_plain, metadata=metadata, init=init)
 
     length_unit = usys["length"]
     chord_unit = _chord_unit(positions, usys)
@@ -855,6 +855,25 @@ def order(
     )
 
 
+@MSTOrderer.order.dispatch
+def order(
+    self: MSTOrderer,
+    positions: VectorQComponents,
+    velocities: VectorQComponents,
+    *,
+    metadata: StateMetadata | None = None,
+    init: AbstractResult | None = None,
+) -> OrderingResult:
+    """Order Quantity-valued tracers with the MST backbone.
+
+    See :func:`_order_with_backbone_and_chord` for the strip/run/reattach body
+    shared with :class:`SOMOrderer`'s dispatch below.
+    """
+    return _order_with_backbone_and_chord(
+        self, positions, velocities, metadata=metadata, init=init
+    )
+
+
 @SOMOrderer.order.dispatch
 def order(
     self: SOMOrderer,
@@ -866,31 +885,11 @@ def order(
 ) -> OrderingResult:
     """Order Quantity-valued tracers with the SOM.
 
-    Strips units into ``usys``, runs the SOM pipeline, and reattaches units:
-    ``positions``/``velocities`` keep their input units, and ``backbone`` keeps
-    each component's own unit. ``chord`` is a single length for all components,
-    so it comes back in the shared position unit when the components agree, and
-    in ``usys["length"]`` when they do not.
+    See :func:`_order_with_backbone_and_chord` for the strip/run/reattach body
+    shared with :class:`MSTOrderer`'s dispatch above.
     """
-    usys = _require_usys(metadata)
-    q_plain = {k: u.ustrip(usys, v) for k, v in positions.items()}
-    p_plain = {k: u.ustrip(usys, v) for k, v in velocities.items()}
-
-    result = self.order(q_plain, p_plain, metadata=metadata, init=init)
-
-    length_unit = usys["length"]
-    chord_unit = _chord_unit(positions, usys)
-    backbone = {
-        k: u.uconvert(positions[k].unit, u.Q(v, length_unit))
-        for k, v in result.backbone.items()
-    }
-    chord = u.uconvert(chord_unit, u.Q(result.chord, length_unit))
-    return dataclassish.replace(
-        result,
-        positions=dict(positions),
-        velocities=dict(velocities),
-        backbone=backbone,
-        chord=chord,
+    return _order_with_backbone_and_chord(
+        self, positions, velocities, metadata=metadata, init=init
     )
 
 

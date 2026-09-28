@@ -112,6 +112,20 @@ def _scale_is_nonzero(scale: float | FSz0, /, *, remedy: str) -> bool:
     return bool(scale != 0.0)
 
 
+def _polyline_length(comps_q: VectorComponents, /) -> FSz0:
+    """Total arc length of the polyline through ``comps_q``, in its given order.
+
+    Uses ``_safe_norm`` rather than ``jnp.linalg.norm``: a coincident pair of
+    consecutive points is not exotic here -- the working set is a caller-
+    supplied subset and can legitimately contain duplicated observations --
+    and a bare norm's 0/0 gradient at a zero-length step would NaN every
+    gradient flowing through the derived scale that uses this.
+    """
+    comps = sorted(comps_q)
+    q = jnp.stack([comps_q[k] for k in comps], axis=-1)
+    return jnp.sum(_som._safe_norm(jnp.diff(q, axis=0)))  # noqa: SLF001
+
+
 class SOMOrderer(AbstractOrderer):
     """Order tracers by projection onto a trained 1-D Self-Organizing Map.
 
@@ -309,7 +323,7 @@ class SOMOrderer(AbstractOrderer):
         "nearest in velocity", which on a winding curve conflates points a whole
         turn apart.
         """
-        follows_velocity = init is not None and getattr(init, "velocity_aware", False)
+        follows_velocity = init is not None and init.velocity_aware
 
         # The metric and the scale are *independent* choices. Resolving them
         # together is what made naming a velocity-aware ``metric`` force the
@@ -351,14 +365,20 @@ class SOMOrderer(AbstractOrderer):
             # follow, or the metric discards the velocity term regardless.
             return metric, 0.0
 
-        comps = sorted(sub_q)
-        q = jnp.stack([sub_q[k] for k in comps], axis=-1)
-        v = jnp.stack([sub_p[k] for k in comps], axis=-1)
+        v = jnp.stack([sub_p[k] for k in sorted(sub_p)], axis=-1)
         # ``sub_q`` is already in the prior stage's order, so consecutive
         # differences are steps along the track.
-        length = jnp.sum(jnp.linalg.norm(jnp.diff(q, axis=0), axis=-1))
+        length = _polyline_length(sub_q)
         sigma_phys = self.sigma_end * length / (self.n_prototypes - 1)
         speed = jnp.median(jnp.linalg.norm(v, axis=-1))
+        # A uniformly tiny (not zero) ``speed`` -- a near-static clump, or a
+        # unit system where the numeric magnitude is small -- does not blow
+        # this up: ``scale`` and ``speed`` are reciprocal by construction, so
+        # a typical velocity's contribution to the metric, ``scale * speed``,
+        # is ``sigma_phys / 2`` regardless of how small ``speed`` itself is.
+        # Only an exact zero (guarded below) or an individual point whose
+        # velocity is a large outlier relative to the median needs the guard.
+        #
         # Left as a JAX scalar rather than ``float(scale)``: ``_train_and_project``
         # is ``eqx.filter_jit``-ed, which treats a Python float as static, so a
         # data-derived scale would trigger a recompile for every new dataset
@@ -397,9 +417,7 @@ class SOMOrderer(AbstractOrderer):
         rho = float(jnp.abs(jnp.corrcoef(prior, rank)[0, 1]))
         if rho >= _DISAGREE_WARN:
             return
-        comps = sorted(sub_q)
-        q = jnp.stack([sub_q[k] for k in comps], axis=-1)
-        length = float(jnp.sum(jnp.linalg.norm(jnp.diff(q, axis=0), axis=-1)))
+        length = float(_polyline_length(sub_q))
         sigma_phys = self.sigma_end * length / (self.n_prototypes - 1)
         # The same fraction as ``sigma_phys / length``, with ``length`` cancelled
         # algebraically rather than divided out. A coincident working set makes
@@ -407,13 +425,23 @@ class SOMOrderer(AbstractOrderer):
         # best-effort diagnostic into the failure it was trying to describe.
         # ``n_prototypes >= 2`` is enforced above, so this cannot divide by zero.
         frac = 100 * self.sigma_end / (self.n_prototypes - 1)
+        # ``length == 0`` (every working-set point coincident) makes
+        # ``sigma_phys`` print as 0 -- pairing that with the same nonzero
+        # ``frac`` reads as self-contradictory ("a smoothing length of 0,
+        # 45% of the track"), even though both are individually correct.
+        # Name the degeneracy instead of leaving the two numbers to clash.
+        smoothing_clause = (
+            f"a smoothing length of {sigma_phys:.3g} ({frac:.1f}% of the track)"
+            if length > 0
+            else f"a smoothing scale of {frac:.1f}% of the track (the track's "
+            "own length is 0: every working-set point is coincident)"
+        )
         warnings.warn(
             f"SOMOrderer's ordering disagrees with the one it was given (rank "
             f"correlation {rho:.2f}). Either the prior ordering was poor and this "
             f"is a genuine overhaul, or the lattice is too coarse for the curve "
             f"and has tangled a good ordering: n_prototypes={self.n_prototypes} "
-            f"gives a smoothing length of {sigma_phys:.3g}, "
-            f"{frac:.1f}% of the track, and any structure "
+            f"gives {smoothing_clause}, and any structure "
             f"finer than that is smoothed away. Compare the two orderings, and "
             f"raise n_prototypes if the curve turns or self-approaches more "
             f"tightly than the smoothing length.",
@@ -460,6 +488,24 @@ class SOMOrderer(AbstractOrderer):
                 "unvisited, dropping those observations with no error. "
                 f"Indices must be in [-1, n_obs) with n_obs={n_obs}, using -1 "
                 "and only -1 for unvisited.",
+            )
+            # A repeated visited index would gather one observation twice into
+            # the working set while silently dropping another. That is exactly
+            # what ``init_prototypes``'s own repeat guard exists to catch, but
+            # ``sub_ordering`` below is a synthetic ``arange`` (the subset is
+            # already in the prior stage's order), which is repeat-free by
+            # construction and so can never trigger that guard -- it has to be
+            # checked here instead, against the real indices.
+            visited_counts = jnp.bincount(
+                jnp.where(prior >= 0, prior, n_obs), length=n_obs + 1
+            )
+            prior = eqx.error_if(
+                prior,
+                jnp.any(visited_counts[:n_obs] > 1),
+                "init.indices contains a repeated visited index. A repeat "
+                "gathers the same observation into the working set twice and "
+                "drops another silently; each visited index must appear at "
+                "most once.",
             )
             if not jax.core.is_concrete(prior):
                 # Without values the visited subset has no size, and no shape

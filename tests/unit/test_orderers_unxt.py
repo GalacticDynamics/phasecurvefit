@@ -175,3 +175,24 @@ def test_chord_unit_falls_back_when_components_disagree(x_unit, y_unit, expected
         q, p, metadata=StateMetadata(usys=u.unitsystems.galactic)
     )
     assert result.chord.unit == u.unit(expected)
+
+
+@pytest.mark.parametrize(
+    ("x_unit", "y_unit", "expected"),
+    [("pc", "pc", "pc"), ("pc", "kpc", "kpc")],
+    ids=["shared", "mixed"],
+)
+def test_chord_unit_falls_back_for_localflow_too(x_unit, y_unit, expected):
+    """The same ``_chord_unit`` fallback must hold on the LocalFlowOrderer path.
+
+    That dispatch reaches ``_local_flow_walk`` directly rather than going
+    through the same code as MSTOrderer/SOMOrderer, so the fallback has to be
+    exercised here separately -- the MST-only coverage above would not catch a
+    regression specific to this path.
+    """
+    q, p = _arc_quantity()
+    q["x"] = u.uconvert(x_unit, q["x"])
+    q["y"] = u.uconvert(y_unit, q["y"])
+    orderer = pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(1.0, "kpc"))
+    result = orderer.order(q, p, metadata=StateMetadata(usys=u.unitsystems.galactic))
+    assert result.chord.unit == u.unit(expected)
