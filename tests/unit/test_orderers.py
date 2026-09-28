@@ -205,10 +205,14 @@ class TestVelocityAwareness:
         # actually distinguishes this from the old derivation: a try/except
         # forcing `True` under any trace would still pass a True-only check,
         # metric_scale traced or not, since it never sees `False` to get wrong.
-        jax.grad(lambda s: run(s, metric=aligned, expected=True))(1.0)
-        jax.jit(lambda s: run(s, metric=aligned, expected=True))(1.0)
-        jax.grad(lambda s: run(s, metric=spatial, expected=False))(1.0)
-        jax.jit(lambda s: run(s, metric=spatial, expected=False))(1.0)
+        # ``float(...)`` rather than discarding the return value: on an async
+        # backend an unconsumed result can defer a runtime failure past this
+        # test, silently. Forcing it is what makes "neither raises" a claim
+        # about actually running the computation, not just tracing it.
+        float(jax.grad(lambda s: run(s, metric=aligned, expected=True))(1.0))
+        float(jax.jit(lambda s: run(s, metric=aligned, expected=True))(1.0))
+        float(jax.grad(lambda s: run(s, metric=spatial, expected=False))(1.0))
+        float(jax.jit(lambda s: run(s, metric=spatial, expected=False))(1.0))
 
     def test_the_deprecated_walk_reports_it_too(self, arc):
         """The flag is set by the walk, not by the orderer wrapping it.
