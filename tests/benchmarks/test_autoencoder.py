@@ -46,7 +46,7 @@ class TestAutoencoderTrainingBenchmarks:
         )
 
         assert result is not None
-        # Losses from: encoder (20) + decoder (100 default) + both (20) = 140
+        # Losses from: encoder (20) + decoder (100) + both (20) = 140
         assert len(losses) == 140
 
     def test_full_autoencoder_training_high_epochs(
