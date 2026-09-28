@@ -165,6 +165,11 @@ def test_localflow_quantity_agrees_with_plain_field_by_field():
     prior = pcf.orderers.MSTOrderer(k=8, jump_cap=5.0, on_disconnected="largest")
     init_plain = prior.order(q_plain, p_plain)
     init_q = prior.order(q, p, metadata=md)
+    # If MST's own Quantity dispatch ever diverged from its plain one, this
+    # test's real target (LocalFlowOrderer's dispatches) would fail on a
+    # difference it did not cause -- assert the shared premise explicitly so
+    # a failure below can be trusted to be about #71's invariant.
+    assert jnp.array_equal(init_plain.indices, init_q.indices)
 
     orderer = pcf.orderers.LocalFlowOrderer(
         config=pcf.WalkConfig(metric=pcf.metrics.FullPhaseSpaceDistanceMetric())
