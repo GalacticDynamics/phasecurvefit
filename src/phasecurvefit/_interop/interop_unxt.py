@@ -48,9 +48,9 @@ from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import Direction, StateMetadata, WalkLocalFlowResult
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
-from phasecurvefit._src.orderers.base import chord_along_ordering
 from phasecurvefit._src.orderers.localflow import (
     LocalFlowOrderer,
+    _finalize,
     _resolve_start_idx,
 )
 from phasecurvefit._src.orderers.mst import MSTOrderer
@@ -925,17 +925,16 @@ def order(
         direction=self.direction,
         usys=usys,
     )
-    # Mirror the plain-array dispatch: this path reaches ``_local_flow_walk``
-    # directly, so the chord has to be attached here too or unit-ful callers
-    # silently get ``None``. Compute it on stripped arrays and reattach, so it
-    # comes back unit-ful like ``backbone`` does on the other orderers.
+    # Calls the same ``_finalize`` the plain dispatch calls, on unit-stripped
+    # positions, rather than re-deriving the chord computation here: a step
+    # added to ``_finalize`` in the future needs no second edit in this
+    # dispatch to keep applying to unit-ful callers too (see #71).
+    plain_positions = {k: u.ustrip(usys, v) for k, v in result.positions.items()}
+    result = _finalize(result, plain_positions)
     chord_unit = _chord_unit(positions, usys)
-    chord = chord_along_ordering(
-        {k: u.ustrip(usys, v) for k, v in result.positions.items()}, result.indices
-    )
     # ``velocity_aware`` is not set here: ``_local_flow_walk`` already derives
     # it from the same ``config``, so overriding would only restate it.
     return dataclassish.replace(
         result,
-        chord=u.uconvert(chord_unit, u.Q(chord, usys["length"])),
+        chord=u.uconvert(chord_unit, u.Q(result.chord, usys["length"])),
     )

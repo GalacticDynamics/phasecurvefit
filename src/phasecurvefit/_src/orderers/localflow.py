@@ -52,7 +52,9 @@ def _resolve_start_idx(
     return jnp.where(jnp.any(visited), first, 0)
 
 
-def _with_chord(result: WalkLocalFlowResult) -> WalkLocalFlowResult:
+def _finalize(
+    result: WalkLocalFlowResult, positions: VectorComponents
+) -> WalkLocalFlowResult:
     """Attach the arc length along the walk path.
 
     The walk has no separate backbone -- its curve is the path through the
@@ -60,9 +62,16 @@ def _with_chord(result: WalkLocalFlowResult) -> WalkLocalFlowResult:
     path. Attached here rather than inside ``_local_flow_walk`` because
     ``chord_along_ordering`` lives in ``orderers.base``, which imports from
     ``algorithm`` -- the walk cannot call it without a cycle.
+
+    ``positions`` is a parameter, not ``result.positions``, so the Quantity
+    dispatch in ``interop_unxt`` can call this too: on unit-stripped positions,
+    before reattaching the unit to the ``chord`` it returns. This is the single
+    place any future per-result postprocessing belongs -- a step added only to
+    the plain dispatch's call site, and not here, is exactly the silent drift
+    between the two paths that cost #56, #67 and #70 (see #71).
     """
     return dataclassish.replace(
-        result, chord=chord_along_ordering(result.positions, result.indices)
+        result, chord=chord_along_ordering(positions, result.indices)
     )
 
 
@@ -141,4 +150,4 @@ class LocalFlowOrderer(AbstractOrderer):
             direction=self.direction,
             **kwargs,
         )
-        return _with_chord(result)
+        return _finalize(result, result.positions)
