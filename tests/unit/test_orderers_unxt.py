@@ -196,3 +196,38 @@ def test_chord_unit_falls_back_for_localflow_too(x_unit, y_unit, expected):
     orderer = pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(1.0, "kpc"))
     result = orderer.order(q, p, metadata=StateMetadata(usys=u.unitsystems.galactic))
     assert result.chord.unit == u.unit(expected)
+
+
+def test_som_quantity_metric_scale_accepts_a_time_unit():
+    """``SOMOrderer``'s ``metric_scale`` must be stripped like everything else.
+
+    #85: ``FullPhaseSpaceDistanceMetric`` multiplies ``metric_scale`` by a
+    velocity difference to get a position difference, so it is dimensionally
+    a time -- the metric's own docstring says so. The Quantity dispatch
+    stripped ``positions``/``velocities`` but forwarded ``self`` (and so
+    ``self.metric_scale``) untouched into the plain, non-``quax`` SOM core:
+    a genuine time Quantity there reached ``metric_scale * d_vel`` still
+    unit-ful while ``d_vel`` was already a bare number, raising
+    ``UnitConversionError: 'Myr2' and '' (dimensionless) are not
+    convertible`` from inside the squared term.
+    """
+    q, p = _arc_quantity()
+    usys = u.unitsystems.galactic
+    result = pcf.orderers.SOMOrderer(
+        n_prototypes=12,
+        metric=pcf.metrics.FullPhaseSpaceDistanceMetric(),
+        metric_scale=u.Q(50.0, "Myr"),
+    ).order(q, p, metadata=StateMetadata(usys=usys))
+    assert int(result.n_visited) == 120
+
+    # The Quantity path must agree with the stripped one, not just avoid
+    # raising -- a dispatch that silently dropped metric_scale to 0 would
+    # also pass the assertion above.
+    q_plain = {k: u.ustrip(usys, v) for k, v in q.items()}
+    p_plain = {k: u.ustrip(usys, v) for k, v in p.items()}
+    stripped = pcf.orderers.SOMOrderer(
+        n_prototypes=12,
+        metric=pcf.metrics.FullPhaseSpaceDistanceMetric(),
+        metric_scale=float(u.ustrip(usys, u.Q(50.0, "Myr"))),
+    ).order(q_plain, p_plain)
+    assert jnp.array_equal(result.indices, stripped.indices)
