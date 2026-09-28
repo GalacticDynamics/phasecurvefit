@@ -1124,7 +1124,9 @@ def train_autoencoder(
         config = TrainingConfig()
 
     # Split the keys
-    keys: Key[Array, "5"] = jr.split(key, 6)[1:]
+    split_keys: Key[Array, "6"] = jr.split(key, 6)
+    key = split_keys[0]
+    keys: Key[Array, "5"] = split_keys[1:]
 
     # ===========================================
     # Train Encoder
