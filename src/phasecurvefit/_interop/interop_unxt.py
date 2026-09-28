@@ -887,7 +887,22 @@ def order(
 
     See :func:`_order_with_backbone_and_chord` for the strip/run/reattach body
     shared with :class:`MSTOrderer`'s dispatch above.
+
+    ``metric_scale``, unlike ``positions``/``velocities``, is not stripped by
+    that shared body: it is a field on ``self``, not a call argument, and the
+    SOM core is plain-array math with no ``quax`` awareness, so a Quantity
+    left on it reaches ``metric_scale * d_vel`` (e.g. inside
+    ``FullPhaseSpaceDistanceMetric``'s ``(metric_scale * d_vel) ** 2``) still
+    unit-ful, while ``d_vel`` is already a bare number -- raising deep inside
+    the metric rather than here.
     """
+    if isinstance(self.metric_scale, u.AbstractQuantity):
+        usys = _require_usys(metadata)
+        # Dimension-inferred from the Quantity's own unit -- unlike a bare
+        # number, there is nothing to guess: whatever unit the caller
+        # attached is stripped into ``usys``'s unit of that same dimension.
+        stripped = u.ustrip(usys, self.metric_scale)
+        self = dataclassish.replace(self, metric_scale=stripped)
     return _order_with_backbone_and_chord(
         self, positions, velocities, metadata=metadata, init=init
     )
@@ -907,6 +922,18 @@ def order(
     Delegates to the ``walk_local_flow`` Quantity dispatch. Scalar
     hyperparameters (``metric_scale``, ``max_dist``) that are plain numbers are
     interpreted in the ``usys`` length unit.
+
+    A plain ``metric_scale`` being labelled a length regardless of the
+    configured metric looks like the same bug as #85's ``SOMOrderer`` one at
+    first glance, but it is not: whatever unit it is wrapped in here is
+    immediately stripped back out by ``_local_flow_walk``'s own Quantity
+    dispatch (via ``u.ustrip(usys, metric_scale)``), and stripping a bare
+    number's wrapper back out through the *same* ``usys`` it was wrapped with
+    is a no-op regardless of which dimension was chosen -- verified: a bare
+    ``50.0`` and both ``u.Q(50.0, "kpc")`` and ``u.Q(50.0, "Myr")`` produce
+    identical orderings here. ``SOMOrderer`` differs because its
+    ``metric_scale`` was never stripped at all before reaching its
+    non-``quax`` plain-array core.
     """
     usys = _require_usys(metadata)
 
