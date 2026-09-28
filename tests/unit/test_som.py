@@ -538,8 +538,15 @@ class TestNumericalHazards:
         x = t + scale * 0.01 * jax.random.normal(noise_key, (n,))
         y = 0.5 * t
         perm = jax.random.permutation(shuffle_key, n)
-        pos = {"x": x[perm], "y": y[perm]}
-        vel = {"x": jnp.ones(n), "y": jnp.full(n, 0.5)}
+        # Forced rather than left to the ambient dtype: with `jax_enable_x64`
+        # on, `linspace`/`normal` would come back float64, whose ~1.8e308
+        # ceiling never overflows at these scales, and the test would pass
+        # without exercising the float32 path it exists to guard.
+        pos = {"x": x[perm].astype(jnp.float32), "y": y[perm].astype(jnp.float32)}
+        vel = {
+            "x": jnp.ones(n, dtype=jnp.float32),
+            "y": jnp.full(n, 0.5, dtype=jnp.float32),
+        }
         pq, _ = som.init_prototypes(pos, vel, n_prototypes=8)
         assert jnp.all(jnp.isfinite(pq["x"]))
         dx = jnp.diff(pq["x"])
