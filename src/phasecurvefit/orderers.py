@@ -37,9 +37,10 @@ __all__: tuple[str, ...] = (
     "MSTOrderer",
     "OrderingResult",
     "SOMOrderer",
+    "default_pipeline",
 )
 
-from ._src.orderers.base import AbstractOrderer
+from ._src.orderers.base import AbstractOrderer, default_pipeline
 from ._src.orderers.chain import ChainOrderer
 from ._src.orderers.localflow import LocalFlowOrderer
 from ._src.orderers.mst import MSTOrderer

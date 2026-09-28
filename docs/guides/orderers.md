@@ -183,6 +183,26 @@ chain = pcf.orderers.ChainOrderer(
 assert len(chain.stages) == 2
 ```
 
+### The recommended walk-then-SOM chain
+
+`pcf.order(q, p)` runs the walk alone, unchanged since before
+{class}`~phasecurvefit.orderers.SOMOrderer` existed — making the SOM part of
+that default would be a breaking change (a different result type and
+`gamma_range`, plus a real per-call cost;
+[GalacticDynamics/phasecurvefit#57](https://github.com/GalacticDynamics/phasecurvefit/issues/57)).
+{func}`~phasecurvefit.orderers.default_pipeline` is the non-breaking version
+of that better default: call it explicitly to get
+`LocalFlowOrderer() | SOMOrderer()`, with one difference from writing that
+chain by hand -- it falls back to the walk alone when there are fewer
+visited tracers than `n_prototypes`, rather than raising:
+
+```python
+result = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
+```
+
+Any {class}`~phasecurvefit.orderers.SOMOrderer` keyword (`sigma_end`,
+`metric`, ...) passes through as a keyword to `default_pipeline` itself.
+
 ### Letting the MST find the walk's start point
 
 The walk has to begin at an end of the curve. Naming that index by hand means
