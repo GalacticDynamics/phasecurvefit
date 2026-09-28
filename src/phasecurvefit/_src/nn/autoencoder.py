@@ -1124,9 +1124,7 @@ def train_autoencoder(
         config = TrainingConfig()
 
     # Split the keys
-    split_keys: Key[Array, "6"] = jr.split(key, 6)
-    key = split_keys[0]
-    keys: Key[Array, "5"] = split_keys[1:]
+    keys: Key[Array, " 5"] = jr.split(key, 5)
 
     # ===========================================
     # Train Encoder
@@ -1195,7 +1193,7 @@ def train_autoencoder(
         qs_mean=mean_qs,
         mask=decoder_mask,
         config=config_decoder,
-        key=keys[2],
+        key=keys[3],
     )
 
     # Model surgery: put the updated decoder back into the model
@@ -1209,7 +1207,7 @@ def train_autoencoder(
 
     # Train the decoder.
     model, autoencoder_opt_state, autoencoder_losses = train_ordering_and_track_net(
-        model, all_ws, mask=is_member, config=config_autoencoder, key=keys[3]
+        model, all_ws, mask=is_member, config=config_autoencoder, key=keys[4]
     )
 
     # ===========================================
