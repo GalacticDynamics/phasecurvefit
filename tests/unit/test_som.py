@@ -548,7 +548,7 @@ class TestNumericalHazards:
             "y": jnp.full(n, 0.5, dtype=jnp.float32),
         }
         pq, _ = som.init_prototypes(pos, vel, n_prototypes=8)
-        assert jnp.all(jnp.isfinite(pq["x"]))
+        assert all(jnp.all(jnp.isfinite(v)) for v in pq.values())
         dx = jnp.diff(pq["x"])
         assert jnp.all(dx > 0) or jnp.all(dx < 0)
 
