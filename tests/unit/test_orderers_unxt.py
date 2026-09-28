@@ -188,11 +188,17 @@ def test_localflow_quantity_agrees_with_plain_field_by_field():
                     q_val[k],
                     rtol=1e-5,
                     atol=1e-8,
+                    equal_nan=True,
                     err_msg=f"{f.name}[{k}]",
                 )
         elif isinstance(plain_val, np.ndarray):
+            # ``equal_nan=True``: ``chord``'s own contract is ``nan`` for
+            # unvisited observations, and this generic comparison has no way
+            # to know that's expected rather than a sign the two paths
+            # disagree -- without it, a nan here would fail even when both
+            # dispatches produce the identical nan.
             np.testing.assert_allclose(
-                plain_val, q_val, rtol=1e-5, atol=1e-8, err_msg=f.name
+                plain_val, q_val, rtol=1e-5, atol=1e-8, equal_nan=True, err_msg=f.name
             )
         else:
             assert plain_val == q_val, f.name
