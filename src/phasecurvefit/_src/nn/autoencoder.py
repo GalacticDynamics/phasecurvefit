@@ -20,7 +20,7 @@ import jax.random as jr
 import jax.tree as jtu
 import optax
 import plum
-from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray, PyTree
+from jaxtyping import Array, Bool, Float, Int, Key, PRNGKeyArray, PyTree, UInt32
 
 from jaxmore.nn import masked_mean
 
@@ -1124,7 +1124,9 @@ def train_autoencoder(
         config = TrainingConfig()
 
     # Split the keys
-    keys: tuple[PRNGKeyArray, ...] = jr.split(key, 5)
+    keys: Key[Array, "5"] | UInt32[Array, "5 2"] | UInt32[Array, "5 4"] = jr.split(
+        key, 5
+    )
 
     # ===========================================
     # Train Encoder
