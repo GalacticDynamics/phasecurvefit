@@ -891,8 +891,10 @@ def order(
     ``metric_scale``, unlike ``positions``/``velocities``, is not stripped by
     that shared body: it is a field on ``self``, not a call argument, and the
     SOM core is plain-array math with no ``quax`` awareness, so a Quantity
-    left on it reaches ``metric * metric_scale`` unconverted and raises deep
-    inside the metric rather than here.
+    left on it reaches ``metric_scale * d_vel`` (e.g. inside
+    ``FullPhaseSpaceDistanceMetric``'s ``(metric_scale * d_vel) ** 2``) still
+    unit-ful, while ``d_vel`` is already a bare number -- raising deep inside
+    the metric rather than here.
     """
     if isinstance(self.metric_scale, u.AbstractQuantity):
         usys = _require_usys(metadata)
