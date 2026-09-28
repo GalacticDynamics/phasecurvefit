@@ -176,13 +176,21 @@ def order(
     Array([0, 1, 2], dtype=int32)
 
     """
-    if not positions and not velocities:
+    if (
+        isinstance(positions, dict)
+        and isinstance(velocities, dict)
+        and not positions
+        and not velocities
+    ):
         # An empty dict satisfies both the plain-array and Quantity dispatch
         # signatures equally, so plum cannot pick one and raises before any
         # orderer's own body runs -- naming its own internals rather than the
         # caller's mistake. Every partially-empty case already errors clearly
         # from inside the orderer (mismatched component keys); this is the
-        # one case worth catching here instead of downstream.
+        # one case worth catching here instead of downstream. Restricted to
+        # dicts specifically -- ``not positions`` alone is also true for e.g.
+        # ``None``, which is a different mistake and deserves its own error
+        # rather than this one's misleading "both empty" message.
         msg = (
             "positions and velocities cannot both be empty; there is nothing to order."
         )

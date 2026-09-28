@@ -32,6 +32,17 @@ class TestOrdererNamespace:
         with pytest.raises(ValueError, match="cannot both be empty"):
             pcf.order({}, {})
 
+    def test_order_facade_leaves_non_dict_falsy_input_to_dispatch(self):
+        """The guard is about the empty-*dict* ambiguity, not falsiness.
+
+        ``None`` is also falsy, but it is a different mistake -- a type
+        error, not "nothing to order" -- and deserves the message dispatch
+        itself gives, not this guard's misleading "both empty" one.
+        """
+        with pytest.raises(LookupError) as exc_info:
+            pcf.order(None, None)
+        assert "cannot both be empty" not in str(exc_info.value)
+
 
 class TestOrderingResultUnification:
     """OrderingResult is unified; WalkLocalFlowResult subclasses it."""
