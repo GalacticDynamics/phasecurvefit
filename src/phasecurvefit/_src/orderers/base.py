@@ -176,6 +176,20 @@ def order(
     Array([0, 1, 2], dtype=int32)
 
     """
+    msg = "positions and velocities cannot both be empty; there is nothing to order."
+    if (isinstance(positions, dict) and not positions) and (
+        isinstance(velocities, dict) and not velocities
+    ):
+        # An empty dict satisfies both the plain-array and Quantity dispatch
+        # signatures equally, so plum cannot pick one and raises before any
+        # orderer's own body runs -- naming its own internals rather than the
+        # caller's mistake. Every partially-empty case already errors clearly
+        # from inside the orderer (mismatched component keys); this is the
+        # one case worth catching here instead of downstream. Restricted to
+        # dicts specifically -- ``not positions`` alone is also true for e.g.
+        # ``None``, which is a different mistake and deserves its own error
+        # rather than this one's misleading "both empty" message.
+        raise ValueError(msg)
     if orderer is None:
         # Lazy import: localflow imports AbstractOrderer from this module.
         from phasecurvefit._src.orderers import localflow  # noqa: PLC0415
