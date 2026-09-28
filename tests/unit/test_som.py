@@ -516,6 +516,35 @@ class TestNumericalHazards:
         assert jnp.all(jnp.diff(pq["x"]) > 0)
         assert float(pq["x"].max()) == pytest.approx(1000.0, rel=1e-3)
 
+    @pytest.mark.parametrize(
+        "scale",
+        [1.0, 1e-8, 1e18, 3.086e19],
+        ids=["1", "1e-8", "1e18", "kpc-in-m"],
+    )
+    def test_pca_fallback_survives_large_position_magnitude(self, scale):
+        """The PCA fallback's Gram matrix squared positions in float32.
+
+        1 kpc in SI units is ~3.086e19 m -- ordinary galactic data, stripped
+        into an SI unit system by the ``unxt`` interop. Squared in the Gram
+        (``centered.T @ centered``), that overflows float32's ~3.4e38 ceiling
+        with no exception and no NaN in the *output* -- just a wrong axis and
+        a silently corrupted ordering, since ``eigh`` of an inf-valued matrix
+        returns NaN eigenvectors that ``argsort`` still happily ranks. SVD on
+        the centred matrix directly avoids the squaring that causes this.
+        """
+        n = 100
+        noise_key, shuffle_key = jax.random.split(jax.random.key(0))
+        t = scale * jnp.linspace(0.0, 10.0, n)
+        x = t + scale * 0.01 * jax.random.normal(noise_key, (n,))
+        y = 0.5 * t
+        perm = jax.random.permutation(shuffle_key, n)
+        pos = {"x": x[perm], "y": y[perm]}
+        vel = {"x": jnp.ones(n), "y": jnp.full(n, 0.5)}
+        pq, _ = som.init_prototypes(pos, vel, n_prototypes=8)
+        assert jnp.all(jnp.isfinite(pq["x"]))
+        dx = jnp.diff(pq["x"])
+        assert jnp.all(dx > 0) or jnp.all(dx < 0)
+
     def test_chord_is_invariant_to_the_position_scale(self):
         """``_TINY`` guarded ``|s|^2``, which carries (length)^2 units.
 
