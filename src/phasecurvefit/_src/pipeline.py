@@ -6,7 +6,7 @@ Collapses the multi-step recipe in the quickstart and autoencoder guides
 callers who want a fitted track without assembling the steps themselves.
 """
 
-__all__: tuple[str, ...] = ("pipeline",)
+__all__: tuple[str, ...] = ("fit_track",)
 
 import jax.random as jr
 from jaxtyping import Array, Float, PRNGKeyArray
@@ -24,7 +24,7 @@ from phasecurvefit._src.nn import (
 from phasecurvefit._src.orderers.base import default_pipeline
 
 
-def pipeline(
+def fit_track(
     positions: VectorComponents,
     velocities: VectorComponents,
     *,
@@ -79,8 +79,10 @@ def pipeline(
     >>> ang = jnp.linspace(0.0, jnp.pi, 60)
     >>> pos = {"x": 5.0 * jnp.cos(ang), "y": 5.0 * jnp.sin(ang)}
     >>> vel = {"x": -jnp.sin(ang), "y": jnp.cos(ang)}
-    >>> cfg = pcf.nn.TrainingConfig(n_epochs_both=5, show_pbar=False)
-    >>> ordering, fitted, losses = pcf.pipeline(
+    >>> cfg = pcf.nn.TrainingConfig(
+    ...     n_epochs_encoder=5, n_epochs_decoder=5, n_epochs_both=5, show_pbar=False
+    ... )
+    >>> ordering, fitted, losses = pcf.fit_track(
     ...     pos, vel, key=jax.random.key(0), n_prototypes=12, training_config=cfg
     ... )
     >>> int(ordering.n_visited)

@@ -62,12 +62,12 @@ ordered_all = result.indices
 ```
 
 These four steps -- order, normalize, build, train -- collapse into one call
-via {func}`~phasecurvefit.pipeline`, which also runs
+via {func}`~phasecurvefit.fit_track`, which also runs
 {func}`~phasecurvefit.orderers.default_pipeline` (the walk refined by a SOM
 stage) instead of the bare walk:
 
 ```python
-ordering, result, losses = pcf.pipeline(pos, vel, key=jax.random.key(0))
+ordering, result, losses = pcf.fit_track(pos, vel, key=jax.random.key(0))
 ```
 
 Use the pieces directly, as above, for control over any individual step --

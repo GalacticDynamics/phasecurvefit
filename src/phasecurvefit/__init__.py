@@ -81,7 +81,7 @@ __all__: tuple[str, ...] = (
     # Orderers
     "order",
     # End-to-end
-    "pipeline",
+    "fit_track",
     # Query configuration
     "WalkConfig",
     # Result accessor
@@ -97,7 +97,7 @@ from ._src.algorithm import (
     walk_local_flow,
 )
 from ._src.orderers.base import order
-from ._src.pipeline import pipeline
+from ._src.pipeline import fit_track
 from ._src.query_config import WalkConfig
 from ._version import version as __version__
 
