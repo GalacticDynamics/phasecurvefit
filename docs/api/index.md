@@ -119,7 +119,7 @@ Low-level functions for phase-space operations. Available in the `phasecurvefit.
 
 ## Autoencoder Module
 
-Neural network for interpolating skipped tracers. See [Autoencoder Guide](../guides/autoencoder.md) for details.
+Neural network for interpolating skipped tracers. See [Autoencoder Guide](../guides/nn.md) for details.
 
 ### Classes
 
@@ -185,6 +185,40 @@ Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
    :no-index:
 
 .. autofunction:: phasecurvefit.nn.uniform_background_density
+   :no-index:
+```
+
+## SOM Module
+
+Self-Organizing Map ordering, after Starkman et al. (2023). See
+{doc}`/guides/som`.
+
+```{eval-rst}
+.. autoclass:: phasecurvefit.orderers.SOMOrderer
+   :no-index:
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.orderers.ChainOrderer
+   :no-index:
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.som.SOM1D
+   :no-index:
+   :members: make, fit, backbone, chord, n_prototypes
+   :show-inheritance:
+
+.. autofunction:: phasecurvefit.som.init_prototypes
+   :no-index:
+
+.. autofunction:: phasecurvefit.som.fit
+   :no-index:
+
+.. autofunction:: phasecurvefit.som.densify
+   :no-index:
+
+.. autofunction:: phasecurvefit.som.chord
    :no-index:
 ```
 

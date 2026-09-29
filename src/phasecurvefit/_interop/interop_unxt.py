@@ -44,12 +44,18 @@ from unxt import AbstractQuantity as AbcQ
 from unxt.quantity import AllowValue
 
 from phasecurvefit._src import algorithm, phasespace
+from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import Direction, StateMetadata, WalkLocalFlowResult
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
-from phasecurvefit._src.orderers.localflow import LocalFlowOrderer
+from phasecurvefit._src.orderers.localflow import (
+    LocalFlowOrderer,
+    _finalize,
+    _resolve_start_idx,
+)
 from phasecurvefit._src.orderers.mst import MSTOrderer
 from phasecurvefit._src.orderers.result import OrderingResult
+from phasecurvefit._src.orderers.som import SOMOrderer
 from phasecurvefit._src.query_config import WalkConfig
 
 RQSz0: TypeAlias = Real[AbcQ, " "]  # noqa: UP040
@@ -615,7 +621,7 @@ def _local_flow_walk(
     n_max: int | None = None,
     config: WalkConfig = WalkConfig(),  # noqa: B008
     direction: Direction = "forward",
-    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    metadata: StateMetadata | None = None,
     usys: u.AbstractUnitSystem | None = None,
 ) -> WalkLocalFlowResult:
     """Implement for Quantity-valued phase-space data.
@@ -688,18 +694,21 @@ def _local_flow_walk(
         'x': Quantity(f32[3], unit='m / s'), 'y': Quantity(f32[3], unit='m / s')
       },
       indices=i32[3],
-      gamma_range=(0.0, 1.0)
+      gamma_range=(0.0, 1.0),
+      velocity_aware=True,
+      chord=Quantity(f32[3], unit='m')
     )
 
     """
-    # Process the metadata
+    # Process the metadata. ``metadata`` is None whenever the caller omitted
+    # it -- a shared ``StateMetadata()`` default would be one instance created
+    # at definition time, and its ``_data`` is a plain dict, so a mutation
+    # reaching through that attribute would leak into every later call.
     if usys is not None:
-        metadata = StateMetadata(**(dict(metadata) | {"usys": usys}))
+        carried = dict(metadata) if metadata is not None else {}
+        metadata = StateMetadata(**(carried | {"usys": usys}))
 
-    usys = metadata.get("usys")
-    if not isinstance(usys, u.AbstractUnitSystem):
-        msg = "`usys` must be an `unxt.AbstractUnitSystem`."  # type: ignore[unreachable]
-        raise TypeError(msg)
+    usys = _require_usys(metadata, hint=_USYS_VIA_WALK)
 
     if not isinstance(metric_scale, u.AbstractQuantity):
         msg = "`metric_scale` must be an `unxt.AbstractQuantity`."  # type: ignore[unreachable]
@@ -739,6 +748,9 @@ def init(
     /,
     **kwargs: object,
 ) -> None:
+    # Explicit two-arg form: this overload is defined outside the class body.
+    super(StandardScalerNormalizer, self).__init__(qs, ps)
+
     self.q_comps = list(qs.keys())
     xs = qnp.stack(list(qs.values()), axis=1)
     self.q_mean = qnp.mean(xs, axis=0)
@@ -768,38 +780,68 @@ def transform(
 # ==============================================================================
 
 
-def _require_usys(metadata: StateMetadata) -> u.AbstractUnitSystem:
-    usys = metadata.get("usys")
+# How to supply the unit system, per entry point. The orderer dispatches take
+# ``metadata`` only; ``walk_local_flow`` also accepts ``usys`` directly, so
+# naming just one of them there would send the caller the long way round.
+_USYS_VIA_ORDER = "order(q, p, metadata=StateMetadata(usys=...))"
+_USYS_VIA_WALK = (
+    "walk_local_flow(..., usys=...) or "
+    "walk_local_flow(..., metadata=StateMetadata(usys=...))"
+)
+
+
+def _require_usys(
+    metadata: StateMetadata | None, /, *, hint: str = _USYS_VIA_ORDER
+) -> u.AbstractUnitSystem:
+    # ``metadata`` is None whenever the caller omitted it: both the ``order``
+    # facade and ChainOrderer forward it unconditionally.
+    usys = metadata.get("usys") if metadata is not None else None
     if not isinstance(usys, u.AbstractUnitSystem):
-        msg = (
-            "`usys` must be provided for Quantity inputs, e.g. "
-            "order(q, p, metadata=StateMetadata(usys=...))."
-        )
+        msg = f"`usys` must be provided for Quantity inputs, e.g. {hint}."
         raise TypeError(msg)
     return usys
 
 
-@MSTOrderer.order.dispatch
-def order(
-    self: MSTOrderer,
+def _chord_unit(
+    positions: VectorQComponents, usys: u.AbstractUnitSystem
+) -> u.AbstractUnit:
+    """Pick the unit for ``chord``, which is one length for all components.
+
+    ``backbone`` is per-component and keeps each component's own unit, but the
+    chord is a single distance along the track, so there is no component to
+    take the unit from. When every component agrees, that shared unit is the
+    least surprising answer; when they differ there is no defensible choice
+    among them, so fall back to the unit system the walk ran in.
+    """
+    units = {v.unit for v in positions.values()}
+    return units.pop() if len(units) == 1 else usys["length"]
+
+
+def _order_with_backbone_and_chord(
+    orderer: MSTOrderer | SOMOrderer,
     positions: VectorQComponents,
     velocities: VectorQComponents,
     *,
-    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    metadata: StateMetadata | None,
+    init: AbstractResult | None,
 ) -> OrderingResult:
-    """Order Quantity-valued tracers with the MST backbone.
+    """Shared body for orderers whose Quantity dispatch returns a backbone and chord.
 
-    Strips units into ``usys`` (host-side), runs the MST pipeline, and reattaches
-    units: ``positions``/``velocities`` keep their input units and ``backbone``
-    is returned in the position units.
+    Currently ``MSTOrderer`` and ``SOMOrderer``. Strips units into ``usys``
+    (host-side), runs the orderer's plain-array pipeline, and reattaches units:
+    ``positions``/``velocities`` keep their input units, and ``backbone`` keeps
+    each component's own unit. ``chord`` is a single length for all
+    components, so it comes back in the shared position unit when the
+    components agree, and in ``usys["length"]`` when they do not.
     """
     usys = _require_usys(metadata)
     q_plain = {k: u.ustrip(usys, v) for k, v in positions.items()}
     p_plain = {k: u.ustrip(usys, v) for k, v in velocities.items()}
 
-    result = self.order(q_plain, p_plain)  # -> plain VectorComponents dispatch
+    result = orderer.order(q_plain, p_plain, metadata=metadata, init=init)
 
     length_unit = usys["length"]
+    chord_unit = _chord_unit(positions, usys)
     backbone = {
         k: u.uconvert(positions[k].unit, u.Q(v, length_unit))
         for k, v in result.backbone.items()
@@ -809,6 +851,60 @@ def order(
         positions=dict(positions),
         velocities=dict(velocities),
         backbone=backbone,
+        chord=u.uconvert(chord_unit, u.Q(result.chord, length_unit)),
+    )
+
+
+@MSTOrderer.order.dispatch
+def order(
+    self: MSTOrderer,
+    positions: VectorQComponents,
+    velocities: VectorQComponents,
+    *,
+    metadata: StateMetadata | None = None,
+    init: AbstractResult | None = None,
+) -> OrderingResult:
+    """Order Quantity-valued tracers with the MST backbone.
+
+    See :func:`_order_with_backbone_and_chord` for the strip/run/reattach body
+    shared with :class:`SOMOrderer`'s dispatch below.
+    """
+    return _order_with_backbone_and_chord(
+        self, positions, velocities, metadata=metadata, init=init
+    )
+
+
+@SOMOrderer.order.dispatch
+def order(
+    self: SOMOrderer,
+    positions: VectorQComponents,
+    velocities: VectorQComponents,
+    *,
+    metadata: StateMetadata | None = None,
+    init: AbstractResult | None = None,
+) -> OrderingResult:
+    """Order Quantity-valued tracers with the SOM.
+
+    See :func:`_order_with_backbone_and_chord` for the strip/run/reattach body
+    shared with :class:`MSTOrderer`'s dispatch above.
+
+    ``metric_scale``, unlike ``positions``/``velocities``, is not stripped by
+    that shared body: it is a field on ``self``, not a call argument, and the
+    SOM core is plain-array math with no ``quax`` awareness, so a Quantity
+    left on it reaches ``metric_scale * d_vel`` (e.g. inside
+    ``FullPhaseSpaceDistanceMetric``'s ``(metric_scale * d_vel) ** 2``) still
+    unit-ful, while ``d_vel`` is already a bare number -- raising deep inside
+    the metric rather than here.
+    """
+    if isinstance(self.metric_scale, u.AbstractQuantity):
+        usys = _require_usys(metadata)
+        # Dimension-inferred from the Quantity's own unit -- unlike a bare
+        # number, there is nothing to guess: whatever unit the caller
+        # attached is stripped into ``usys``'s unit of that same dimension.
+        stripped = u.ustrip(usys, self.metric_scale)
+        self = dataclassish.replace(self, metric_scale=stripped)
+    return _order_with_backbone_and_chord(
+        self, positions, velocities, metadata=metadata, init=init
     )
 
 
@@ -818,23 +914,36 @@ def order(
     positions: VectorQComponents,
     velocities: VectorQComponents,
     *,
-    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    metadata: StateMetadata | None = None,
+    init: AbstractResult | None = None,
 ) -> WalkLocalFlowResult:
     """Order Quantity-valued tracers with the local-flow walk.
 
     Delegates to the ``walk_local_flow`` Quantity dispatch. Scalar
     hyperparameters (``metric_scale``, ``max_dist``) that are plain numbers are
     interpreted in the ``usys`` length unit.
+
+    A plain ``metric_scale`` being labelled a length regardless of the
+    configured metric looks like the same bug as #85's ``SOMOrderer`` one at
+    first glance, but it is not: whatever unit it is wrapped in here is
+    immediately stripped back out by ``_local_flow_walk``'s own Quantity
+    dispatch (via ``u.ustrip(usys, metric_scale)``), and stripping a bare
+    number's wrapper back out through the *same* ``usys`` it was wrapped with
+    is a no-op regardless of which dimension was chosen -- verified: a bare
+    ``50.0`` and both ``u.Q(50.0, "kpc")`` and ``u.Q(50.0, "Myr")`` produce
+    identical orderings here. ``SOMOrderer`` differs because its
+    ``metric_scale`` was never stripped at all before reaching its
+    non-``quax`` plain-array core.
     """
     usys = _require_usys(metadata)
 
     def _as_length_q(val: object) -> AbcQ:
         return val if isinstance(val, u.AbstractQuantity) else u.Q(val, usys["length"])
 
-    return algorithm._local_flow_walk(  # noqa: SLF001
+    result = algorithm._local_flow_walk(  # noqa: SLF001
         positions,
         velocities,
-        start_idx=self.start_idx,
+        start_idx=_resolve_start_idx(self.start_idx, init),
         metric_scale=_as_length_q(self.metric_scale),
         max_dist=_as_length_q(self.max_dist),
         terminate_indices=self.terminate_indices,
@@ -842,4 +951,17 @@ def order(
         config=self.config,
         direction=self.direction,
         usys=usys,
+    )
+    # Calls the same ``_finalize`` the plain dispatch calls, on unit-stripped
+    # positions, rather than re-deriving the chord computation here: a step
+    # added to ``_finalize`` in the future needs no second edit in this
+    # dispatch to keep applying to unit-ful callers too (see #71).
+    plain_positions = {k: u.ustrip(usys, v) for k, v in result.positions.items()}
+    result = _finalize(result, plain_positions)
+    chord_unit = _chord_unit(positions, usys)
+    # ``velocity_aware`` is not set here: ``_local_flow_walk`` already derives
+    # it from the same ``config``, so overriding would only restate it.
+    return dataclassish.replace(
+        result,
+        chord=u.uconvert(chord_unit, u.Q(result.chord, usys["length"])),
     )

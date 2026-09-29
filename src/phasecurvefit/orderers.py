@@ -17,6 +17,12 @@ LocalFlowOrderer
 MSTOrderer
     MST longest-path backbone ordering for near-closed-loop / self-overlapping
     streams. Host-side (NumPy/SciPy).
+SOMOrderer
+    Self-Organizing Map refinement: trains a 1-D SOM and orders by arc-length
+    projection onto its backbone. Cite Starkman et al. (2023).
+ChainOrderer
+    Runs orderers in sequence, threading each result into the next as
+    ``init``. Also built by ``a | b``.
 
 See Also
 --------
@@ -26,12 +32,16 @@ phasecurvefit.order : functional façade mirroring ``walk_local_flow``.
 
 __all__: tuple[str, ...] = (
     "AbstractOrderer",
+    "ChainOrderer",
     "LocalFlowOrderer",
     "MSTOrderer",
     "OrderingResult",
+    "SOMOrderer",
 )
 
 from ._src.orderers.base import AbstractOrderer
+from ._src.orderers.chain import ChainOrderer
 from ._src.orderers.localflow import LocalFlowOrderer
 from ._src.orderers.mst import MSTOrderer
 from ._src.orderers.result import OrderingResult
+from ._src.orderers.som import SOMOrderer

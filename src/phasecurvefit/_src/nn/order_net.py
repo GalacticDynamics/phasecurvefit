@@ -493,6 +493,7 @@ def train_ordering_net(
     /,
     config: OrderingTrainingConfig | None = None,
     *,
+    chord: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[OrderingNet, optax.OptState, Float[Array, "E"]]:
     r"""Train the interpolation network on ordered stream tracers.
@@ -507,6 +508,12 @@ def train_ordering_net(
         The interpolation network to train.
     all_ws : Array, shape (N, 2*n_dims)
         Phase-space coordinates from the walk algorithm.
+    chord : Array, shape (N,) | None, keyword-only
+        The orderer's arc-length parameter per observation, in input order
+        (``OrderingResult.chord``). When given it supplies the arclength target
+        that ``arclength_alpha`` blends toward; when ``None`` that target is
+        approximated by summing straight-line steps between consecutive ordered
+        observations, which is noisier and lives in normalized space.
     ordering_indices : Array, shape (N,)
         Indices representing the ordering of tracers.  Unvisited tracers have
         indices of -1.
@@ -560,16 +567,23 @@ def train_ordering_net(
     gmin, gmax = model.gamma_range
     gamma_lin = jnp.linspace(gmin, gmax, n_total)
 
-    # Optional arclength-like target (computed from positions of ordered
-    # tracers) This mitigates tanh-compression in gamma by encouraging gamma to
-    # track cumulative arclength rather than index.
-    D = ordered_ws.shape[1] // 2
-    qs_ord = ordered_ws[:, :D]
-
-    # Cumulative arclength proxy s
-    dqs = qs_ord[1:] - qs_ord[:-1]
-    ds = jnp.linalg.norm(dqs, axis=1)
-    s = jnp.concatenate([jnp.zeros((1,), dtype=ds.dtype), jnp.cumsum(ds)])
+    # Arclength-like target. This mitigates tanh-compression in gamma by
+    # encouraging gamma to track cumulative arclength rather than index.
+    #
+    # ``chord`` is the orderer's own along-track coordinate, measured along the
+    # curve it fitted and in physical position units. Prefer it: the fallback
+    # below sums straight-line steps between consecutive *observations* in
+    # normalized space, so it carries their scatter and weights each component
+    # by its spread.
+    if chord is not None:
+        s = jnp.asarray(chord)[ordering_indices[ordering_indices >= 0]]
+        s = s - s[0]
+    else:
+        D = ordered_ws.shape[1] // 2
+        qs_ord = ordered_ws[:, :D]
+        dqs = qs_ord[1:] - qs_ord[:-1]
+        ds = jnp.linalg.norm(dqs, axis=1)
+        s = jnp.concatenate([jnp.zeros((1,), dtype=ds.dtype), jnp.cumsum(ds)])
     s_tot = s[-1]
 
     # Map s -> gamma_range, guarding against degenerate s_tot

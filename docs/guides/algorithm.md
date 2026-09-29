@@ -7,10 +7,11 @@ the phase flow walking algorithm.
 The walk described here is one of the pluggable **orderers**. The examples below
 run it via `pcf.order` with a
 {class}`~phasecurvefit.orderers.LocalFlowOrderer`. The walk *follows* the
-velocity field, so it covers only one arm of a **near-closed loop** whose
-velocity reverses at a progenitor. For that case the
+velocity field from a start point; on a **near-closed loop** whose velocity
+reverses at a progenitor it must start at the progenitor and walk both ways
+(`direction="both"`, below). When no start point is known, the
 {class}`~phasecurvefit.orderers.MSTOrderer` backbone orders the loop tip-to-tip
-without a start point — see the [Orderers guide](orderers.md).
+without one — see the [Orderers guide](orderers.md).
 ```
 
 ## Mathematical Foundation
@@ -84,8 +85,14 @@ The momentum weight $\lambda$ controls the balance between spatial and momentum 
   $$d \approx \lambda \cdot (1 - \cos\theta)$$
   Strongly favors points in the velocity direction, even if far away.
 
-- **$\lambda \approx 1$**: Balanced
-  Both spatial proximity and momentum alignment matter equally.
+- **$\lambda$ comparable to the spacing between neighbouring points**: balanced.
+  $\lambda$ is a length, so "balanced" is relative to the data: at $\lambda$ equal
+  to the typical spacing $s$, a neighbour at $90°$ and distance $s$ costs $2s$,
+  the same as a point straight ahead at distance $2s$.
+
+Larger $\lambda$ makes the walk take longer strides along the flow and skip points
+off to the side; that is often what you want for a thin stream, since the skipped
+points can be ordered later by the [autoencoder](nn.md).
 
 ### Physical Interpretation (Default Metric)
 
@@ -134,12 +141,14 @@ Procedure:
         # Mask visited points with infinity
         distances_masked[i] ← visited_mask[i] > 0.5 ? distances[i] : infinity
 
-        # Find nearest unvisited neighbor
-        min_dist ← min(distances_masked)
+        # Best unvisited candidate under the metric
         best_idx ← argmin(distances_masked)
 
-        # Check early termination
-        if min_dist > max_dist:
+        # Check early termination: max_dist is a *spatial* distance
+        spatial[i] ← ||position[i] - current_pos||  (unvisited only)
+        if distances_masked[best_idx] is infinity:
+            Break  # No unvisited candidates remain
+        if min(spatial) > max_dist OR spatial[best_idx] > max_dist:
             Break  # Gap detected, stop algorithm
 
         # Update state
@@ -160,11 +169,12 @@ Due to the momentum condition, the walk algorithm inevitably skips some tracers.
 To assign $\gamma$ values to these skipped particles, an **autoencoder neural
 network** can interpolate based on phase-space location:
 
-1. **Interpolation Network**: Learns $(x, v) \rightarrow (\gamma, p)$ from ordered tracers
-2. **Param-Net**: Reconstructs positions from $\gamma$ values
-3. **Momentum condition**: Ensures alignment with velocity field
+1. **Encoder**: learns $(x, v) \rightarrow (\gamma, p)$ from the ordered tracers
+2. **Decoder**: learns the mean track $\gamma \rightarrow x$
+3. **Joint training**: refines both, with a velocity-alignment term that keeps the
+   track's direction consistent with the stars' velocities
 
-See [Autoencoder for Gap Filling](autoencoder.md) for details.
+See [Autoencoder for Gap Filling](nn.md) for details.
 
 ## Extensions and Variants
 

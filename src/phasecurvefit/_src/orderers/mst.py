@@ -46,8 +46,9 @@ from scipy.sparse.csgraph import (
 )
 from scipy.spatial import cKDTree
 
-from .base import AbstractOrderer
+from .base import AbstractOrderer, _check_component_keys, chord_along_ordering
 from .result import OrderingResult
+from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
 
@@ -141,12 +142,17 @@ def _sigma_clip_edges(
         sub = tree[current][:, current].tocoo()
         upper = sub.row < sub.col  # undirected edges, once each
         ei, ej = sub.row[upper], sub.col[upper]
-        if ei.size == 0:
+        length = np.linalg.norm(P[current[ei]] - P[current[ej]], axis=1)
+        # Zero-length edges join coincident points: they have no log length,
+        # carry no spacing information, and can never be too long to keep.
+        pos = length > 0.0
+        if not pos.any():
             break
-        loglen = np.log(np.linalg.norm(P[current[ei]] - P[current[ej]], axis=1))
+        loglen = np.log(length[pos])
         med = float(np.median(loglen))
         scale = 1.4826 * float(np.median(np.abs(loglen - med)))
-        cut = loglen > med + max(sigma * scale, log_floor)
+        cut = np.zeros_like(pos)
+        cut[pos] = loglen > med + max(sigma * scale, log_floor)
         if not cut.any():
             break
         m = current.size
@@ -190,9 +196,12 @@ def _mst_backbone(
     nn_d = np.atleast_2d(nn_d)
     nn_i = np.atleast_2d(nn_i)
 
-    rows = np.repeat(np.arange(n), k_eff)
-    cols = nn_i[:, 1:].ravel()
-    d_edges = nn_d[:, 1:].ravel()  # spatial edge length
+    # Exclude self by index, not by dropping column 0: with coincident points
+    # cKDTree may list a duplicate before the point itself.
+    not_self = nn_i != np.arange(n)[:, None]
+    rows = np.nonzero(not_self)[0]
+    cols = nn_i[not_self]
+    d_edges = nn_d[not_self]  # spatial edge length
 
     # velocity alignment (only computed when a mechanism needs it)
     need_cos = velocity_weight > 0.0 or sever_cos_threshold is not None
@@ -201,6 +210,10 @@ def _mst_backbone(
     weights = d_edges.copy()
     if velocity_weight > 0.0:  # Mechanism 1: phase-space edge weights
         weights = d_edges + velocity_weight * (1.0 - cos)
+    # scipy's csgraph treats zero weights as missing edges, which would cut
+    # coincident points (repeat observations) out of the graph. Floor to the
+    # smallest positive float: still "free", but a real edge.
+    weights = np.maximum(weights, np.finfo(weights.dtype).tiny)
 
     keep = d_edges <= jump_cap  # sever long cross-loop edges (spatial)
     if sever_cos_threshold is not None:  # Mechanism 2: velocity-aware severing
@@ -418,6 +431,12 @@ class MSTOrderer(AbstractOrderer):
                 f"got {self.on_disconnected!r}."
             )
             raise ValueError(msg)
+        if self.velocity_weight < 0.0:
+            # Only ``> 0.0`` engages the phase-space edge weights, so a negative
+            # value would do nothing at all -- and would make ``velocity_aware``
+            # read False on an orderer the caller thought used velocity.
+            msg = f"velocity_weight must be >= 0, got {self.velocity_weight}."
+            raise ValueError(msg)
         if self.edge_clip_sigma is not None and self.edge_clip_sigma <= 0:
             msg = f"edge_clip_sigma must be positive, got {self.edge_clip_sigma}."
             raise ValueError(msg)
@@ -432,6 +451,7 @@ class MSTOrderer(AbstractOrderer):
         velocities: VectorComponents,
         *,
         metadata: StateMetadata | None = None,  # noqa: ARG002
+        init: AbstractResult | None = None,  # noqa: ARG002
     ) -> OrderingResult:
         """Order tracers along the MST backbone.
 
@@ -441,15 +461,14 @@ class MSTOrderer(AbstractOrderer):
         traced), the host graph algorithms instead run through
         ``jax.pure_callback`` so tracing doesn't break; the ordering itself has
         no gradient either way (see the module docstring).
+
+        A caveat of the traced path: ``on_disconnected="raise"`` raises
+        ``ValueError`` eagerly, but surfaces as ``jax.errors.JaxRuntimeError``
+        (wrapping the same message) under jit/vmap/grad, since the host call
+        actually runs at execution time, after ``order()`` has already
+        returned traced outputs.
         """
-        if set(positions) != set(velocities):
-            missing = sorted(set(positions) - set(velocities))
-            extra = sorted(set(velocities) - set(positions))
-            msg = (
-                "positions and velocities must have the same component keys; "
-                f"missing={missing}, extra={extra}."
-            )
-            raise ValueError(msg)
+        _check_component_keys(positions, velocities)
 
         comps = sorted(positions)
         P = jnp.stack([jnp.asarray(positions[c]) for c in comps], axis=1)
@@ -490,18 +509,17 @@ class MSTOrderer(AbstractOrderer):
 
             @jax.custom_jvp
             def _call_host(p: jnp.ndarray, v: jnp.ndarray) -> tuple:
-                try:
-                    return jax.pure_callback(
-                        _host, result_shapes, p, v, vmap_method="sequential"
-                    )
-                except jax.errors.JaxRuntimeError as e:
-                    # ponytail: pure_callback wraps host exceptions as
-                    # JaxRuntimeError, losing the original type; the only one
-                    # this callback raises intentionally is
-                    # `on_disconnected="raise"`'s ValueError, so re-raise as
-                    # that. Upgrade to preserve the original type if a
-                    # non-ValueError host failure needs to surface distinctly.
-                    raise ValueError(str(e)) from e
+                # Note: under an outer jax.jit/vmap, pure_callback only
+                # *records* this call during tracing -- ``_host`` (and any
+                # ``on_disconnected="raise"`` ValueError it raises) actually
+                # runs later, at execution, after this function has already
+                # returned. So a disconnected-graph failure here surfaces to
+                # the caller as ``jax.errors.JaxRuntimeError`` (wrapping the
+                # original message), not ``ValueError`` as it does eagerly --
+                # a try/except here cannot change that.
+                return jax.pure_callback(
+                    _host, result_shapes, p, v, vmap_method="sequential"
+                )
 
             @_call_host.defjvp
             def _call_host_jvp(primals: tuple, tangents: tuple) -> tuple:
@@ -527,11 +545,17 @@ class MSTOrderer(AbstractOrderer):
             idx_full, backbone_full, backbone_len = _call_host(P, V)
 
         backbone = {c: backbone_full[:, i] for i, c in enumerate(comps)}
+        qs = {key: jnp.asarray(val) for key, val in positions.items()}
         return OrderingResult(
-            positions={key: jnp.asarray(val) for key, val in positions.items()},
+            positions=qs,
             velocities={key: jnp.asarray(val) for key, val in velocities.items()},
             indices=idx_full,
             gamma_range=(-1.0, 1.0),
             backbone=backbone,
             backbone_size=backbone_len,
+            chord=chord_along_ordering(qs, idx_full),
+            # ``orient_by_velocity`` only picks a direction; it does not make
+            # the ordering itself velocity-aware.
+            velocity_aware=self.velocity_weight > 0.0
+            or self.sever_cos_threshold is not None,
         )

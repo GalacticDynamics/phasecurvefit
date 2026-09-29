@@ -2,9 +2,49 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
 [![Python versions](https://img.shields.io/pypi/pyversions/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
+[![CI](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/ci.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/GalacticDynamics/phasecurvefit/branch/main/graph/badge.svg)](https://codecov.io/gh/GalacticDynamics/phasecurvefit)
+[![Documentation Status](https://readthedocs.org/projects/phasecurvefit/badge/?version=latest)](https://phasecurvefit.readthedocs.io/en/latest/?badge=latest)
+[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
+[![CITATION.cff](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml)
 
 Construct paths through phase-Space points, supporting many different
 algorithms.
+
+## Why phasecurvefit?
+
+Many datasets are samples along a curve in phase space whose order along the
+curve is unknown. Before fitting a model to such a curve you need two things: an
+ordering coordinate for every sample, and a smooth track through them. Doing
+this by hand, or with a position-only nearest-neighbor or clustering method,
+breaks down in exactly the cases that matter:
+
+- **Curves that cross or fold back on themselves.** Where two strands meet, the
+  nearest point is often on the wrong strand. phasecurvefit uses velocities as
+  well as positions, so the ordering stays on the right strand (see the
+  [epitrochoid tutorials](https://phasecurvefit.readthedocs.io/en/latest/tutorials/epitrochoid_autoencoder.html)).
+- **No known starting point.** The MST orderer finds the two ends of the curve
+  itself, so no progenitor position or hand-picked start index is needed
+  ([MST tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_mst.html)).
+- **Incomplete orderings.** A conservative walk orders a reliable subset; an
+  autoencoder then assigns an ordering coordinate γ to every sample and learns a
+  smooth mean track through them
+  ([stream autoencoder tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_autoencoder.html)).
+- **Contamination.** A stream-plus-background mixture model gives each sample a
+  calibrated membership probability, so interlopers can be down-weighted or
+  removed
+  ([outlier-rejection tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/outlier_rejection.html)).
+- **Use inside larger models.** phasecurvefit is built on JAX: the walk, the
+  distance metrics and the neural networks work with `jit`, `vmap` and `grad`
+  and run on CPU or GPU. A training-free running-mean track is available when
+  speed matters more than accuracy, for example inside a likelihood evaluated at
+  every step of an MCMC
+  ([running-mean tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_runningmean.html)).
+
+phasecurvefit is a reusable, tested library for momentum-weighted ordering, with
+alternative orderers, gap filling, outlier rejection and optional physical units
+(via `unxt`). It was built for stellar streams but applies to any ordered
+phase-space data.
 
 ## Features
 
@@ -80,6 +120,63 @@ Or with uv:
 # uv add phasecurvefit --extra all  # installs all extras
 uv add phasecurvefit --extra interop
 uv add phasecurvefit --extra kdtree
+```
+
+### Running the Tutorials
+
+The
+[tutorial notebooks](https://phasecurvefit.readthedocs.io/en/latest/tutorials/index.html)
+need packages beyond the runtime `[all]` extra — `matplotlib` for plotting and
+`galax` for the mock-stream examples. Install them with the `tutorials` extra:
+
+```bash
+pip install phasecurvefit[tutorials]
+```
+
+```bash
+uv add phasecurvefit --extra tutorials
+```
+
+Note `[all]` intentionally does not include `tutorials`: `all` covers optional
+_runtime_ functionality, while `tutorials` covers packages only needed to run
+the example notebooks.
+
+### GPU Support (NVIDIA CUDA)
+
+phasecurvefit runs on GPU through JAX, but a plain `pip install jax` (what
+phasecurvefit depends on) only ships a CPU-only `jaxlib`. If you have an NVIDIA
+GPU and see:
+
+```text
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is
+not installed. Falling back to cpu.
+```
+
+Install JAX's CUDA-enabled build alongside phasecurvefit:
+
+```bash
+pip install --upgrade "phasecurvefit[all]" "jax[cuda12]"
+```
+
+Or with uv:
+
+```bash
+uv add phasecurvefit --extra all
+uv add "jax[cuda12]"
+```
+
+This pulls in self-contained NVIDIA CUDA/cuDNN wheels — you don't need the CUDA
+toolkit installed system-wide — but you do still need a
+[compatible NVIDIA driver](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for your GPU. `--upgrade` ensures pip actually swaps in the CUDA-enabled
+`jaxlib` even if a CPU-only one is already installed. See the
+[JAX GPU installation guide](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for other CUDA versions or platforms (TPU, ROCm), and verify the install with:
+
+```python
+import jax
+
+print(jax.devices())  # should list a CudaDevice, not just CpuDevice
 ```
 
 ## Quick Start
@@ -374,6 +471,29 @@ class SmallestIndexStrategy(pcf.strats.AbstractQueryStrategy):
 config = pcf.WalkConfig(strategy=SmallestIndexStrategy())
 result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
+
+## Citation
+
+If you use `phasecurvefit` in published work, please cite the package via its
+DOI, together with the paper behind whichever component you used.
+
+[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
+
+<details>
+  <summary>component papers</summary>
+
+- **momentum-weighted ordering** — Nibauer et al. (2022),
+  [arXiv:2201.12042](https://arxiv.org/abs/2201.12042)
+- **SOM ordering** — Starkman et al. (2023), MNRAS 522, 5022,
+  [arXiv:2212.00949](https://arxiv.org/abs/2212.00949)
+- **mixture-model membership / outlier rejection** — Hogg, Bovy & Lang (2010),
+  [arXiv:1008.4686](https://arxiv.org/abs/1008.4686)
+
+Machine-readable metadata for all of these is in
+[`CITATION.cff`](https://github.com/GalacticDynamics/phasecurvefit/blob/main/CITATION.cff);
+BibTeX entries are in the [documentation](https://phasecurvefit.readthedocs.io).
+
+</details>
 
 ## AI Usage Disclosure
 

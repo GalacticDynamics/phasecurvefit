@@ -205,17 +205,21 @@ class KDTree(AbstractQueryStrategy):
             [current_pos[k] for k in sorted(current_pos.keys())]
         )
 
-        # Query one extra neighbor so we can drop the current point itself,
-        # which the tree always returns first (distance 0). Without this drop,
-        # ``k`` yields only ``k - 1`` usable candidates and small ``k`` can
-        # deadlock the walk: the sole non-self neighbor may already be visited,
-        # leaving no candidate and terminating the walk prematurely. Clamp to
-        # the point count since jaxkd errors when ``k`` exceeds the tree size.
+        # Query one extra neighbor to make room for the current point itself.
+        # Otherwise ``k`` yields only ``k - 1`` usable candidates and small
+        # ``k`` can deadlock the walk: the sole non-self neighbor may already
+        # be visited, leaving no candidate and terminating the walk
+        # prematurely. Self is NOT dropped positionally: with coincident points
+        # the tree may return a duplicate before self, so slicing off slot 0
+        # would drop an unvisited duplicate and keep self. Instead self stays
+        # in the candidate set and is excluded by index via the walk's visited
+        # mask (the current point is always visited). Clamp to the point count
+        # since jaxkd errors when ``k`` exceeds the tree size.
         n_query = min(self.k + 1, kd_state["n_points"])
         indices, _ = self._jaxkd.query_neighbors(
             kd_state["tree"], current_pos_arr[None, :], k=n_query
         )
-        indices = indices[0, 1:]  # drop self (nearest, distance 0)
+        indices = indices[0]
 
         # Compute metric distances to all points
         distances_metric = metric_fn(
