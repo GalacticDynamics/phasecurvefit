@@ -305,6 +305,23 @@ class TestMSTJaxTraceability:
 
         assert jnp.any(jax.grad(loss)(pos["x"]) != 0.0)
 
+    def test_grad_wrt_velocity_only_is_traced(self):
+        """Positions concrete, velocities traced: still takes the traced path.
+
+        The two are independent tracer checks (``P`` and ``V``), so this covers
+        the case the ``positions``-only grad test above does not: ``V`` traced
+        while ``P`` stays a plain, concrete array.
+        """
+        pos, vel, _t = _open_arc(n=60)
+
+        def loss(vx):
+            res = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(
+                pos, {"x": vx, "y": vel["y"]}
+            )
+            return jnp.sum(res(jnp.array(0.3))["x"] ** 2)
+
+        assert jnp.all(jax.grad(loss)(vel["x"]) == 0.0)
+
 
 def _with_copies(pos, vel, idx, n_copies):
     """Append ``n_copies`` exact copies of the points at ``idx`` (repeat obs)."""
