@@ -55,13 +55,10 @@ requires      = ["hatch-vcs", "hatchling"]
 
 [dependency-groups]
 dev = [
-  "ipykernel>=7.1.0",
-  "matplotlib>=3.10.8",
   { include-group = "docs" },
   { include-group = "lint" },
   { include-group = "nox" },
   { include-group = "test" },
-  "ipywidgets>=8.1.8",
   "cz-conventional-gitmoji>=0.7.0",
   "commitizen>=4.11.3",
 ]
@@ -81,6 +78,13 @@ docs = [
   "sphinxext-opengraph>=0.9.2",
   "jaxkd>=0.0.5",
   "galax",
+  # Executing the tutorials. `nbsphinx_execute` is "always" off ReadTheDocs
+  # (docs/conf.py), so a docs build runs every notebook: ipykernel provides the
+  # kernel, matplotlib is imported by all of them, and ipywidgets backs the
+  # progress bars `jax_tqdm` draws through `tqdm.auto`.
+  "ipykernel>=7.1.0",
+  "matplotlib>=3.10.8",
+  "ipywidgets>=8.1.8",
 ]
 lint = ["cz-conventional-gitmoji>=0.6.1", "prek>=0.5.3", "pylint>=3.3.8"]
 nox = ["nox>=2024.10.9", "nox-uv>=0.6.3"]
