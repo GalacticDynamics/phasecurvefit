@@ -142,6 +142,41 @@ class TestAlignedMomentumDistanceMetric:
         # Point 3 (opposite): d = 1 + λ * 2 = 3
         assert jnp.isclose(distances[3], 3.0, atol=1e-5)
 
+    def test_asymmetric_unlike_the_other_metrics(self):
+        """Deliberately not symmetric: the penalty depends on whose velocity looks.
+
+        A sits at the origin moving toward B; B sits ahead of A, moving the same
+        way (so away from A). From A's side, B is dead ahead: no penalty. From
+        B's side, A is directly behind: the maximal penalty. Spatial and
+        FullPhaseSpace are symmetric by construction (see
+        ``TestSpatialDistanceMetric``/``TestFullPhaseSpaceDistanceMetric``); this
+        one is not, and callers should not assume otherwise.
+        """
+        metric = pcf.metrics.AlignedMomentumDistanceMetric()
+        pos_a = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
+        vel_a = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
+        pos_b = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
+        vel_b = {"x": jnp.array(1.0), "y": jnp.array(0.0)}  # same velocity as A
+
+        d_ab = metric(
+            pos_a,
+            vel_a,
+            {k: v[None] for k, v in pos_b.items()},
+            {k: v[None] for k, v in vel_b.items()},
+            metric_scale=1.0,
+        )[0]
+        d_ba = metric(
+            pos_b,
+            vel_b,
+            {k: v[None] for k, v in pos_a.items()},
+            {k: v[None] for k, v in vel_a.items()},
+            metric_scale=1.0,
+        )[0]
+
+        assert jnp.isclose(d_ab, 1.0)  # B is dead ahead of A: no penalty
+        assert jnp.isclose(d_ba, 3.0)  # A is directly behind B: max penalty
+        assert not jnp.isclose(d_ab, d_ba)
+
     def test_jit_compatible(self):
         """Test that metric works with JAX JIT compilation."""
         metric = pcf.metrics.AlignedMomentumDistanceMetric()
