@@ -315,7 +315,7 @@ Integration guide.
 
 ## Next Steps
 
-- [Orderers](orderers.md#the-recommended-walk-then-som-chain) - `pcf.orderers.default_pipeline` refines the walk with a SOM stage, a better default than the bare walk above without changing it
+- [The recommended walk-then-SOM chain](orderers.md#the-recommended-walk-then-som-chain) - `pcf.orderers.default_pipeline` refines the walk with a SOM stage, a better default than the bare walk above without changing it
 - [Tutorials](../tutorials/index.md) - Worked examples, starting with a simulated stellar stream
 - [Autoencoder](nn.md) - Order every point, including the ones the walk skipped, and fit a smooth track - or run the whole thing in one call with `pcf.fit_track`
 - [Algorithm Details](algorithm.md) - Understand the math
