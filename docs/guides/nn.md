@@ -67,7 +67,12 @@ via {func}`~phasecurvefit.fit_track`, which also runs
 stage) instead of the bare walk:
 
 ```python
-ordering, result, losses = pcf.fit_track(pos, vel, key=jax.random.key(0))
+fast_config = pcf.nn.TrainingConfig(
+    n_epochs_encoder=5, n_epochs_decoder=5, n_epochs_both=5, show_pbar=False
+)
+ordering, result, losses = pcf.fit_track(
+    pos, vel, key=jax.random.key(0), training_config=fast_config
+)
 ```
 
 Use the pieces directly, as above, for control over any individual step --
