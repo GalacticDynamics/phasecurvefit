@@ -149,8 +149,9 @@ class TestAlignedMomentumDistanceMetric:
         way (so away from A). From A's side, B is dead ahead: no penalty. From
         B's side, A is directly behind: the maximal penalty. Spatial and
         FullPhaseSpace are symmetric by construction (see
-        ``TestSpatialDistanceMetric``/``TestFullPhaseSpaceDistanceMetric``); this
-        one is not, and callers should not assume otherwise.
+        ``test_som_properties.py::TestMetrics.test_non_negative_and_symmetric``,
+        parametrized over both); this one is not, and callers should not assume
+        otherwise.
         """
         metric = pcf.metrics.AlignedMomentumDistanceMetric()
         pos_a = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
