@@ -19,8 +19,13 @@ mechanisms, all reusing the phase-space notion of velocity alignment
 3. *tip orientation* (``orient_by_velocity``): flip the ordering so ``gamma``
    increases along the mean velocity.
 
-The computation is **host-side** (NumPy/SciPy) and deterministic; ``order()`` is
-not jit/vmap-traceable (per the ``AbstractOrderer`` contract).
+The graph algorithms themselves (kNN, MST, shortest-path) remain **host-side**
+(NumPy/SciPy) and deterministic -- they have no meaningful gradient, since the
+selected edges change combinatorially rather than smoothly as points move.
+``order()`` runs them through ``jax.pure_callback``, so it is jit/vmap-traceable
+(``vmap_method="sequential"``: one host call per batch element) and can sit
+inside a larger autodiffed pipeline; gradients through the ordering step itself
+are stopped.
 """
 
 __all__: tuple[str, ...] = ("MSTOrderer",)
@@ -29,6 +34,7 @@ import warnings
 from typing import Literal
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import plum
@@ -240,6 +246,53 @@ def _mst_backbone(
     return order_idx, Cb
 
 
+def _mst_backbone_padded(
+    P: np.ndarray,
+    V: np.ndarray,
+    *,
+    k: int,
+    jump_cap: float,
+    velocity_weight: float,
+    sever_cos_threshold: float | None,
+    orient_by_velocity: bool,
+    on_disconnected: OnDisconnected,
+    edge_clip_sigma: float | None,
+    edge_clip_max_iters: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``_mst_backbone``, padded to shapes fixed by ``P`` (for ``pure_callback``).
+
+    The backbone's true vertex count is data-dependent (a shortest-path length),
+    so it can't be a ``jax.pure_callback`` output shape on its own. Returns
+    ``(idx_full, backbone_full, backbone_len)``: ``idx_full`` is ``order_idx``
+    padded to ``len(P)`` with ``-1`` (as in ``OrderingResult.indices``);
+    ``backbone_full`` is the backbone polyline padded to ``len(P)`` rows by
+    repeating its last vertex; ``backbone_len`` is the true vertex count.
+    """
+    n, d = P.shape
+    order_idx, backbone_p = _mst_backbone(
+        P,
+        V,
+        k=k,
+        jump_cap=jump_cap,
+        velocity_weight=velocity_weight,
+        sever_cos_threshold=sever_cos_threshold,
+        orient_by_velocity=orient_by_velocity,
+        on_disconnected=on_disconnected,
+        edge_clip_sigma=edge_clip_sigma,
+        edge_clip_max_iters=edge_clip_max_iters,
+    )
+
+    idx_full = np.full(n, -1, dtype=np.int32)
+    idx_full[: order_idx.size] = order_idx
+
+    b = backbone_p.shape[0]
+    backbone_full = np.empty((n, d), dtype=P.dtype)
+    backbone_full[:b] = backbone_p
+    if b > 0:
+        backbone_full[b:] = backbone_p[-1]  # pad by repeating the last vertex
+    return idx_full, backbone_full, np.asarray(b, dtype=np.int32)
+
+
 class MSTOrderer(AbstractOrderer):
     """Order tracers along the MST longest-path backbone.
 
@@ -380,7 +433,15 @@ class MSTOrderer(AbstractOrderer):
         *,
         metadata: StateMetadata | None = None,  # noqa: ARG002
     ) -> OrderingResult:
-        """Order tracers along the MST backbone (host-side)."""
+        """Order tracers along the MST backbone.
+
+        Runs directly (no JAX overhead) when called eagerly -- the common case,
+        per the ``AbstractOrderer`` contract. When called under ``jax.jit``,
+        ``jax.vmap``, or ``jax.grad`` (i.e. ``positions``/``velocities`` are
+        traced), the host graph algorithms instead run through
+        ``jax.pure_callback`` so tracing doesn't break; the ordering itself has
+        no gradient either way (see the module docstring).
+        """
         if set(positions) != set(velocities):
             missing = sorted(set(positions) - set(velocities))
             extra = sorted(set(velocities) - set(positions))
@@ -391,30 +452,86 @@ class MSTOrderer(AbstractOrderer):
             raise ValueError(msg)
 
         comps = sorted(positions)
-        P = np.stack([np.asarray(positions[c]) for c in comps], axis=1)
-        V = np.stack([np.asarray(velocities[c]) for c in comps], axis=1)
-        order_idx, backbone_P = _mst_backbone(
-            P,
-            V,
-            k=self.k,
-            jump_cap=self.jump_cap,
-            velocity_weight=self.velocity_weight,
-            sever_cos_threshold=self.sever_cos_threshold,
-            orient_by_velocity=self.orient_by_velocity,
-            on_disconnected=self.on_disconnected,
-            edge_clip_sigma=self.edge_clip_sigma,
-            edge_clip_max_iters=self.edge_clip_max_iters,
-        )
+        P = jnp.stack([jnp.asarray(positions[c]) for c in comps], axis=1)
+        V = jnp.stack([jnp.asarray(velocities[c]) for c in comps], axis=1)
+        n, d = P.shape
 
-        n = P.shape[0]
-        idx_full = np.full(n, -1, dtype=np.int32)
-        idx_full[: order_idx.size] = order_idx
+        def _host(p: np.ndarray, v: np.ndarray) -> tuple:
+            return _mst_backbone_padded(
+                np.asarray(p),
+                np.asarray(v),
+                k=self.k,
+                jump_cap=self.jump_cap,
+                velocity_weight=self.velocity_weight,
+                sever_cos_threshold=self.sever_cos_threshold,
+                orient_by_velocity=self.orient_by_velocity,
+                on_disconnected=self.on_disconnected,
+                edge_clip_sigma=self.edge_clip_sigma,
+                edge_clip_max_iters=self.edge_clip_max_iters,
+            )
 
-        backbone = {c: jnp.asarray(backbone_P[:, i]) for i, c in enumerate(comps)}
+        if not (isinstance(P, jax.core.Tracer) or isinstance(V, jax.core.Tracer)):
+            # Eager call (the common case): run directly on this thread. Same
+            # computation as the traced branch below, but without a round trip
+            # through jax.pure_callback -- whose CPU host-callback thread has
+            # been observed to segfault scipy's cKDTree/sparse-graph C
+            # extensions on some inputs (a JAX/SciPy threading interaction, not
+            # a bug in this module's logic).
+            idx_full, backbone_full, backbone_len = _host(P, V)
+            idx_full = jnp.asarray(idx_full)
+            backbone_full = jnp.asarray(backbone_full)
+            backbone_len = jnp.asarray(backbone_len)
+        else:
+            result_shapes = (
+                jax.ShapeDtypeStruct((n,), jnp.int32),
+                jax.ShapeDtypeStruct((n, d), P.dtype),
+                jax.ShapeDtypeStruct((), jnp.int32),
+            )
+
+            @jax.custom_jvp
+            def _call_host(p: jnp.ndarray, v: jnp.ndarray) -> tuple:
+                try:
+                    return jax.pure_callback(
+                        _host, result_shapes, p, v, vmap_method="sequential"
+                    )
+                except jax.errors.JaxRuntimeError as e:
+                    # ponytail: pure_callback wraps host exceptions as
+                    # JaxRuntimeError, losing the original type; the only one
+                    # this callback raises intentionally is
+                    # `on_disconnected="raise"`'s ValueError, so re-raise as
+                    # that. Upgrade to preserve the original type if a
+                    # non-ValueError host failure needs to surface distinctly.
+                    raise ValueError(str(e)) from e
+
+            @_call_host.defjvp
+            def _call_host_jvp(primals: tuple, tangents: tuple) -> tuple:
+                # The ordering is piecewise-constant in (P, V) -- graph
+                # combinatorial, not smooth -- so its true derivative is zero
+                # a.e.; this makes that explicit rather than leaving
+                # pure_callback's JVP undefined.
+                del tangents
+                primal_out = _call_host(*primals)
+
+                def _zero_tangent(x: jnp.ndarray) -> jnp.ndarray:
+                    # integer outputs need the symbolic-zero `float0` tangent
+                    dtype = (
+                        jax.dtypes.float0
+                        if jnp.issubdtype(x.dtype, jnp.integer)
+                        else x.dtype
+                    )
+                    return jnp.zeros(x.shape, dtype=dtype)
+
+                tangent_out = jax.tree.map(_zero_tangent, primal_out)
+                return primal_out, tangent_out
+
+            idx_full, backbone_full, backbone_len = _call_host(P, V)
+
+        backbone = {c: backbone_full[:, i] for i, c in enumerate(comps)}
         return OrderingResult(
             positions={key: jnp.asarray(val) for key, val in positions.items()},
             velocities={key: jnp.asarray(val) for key, val in velocities.items()},
-            indices=jnp.asarray(idx_full),
+            indices=idx_full,
             gamma_range=(-1.0, 1.0),
             backbone=backbone,
+            backbone_size=backbone_len,
         )

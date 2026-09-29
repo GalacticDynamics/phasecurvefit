@@ -1,5 +1,6 @@
 """Tests for the MST-backbone orderer (``pcf.orderers.MSTOrderer``)."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -243,3 +244,63 @@ class TestMSTEdgeClip:
         """``edge_clip_max_iters < 1`` is rejected at construction."""
         with pytest.raises(ValueError, match="edge_clip_max_iters"):
             pcf.orderers.MSTOrderer(edge_clip_sigma=3.0, edge_clip_max_iters=0)
+
+
+class TestMSTJaxTraceability:
+    """``order()`` stays traceable under jit/vmap/grad.
+
+    Host algorithms run via ``jax.pure_callback`` when traced; see the module
+    docstring.
+    """
+
+    def test_jit(self):
+        """``order()`` composed with interpolation runs under ``jax.jit``."""
+        pos, vel, _t = _open_arc(n=60)
+        orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0)
+
+        @jax.jit
+        def run(pos, vel):
+            return orderer.order(pos, vel)(jnp.linspace(-1.0, 1.0, 5))
+
+        eager = orderer.order(pos, vel)(jnp.linspace(-1.0, 1.0, 5))
+        jitted = run(pos, vel)
+        assert jnp.allclose(jitted["x"], eager["x"])
+        assert jnp.allclose(jitted["y"], eager["y"])
+
+    def test_vmap(self):
+        """``order()`` runs one host call per batch element under ``jax.vmap``."""
+        pos, vel, _t = _open_arc(n=60)
+        orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0)
+        pos_batch = {k: jnp.stack([v, v]) for k, v in pos.items()}
+        vel_batch = {k: jnp.stack([v, v]) for k, v in vel.items()}
+
+        def single(p, v):
+            return orderer.order(p, v)(jnp.array(0.0))
+
+        out = jax.vmap(single)(pos_batch, vel_batch)
+        assert out["x"].shape == (2,)
+        assert jnp.all(jnp.isfinite(out["x"]))
+
+    def test_grad_through_ordering_is_zero(self):
+        """The ordering is graph-combinatorial, so its gradient is (correctly) zero."""
+        pos, vel, _t = _open_arc(n=60)
+
+        def loss(x):
+            res = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(
+                {"x": x, "y": pos["y"]}, vel
+            )
+            return jnp.sum(res(jnp.array(0.3))["x"] ** 2)
+
+        assert jnp.all(jax.grad(loss)(pos["x"]) == 0.0)
+
+    def test_grad_through_direct_positions_is_nonzero(self):
+        """A loss on the untouched ``positions`` passthrough still differentiates."""
+        pos, vel, _t = _open_arc(n=60)
+
+        def loss(x):
+            res = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(
+                {"x": x, "y": pos["y"]}, vel
+            )
+            return jnp.sum(res.positions["x"] ** 2)
+
+        assert jnp.any(jax.grad(loss)(pos["x"]) != 0.0)

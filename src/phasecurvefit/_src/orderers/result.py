@@ -47,6 +47,12 @@ class OrderingResult(AbstractResult):
         Optional ordered polyline (tip-to-tip) that ``__call__`` interpolates
         along. ``None`` for walk-style results, which interpolate along the
         ordered visited observations instead.
+    backbone_size : Int[Array, ""] | None
+        Number of valid leading vertices in ``backbone`` when it has been
+        padded to a static shape (e.g. by ``MSTOrderer`` under
+        ``jax.pure_callback``, where the true backbone length is data-dependent
+        and unknown at trace time). ``None`` (default) means every vertex in
+        ``backbone`` is valid.
 
     Examples
     --------
@@ -120,6 +126,7 @@ class OrderingResult(AbstractResult):
     _: KW_ONLY
     gamma_range: tuple[float, float] = eqx.field(static=True, default=(0.0, 1.0))
     backbone: VectorComponents | None = None
+    backbone_size: ISz0 | None = None
 
     def __check_init__(self) -> None:
         """Reject a degenerate ``gamma_range`` (its width divides in ``__call__``)."""
@@ -209,11 +216,18 @@ class OrderingResult(AbstractResult):
         return idx_lower, idx_upper, indices_float - floor
 
     def _interp_backbone(self, gamma_normalized: Array) -> VectorComponents:
-        """Interpolate along the static backbone polyline vertices."""
-        n_control = len(zeroth(self.backbone.values()))
-        if n_control == 0:
-            msg = "Cannot interpolate: the backbone has no vertices."
-            raise ValueError(msg)
+        """Interpolate along the backbone polyline vertices.
+
+        Uses ``backbone_size`` as the valid vertex count when set (the backbone
+        arrays may be padded to a static shape beyond that point).
+        """
+        if self.backbone_size is None:
+            n_control = len(zeroth(self.backbone.values()))
+            if n_control == 0:
+                msg = "Cannot interpolate: the backbone has no vertices."
+                raise ValueError(msg)
+        else:
+            n_control = self.backbone_size
         lo, hi, w = self._lerp_bracket(gamma_normalized, n_control)
 
         def interpolate_component(vals: Array) -> Array:
