@@ -249,8 +249,10 @@ class TestMSTEdgeClip:
 class TestMSTJaxTraceability:
     """``order()`` stays traceable under jit/vmap/grad.
 
-    Host algorithms run via ``jax.pure_callback`` when traced; see the module
-    docstring.
+    Host algorithms run via ``jax.pure_callback`` when traced, returning only
+    indices; backbone coordinates are gathered from positions/velocities in
+    ordinary JAX, so gradient flows through them like any other data-dependent
+    gather. See the module docstring.
     """
 
     def test_jit(self):
@@ -281,8 +283,15 @@ class TestMSTJaxTraceability:
         assert out["x"].shape == (2,)
         assert jnp.all(jnp.isfinite(out["x"]))
 
-    def test_grad_through_ordering_is_zero(self):
-        """The ordering is graph-combinatorial, so its gradient is (correctly) zero."""
+    def test_grad_through_backbone_gather_is_nonzero(self):
+        """Backbone coordinates are a gather of positions, so gradient flows.
+
+        ``Cb = P[backbone_nodes]`` is a literal gather, so -- away from the
+        measure-zero set of configurations where the selected nodes themselves
+        would change -- its true derivative is the ordinary gather Jacobian,
+        not zero (unlike the discrete ``indices``/``backbone_size``, which
+        stay gradient-free; see ``test_grad_of_indices_is_zero``).
+        """
         pos, vel, _t = _open_arc(n=60)
 
         def loss(x):
@@ -290,6 +299,22 @@ class TestMSTJaxTraceability:
                 {"x": x, "y": pos["y"]}, vel
             )
             return jnp.sum(res(jnp.array(0.3))["x"] ** 2)
+
+        assert jnp.any(jax.grad(loss)(pos["x"]) != 0.0)
+
+    def test_grad_of_indices_is_zero(self):
+        """The discrete ordering/backbone_size have no gradient (backbone coords do)."""
+        pos, vel, _t = _open_arc(n=60)
+
+        def loss(x):
+            res = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(
+                {"x": x, "y": pos["y"]}, vel
+            )
+            # indices/backbone_size are int32; grad needs a float cotangent
+            # target, so combine them into one float loss to check both.
+            return jnp.sum(res.indices.astype(jnp.float32)) + res.backbone_size.astype(
+                jnp.float32
+            )
 
         assert jnp.all(jax.grad(loss)(pos["x"]) == 0.0)
 
