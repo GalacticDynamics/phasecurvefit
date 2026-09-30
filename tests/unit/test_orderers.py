@@ -85,6 +85,10 @@ class TestDefaultPipeline:
         assert isinstance(below, pcf.WalkLocalFlowResult)
         at_or_above = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
         assert isinstance(at_or_above, pcf.orderers.OrderingResult)
+        # `WalkLocalFlowResult` subclasses `OrderingResult`, so the assertion
+        # above alone would still pass if the threshold were off by one and the
+        # SOM were skipped here too. Rule that out explicitly.
+        assert not isinstance(at_or_above, pcf.WalkLocalFlowResult)
 
     def test_som_kwargs_reach_the_som_stage(self, arc):
         """A caller can still tune the SOM through this entry point."""
