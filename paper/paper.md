@@ -76,7 +76,7 @@ stabilization of the loss function across training phases.
 Ordering stream members is challenging, even in forward-model simulations where
 all variables can be controlled. For most models, no property intrinsic to the
 stream may be used to determine the path or path-order without prior knowledge
-of the gravitional potential. Therefore, it is necessary to develop algorithms
+of the gravitational potential. Therefore, it is necessary to develop algorithms
 which can infer the path-ordering of the stream. Moreover, it is necessary for
 these methods to be performant to support the analysis of high performance
 stream simulators, and auto-differentiable to support inference routines.
