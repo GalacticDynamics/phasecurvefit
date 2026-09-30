@@ -19,16 +19,33 @@ mechanisms, all reusing the phase-space notion of velocity alignment
 3. *tip orientation* (``orient_by_velocity``): flip the ordering so ``gamma``
    increases along the mean velocity.
 
-The computation is **host-side** (NumPy/SciPy) and deterministic; ``order()`` is
-not jit/vmap-traceable (per the ``AbstractOrderer`` contract).
+The graph algorithms themselves (kNN, MST, shortest-path) remain **host-side**
+(NumPy/SciPy) and deterministic -- the *selection* they make (which edges,
+which nodes, in what order) is combinatorial and has no meaningful gradient,
+since it changes in discrete jumps rather than smoothly as points move.
+``order()`` runs them through ``jax.pure_callback`` with their inputs
+stop-gradiented, so it is jit/vmap-traceable (``vmap_method="sequential"``: one
+host call per batch element) and can sit inside a larger autodiffed pipeline.
+The callback itself returns only indices (``indices``, the backbone's node
+indices, ``backbone_size``) -- correctly gradient-free. The backbone
+*coordinates* are then gathered from ``positions``/``velocities`` in ordinary
+JAX (``P[backbone_idx]``), so -- away from the measure-zero set of points where
+the selection itself changes -- gradient flows through them exactly as it would
+through any other data-dependent gather (e.g. ``x[jnp.argmax(x)]``): real
+w.r.t. the gathered values, zero w.r.t. the (integer, non-differentiable)
+index that picked them.
 """
 
 __all__: tuple[str, ...] = ("MSTOrderer",)
 
+import queue
+import threading
 import warnings
+from collections.abc import Callable
 from typing import Literal
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import plum
@@ -57,6 +74,57 @@ _EDGE_CLIP_MIN_RATIO = 2.0
 # fewer than this fraction of the working points. Larger pieces are kept and
 # reconnected, so cutting a genuine sparse-region edge never discards stream.
 _EDGE_CLIP_SMALL_FRAC = 0.01
+
+
+# A single, long-lived worker thread that runs every _run_in_thread() job.
+#
+# The original workaround (spawn a fresh threading.Thread per call, from
+# wherever _run_in_thread happened to be called) fixed a segfault reliably on
+# macOS, but the identical input still segfaulted identically on Linux CI --
+# even with an explicit, generous stack size on that fresh thread. That points
+# away from "the new thread's stack was too small" and toward "creating a
+# *new* thread from inside jax.pure_callback's own native dispatch thread is
+# itself unsafe on some platforms" -- plausible, since that dispatch thread is
+# a foreign thread CPython has attached a PyThreadState to (not one CPython
+# created itself), and further threading operations from such a thread are
+# less well-trodden than from an ordinary one.
+#
+# A single worker thread sidesteps that concern entirely: it is created once,
+# here, at import time -- on whatever thread imports this module, which is
+# always an ordinary Python thread, never jax's callback-dispatch thread.
+# _run_in_thread() then only ever *hands work to* that already-running thread
+# via a queue; it never creates a thread from within pure_callback's dispatch
+# thread. Confirmed on Linux CI to fix the segfault.
+_job_queue: "queue.Queue[tuple[Callable[[], object], queue.Queue]]" = queue.Queue()
+
+
+def _worker() -> None:
+    while True:
+        fn, out = _job_queue.get()
+        try:
+            out.put(("ok", fn()))
+        except BaseException as exc:  # noqa: BLE001 -- forwarded to the caller
+            out.put(("err", exc))
+
+
+threading.Thread(target=_worker, daemon=True, name="phasecurvefit-mst-host").start()
+
+
+def _run_in_thread[T](fn: Callable[[], T]) -> T:
+    """Run ``fn`` on this module's persistent worker thread; re-raise there.
+
+    Works around a segfault observed when scipy's ``cKDTree``/sparse-graph C
+    extensions run directly on the native thread ``jax.pure_callback``
+    dispatches the host call onto. See the module-level worker thread's
+    comment for why this hands work to an already-running thread rather than
+    spawning a new one on demand.
+    """
+    out: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=1)
+    _job_queue.put((fn, out))
+    kind, payload = out.get()
+    if kind == "err":
+        raise payload  # type: ignore[misc]
+    return payload  # type: ignore[return-value]
 
 
 def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
@@ -178,12 +246,15 @@ def _mst_backbone(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Order points along the MST longest-path backbone.
 
-    Returns ``(order_idx, backbone)``: the arc-length ordering (original point
-    indices) and the tip-to-tip backbone polyline coordinates.
+    Returns ``(order_idx, backbone_nodes)``: the arc-length ordering (original
+    point indices) and the original indices of the tip-to-tip backbone
+    vertices, in order. Indices rather than coordinates -- the caller gathers
+    ``P[backbone_nodes]`` in JAX so gradient flows through the gather (see the
+    module docstring).
     """
     n = len(P)
     if n < 2:
-        return np.arange(n), P.copy()
+        return np.arange(n), np.arange(n)
 
     k_eff = int(min(k, n - 1))
     nn_d, nn_i = cKDTree(P).query(P, k=k_eff + 1)
@@ -248,9 +319,58 @@ def _mst_backbone(
         vmid = 0.5 * (vseg[:-1] + vseg[1:])
         if np.sum(tang * vmid) < 0.0:
             order_idx = order_idx[::-1]
-            Cb = Cb[::-1]
+            backbone_nodes = backbone_nodes[::-1]
 
-    return order_idx, Cb
+    return order_idx, backbone_nodes
+
+
+def _mst_backbone_padded(
+    P: np.ndarray,
+    V: np.ndarray,
+    *,
+    k: int,
+    jump_cap: float,
+    velocity_weight: float,
+    sever_cos_threshold: float | None,
+    orient_by_velocity: bool,
+    on_disconnected: OnDisconnected,
+    edge_clip_sigma: float | None,
+    edge_clip_max_iters: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``_mst_backbone``, padded to a shape fixed by ``P`` (for ``pure_callback``).
+
+    The backbone's true vertex count is data-dependent (a shortest-path length),
+    so it can't be a ``jax.pure_callback`` output shape on its own. Returns
+    ``(idx_full, backbone_idx_full, backbone_len)``: ``idx_full`` is
+    ``order_idx`` padded to ``len(P)`` with ``-1`` (as in
+    ``OrderingResult.indices``); ``backbone_idx_full`` is ``backbone_nodes``
+    padded to ``len(P)`` by repeating its last index; ``backbone_len`` is the
+    true vertex count. Indices, not coordinates -- the caller gathers
+    ``P[backbone_idx_full]`` in JAX (see the module docstring).
+    """
+    n = P.shape[0]
+    order_idx, backbone_nodes = _mst_backbone(
+        P,
+        V,
+        k=k,
+        jump_cap=jump_cap,
+        velocity_weight=velocity_weight,
+        sever_cos_threshold=sever_cos_threshold,
+        orient_by_velocity=orient_by_velocity,
+        on_disconnected=on_disconnected,
+        edge_clip_sigma=edge_clip_sigma,
+        edge_clip_max_iters=edge_clip_max_iters,
+    )
+
+    idx_full = np.full(n, -1, dtype=np.int32)
+    idx_full[: order_idx.size] = order_idx
+
+    b = backbone_nodes.shape[0]
+    backbone_idx_full = np.empty(n, dtype=np.int32)
+    backbone_idx_full[:b] = backbone_nodes
+    if b > 0:
+        backbone_idx_full[b:] = backbone_nodes[-1]  # pad by repeating last index
+    return idx_full, backbone_idx_full, np.asarray(b, dtype=np.int32)
 
 
 class MSTOrderer(AbstractOrderer):
@@ -400,39 +520,102 @@ class MSTOrderer(AbstractOrderer):
         metadata: StateMetadata | None = None,  # noqa: ARG002
         init: AbstractResult | None = None,  # noqa: ARG002
     ) -> OrderingResult:
-        """Order tracers along the MST backbone (host-side)."""
+        """Order tracers along the MST backbone.
+
+        Runs directly (no JAX overhead) when called eagerly -- the common case,
+        per the ``AbstractOrderer`` contract. When called under ``jax.jit``,
+        ``jax.vmap``, or ``jax.grad`` (i.e. ``positions``/``velocities`` are
+        traced), the host graph algorithms instead run through
+        ``jax.pure_callback`` (inputs stop-gradiented) so tracing doesn't
+        break, returning only indices; the backbone coordinates are then
+        gathered from ``positions``/``velocities`` in ordinary JAX, so
+        gradient flows through them like any other data-dependent gather (see
+        the module docstring).
+
+        A caveat of the traced path: ``on_disconnected="raise"`` raises
+        ``ValueError`` eagerly, but surfaces as ``jax.errors.JaxRuntimeError``
+        (wrapping the same message) under jit/vmap/grad, since the host call
+        actually runs at execution time, after ``order()`` has already
+        returned traced outputs.
+        """
         _check_component_keys(positions, velocities)
 
         comps = sorted(positions)
-        P = np.stack([np.asarray(positions[c]) for c in comps], axis=1)
-        V = np.stack([np.asarray(velocities[c]) for c in comps], axis=1)
-        order_idx, backbone_P = _mst_backbone(
-            P,
-            V,
-            k=self.k,
-            jump_cap=self.jump_cap,
-            velocity_weight=self.velocity_weight,
-            sever_cos_threshold=self.sever_cos_threshold,
-            orient_by_velocity=self.orient_by_velocity,
-            on_disconnected=self.on_disconnected,
-            edge_clip_sigma=self.edge_clip_sigma,
-            edge_clip_max_iters=self.edge_clip_max_iters,
-        )
+        P = jnp.stack([jnp.asarray(positions[c]) for c in comps], axis=1)
+        V = jnp.stack([jnp.asarray(velocities[c]) for c in comps], axis=1)
+        n, _d = P.shape
 
-        n = P.shape[0]
-        idx_full = np.full(n, -1, dtype=np.int32)
-        idx_full[: order_idx.size] = order_idx
+        def _host(p: np.ndarray, v: np.ndarray) -> tuple:
+            return _mst_backbone_padded(
+                np.asarray(p),
+                np.asarray(v),
+                k=self.k,
+                jump_cap=self.jump_cap,
+                velocity_weight=self.velocity_weight,
+                sever_cos_threshold=self.sever_cos_threshold,
+                orient_by_velocity=self.orient_by_velocity,
+                on_disconnected=self.on_disconnected,
+                edge_clip_sigma=self.edge_clip_sigma,
+                edge_clip_max_iters=self.edge_clip_max_iters,
+            )
 
-        backbone = {c: jnp.asarray(backbone_P[:, i]) for i, c in enumerate(comps)}
+        # The host call only ever needs to see values, never gradients -- the
+        # selection it makes is discrete either way -- so its inputs are
+        # stop-gradiented up front. That leaves pure_callback with nothing to
+        # differentiate (no custom_jvp needed): the real gradient path is the
+        # P[backbone_idx_full] gather below, using the original (not
+        # stop-gradiented) P.
+        P_static = jax.lax.stop_gradient(P)
+        V_static = jax.lax.stop_gradient(V)
+
+        if not (isinstance(P, jax.core.Tracer) or isinstance(V, jax.core.Tracer)):
+            # Eager call (the common case): run directly on this thread, no
+            # JAX overhead -- confirmed safe without _run_in_thread's fix (see
+            # below), since it's only pure_callback's own dispatch thread that
+            # triggers the crash.
+            idx_full, backbone_idx_full, backbone_len = _host(P_static, V_static)
+            idx_full = jnp.asarray(idx_full)
+            backbone_idx_full = jnp.asarray(backbone_idx_full)
+            backbone_len = jnp.asarray(backbone_len)
+        else:
+            result_shapes = (
+                jax.ShapeDtypeStruct((n,), jnp.int32),
+                jax.ShapeDtypeStruct((n,), jnp.int32),
+                jax.ShapeDtypeStruct((), jnp.int32),
+            )
+
+            def _host_threaded(p: np.ndarray, v: np.ndarray) -> tuple:
+                # _run_in_thread works around a segfault observed when the
+                # host computation runs directly on the native thread
+                # jax.pure_callback dispatches onto. See its docstring.
+                return _run_in_thread(lambda: _host(p, v))
+
+            # Note: under an outer jax.jit/vmap, pure_callback only *records*
+            # this call during tracing -- ``_host`` (and any
+            # ``on_disconnected="raise"`` ValueError it raises) actually runs
+            # later, at execution, after this function has already returned.
+            # So a disconnected-graph failure here surfaces to the caller as
+            # ``jax.errors.JaxRuntimeError`` (wrapping the original message),
+            # not ``ValueError`` as it does eagerly.
+            idx_full, backbone_idx_full, backbone_len = jax.pure_callback(
+                _host_threaded,
+                result_shapes,
+                P_static,
+                V_static,
+                vmap_method="sequential",
+            )
+
+        backbone_full = P[backbone_idx_full]  # JAX gather: gradient flows via P
+        backbone = {c: backbone_full[:, i] for i, c in enumerate(comps)}
         qs = {key: jnp.asarray(val) for key, val in positions.items()}
-        idx = jnp.asarray(idx_full)
         return OrderingResult(
             positions=qs,
             velocities={key: jnp.asarray(val) for key, val in velocities.items()},
-            indices=idx,
+            indices=idx_full,
             gamma_range=(-1.0, 1.0),
             backbone=backbone,
-            chord=chord_along_ordering(qs, idx),
+            backbone_size=backbone_len,
+            chord=chord_along_ordering(qs, idx_full),
             # ``orient_by_velocity`` only picks a direction; it does not make
             # the ordering itself velocity-aware.
             velocity_aware=self.velocity_weight > 0.0

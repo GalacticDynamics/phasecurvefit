@@ -1,5 +1,6 @@
 """Tests for the MST-backbone orderer (``pcf.orderers.MSTOrderer``)."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -243,6 +244,130 @@ class TestMSTEdgeClip:
         """``edge_clip_max_iters < 1`` is rejected at construction."""
         with pytest.raises(ValueError, match="edge_clip_max_iters"):
             pcf.orderers.MSTOrderer(edge_clip_sigma=3.0, edge_clip_max_iters=0)
+
+
+class TestMSTJaxTraceability:
+    """``order()`` stays traceable under jit/vmap/grad.
+
+    Host algorithms run via ``jax.pure_callback`` when traced, returning only
+    indices; backbone coordinates are gathered from positions/velocities in
+    ordinary JAX, so gradient flows through them like any other data-dependent
+    gather. See the module docstring.
+    """
+
+    def test_jit(self):
+        """``order()`` composed with interpolation runs under ``jax.jit``."""
+        pos, vel, _t = _open_arc(n=60)
+        orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0)
+
+        @jax.jit
+        def run(pos, vel):
+            return orderer.order(pos, vel)(jnp.linspace(-1.0, 1.0, 5))
+
+        eager = orderer.order(pos, vel)(jnp.linspace(-1.0, 1.0, 5))
+        jitted = run(pos, vel)
+        assert jnp.allclose(jitted["x"], eager["x"])
+        assert jnp.allclose(jitted["y"], eager["y"])
+
+    def test_vmap(self):
+        """``order()`` runs one host call per batch element under ``jax.vmap``."""
+        pos, vel, _t = _open_arc(n=60)
+        orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0)
+        pos_batch = {k: jnp.stack([v, v]) for k, v in pos.items()}
+        vel_batch = {k: jnp.stack([v, v]) for k, v in vel.items()}
+
+        def single(p, v):
+            return orderer.order(p, v)(jnp.array(0.0))
+
+        out = jax.vmap(single)(pos_batch, vel_batch)
+        assert out["x"].shape == (2,)
+        assert jnp.all(jnp.isfinite(out["x"]))
+
+    def test_grad_through_backbone_gather_is_nonzero(self):
+        """Backbone coordinates are a gather of positions, so gradient flows.
+
+        ``Cb = P[backbone_nodes]`` is a literal gather, so -- away from the
+        measure-zero set of configurations where the selected nodes themselves
+        would change -- its true derivative is the ordinary gather Jacobian,
+        not zero (unlike the discrete ``indices``/``backbone_size``, which
+        stay gradient-free; see ``test_grad_of_indices_is_zero``).
+        """
+        pos, vel, _t = _open_arc(n=60)
+
+        def loss(x):
+            res = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(
+                {"x": x, "y": pos["y"]}, vel
+            )
+            return jnp.sum(res(jnp.array(0.3))["x"] ** 2)
+
+        assert jnp.any(jax.grad(loss)(pos["x"]) != 0.0)
+
+    def test_jit_does_not_crash_the_process_on_unlucky_knn_shapes(self):
+        """Regression test for a real segfault, not just a failing assertion.
+
+        ``jax.pure_callback``'s host-dispatch thread was found to have too
+        small a stack for some (unlucky, not adversarial) ``cKDTree`` query
+        shapes -- this exact input reliably crashed the whole process (not a
+        catchable exception) before ``_run_in_thread`` gave the host
+        computation a normal thread's stack instead. If that regresses, this
+        test does not fail cleanly -- it takes the interpreter down.
+        """
+        xs = jnp.concatenate([jnp.linspace(0.0, 9.0, 40), jnp.array([30.0])])
+        ys = jnp.concatenate([jnp.zeros(40), jnp.array([30.0])])
+        vel = {"x": jnp.ones(41), "y": jnp.zeros(41)}
+        clipper = pcf.orderers.MSTOrderer(k=10, jump_cap=50.0, edge_clip_sigma=3.0)
+
+        @jax.jit
+        def run(pos, vel):
+            return clipper.order(pos, vel).indices
+
+        out = run({"x": xs, "y": ys}, vel)
+        assert int((out >= 0).sum()) == 40  # the lone interloper still rejected
+
+    def test_grad_of_indices_is_zero(self):
+        """The discrete ordering/backbone_size have no gradient (backbone coords do)."""
+        pos, vel, _t = _open_arc(n=60)
+
+        def loss(x):
+            res = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(
+                {"x": x, "y": pos["y"]}, vel
+            )
+            # indices/backbone_size are int32; grad needs a float cotangent
+            # target, so combine them into one float loss to check both.
+            return jnp.sum(res.indices.astype(jnp.float32)) + res.backbone_size.astype(
+                jnp.float32
+            )
+
+        assert jnp.all(jax.grad(loss)(pos["x"]) == 0.0)
+
+    def test_grad_through_direct_positions_is_nonzero(self):
+        """A loss on the untouched ``positions`` passthrough still differentiates."""
+        pos, vel, _t = _open_arc(n=60)
+
+        def loss(x):
+            res = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(
+                {"x": x, "y": pos["y"]}, vel
+            )
+            return jnp.sum(res.positions["x"] ** 2)
+
+        assert jnp.any(jax.grad(loss)(pos["x"]) != 0.0)
+
+    def test_grad_wrt_velocity_only_is_traced(self):
+        """Positions concrete, velocities traced: still takes the traced path.
+
+        The two are independent tracer checks (``P`` and ``V``), so this covers
+        the case the ``positions``-only grad test above does not: ``V`` traced
+        while ``P`` stays a plain, concrete array.
+        """
+        pos, vel, _t = _open_arc(n=60)
+
+        def loss(vx):
+            res = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(
+                pos, {"x": vx, "y": vel["y"]}
+            )
+            return jnp.sum(res(jnp.array(0.3))["x"] ** 2)
+
+        assert jnp.all(jax.grad(loss)(vel["x"]) == 0.0)
 
 
 def _with_copies(pos, vel, idx, n_copies):
