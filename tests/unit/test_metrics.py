@@ -1,7 +1,10 @@
 """Tests for distance metrics."""
 
+import copy
+
 import jax
 import jax.numpy as jnp
+import jax.tree as jt
 import pytest
 
 import phasecurvefit as pcf
@@ -157,21 +160,14 @@ class TestAlignedMomentumDistanceMetric:
         pos_a = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
         vel_a = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
         pos_b = {"x": jnp.array(1.0), "y": jnp.array(0.0)}
-        vel_b = {"x": jnp.array(1.0), "y": jnp.array(0.0)}  # same velocity as A
+        vel_b = copy.deepcopy(vel_a)  # same velocity as A
 
+        f = lambda v: v[None]
         d_ab = metric(
-            pos_a,
-            vel_a,
-            {k: v[None] for k, v in pos_b.items()},
-            {k: v[None] for k, v in vel_b.items()},
-            metric_scale=1.0,
+            pos_a, vel_a, jt.map(f, pos_b), jt.map(f, vel_b), metric_scale=1.0
         )[0]
         d_ba = metric(
-            pos_b,
-            vel_b,
-            {k: v[None] for k, v in pos_a.items()},
-            {k: v[None] for k, v in vel_a.items()},
-            metric_scale=1.0,
+            pos_b, vel_b, jt.map(f, pos_a), jt.map(f, vel_a), metric_scale=1.0
         )[0]
 
         assert jnp.isclose(d_ab, 1.0)  # B is dead ahead of A: no penalty
