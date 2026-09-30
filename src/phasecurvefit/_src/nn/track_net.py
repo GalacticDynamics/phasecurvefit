@@ -318,15 +318,15 @@ def decoder_loss(
     -----
     The mathematical form is:
 
-    $$ \\ell_\\theta(\\theta) = \\sum_{n=1}^N w_n \\left[
-        \\lambda_q \\|x_n - x_\\theta(\\gamma_\\theta(x_n, v_n))\\|^2
-        + \\lambda_p \\|T_n - T_\\theta(\\gamma_\\theta(x_n, v_n))\\|^2
+    $$ \\ell_{\\theta}(\\theta) = \\sum_{n=1}^N w_n \\left[
+        \\lambda_q \\|x_n - x_{\\theta}(\\gamma_{\\theta}(x_n, v_n))\\|^2
+        + \\lambda_p \\|T_n - T_{\\theta}(\\gamma_{\\theta}(x_n, v_n))\\|^2
     \\right] $$
 
     where:
     - $w_n$ are the sample weights
-    - $x_n$ are true coordinates, $x_\\theta$ are predicted
-    - $T_n$ are true tangent vectors, $T_\\theta$ are predicted
+    - $x_n$ are true coordinates, $x_{\\theta}$ are predicted
+    - $T_n$ are true tangent vectors, $T_{\\theta}$ are predicted
     - $\\lambda_q$ and $\\lambda_p$ control relative importance
 
     References

@@ -775,7 +775,7 @@ class SOM1D(eqx.Module):
     A thin, composable object over the functional core: it carries the
     prototypes and the hyperparameters, and its methods forward to
     :func:`fit`, :func:`densify` and :func:`chord`. The functions remain the
-    primary interface -- an ensemble ``vmap``s those, not this class.
+    primary interface -- an ensemble maps ``vmap`` over those, not this class.
 
     Examples
     --------
