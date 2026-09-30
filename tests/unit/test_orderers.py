@@ -1,5 +1,6 @@
 """Tests for the pluggable orderer abstraction (``pcf.orderers``)."""
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import pytest
@@ -46,25 +47,62 @@ class TestOrdererNamespace:
 
 
 class TestDefaultPipeline:
-    """#57: a non-breaking walk-then-SOM pipeline, left out of ``order()``'s default."""
+    """``order()``'s default: an MST backbone refined by a SOM (#57)."""
 
-    def test_chains_the_walk_and_the_som(self, arc):
-        """Enough tracers: the SOM stage runs, and its signature shows it did."""
+    @staticmethod
+    def _explicit_chain(n_prototypes):
+        """Build the chain ``default_pipeline`` documents itself as running."""
+        mst = pcf.orderers.MSTOrderer(
+            jump_cap=float("inf"), orient_by_velocity=True, on_disconnected="warn"
+        )
+        return mst | pcf.orderers.SOMOrderer(n_prototypes=n_prototypes)
+
+    def test_chains_the_mst_and_the_som(self, arc):
+        """Enough tracers: the result is exactly the MST-then-SOM chain."""
         pos, vel, _ = arc(n=60)
         result = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
+        expected = self._explicit_chain(12).order(pos, vel)
         assert isinstance(result, pcf.orderers.OrderingResult)
         assert result.gamma_range == (-1.0, 1.0)
-        assert result.backbone is not None
+        assert eqx.tree_equal(result, expected)
+
+    def test_bare_order_runs_the_default_pipeline(self, arc):
+        """``order(pos, vel)`` with no orderer *is* ``default_pipeline``."""
+        pos, vel, _ = arc(n=60)
+        assert eqx.tree_equal(
+            pcf.order(pos, vel), pcf.orderers.default_pipeline(pos, vel)
+        )
 
     def test_recovers_the_arc_order(self, arc, spearman):
         """The whole point: the chained result should track the truth well."""
         curve = arc(n=60)
-        result = pcf.orderers.default_pipeline(
-            curve.positions, curve.velocities, n_prototypes=12
-        )
+        result = pcf.order(curve.positions, curve.velocities)
         assert spearman(result, curve) > 0.99
 
-    def test_falls_back_to_the_walk_alone_below_n_prototypes(self):
+    def test_orders_along_the_velocity(self):
+        """``gamma`` increases along the flow, whichever way the data are stored."""
+        t = jnp.linspace(jnp.pi, 0.0, 60)  # the flow runs toward *lower* t
+        pos = {"x": 5.0 * jnp.cos(t), "y": 5.0 * jnp.sin(t)}
+        vel = {"x": jnp.sin(t), "y": -jnp.cos(t)}
+        idx = pcf.order(pos, vel).indices
+        # The flow runs from index 0 toward index 59, so the ordering does too.
+        assert int(idx[0]) < int(idx[-1])
+
+    @pytest.mark.parametrize("scale", [1.0, 1e3, 1e-3])
+    def test_is_independent_of_the_data_scale(self, arc, spearman, scale):
+        """No absolute length scale is baked in.
+
+        ``MSTOrderer``'s own ``jump_cap`` default (3.0) severs every edge of a
+        dataset whose spacing exceeds it, so a default built on it would raise
+        on sparse or large-scale data.
+        """
+        curve = arc(n=60)
+        pos = {k: v * scale for k, v in curve.positions.items()}
+        result = pcf.order(pos, curve.velocities)
+        assert int(result.n_visited) == 60
+        assert spearman(result, curve) > 0.99
+
+    def test_falls_back_to_the_mst_alone_below_n_prototypes(self):
         """#57's own landmine: the library's small examples must keep working.
 
         3 tracers, the package's own headline example size, with the SOM's
@@ -73,22 +111,20 @@ class TestDefaultPipeline:
         """
         pos = {"x": jnp.array([0.0, 1.0, 2.0])}
         vel = {"x": jnp.array([1.0, 1.0, 1.0])}
-        result = pcf.orderers.default_pipeline(pos, vel)
-        assert isinstance(result, pcf.WalkLocalFlowResult)
-        assert result.gamma_range == (0.0, 1.0)
+        result = pcf.order(pos, vel)
+        assert isinstance(result, pcf.orderers.OrderingResult)
+        assert not isinstance(result, pcf.WalkLocalFlowResult)
+        assert result.gamma_range == (-1.0, 1.0)
         assert jnp.array_equal(result.indices, jnp.array([0, 1, 2]))
 
     def test_the_fallback_threshold_is_n_prototypes_itself(self, arc):
         """Exactly at the threshold and one above it, not just far below."""
         pos, vel, _ = arc(n=12)
         below = pcf.orderers.default_pipeline(pos, vel, n_prototypes=13)
-        assert isinstance(below, pcf.WalkLocalFlowResult)
-        at_or_above = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
-        assert isinstance(at_or_above, pcf.orderers.OrderingResult)
-        # `WalkLocalFlowResult` subclasses `OrderingResult`, so the assertion
-        # above alone would still pass if the threshold were off by one and the
-        # SOM were skipped here too. Rule that out explicitly.
-        assert not isinstance(at_or_above, pcf.WalkLocalFlowResult)
+        at = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
+        # The MST stage records its backbone length; the SOM stage does not.
+        assert below.backbone_size is not None
+        assert at.backbone_size is None
 
     def test_som_kwargs_reach_the_som_stage(self, arc):
         """A caller can still tune the SOM through this entry point."""
@@ -98,6 +134,27 @@ class TestDefaultPipeline:
         # Different smoothing must produce a different backbone -- otherwise
         # sigma_end silently never reached the SOM.
         assert not jnp.array_equal(tight.backbone["x"], loose.backbone["x"])
+
+    def test_tracing_the_default_says_to_pass_an_orderer(self, arc):
+        """Under jit/vmap the default cannot decide whether to run the SOM: say so."""
+        pos, vel, _ = arc(n=30)
+        with pytest.raises(TypeError, match="explicit orderer"):
+            jax.jit(lambda q, p: pcf.order(q, p).chord)(pos, vel)
+        batched = jax.tree.map(lambda a: a[None], (pos, vel))
+        with pytest.raises(TypeError, match="explicit orderer"):
+            jax.vmap(lambda q, p: pcf.order(q, p).chord)(*batched)
+        # ...while the explicit orderers it points to do trace.
+        for orderer in (
+            pcf.orderers.MSTOrderer(jump_cap=float("inf")),
+            pcf.orderers.LocalFlowOrderer(),
+        ):
+            jax.jit(lambda q, p, o=orderer: pcf.order(q, p, o).chord)(pos, vel)
+
+    def test_explicit_orderer_bypasses_the_default(self, arc):
+        """Passing an orderer is unaffected by the default changing."""
+        pos, vel, _ = arc(n=30)
+        lfo = pcf.orderers.LocalFlowOrderer()
+        assert isinstance(pcf.order(pos, vel, lfo), pcf.WalkLocalFlowResult)
 
 
 class TestOrderingResultUnification:

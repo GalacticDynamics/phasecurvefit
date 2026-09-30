@@ -283,7 +283,7 @@ class TestTrainAutoencoder:
         pos = {"x": t, "y": 0.5 * t}
         vel = {"x": jnp.ones(n_points), "y": 0.5 * jnp.ones(n_points)}
 
-        return pcf.order(pos, vel)
+        return pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
 
     def test_loss_finite_when_encoder_claims_no_members(self, rng_key: PRNGKeyArray):
         """The joint loss stays finite when no star clears `member_threshold`.
@@ -679,7 +679,7 @@ class TestEdgeCases:
         pos = {"x": jnp.array([0.0, 1.0]), "y": jnp.array([0.0, 1.0])}
         vel = {"x": jnp.array([1.0, 1.0]), "y": jnp.array([1.0, 1.0])}
 
-        walkresult = pcf.order(pos, vel)
+        walkresult = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
 
         normalizer = pcf.nn.StandardScalerNormalizer(
             walkresult.positions, walkresult.velocities
@@ -707,7 +707,7 @@ class TestEdgeCases:
         pos = {"x": t, "y": jnp.zeros(n_points)}
         vel = {"x": jnp.ones(n_points), "y": jnp.zeros(n_points)}
 
-        walkresult = pcf.order(pos, vel)
+        walkresult = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
 
         # All points should be ordered
         assert len(walkresult.indices) == n_points

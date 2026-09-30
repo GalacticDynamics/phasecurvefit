@@ -188,7 +188,7 @@ class WalkLocalFlowResult(OrderingResult):
     ...     "y": jnp.sin(jnp.linspace(0, 2 * 3.14159, 20)),
     ... }
     >>> vel = {"x": jnp.ones(20), "y": jnp.cos(jnp.linspace(0, 2 * 3.14159, 20))}
-    >>> result = pcf.order(pos, vel)
+    >>> result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
     >>> result.indices
     Array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16,
            17, 18, 19], dtype=int32)
@@ -297,7 +297,8 @@ def _local_flow_walk(
     r"""Find an ordered path through phase-space using the local flow.
 
     The implementation behind `LocalFlowOrderer` and the (deprecated) public
-    `walk_local_flow`. Prefer ``pcf.order(positions, velocities)`` at call sites.
+    `walk_local_flow`. Prefer ``pcf.order(positions, velocities,
+    pcf.orderers.LocalFlowOrderer())`` at call sites.
 
     Parameters
     ----------
@@ -558,10 +559,10 @@ def walk_local_flow(*args: object, **kwargs: object) -> WalkLocalFlowResult:
 
     .. deprecated:: 0.3
         ``walk_local_flow`` will be removed in v0.4. Use
-        ``pcf.order(positions, velocities)`` -- or
-        ``pcf.orderers.LocalFlowOrderer(...).order(...)`` for non-default walk
-        parameters -- which routes through the same implementation without a
-        warning.
+        ``pcf.order(positions, velocities, pcf.orderers.LocalFlowOrderer(...))``
+        (or ``LocalFlowOrderer(...).order(...)``), which routes through the same
+        implementation without a warning. Note that ``pcf.order`` with no
+        orderer no longer runs the walk; it runs the MST | SOM default pipeline.
 
     Thin wrapper that emits a `DeprecationWarning` and forwards to the private
     implementation (plain and Quantity dispatch), returning an unchanged
@@ -569,9 +570,8 @@ def walk_local_flow(*args: object, **kwargs: object) -> WalkLocalFlowResult:
     """
     warnings.warn(
         "`walk_local_flow` is deprecated and will be removed in v0.4; use "
-        "`pcf.order(positions, velocities)` (or "
-        "`pcf.orderers.LocalFlowOrderer(...).order(...)` for non-default walk "
-        "parameters) instead.",
+        "`pcf.order(positions, velocities, pcf.orderers.LocalFlowOrderer(...))` "
+        "(or `pcf.orderers.LocalFlowOrderer(...).order(...)`) instead.",
         DeprecationWarning,
         stacklevel=2,
     )

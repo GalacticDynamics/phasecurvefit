@@ -4,7 +4,9 @@ An **orderer** turns phase-space tracers `(positions, velocities)` into an
 ordered result that the autoencoder consumes unchanged. All orderers share one
 interface — {class}`~phasecurvefit.orderers.AbstractOrderer` — and return a
 unified {class}`~phasecurvefit.orderers.OrderingResult`, so they are
-interchangeable at call sites:
+interchangeable at call sites. With no orderer, `pcf.order(pos, vel)` runs the
+[default pipeline](#the-default-pipeline-mst-then-som): an MST backbone refined by
+a SOM.
 
 <!-- skip: next -->
 ```python
@@ -17,6 +19,10 @@ ae, *_ = pcf.nn.train_autoencoder(model, result, config=cfg, key=key)
 ```
 
 ## Choosing an orderer
+
+You usually do not need to: the default pipeline, `MSTOrderer | SOMOrderer`, needs
+no start point and suits most curves. Reach for another orderer when its mechanism
+fits your data better:
 
 | Orderer | Best for | Mechanism |
 |---|---|---|
@@ -78,8 +84,9 @@ machinery, see the [Algorithm guide](algorithm.md).
 
 ## MSTOrderer
 
-The MST is **host-side** (NumPy/SciPy): `order()` is a one-shot preprocessing
-step, not a jit/vmap-traceable function. Pure-spatial is the default:
+The MST's graph algorithms are **host-side** (NumPy/SciPy); `order()` runs them
+through `jax.pure_callback` when traced, so it works under `jit` and `vmap`.
+Pure-spatial is the default:
 
 ```python
 import jax.numpy as jnp
@@ -183,25 +190,43 @@ chain = pcf.orderers.ChainOrderer(
 assert len(chain.stages) == 2
 ```
 
-### The recommended walk-then-SOM chain
+### The default pipeline: MST, then SOM
 
-`pcf.order(q, p)` runs the walk alone, unchanged since before
-{class}`~phasecurvefit.orderers.SOMOrderer` existed — making the SOM part of
-that default would be a breaking change (a different result type and
-`gamma_range`, plus a real per-call cost;
-[GalacticDynamics/phasecurvefit#57](https://github.com/GalacticDynamics/phasecurvefit/issues/57)).
-{func}`~phasecurvefit.orderers.default_pipeline` is the non-breaking version
-of that better default: call it explicitly to get
-`LocalFlowOrderer() | SOMOrderer()`, with one difference from writing that
-chain by hand -- it falls back to the walk alone when there are fewer
-visited tracers than `n_prototypes`, rather than raising:
+`pcf.order(q, p)` with no orderer runs
+{func}`~phasecurvefit.orderers.default_pipeline`, which is
+`MSTOrderer(...) | SOMOrderer(...)`: the MST finds the curve's two ends and a
+tip-to-tip ordering, and the SOM averages over many tracers to smooth it. Its
+chain differs from one written by hand in three ways:
+
+- it falls back to the MST alone when there are fewer visited tracers than
+  `n_prototypes` (15 by default), rather than raising;
+- its MST stage is configured to work at any data scale --
+  `jump_cap=inf`, `orient_by_velocity=True`, `on_disconnected="warn"` -- where
+  `MSTOrderer()`'s own `jump_cap=3.0` is an absolute length that severs every edge
+  of a sparse or large-scale dataset;
+- it cannot run under `jit` or `vmap`: whether the SOM stage runs depends on the
+  number of tracers the MST visited.
 
 ```python
 result = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
+assert int(result.n_visited) == 60
 ```
 
 Any {class}`~phasecurvefit.orderers.SOMOrderer` keyword (`sigma_end`,
-`metric`, ...) passes through as a keyword to `default_pipeline` itself.
+`metric`, ...) passes through as a keyword to `default_pipeline` itself. To tune the
+MST stage instead -- a finite `jump_cap`, velocity-aware edges, outlier rejection
+with `edge_clip_sigma` -- build the chain and pass it to `pcf.order`:
+
+```python
+chain = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0, edge_clip_sigma=3.0) | (
+    pcf.orderers.SOMOrderer(n_prototypes=12)
+)
+result = pcf.order(pos, vel, chain)
+```
+
+The default used to be the walk alone (`LocalFlowOrderer()`); the change, and how
+to keep the walk, is covered in the
+[v0.3 → v0.4 migration guide](../migration/v0.3-to-v0.4.md).
 
 ### Letting the MST find the walk's start point
 

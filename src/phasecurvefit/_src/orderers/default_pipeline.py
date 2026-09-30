@@ -1,7 +1,7 @@
-"""The library's recommended, non-breaking default ordering pipeline.
+"""The library's default ordering pipeline: an MST backbone refined by a SOM.
 
 A separate module rather than living in ``base``: this chains
-:class:`~phasecurvefit.orderers.LocalFlowOrderer` with
+:class:`~phasecurvefit.orderers.MSTOrderer` with
 :class:`~phasecurvefit.orderers.SOMOrderer`, both of which import
 ``AbstractOrderer`` *from* ``base`` -- ``base`` importing them back at module
 scope would cycle. Downstream of all three, this module can import both at the
@@ -10,10 +10,12 @@ top level instead of needing ``base``'s lazy, ``noqa: PLC0415`` imports.
 
 __all__: tuple[str, ...] = ("default_pipeline",)
 
+import jax
+
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
-from phasecurvefit._src.orderers.localflow import LocalFlowOrderer
+from phasecurvefit._src.orderers.mst import MSTOrderer
 from phasecurvefit._src.orderers.som import SOMOrderer
 
 
@@ -22,38 +24,54 @@ def default_pipeline(
     velocities: VectorComponents,
     *,
     metadata: StateMetadata | None = None,
+    init: AbstractResult | None = None,
     n_prototypes: int = 15,
     **som_kwargs: object,
 ) -> AbstractResult:
-    """Order tracers with the library's recommended two-stage pipeline.
+    """Order tracers with the library's default two-stage pipeline.
 
-    Chains the velocity-following local-flow walk with a SOM refinement
-    stage -- ``LocalFlowOrderer() | SOMOrderer(n_prototypes=n_prototypes,
-    **som_kwargs)``. The SOM's prototypes average over many tracers, so the
-    backbone it produces is far less sensitive to local noise than the walk's
-    step-by-step decisions alone; see :doc:`/guides/som`.
+    Chains an MST backbone ordering with a SOM refinement stage --
+    ``MSTOrderer(...) | SOMOrderer(n_prototypes=n_prototypes, **som_kwargs)``.
+    This is what :func:`~phasecurvefit.order` runs when it is given no
+    ``orderer``. The MST needs no progenitor or start index and orders a stream
+    tip to tip, including near-closed loops whose velocity field reverses; the
+    SOM's prototypes then average over many tracers, so the final backbone is
+    far less sensitive to local noise than the MST's individual graph edges. See
+    :doc:`/guides/som`.
 
-    This is *not* what :func:`order` runs by default: making the SOM part of
-    the primary entry point's default would be a breaking change (a different
-    result type, a different ``gamma_range``, and a real per-call cost --
-    `GalacticDynamics/phasecurvefit#57
-    <https://github.com/GalacticDynamics/phasecurvefit/issues/57>`_). This
-    function is the non-breaking alternative: call it explicitly to get the
-    better default without touching :func:`order`'s own.
+    The MST stage is configured to work on data of any scale and to fail soft,
+    not to be tuned: ``jump_cap=inf`` (the default ``jump_cap`` is an absolute
+    length, which severs every edge of a sparse or large-scale dataset),
+    ``orient_by_velocity=True`` (so ``gamma`` increases along the flow rather
+    than in an arbitrary tip-to-tip direction), and ``on_disconnected="warn"``
+    (order the largest connected piece and warn, rather than raise). For
+    anything else -- a finite ``jump_cap``, velocity-aware edges, outlier
+    clipping -- build the chain yourself and pass it to
+    :func:`~phasecurvefit.order`.
 
-    Falls back to the walk alone when fewer tracers were visited than
+    Falls back to the MST alone when fewer tracers were visited than
     ``n_prototypes`` -- the SOM's own minimum
     (:func:`~phasecurvefit.som.init_prototypes` needs at least that many
     points to bin). Rather than raise on the library's own small examples,
     the SOM stage simply cannot help there, so it is skipped instead of
     failing.
 
+    Unlike its MST stage alone, this cannot run under ``jit`` or ``vmap``: the
+    fallback test and the SOM stage both need the concrete visited count, and
+    a SOM stage chained after another cannot be traced. To trace an ordering,
+    pass :func:`~phasecurvefit.order` an explicit orderer (``MSTOrderer()`` and
+    ``LocalFlowOrderer()`` both trace; see :doc:`/guides/jax-integration`).
+
     Parameters
     ----------
     positions, velocities
-        Phase-space tracers, as for :func:`order`.
+        Phase-space tracers, as for :func:`~phasecurvefit.order`.
     metadata
         Passed through to both stages.
+    init
+        A prior ordering result, passed to the first (MST) stage, which -- like
+        any orderer that cannot refine a prior ordering -- accepts and ignores
+        it.
     n_prototypes
         Passed to :class:`~phasecurvefit.orderers.SOMOrderer`; also the
         threshold below which the SOM stage is skipped.
@@ -64,12 +82,9 @@ def default_pipeline(
     Returns
     -------
     AbstractResult
-        An :class:`~phasecurvefit.orderers.OrderingResult` from the SOM stage
-        when there was enough data, otherwise the walk's own
-        :class:`~phasecurvefit.WalkLocalFlowResult`. The two carry different
-        ``gamma_range``: ``(0, 1)`` for the bare walk, ``(-1, 1)`` after the
-        SOM -- callers reading ``gamma_range`` off the result rather than
-        assuming a fixed one are unaffected by which stage actually ran.
+        An :class:`~phasecurvefit.orderers.OrderingResult`, from the SOM stage
+        when there was enough data and from the MST otherwise. Both carry
+        ``gamma_range == (-1.0, 1.0)``.
 
     Examples
     --------
@@ -82,17 +97,31 @@ def default_pipeline(
     >>> int(result.n_visited)
     60
 
-    Too few tracers for the SOM stage falls back to the walk alone rather
+    Too few tracers for the SOM stage falls back to the MST alone rather
     than raising:
 
     >>> q = {"x": jnp.array([0.0, 1.0, 2.0])}
     >>> p = {"x": jnp.array([1.0, 1.0, 1.0])}
-    >>> pcf.orderers.default_pipeline(q, p).gamma_range
-    (0.0, 1.0)
+    >>> pcf.orderers.default_pipeline(q, p).indices
+    Array([0, 1, 2], dtype=int32)
 
     """
-    walk_result = LocalFlowOrderer().order(positions, velocities, metadata=metadata)
-    if int(walk_result.n_visited) < n_prototypes:
-        return walk_result
+    mst = MSTOrderer(
+        jump_cap=float("inf"), orient_by_velocity=True, on_disconnected="warn"
+    )
+    mst_result = mst.order(positions, velocities, metadata=metadata, init=init)
+    try:
+        n_visited = int(mst_result.n_visited)
+    except jax.errors.ConcretizationTypeError as exc:
+        msg = (
+            "The default ordering pipeline cannot run under jit or vmap: "
+            "whether to run the SOM stage depends on the number of tracers "
+            "visited, which is only known once the MST has run. Pass an "
+            "explicit orderer instead, e.g. `pcf.orderers.MSTOrderer(...)` or "
+            "`pcf.orderers.LocalFlowOrderer()`, both of which can be traced."
+        )
+        raise TypeError(msg) from exc
+    if n_visited < n_prototypes:
+        return mst_result
     som = SOMOrderer(n_prototypes=n_prototypes, **som_kwargs)
-    return som.order(positions, velocities, metadata=metadata, init=walk_result)
+    return som.order(positions, velocities, metadata=metadata, init=mst_result)

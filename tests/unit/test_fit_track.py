@@ -49,9 +49,9 @@ def test_ordering_result_matches_default_pipeline_alone(arc):
 def test_falls_back_below_n_prototypes_and_still_trains(arc):
     """Too few tracers for the SOM stage must not stop the pipeline overall.
 
-    The walk-only fallback still hands train_autoencoder a valid result --
-    gamma_range (0, 1) instead of (-1, 1) -- and training must adapt rather
-    than assume the SOM ran.
+    The MST-only fallback still hands train_autoencoder a valid result -- one
+    with no SOM backbone of its own -- and training must adapt rather than
+    assume the SOM ran.
     """
     pos, vel, _ = arc(n=10)
     ordering, fitted, losses = pcf.fit_track(
@@ -61,8 +61,8 @@ def test_falls_back_below_n_prototypes_and_still_trains(arc):
         n_prototypes=15,
         training_config=_fast_config(batch_size=5),
     )
-    assert isinstance(ordering, pcf.WalkLocalFlowResult)
-    assert ordering.gamma_range == (0.0, 1.0)
+    assert isinstance(ordering, pcf.orderers.OrderingResult)
+    assert ordering.backbone_size is not None  # the MST stage alone ran
     assert jnp.all(jnp.isfinite(losses))
     assert fitted.model.normalizer.n_spatial_dims == len(pos)
 

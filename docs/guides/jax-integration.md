@@ -4,11 +4,14 @@ This guide shows how to use `phasecurvefit` with JAX for faster computation, bat
 
 ```{note}
 This guide covers the **local-flow walk**
-({class}`~phasecurvefit.orderers.LocalFlowOrderer`), which is fully JAX-traceable.
-The {class}`~phasecurvefit.orderers.MSTOrderer` is **host-side** (NumPy/SciPy):
-its `order()` is a one-shot preprocessing step and is *not* jit/vmap/grad-able.
-Its *result*, however, is an ordinary `OrderingResult` whose `__call__`
-interpolation is JAX-traceable like any other.
+({class}`~phasecurvefit.orderers.LocalFlowOrderer`), which is fully JAX-traceable,
+so every example here names it explicitly. `pcf.order(pos, vel)` with **no**
+orderer runs the default MST | SOM pipeline, which is *not* traceable under `jit`
+or `vmap` (it raises a `TypeError` saying so): whether the SOM stage runs depends
+on the visited count, and a SOM stage chained after another cannot be traced. The
+{class}`~phasecurvefit.orderers.MSTOrderer` alone does trace: its graph
+algorithms run host-side (NumPy/SciPy) through `jax.pure_callback`. A result's
+`__call__` interpolation is JAX-traceable whichever orderer produced it.
 ```
 
 ## Basic Usage

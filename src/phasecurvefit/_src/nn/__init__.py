@@ -21,7 +21,8 @@ Training follows a two-step process:
 References
 ----------
 Nibauer et al. (2022). "Charting Galactic Accelerations with Stellar Streams
-and Machine Learning." Appendix A.2.
+and Machine Learning." Appendix A.2. If you use the autoencoder in published
+work, please cite that paper (see :doc:`/citation`).
 
 Examples
 --------
@@ -29,21 +30,21 @@ Examples
 >>> import jax.numpy as jnp
 >>> import phasecurvefit as pcf
 
-Create phase-space data and run phase-flow walk:
+Create phase-space data and order it:
 
 >>> pos = {"x": jnp.linspace(0, 5, 20), "y": jnp.sin(jnp.linspace(0, jnp.pi, 20))}
 >>> vel = {"x": jnp.ones(20), "y": jnp.cos(jnp.linspace(0, jnp.pi, 20))}
->>> walkresult = pcf.order(pos, vel)
+>>> ordering = pcf.order(pos, vel)
 
 Train autoencoder to interpolate skipped tracers:
 
 >>> keys = jax.random.split(jax.random.key(0), 2)
 >>> normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
 >>> model = pcf.nn.PathAutoencoder.make(
-...     normalizer, gamma_range=walkresult.gamma_range, key=keys[0]
+...     normalizer, gamma_range=ordering.gamma_range, key=keys[0]
 ... )
 >>> cfg = pcf.nn.TrainingConfig(n_epochs_both=100, show_pbar=False)
->>> result, *_ = pcf.nn.train_autoencoder(model, walkresult, config=cfg, key=keys[1])
+>>> result, *_ = pcf.nn.train_autoencoder(model, ordering, config=cfg, key=keys[1])
 
 >>> list(result.positions.keys())
 ['x', 'y']

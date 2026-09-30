@@ -15,7 +15,12 @@ tracers by projecting them onto it.
 The SOM is a **smoothing** stage. Its prototypes are averages over many
 tracers, so the backbone it produces is far less sensitive to local noise than
 a greedy walk's step-by-step decisions or an MST's individual graph edges. It is
-most useful as a refinement *after* an initial ordering, and before fitting:
+most useful as a refinement *after* an initial ordering, and before fitting --
+which is exactly what the default pipeline does: `pcf.order(pos, vel)` with no
+orderer runs an {class}`~phasecurvefit.orderers.MSTOrderer` chained into a
+`SOMOrderer` (see
+[The default pipeline](orderers.md#the-default-pipeline-mst-then-som)). Chaining
+it explicitly gives you control over both stages:
 
 ```python
 import jax.numpy as jnp
@@ -361,7 +366,7 @@ published numbers will not reproduce bit-for-bit:
    above), mirroring {class}`~phasecurvefit.orderers.MSTOrderer`'s edge-length
    clipping.
 
-The BibTeX entry is in the [Citation](../index.md#citation) section.
+The BibTeX entry is on the [Citation page](../citation.md).
 
 ## See also
 
