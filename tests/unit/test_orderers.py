@@ -45,6 +45,61 @@ class TestOrdererNamespace:
         assert "cannot both be empty" not in str(exc_info.value)
 
 
+class TestDefaultPipeline:
+    """#57: a non-breaking walk-then-SOM pipeline, left out of ``order()``'s default."""
+
+    def test_chains_the_walk_and_the_som(self, arc):
+        """Enough tracers: the SOM stage runs, and its signature shows it did."""
+        pos, vel, _ = arc(n=60)
+        result = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
+        assert isinstance(result, pcf.orderers.OrderingResult)
+        assert result.gamma_range == (-1.0, 1.0)
+        assert result.backbone is not None
+
+    def test_recovers_the_arc_order(self, arc, spearman):
+        """The whole point: the chained result should track the truth well."""
+        curve = arc(n=60)
+        result = pcf.orderers.default_pipeline(
+            curve.positions, curve.velocities, n_prototypes=12
+        )
+        assert spearman(result, curve) > 0.99
+
+    def test_falls_back_to_the_walk_alone_below_n_prototypes(self):
+        """#57's own landmine: the library's small examples must keep working.
+
+        3 tracers, the package's own headline example size, with the SOM's
+        default n_prototypes=15 -- far too few for init_prototypes, which
+        would otherwise raise ``binning needs at least n_prototypes points``.
+        """
+        pos = {"x": jnp.array([0.0, 1.0, 2.0])}
+        vel = {"x": jnp.array([1.0, 1.0, 1.0])}
+        result = pcf.orderers.default_pipeline(pos, vel)
+        assert isinstance(result, pcf.WalkLocalFlowResult)
+        assert result.gamma_range == (0.0, 1.0)
+        assert jnp.array_equal(result.indices, jnp.array([0, 1, 2]))
+
+    def test_the_fallback_threshold_is_n_prototypes_itself(self, arc):
+        """Exactly at the threshold and one above it, not just far below."""
+        pos, vel, _ = arc(n=12)
+        below = pcf.orderers.default_pipeline(pos, vel, n_prototypes=13)
+        assert isinstance(below, pcf.WalkLocalFlowResult)
+        at_or_above = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
+        assert isinstance(at_or_above, pcf.orderers.OrderingResult)
+        # `WalkLocalFlowResult` subclasses `OrderingResult`, so the assertion
+        # above alone would still pass if the threshold were off by one and the
+        # SOM were skipped here too. Rule that out explicitly.
+        assert not isinstance(at_or_above, pcf.WalkLocalFlowResult)
+
+    def test_som_kwargs_reach_the_som_stage(self, arc):
+        """A caller can still tune the SOM through this entry point."""
+        pos, vel, _ = arc(n=60)
+        tight = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12, sigma_end=0.1)
+        loose = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12, sigma_end=5.0)
+        # Different smoothing must produce a different backbone -- otherwise
+        # sigma_end silently never reached the SOM.
+        assert not jnp.array_equal(tight.backbone["x"], loose.backbone["x"])
+
+
 class TestOrderingResultUnification:
     """OrderingResult is unified; WalkLocalFlowResult subclasses it."""
 

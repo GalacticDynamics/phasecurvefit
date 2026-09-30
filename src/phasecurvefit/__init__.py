@@ -80,6 +80,8 @@ __all__: tuple[str, ...] = (
     "StateMetadata",
     # Orderers
     "order",
+    # End-to-end
+    "fit_track",
     # Query configuration
     "WalkConfig",
     # Result accessor
@@ -95,6 +97,7 @@ from ._src.algorithm import (
     walk_local_flow,
 )
 from ._src.orderers.base import order
+from ._src.pipeline import fit_track
 from ._src.query_config import WalkConfig
 from ._version import version as __version__
 

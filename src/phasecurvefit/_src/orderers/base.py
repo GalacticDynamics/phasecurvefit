@@ -16,7 +16,11 @@ prefix of length ``n_visited``, with all remaining entries set to ``-1``;
 ``gamma_range`` is static.
 """
 
-__all__: tuple[str, ...] = ("AbstractOrderer", "chord_along_ordering", "order")
+__all__: tuple[str, ...] = (
+    "AbstractOrderer",
+    "chord_along_ordering",
+    "order",
+)
 
 import abc
 
