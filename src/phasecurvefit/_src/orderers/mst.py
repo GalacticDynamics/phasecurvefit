@@ -39,6 +39,8 @@ index that picked them.
 __all__: tuple[str, ...] = ("MSTOrderer",)
 
 import faulthandler
+import os
+import queue
 import threading
 import warnings
 from collections.abc import Callable
@@ -76,59 +78,74 @@ _EDGE_CLIP_MIN_RATIO = 2.0
 _EDGE_CLIP_SMALL_FRAC = 0.01
 
 
-# A generous, explicit stack size for _run_in_thread's worker thread, rather
-# than relying on whatever a given platform/container happens to default a new
-# thread's stack to (that default was insufficient on Linux CI even though it
-# was plenty on macOS -- see _run_in_thread's docstring). Reserving this much
-# address space is cheap: a thread's stack is committed lazily, page by page,
-# as it's actually used.
-_THREAD_STACK_SIZE = 64 * 1024 * 1024  # 64 MiB
-_stack_size_lock = threading.Lock()
+def _debug(msg: str) -> None:
+    # ponytail: temporary diagnostic for a Linux-CI-only segfault that leaves
+    # no faulthandler traceback; os.write bypasses Python's stdio buffering so
+    # a checkpoint survives even if the very next line crashes the process.
+    # Remove once the root cause is found. Defined before the worker thread is
+    # started below, since that thread calls this immediately.
+    os.write(2, f"[mst-debug pid={os.getpid()}] {msg}\n".encode())
+
+
+# A single, long-lived worker thread that runs every _run_in_thread() job.
+#
+# The original workaround (spawn a fresh threading.Thread per call, from
+# wherever _run_in_thread happened to be called) fixed a segfault reliably on
+# macOS, but the identical input still segfaulted identically on Linux CI --
+# even with an explicit, generous stack size on that fresh thread, and even
+# with faulthandler re-armed on it (which should have at least printed a
+# traceback, and didn't). That points away from "the new thread's stack was
+# too small" and toward "creating a *new* thread from inside jax.pure_callback's
+# own native dispatch thread is itself unsafe on some platforms" -- plausible,
+# since that dispatch thread is a foreign thread CPython has attached a
+# PyThreadState to (not one CPython created itself), and further threading
+# operations from such a thread are less well-trodden than from an ordinary one.
+#
+# A single worker thread sidesteps that concern entirely: it is created once,
+# here, at import time -- on whatever thread imports this module, which is
+# always an ordinary Python thread, never jax's callback-dispatch thread.
+# _run_in_thread() then only ever *hands work to* that already-running thread
+# via a queue; it never creates a thread from within pure_callback's dispatch
+# thread.
+_job_queue: "queue.Queue[tuple[Callable[[], object], queue.Queue]]" = queue.Queue()
+
+
+def _worker() -> None:
+    faulthandler.enable(all_threads=True)  # see _run_in_thread's docstring
+    _debug("worker thread alive")
+    while True:
+        fn, out = _job_queue.get()
+        _debug("worker got a job, calling fn()")
+        try:
+            result = fn()
+        except BaseException as exc:  # noqa: BLE001 -- forwarded to the caller
+            _debug(f"worker: fn() raised {exc!r}")
+            out.put(("err", exc))
+        else:
+            _debug("worker: fn() returned normally")
+            out.put(("ok", result))
+
+
+threading.Thread(target=_worker, daemon=True, name="phasecurvefit-mst-host").start()
 
 
 def _run_in_thread[T](fn: Callable[[], T]) -> T:
-    """Run ``fn`` on a freshly spawned thread and return its result, re-raising.
+    """Run ``fn`` on this module's persistent worker thread; re-raise there.
 
     Works around a segfault observed when scipy's ``cKDTree``/sparse-graph C
-    extensions run on the native thread ``jax.pure_callback`` dispatches the
-    host call onto: certain (non-adversarial, just unlucky) kNN tree shapes
-    recurse deep enough during ``cKDTree.query`` to overflow that thread's
-    stack. Giving the computation its own ``threading.Thread`` with an
-    explicit, generous stack size (rather than depending on a platform's
-    default, which is not reliably big enough -- see ``_THREAD_STACK_SIZE``)
-    was confirmed, by direct testing, to make inputs that previously crashed
-    the process run cleanly instead.
-
-    ``faulthandler.enable()`` is re-armed on the new thread: a crash's
-    registered signal handler is otherwise only guaranteed for the thread that
-    called it (typically the main thread, e.g. via pytest's own startup), so
-    without this a crash here would stay silent instead of printing a
-    traceback.
+    extensions run directly on the native thread ``jax.pure_callback``
+    dispatches the host call onto. See the module-level worker thread's
+    comment for why this hands work to an already-running thread rather than
+    spawning a new one on demand.
     """
-    box: dict[str, object] = {}
-
-    def _target() -> None:
-        faulthandler.enable(all_threads=True)
-        try:
-            box["result"] = fn()
-        except BaseException as exc:  # noqa: BLE001 -- re-raised below, on the caller's thread
-            box["exc"] = exc
-
-    with _stack_size_lock:
-        # threading.stack_size() is process-global (applies to every thread
-        # subsequently created, not just this one), so this only widens it for
-        # as long as it takes to start our own thread, then restores it.
-        previous_stack_size = threading.stack_size()
-        threading.stack_size(_THREAD_STACK_SIZE)
-        try:
-            thread = threading.Thread(target=_target)
-            thread.start()
-        finally:
-            threading.stack_size(previous_stack_size)
-    thread.join()
-    if "exc" in box:
-        raise box["exc"]  # type: ignore[misc]
-    return box["result"]  # type: ignore[return-value]
+    out: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=1)
+    _debug("enqueueing job")
+    _job_queue.put((fn, out))
+    kind, payload = out.get()
+    _debug(f"received result kind={kind!r}")
+    if kind == "err":
+        raise payload  # type: ignore[misc]
+    return payload  # type: ignore[return-value]
 
 
 def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
@@ -150,9 +167,12 @@ def _backbone_on_component(
     """
     sub = tree[nodes][:, nodes]
     # graph diameter via double shortest-path: farthest node a, then farthest b
+    _debug("shortest_path #1")
     d0 = shortest_path(sub, method="D", indices=0)
     a = int(np.nanargmax(np.where(np.isinf(d0), -1.0, d0)))
+    _debug("shortest_path #2")
     da, pred = shortest_path(sub, method="D", indices=a, return_predecessors=True)
+    _debug("shortest_path done")
     b = int(np.nanargmax(np.where(np.isinf(da), -1.0, da)))
     # walk predecessors b -> a to recover the backbone path
     bb: list[int] = []
@@ -168,7 +188,9 @@ def _backbone_on_component(
     seg = np.linalg.norm(np.diff(Cb, axis=0), axis=1)
     s_bb = np.concatenate([[0.0], np.cumsum(seg)])
     # project every component point onto the backbone -> along-track arc length
+    _debug("backbone cKDTree build+query")
     _, near = cKDTree(Cb).query(P[nodes])
+    _debug("backbone cKDTree query done")
     order_local = np.argsort(s_bb[near], kind="stable")
     return nodes[order_local], backbone_nodes, Cb
 
@@ -204,7 +226,8 @@ def _sigma_clip_edges(
     """
     log_floor = np.log(_EDGE_CLIP_MIN_RATIO)
     current = nodes
-    for _ in range(max_iters):
+    for iteration in range(max_iters):
+        _debug(f"sigma-clip iteration {iteration}")
         sub = tree[current][:, current].tocoo()
         upper = sub.row < sub.col  # undirected edges, once each
         ei, ej = sub.row[upper], sub.col[upper]
@@ -261,7 +284,11 @@ def _mst_backbone(
         return np.arange(n), np.arange(n)
 
     k_eff = int(min(k, n - 1))
-    nn_d, nn_i = cKDTree(P).query(P, k=k_eff + 1)
+    _debug(f"building cKDTree, n={n}")
+    kdtree = cKDTree(P)
+    _debug("cKDTree built, querying")
+    nn_d, nn_i = kdtree.query(P, k=k_eff + 1)
+    _debug("cKDTree query done")
     nn_d = np.atleast_2d(nn_d)
     nn_i = np.atleast_2d(nn_i)
 
@@ -290,10 +317,14 @@ def _mst_backbone(
 
     graph = csr_matrix((weights[keep], (rows[keep], cols[keep])), shape=(n, n))
     graph = graph.maximum(graph.T)  # symmetrise
+    _debug("computing minimum_spanning_tree")
     tree = minimum_spanning_tree(graph)
+    _debug("minimum_spanning_tree done")
     tree = tree + tree.T
 
+    _debug("computing connected_components")
     n_comp, labels = connected_components(tree, directed=False)
+    _debug("connected_components done")
     if n_comp != 1:
         msg = (
             f"kNN graph is disconnected into {n_comp} components "
@@ -589,12 +620,13 @@ class MSTOrderer(AbstractOrderer):
             )
 
             def _host_threaded(p: np.ndarray, v: np.ndarray) -> tuple:
-                # _run_in_thread works around a segfault: jax.pure_callback
-                # dispatches the host call onto a native thread whose stack is
-                # too small for some (unlucky, not adversarial) cKDTree query
-                # shapes, so give the computation a normal Python thread's
-                # stack instead. See _run_in_thread's docstring.
-                return _run_in_thread(lambda: _host(p, v))
+                # _run_in_thread works around a segfault observed when the
+                # host computation runs directly on the native thread
+                # jax.pure_callback dispatches onto. See its docstring.
+                _debug("_host_threaded called from pure_callback")
+                result = _run_in_thread(lambda: _host(p, v))
+                _debug("_host_threaded got a result back")
+                return result
 
             # Note: under an outer jax.jit/vmap, pure_callback only *records*
             # this call during tracing -- ``_host`` (and any
