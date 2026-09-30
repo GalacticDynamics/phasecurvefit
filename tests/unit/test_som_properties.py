@@ -192,6 +192,9 @@ class TestMetrics:
         forward = np.asarray(metric(one(pos, 0), one(vel, 0), pos, vel, scale))
         assert np.all(forward >= 0)
         assert forward[0] == pytest.approx(0.0, abs=1e-3)
+        # zero iff identical: `polylines` nudges every point apart, so every
+        # other point is a distinct observation and must have positive distance.
+        assert np.all(forward[1:] > 0)
 
         ab = float(
             metric(one(pos, 0), one(vel, 0), many(pos, -1), many(vel, -1), scale)[0]
