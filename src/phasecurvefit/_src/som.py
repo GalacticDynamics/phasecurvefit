@@ -17,31 +17,46 @@ Starkman, N., Bovy, J., Webb, J. J., Calvetti, D., & Somersalo, E. (2023).
 MNRAS 522(4), 5022-5036. https://arxiv.org/abs/2212.00949
 
 If you use this SOM stage in published work, please cite that paper. It
-deviates from the paper's method in eight places, listed in
+deviates from the paper's method in nine places, listed in
 :doc:`/guides/som`.
 
 """
 
-__all__: tuple[str, ...] = ("SOM1D", "chord", "densify", "fit", "init_prototypes")
+__all__: tuple[str, ...] = (
+    "SOM1D",
+    "FitResult",
+    "bmu_distance",
+    "chord",
+    "densify",
+    "fit",
+    "init_prototypes",
+)
 
-from typing import ClassVar, Final
+from typing import ClassVar, Final, NamedTuple
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.tree as jt
 import numpy as np
-from jaxtyping import Array, Float, PRNGKeyArray
+from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
+from jaxmore import bounded_while_loop
 from zeroth import zeroth
 
-from phasecurvefit._src.custom_types import FSz0, FSzN, ISzN, VectorComponents
+from phasecurvefit._src.custom_types import FSz0, ISzN, VectorComponents
 from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
     SpatialDistanceMetric,
 )
 
 _TINY: Final = 1e-12
+# Mirrors `MSTOrderer`'s `_EDGE_CLIP_MIN_RATIO`: a point's distance to its
+# best-matching unit must be at least this multiple of the (kept) median before
+# it is a clip candidate, floors the (multiplicative) threshold so a well-fit
+# lattice -- where the robust spread collapses to ~0 -- is not shredded by
+# microscopic quantization-error variation.
+_OUTLIER_CLIP_MIN_RATIO: Final = 2.0
 
 
 def _check_matching_keys(**components: VectorComponents) -> None:
@@ -269,7 +284,29 @@ def _distance_matrix(
     return jax.vmap(one)(positions, velocities)
 
 
-def fit(
+class FitResult(NamedTuple):
+    """Trained prototypes, and which data survived outlier clipping.
+
+    A named result rather than a bare tuple so ``kept`` -- absent unless
+    ``outlier_clip_sigma`` is set -- never changes how many values ``fit``
+    returns.
+
+    Attributes
+    ----------
+    prototype_positions, prototype_velocities : VectorComponents
+        Trained prototypes, shape ``(K,)`` per component.
+    kept : Bool[Array, " N"]
+        ``True`` for data that survived every outlier-clipping round.
+        All-``True`` when ``outlier_clip_sigma`` was ``None``.
+
+    """
+
+    prototype_positions: VectorComponents
+    prototype_velocities: VectorComponents
+    kept: Bool[Array, " N"]
+
+
+def _fit_core(
     proto_positions: VectorComponents,
     proto_velocities: VectorComponents,
     positions: VectorComponents,
@@ -277,91 +314,16 @@ def fit(
     /,
     *,
     metric: AbstractDistanceMetric,
-    metric_scale: float | FSz0 = 0.0,
-    n_epochs: int = 10,
-    sigma_start: float | None = None,
-    sigma_end: float = 0.7,
-    weights: FSzN | None = None,
+    metric_scale: float | FSz0,
+    n_epochs: int,
+    sigma_start: float | None,
+    sigma_end: float,
+    weights: Float[Array, " N"] | None,
 ) -> tuple[VectorComponents, VectorComponents]:
-    r"""Train a 1-D SOM by batch Kohonen updates.
+    r"""Run the batch-Kohonen scan itself, without the outlier-clip wrapper.
 
-    Each epoch assigns every datum to its best-matching unit, then replaces
-    every prototype by the neighbourhood-weighted mean of all the data:
-
-    .. math::
-
-        p_k \leftarrow \frac{\sum_n h_{c(n),k}\, w_n}{\sum_n h_{c(n),k}},
-        \qquad h_{ij} = \exp\!\left(-\frac{(i-j)^2}{2\sigma^2}\right)
-
-    The neighbourhood is equation (A8) of the paper on the paper's linear
-    lattice. The update replaces the paper's online form (A9)/(A10): there is no
-    learning rate. This batch form is the fixed point of the conventional
-    online Kohonen update, whose increment is proportional to ``w - p^(k)``
-    (:doc:`/guides/som` notes how that differs from (A9) as printed).
-
-    With ``weights`` the sums above become :math:`\\sum_n w_n h_{c(n),k}`, which
-    is what makes an *ensemble* of SOMs possible. Batch Kohonen is strongly
-    contractive -- a prototype is replaced outright by a mean of the data, so
-    it survives only through which datum it wins -- and members that agree on
-    their assignments stay merged for every later epoch. Perturbing a shared
-    initialization therefore does not produce a posterior; weighting the data
-    does, because each member then fits *different data*. Drawing multinomial
-    counts (:func:`bootstrap_weights`) is a bootstrap resample expressed as
-    weights, and 0/1 weights are a subsample.
-
-    ``sigma`` anneals geometrically from ``sigma_start`` to ``sigma_end``, so the
-    global ordering forms first and local detail is refined afterwards.
-    ``sigma_end`` is reached on the *last* epoch, so ``n_epochs=1`` runs its one
-    epoch at ``sigma_start`` and never narrows; pass ``sigma_start=sigma_end``
-    to train a single epoch at the final width.
-
-    Parameters
-    ----------
-    proto_positions, proto_velocities
-        Initial prototypes, shape ``(K,)`` per component.
-    positions, velocities
-        The data, shape ``(N,)`` per component.
-    metric
-        Any *symmetric* :class:`~phasecurvefit.metrics.AbstractDistanceMetric`;
-        see :class:`~phasecurvefit.orderers.SOMOrderer` for which, and why.
-    metric_scale
-        Scale parameter handed to ``metric``; see
-        :class:`~phasecurvefit.orderers.SOMOrderer`.
-    n_epochs
-        Number of batch updates. Static.
-    sigma_start
-        Initial neighbourhood width in lattice units. ``None`` uses
-        ``max(K / 4, sigma_end)``, i.e. ``K / 4`` floored at ``sigma_end`` so
-        the anneal is never inverted on a very small lattice.
-    sigma_end
-        Final neighbourhood width in lattice units.
-    weights
-        Per-datum non-negative weights, shape ``(N,)``. ``None`` weights every
-        datum equally, which is the plain fit. Assignment to a best-matching
-        unit is unweighted -- a zero-weight datum is still assigned, it just
-        contributes nothing to the mean -- so the shapes never depend on the
-        weights and this stays ``vmap``-able.
-
-    Returns
-    -------
-    tuple[dict, dict]
-        Trained prototype positions and velocities.
-
-    Examples
-    --------
-    >>> import jax.numpy as jnp
-    >>> import phasecurvefit as pcf
-    >>> from phasecurvefit import som
-
-    >>> pos = {"x": jnp.linspace(0.0, 9.0, 50), "y": jnp.zeros(50)}
-    >>> vel = {"x": jnp.ones(50), "y": jnp.zeros(50)}
-    >>> pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
-    >>> fq, fp = som.fit(
-    ...     pq, pp, pos, vel, metric=pcf.metrics.SpatialDistanceMetric(), n_epochs=20
-    ... )
-    >>> bool(jnp.all(jnp.diff(fq["x"]) > 0))
-    True
-
+    Split out of :func:`fit` so the clip-and-refit loop there can call this
+    directly instead of recursing into :func:`fit`.
     """
     _check_matching_keys(
         proto_positions=proto_positions,
@@ -389,15 +351,6 @@ def fit(
             f"densified into a backbone."
         )
         raise ValueError(msg)
-    n_obs = len(zeroth(positions.values()))
-    if weights is not None and jnp.shape(weights) != (n_obs,):
-        # Shape is static even under a transform, so this is safe to check here.
-        msg = (
-            f"weights must have shape ({n_obs},), one per datum; got "
-            f"{jnp.shape(weights)}."
-        )
-        raise ValueError(msg)
-
     start = max(n_prototypes / 4.0, sigma_end) if sigma_start is None else sigma_start
     if start <= 0:
         msg = f"sigma_start must be positive, got {start}."
@@ -425,14 +378,12 @@ def fit(
     # off-diagonal and their Gaussian underflows to zero regardless.
     lat = lattice.astype(stacked.dtype)
     lattice_sq = (lat[:, None] - lat[None, :]) ** 2
-    # Unweighted is `w = 1`, which makes the two segment sums below a count and
-    # a plain total -- identical to the unweighted form, not merely close.
-    w = (
-        jnp.ones((n_obs,), dtype=stacked.dtype)
+    omega = (
+        jnp.ones(stacked.shape[0], dtype=stacked.dtype)
         if weights is None
-        else jnp.asarray(weights).astype(stacked.dtype)
+        else jnp.asarray(weights, dtype=stacked.dtype)
     )
-    w = eqx.error_if(w, jnp.any(w < 0), "weights must be non-negative.")
+    weighted_stacked = stacked * omega[:, None]
 
     def epoch(
         carry: tuple[VectorComponents, VectorComponents], step: Array
@@ -449,10 +400,8 @@ def fit(
         # consumers -- a column sum and a matmul -- which blocked XLA from
         # fusing the whole (N, K) chain, so it materialized: `fit` peaked at
         # 416 MB for N=1e6, K=100 against 16 MB this way.
-        counts = jax.ops.segment_sum(w, bmu, num_segments=n_prototypes)
-        totals = jax.ops.segment_sum(
-            w[:, None] * stacked, bmu, num_segments=n_prototypes
-        )
+        counts = jax.ops.segment_sum(omega, bmu, num_segments=n_prototypes)
+        totals = jax.ops.segment_sum(weighted_stacked, bmu, num_segments=n_prototypes)
         neighbourhood = jnp.exp(-lattice_sq / (2.0 * sigma**2))
         weight = counts @ neighbourhood
         # A lattice unit no datum reaches has zero weight *and* zero numerator
@@ -472,18 +421,299 @@ def fit(
     return trained_q, trained_p
 
 
-def bootstrap_weights(key: PRNGKeyArray, n_obs: int, /) -> FSzN:
-    """Multinomial counts for one bootstrap resample, as weights for :func:`fit`.
+def bmu_distance(
+    metric: AbstractDistanceMetric,
+    metric_scale: float | FSz0,
+    positions: VectorComponents,
+    velocities: VectorComponents,
+    proto_positions: VectorComponents,
+    proto_velocities: VectorComponents,
+    /,
+) -> Float[Array, " N"]:
+    """Each datum's phase-space distance to its own best-matching prototype.
+
+    The quantization error `fit` minimizes but never returns: a large value
+    means a datum sits far from every prototype, whether because it is an
+    outlier or because the lattice is too coarse to reach it. Used internally
+    by :func:`fit` to decide which is which when ``outlier_clip_sigma`` is set.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+    >>> from phasecurvefit import som
+
+    >>> pos = {"x": jnp.linspace(0.0, 9.0, 50), "y": jnp.zeros(50)}
+    >>> vel = {"x": jnp.ones(50), "y": jnp.zeros(50)}
+    >>> pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
+    >>> result = som.fit(
+    ...     pq, pp, pos, vel, metric=pcf.metrics.SpatialDistanceMetric(), n_epochs=20
+    ... )
+    >>> d = som.bmu_distance(
+    ...     pcf.metrics.SpatialDistanceMetric(),
+    ...     0.0,
+    ...     pos,
+    ...     vel,
+    ...     result.prototype_positions,
+    ...     result.prototype_velocities,
+    ... )
+    >>> d.shape
+    (50,)
+    >>> bool(jnp.all(d >= 0))
+    True
+
+    """
+    d = _distance_matrix(
+        metric, metric_scale, positions, velocities, proto_positions, proto_velocities
+    )
+    return jnp.min(d, axis=1)
+
+
+def fit(
+    proto_positions: VectorComponents,
+    proto_velocities: VectorComponents,
+    positions: VectorComponents,
+    velocities: VectorComponents,
+    /,
+    *,
+    metric: AbstractDistanceMetric,
+    metric_scale: float | FSz0 = 0.0,
+    n_epochs: int = 10,
+    sigma_start: float | None = None,
+    sigma_end: float = 0.7,
+    weights: Float[Array, " N"] | None = None,
+    outlier_clip_sigma: float | None = None,
+    outlier_clip_max_iters: int = 5,
+) -> FitResult:
+    r"""Train a 1-D SOM by batch Kohonen updates.
+
+    Each epoch assigns every datum to its best-matching unit, then replaces
+    every prototype by the neighbourhood-weighted mean of all the data:
+
+    .. math::
+
+        p_k \leftarrow \frac{\sum_n h_{c(n),k}\, \omega_n\, w_n}
+                             {\sum_n h_{c(n),k}\, \omega_n},
+        \qquad h_{ij} = \exp\!\left(-\frac{(i-j)^2}{2\sigma^2}\right)
+
+    The neighbourhood is equation (A8) of the paper on the paper's linear
+    lattice. The update replaces the paper's online form (A9)/(A10): there is no
+    learning rate. This batch form is the fixed point of the conventional
+    online Kohonen update, whose increment is proportional to ``w - p^(k)``
+    (:doc:`/guides/som` notes how that differs from (A9) as printed). ``omega_n``
+    is ``weights``, defaulting to ``1`` for every datum -- the paper has no such
+    term, so this is an addition, not a further deviation from (A9)/(A10): with
+    the default, the sum above is exactly the un-weighted one.
+
+    ``sigma`` anneals geometrically from ``sigma_start`` to ``sigma_end``, so the
+    global ordering forms first and local detail is refined afterwards.
+    ``sigma_end`` is reached on the *last* epoch, so ``n_epochs=1`` runs its one
+    epoch at ``sigma_start`` and never narrows; pass ``sigma_start=sigma_end``
+    to train a single epoch at the final width.
+
+    Setting ``outlier_clip_sigma`` layers on iterated, robust rejection of
+    quantization-error outliers, mirroring
+    :attr:`~phasecurvefit.orderers.MSTOrderer.edge_clip_sigma` /
+    ``edge_clip_max_iters`` in both mechanism and iteration, applied to each
+    datum's distance to its best-matching unit (:func:`bmu_distance`) rather
+    than MST edge length. Each iteration:
+
+    1. refits with the current per-datum weight (``1`` for a kept datum, ``0``
+       for a rejected one -- so rejected data stop pulling on any prototype
+       without changing any array's shape);
+    2. among the still-kept data, in log space (distances are positive and
+       heavy-tailed): computes the median and a robust spread
+       (``1.4826 * MAD``), then rejects everything beyond
+       ``median + max(outlier_clip_sigma * spread, log(2))`` -- the floor
+       keeps a well-fit lattice, where the spread collapses to ~0, from being
+       shredded by microscopic quantization-error variation;
+    3. stops when a round rejects nothing new, or after
+       ``outlier_clip_max_iters`` rounds, whichever first -- a rejection is
+       never undone once made.
+
+    There is no graph here, so there is no analogue of MST's component-size
+    veto (a long edge that would fragment the graph is kept); a quantization
+    error is a per-datum quantity, not shared between data, so nothing here
+    can "reconnect" the way a spared MST edge can.
+
+    Parameters
+    ----------
+    proto_positions, proto_velocities
+        Initial prototypes, shape ``(K,)`` per component.
+    positions, velocities
+        The data, shape ``(N,)`` per component.
+    metric
+        Any *symmetric* :class:`~phasecurvefit.metrics.AbstractDistanceMetric`;
+        see :class:`~phasecurvefit.orderers.SOMOrderer` for which, and why.
+    metric_scale
+        Scale parameter handed to ``metric``; see
+        :class:`~phasecurvefit.orderers.SOMOrderer`.
+    n_epochs
+        Number of batch updates. Static.
+    sigma_start
+        Initial neighbourhood width in lattice units. ``None`` uses
+        ``max(K / 4, sigma_end)``, i.e. ``K / 4`` floored at ``sigma_end`` so
+        the anneal is never inverted on a very small lattice.
+    sigma_end
+        Final neighbourhood width in lattice units.
+    weights
+        Per-datum weight ``omega_n`` in the update above, shape ``(N,)``.
+        ``None`` (default) weighs every datum equally. A datum weighted ``0``
+        contributes to no prototype's update without changing any array's
+        shape. Mutually exclusive with ``outlier_clip_sigma``, which computes
+        its own weights round by round.
+    outlier_clip_sigma
+        Robust-sigma threshold in log space for outlier rejection. ``None``
+        (default) disables it -- ``fit`` then runs exactly one batch-Kohonen
+        pass, as if ``outlier_clip_sigma`` never existed. Otherwise must be
+        positive.
+    outlier_clip_max_iters
+        Maximum number of refit-and-reclip rounds when ``outlier_clip_sigma``
+        is set. Static; must be >= 1. Unused otherwise.
+
+    Returns
+    -------
+    FitResult
+        Trained prototype positions and velocities, and a boolean ``(N,)``
+        ``kept`` mask -- all-``True`` unless ``outlier_clip_sigma`` rejected
+        something. A named result rather than a bare tuple so adding
+        ``outlier_clip_sigma`` never changed how many values this function
+        returns.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+    >>> from phasecurvefit import som
+
+    >>> pos = {"x": jnp.linspace(0.0, 9.0, 50), "y": jnp.zeros(50)}
+    >>> vel = {"x": jnp.ones(50), "y": jnp.zeros(50)}
+    >>> pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
+    >>> result = som.fit(
+    ...     pq, pp, pos, vel, metric=pcf.metrics.SpatialDistanceMetric(), n_epochs=20
+    ... )
+    >>> bool(jnp.all(jnp.diff(result.prototype_positions["x"]) > 0))
+    True
+    >>> bool(jnp.all(result.kept))
+    True
+
+    With one wild outlier, ``outlier_clip_sigma`` finds it:
+
+    >>> pos_c = dict(pos)
+    >>> pos_c["y"] = pos_c["y"].at[25].set(50.0)
+    >>> pq, pp = som.init_prototypes(pos_c, vel, n_prototypes=6)
+    >>> result = som.fit(
+    ...     pq,
+    ...     pp,
+    ...     pos_c,
+    ...     vel,
+    ...     metric=pcf.metrics.SpatialDistanceMetric(),
+    ...     n_epochs=20,
+    ...     outlier_clip_sigma=3.0,
+    ... )
+    >>> bool(result.kept[25])
+    False
+    >>> int(result.kept.sum())
+    49
+
+    """
+    if outlier_clip_sigma is None:
+        trained_q, trained_p = _fit_core(
+            proto_positions,
+            proto_velocities,
+            positions,
+            velocities,
+            metric=metric,
+            metric_scale=metric_scale,
+            n_epochs=n_epochs,
+            sigma_start=sigma_start,
+            sigma_end=sigma_end,
+            weights=weights,
+        )
+        n = len(zeroth(positions.values()))
+        return FitResult(trained_q, trained_p, jnp.ones(n, dtype=bool))
+
+    if weights is not None:
+        msg = "weights and outlier_clip_sigma are mutually exclusive."
+        raise ValueError(msg)
+    if outlier_clip_sigma <= 0:
+        msg = f"outlier_clip_sigma must be positive, got {outlier_clip_sigma}."
+        raise ValueError(msg)
+    if outlier_clip_max_iters < 1:
+        msg = f"outlier_clip_max_iters must be >= 1, got {outlier_clip_max_iters}."
+        raise ValueError(msg)
+
+    n = len(zeroth(positions.values()))
+    dtype = zeroth(positions.values()).dtype
+    log_floor = jnp.log(_OUTLIER_CLIP_MIN_RATIO)
+
+    def refit(kept: Bool[Array, " N"]) -> tuple[VectorComponents, VectorComponents]:
+        return _fit_core(
+            proto_positions,
+            proto_velocities,
+            positions,
+            velocities,
+            metric=metric,
+            metric_scale=metric_scale,
+            n_epochs=n_epochs,
+            sigma_start=sigma_start,
+            sigma_end=sigma_end,
+            weights=kept.astype(dtype),
+        )
+
+    State = tuple[Bool[Array, " N"], VectorComponents, VectorComponents, Array]
+
+    def cond_fn(state: State) -> Array:
+        return state[-1]
+
+    def body_fn(state: State) -> State:
+        kept, _pq, _pp, _cut_any = state
+        pq, pp = refit(kept)
+        dist = bmu_distance(metric, metric_scale, positions, velocities, pq, pp)
+        candidate = kept & (dist > 0)
+        loglen = jnp.where(candidate, jnp.log(jnp.where(candidate, dist, 1.0)), jnp.nan)
+        med = jnp.nanmedian(loglen)
+        mad = jnp.nanmedian(jnp.abs(loglen - med))
+        threshold = med + jnp.maximum(outlier_clip_sigma * 1.4826 * mad, log_floor)
+        cut = candidate & (loglen > threshold)
+        return kept & ~cut, pq, pp, jnp.any(cut)
+
+    run_first_iteration = True
+    init_state: State = (
+        jnp.ones(n, dtype=bool),
+        jt.map(jnp.asarray, proto_positions),
+        jt.map(jnp.asarray, proto_velocities),
+        jnp.asarray(run_first_iteration),
+    )
+    kept, trained_q, trained_p, _ = bounded_while_loop(
+        cond_fn,
+        body_fn,
+        init_state,
+        max_steps=outlier_clip_max_iters,
+        check_termination=False,
+    )
+    return FitResult(trained_q, trained_p, kept)
+
+
+def bootstrap_weights(key: PRNGKeyArray, n_obs: int, /) -> Float[Array, " N"]:
+    """Multinomial counts for one bootstrap resample, as ``weights`` for :func:`fit`.
 
     Draws ``n_obs`` indices with replacement and returns how often each datum
-    was drawn. Passed as ``weights`` this is exactly a bootstrap resample: a
-    datum drawn twice counts twice in the neighbourhood-weighted mean, and one
-    never drawn counts not at all. Roughly ``1/e`` of the data is left out of
-    any given member, which is where the spread comes from.
+    was drawn. Handed to ``fit`` as ``weights`` this *is* a bootstrap resample:
+    a datum drawn twice counts twice in the neighbourhood-weighted mean, and
+    one never drawn counts not at all. Roughly ``1/e`` of the data is left out
+    of any member, which is where an ensemble's spread comes from.
 
-    Weights rather than gathered indices, because the weights keep every array
-    at shape ``(N,)``. An ensemble is then a ``vmap`` over a ``(M, N)`` weight
-    matrix, with the data passed once, instead of ``M`` gathered copies of it.
+    This exists because ``vmap`` alone does not give you an ensemble. Batch
+    Kohonen replaces each prototype outright with a mean of the data, so a
+    prototype survives only through which datum it wins; members that agree on
+    their assignments stay merged for every later epoch, and perturbing a
+    shared initialization converges to bit-identical members. The diversity has
+    to come from the data.
+
+    Counts rather than gathered indices, because counts keep every array at
+    shape ``(N,)``: an ensemble is a ``vmap`` over an ``(M, N)`` weight matrix
+    with the data passed once, not ``M`` copies of the data.
 
     Parameters
     ----------
@@ -516,9 +746,9 @@ def bootstrap_weights(key: PRNGKeyArray, n_obs: int, /) -> FSzN:
     >>> ws = jax.vmap(lambda k: som.bootstrap_weights(k, 50))(keys)
     >>> pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
     >>> metric = pcf.metrics.SpatialDistanceMetric()
-    >>> fq, _ = jax.vmap(lambda w: som.fit(pq, pp, pos, vel, metric=metric, weights=w))(
+    >>> fq = jax.vmap(lambda w: som.fit(pq, pp, pos, vel, metric=metric, weights=w))(
     ...     ws
-    ... )
+    ... ).prototype_positions
     >>> fq["x"].shape
     (4, 6)
 
@@ -925,19 +1155,10 @@ class SOM1D(eqx.Module):
         return len(zeroth(self.prototype_positions.values()))
 
     def fit(
-        self,
-        positions: VectorComponents,
-        velocities: VectorComponents,
-        /,
-        *,
-        weights: FSzN | None = None,
+        self, positions: VectorComponents, velocities: VectorComponents, /
     ) -> "SOM1D":
-        """Train on the data, returning a new SOM with updated prototypes.
-
-        ``weights`` is forwarded to :func:`fit`; see it for what weighting the
-        data buys, and :func:`bootstrap_weights` for drawing them.
-        """
-        pq, pp = fit(
+        """Train on the data, returning a new SOM with updated prototypes."""
+        result = fit(
             self.prototype_positions,
             self.prototype_velocities,
             positions,
@@ -947,10 +1168,11 @@ class SOM1D(eqx.Module):
             n_epochs=self.n_epochs,
             sigma_start=self.sigma_start,
             sigma_end=self.sigma_end,
-            weights=weights,
         )
         return eqx.tree_at(
-            lambda m: (m.prototype_positions, m.prototype_velocities), self, (pq, pp)
+            lambda m: (m.prototype_positions, m.prototype_velocities),
+            self,
+            (result.prototype_positions, result.prototype_velocities),
         )
 
     def backbone(self) -> tuple[VectorComponents, VectorComponents]:

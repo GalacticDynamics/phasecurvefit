@@ -206,6 +206,42 @@ wedges shrink to nothing, so no angle machinery is needed.
   {class}`~phasecurvefit.metrics.AlignedMomentumDistanceMetric` is not: it
   scores *forward along the direction of travel*, which is what a greedy walk
   step needs, and under it the lattice collapses toward the curve's head.
+- **`outlier_clip_sigma` / `outlier_clip_max_iters`** — see
+  [Outlier rejection](#outlier-rejection) below. `None` (default) disables it.
+
+## Outlier rejection
+
+`SOMOrderer` has no outlier rejection of its own by default, so field
+contamination drags the backbone off the curve. **The failure is silent**: the
+*ordering* stays good — rank correlation against truth stays above 0.99 even at
+20% contamination, because the ordering only needs the backbone roughly right
+along-track — but the *reconstructed track*, the actual deliverable, degrades
+up to 4x over that range. A user sees a smooth, plausible backbone that is
+simply in the wrong place, with nothing in the ordering quality to reveal it.
+
+Set `outlier_clip_sigma` to enable robust, iterated rejection by quantization
+error — each datum's distance to its own best-matching prototype:
+
+```python
+pcf.orderers.SOMOrderer(n_prototypes=25, outlier_clip_sigma=3.0)
+```
+
+Mirrors {attr}`~phasecurvefit.orderers.MSTOrderer.edge_clip_sigma` /
+`edge_clip_max_iters` in mechanism and naming: robust median/MAD clipping in
+log space (distances are positive and heavy-tailed), floored so a well-fit
+lattice — where the spread collapses to ~0 — is not shredded by microscopic
+variation, iterated (refit, reclip) up to `outlier_clip_max_iters` times or
+until a round rejects nothing new. Unlike `MSTOrderer`'s edge clipping there is
+no graph here and so no component-size veto: a quantization error belongs to
+one datum alone, not to an edge that could fragment a graph. A rejected datum
+gets `-1` in `indices` and `nan` in `chord`, the same contract as a point a
+prior stage never visited — so it composes with, rather than overrides, a
+prior stage's own rejections.
+
+Chaining after an orderer with its own rejection ({class}`~phasecurvefit.orderers.MSTOrderer`'s
+`edge_clip_sigma`) remains a complete alternative to this option, and the two
+compose: `MSTOrderer(edge_clip_sigma=3.0) | SOMOrderer()` rejects at the MST
+stage, before the SOM ever sees the contamination.
 
 ## When the SOM makes things worse
 
@@ -291,8 +327,8 @@ weights = jax.vmap(lambda k: som.bootstrap_weights(k, 300))(keys)
 
 
 def member(w):
-    fq, fp = som.fit(proto_q, proto_p, pos, vel, metric=metric, weights=w)
-    bq, bp = som.densify(fq, fp, factor=5)
+    res = som.fit(proto_q, proto_p, pos, vel, metric=metric, weights=w)
+    bq, bp = som.densify(res.prototype_positions, res.prototype_velocities, factor=5)
     return som.chord(bq, bp, pos, vel, metric=metric)
 
 
@@ -307,11 +343,13 @@ out of any given member. Weights rather than gathered indices keeps every array
 at shape `(N,)`: the ensemble is a `vmap` over an `(M, N)` weight matrix with
 the data passed once, not `M` copies of the data.
 
-The weight is a multiplicity, exactly. A weight of zero is the datum being
-absent — bit-identically so, not approximately — and an integer weight of `k`
-is the datum appearing `k` times. That is what makes multinomial counts a
-genuine bootstrap, and it means 0/1 weights are a subsample if you want the
-cheaper option.
+The weight is a multiplicity: a weight of zero is the datum being absent, and
+an integer weight of `k` is the datum appearing `k` times. That is what makes
+multinomial counts a genuine bootstrap rather than a perturbation that
+resembles one, and it means 0/1 weights are a subsample if you want the
+cheaper option. `weights` is the same parameter
+[outlier rejection](#outlier-rejection) uses; the two are mutually exclusive,
+since that one computes its own weights round by round.
 
 What the spread then *means* depends on what you varied. Resampling the data
 propagates sampling noise, which is usually the thing worth reporting. Varying
@@ -375,6 +413,10 @@ published numbers will not reproduce bit-for-bit:
    longitude produced by its §2.1 great-circle frame fit.
    {func}`~phasecurvefit.som.init_prototypes` bins along the first principal
    axis of the positions instead.
+9. **Outlier rejection is an addition**, not in the paper: optional, robust
+   rejection by quantization error (see [Outlier rejection](#outlier-rejection)
+   above), mirroring {class}`~phasecurvefit.orderers.MSTOrderer`'s edge-length
+   clipping.
 
 The BibTeX entry is in the [Citation](../index.md#citation) section.
 

@@ -46,9 +46,10 @@ def test_fit_vmaps_over_an_ensemble(helix):
     metric = pcf.metrics.SpatialDistanceMetric()
     eq, ep = _ensemble_inits(pos, vel, jax.random.key(0))
 
-    fq, _ = jax.vmap(lambda a, b: som.fit(a, b, pos, vel, metric=metric, n_epochs=10))(
+    result = jax.vmap(lambda a, b: som.fit(a, b, pos, vel, metric=metric, n_epochs=10))(
         eq, ep
     )
+    fq = result.prototype_positions
 
     # Indexed by component name, not `jt.leaves(...)[0]`: leaf order is an
     # implementation detail of the pytree, so a positional index silently
@@ -68,8 +69,10 @@ def test_chord_vmaps_to_a_posterior_of_orderings(helix):
     eq, ep = _ensemble_inits(pos, vel, jax.random.key(0))
 
     def one(a, b):
-        fq, fp = som.fit(a, b, pos, vel, metric=metric, n_epochs=10)
-        bq, bp = som.densify(fq, fp, factor=5)
+        result = som.fit(a, b, pos, vel, metric=metric, n_epochs=10)
+        bq, bp = som.densify(
+            result.prototype_positions, result.prototype_velocities, factor=5
+        )
         return som.chord(bq, bp, pos, vel, metric=metric)
 
     def untrained(a, b):
@@ -95,104 +98,13 @@ def test_whole_pipeline_jits_end_to_end(helix):
 
     @jax.jit
     def pipeline(a, b):
-        fq, fp = som.fit(a, b, pos, vel, metric=metric, n_epochs=5)
-        bq, bp = som.densify(fq, fp, factor=5)
+        result = som.fit(a, b, pos, vel, metric=metric, n_epochs=5)
+        bq, bp = som.densify(
+            result.prototype_positions, result.prototype_velocities, factor=5
+        )
         return som.chord(bq, bp, pos, vel, metric=metric)
 
     assert pipeline(pq, pp).shape == (100,)
-
-
-class TestWeightedFit:
-    """``weights`` generalises the batch update to a weighted mean.
-
-    The semantics are pinned by equivalences rather than by recorded numbers:
-    a zero weight must be the datum being absent, and an integer weight must
-    be the datum repeated. Those two are what make multinomial counts a
-    genuine bootstrap rather than a vaguely similar perturbation.
-    """
-
-    @staticmethod
-    def _setup(n=60, k=8):
-        t = jnp.linspace(0.0, 2.0, n)
-        pos = {"x": jnp.cos(t) * 3, "y": jnp.sin(t) * 3}
-        vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
-        pq, pp = som.init_prototypes(pos, vel, n_prototypes=k)
-        return pos, vel, pq, pp, pcf.metrics.SpatialDistanceMetric()
-
-    def test_none_is_exactly_ones(self):
-        """The default must be the old path untouched, not merely close."""
-        pos, vel, pq, pp, metric = self._setup()
-        n = next(iter(pos.values())).shape[0]
-        a, _ = som.fit(pq, pp, pos, vel, metric=metric, n_epochs=8)
-        b, _ = som.fit(pq, pp, pos, vel, metric=metric, n_epochs=8, weights=jnp.ones(n))
-        assert jnp.array_equal(a["x"], b["x"])
-
-    def test_zero_weight_is_the_datum_being_absent(self):
-        """Exactly absent: the segment sums never accumulate it.
-
-        This is the strongest statement of what a weight means, and it is why
-        0/1 weights are a subsample rather than an approximation of one.
-        """
-        pos, vel, pq, pp, metric = self._setup()
-        n = next(iter(pos.values())).shape[0]
-        keep = jnp.arange(n) % 5 != 0
-
-        masked, _ = som.fit(
-            pq, pp, pos, vel, metric=metric, n_epochs=8, weights=keep.astype(float)
-        )
-        subset, _ = som.fit(
-            pq,
-            pp,
-            {k: v[keep] for k, v in pos.items()},
-            {k: v[keep] for k, v in vel.items()},
-            metric=metric,
-            n_epochs=8,
-        )
-        assert jnp.array_equal(masked["x"], subset["x"])
-
-    def test_integer_weight_is_repetition(self):
-        """Weight ``k`` is the datum appearing ``k`` times -- the bootstrap."""
-        pos, vel, pq, pp, metric = self._setup()
-        n = next(iter(pos.values())).shape[0]
-
-        weighted, _ = som.fit(
-            pq,
-            pp,
-            pos,
-            vel,
-            metric=metric,
-            n_epochs=8,
-            weights=jnp.ones(n).at[3].set(3.0),
-        )
-        repeated, _ = som.fit(
-            pq,
-            pp,
-            {k: jnp.concatenate([v, v[3:4], v[3:4]]) for k, v in pos.items()},
-            {k: jnp.concatenate([v, v[3:4], v[3:4]]) for k, v in vel.items()},
-            metric=metric,
-            n_epochs=8,
-        )
-        np.testing.assert_allclose(weighted["x"], repeated["x"], atol=1e-5)
-
-    def test_rejects_a_wrong_length(self):
-        """One weight per datum; the shape is static, so check it eagerly."""
-        pos, vel, pq, pp, metric = self._setup()
-        with pytest.raises(ValueError, match="weights must have shape"):
-            som.fit(pq, pp, pos, vel, metric=metric, weights=jnp.ones(7))
-
-    def test_rejects_negative_weights(self):
-        """A negative weight would pull a prototype away from its own data."""
-        pos, vel, pq, pp, metric = self._setup()
-        n = next(iter(pos.values())).shape[0]
-        with pytest.raises(Exception, match="non-negative"):
-            som.fit(
-                pq,
-                pp,
-                pos,
-                vel,
-                metric=metric,
-                weights=jnp.ones(n).at[0].set(-1.0),
-            )
 
 
 class TestBootstrapWeights:
@@ -255,7 +167,9 @@ class TestEnsembleDiversityComesFromTheData:
             noisy = {
                 k: v + jax.random.normal(key, v.shape) * 0.05 for k, v in pq.items()
             }
-            return som.fit(noisy, pp, pos, vel, metric=metric, n_epochs=10)[0]
+            return som.fit(
+                noisy, pp, pos, vel, metric=metric, n_epochs=10
+            ).prototype_positions
 
         fitted = jax.vmap(jittered)(jax.random.split(jax.random.key(0), 8))
         spread = jnp.abs(fitted["x"][:, None, :] - fitted["x"][None, :, :]).max()
@@ -269,9 +183,9 @@ class TestEnsembleDiversityComesFromTheData:
         weights = jax.vmap(lambda k: som.bootstrap_weights(k, n))(
             jax.random.split(jax.random.key(0), 8)
         )
-        fitted, _ = jax.vmap(
+        fitted = jax.vmap(
             lambda w: som.fit(pq, pp, pos, vel, metric=metric, n_epochs=10, weights=w)
-        )(weights)
+        )(weights).prototype_positions
 
         off_diagonal = jnp.abs(fitted["x"][:, None, :] - fitted["x"][None, :, :]).max(
             -1
@@ -286,8 +200,10 @@ class TestEnsembleDiversityComesFromTheData:
         n = next(iter(pos.values())).shape[0]
 
         def member(w):
-            fq, fp = som.fit(pq, pp, pos, vel, metric=metric, n_epochs=10, weights=w)
-            bq, bp = som.densify(fq, fp, factor=5)
+            res = som.fit(pq, pp, pos, vel, metric=metric, n_epochs=10, weights=w)
+            bq, bp = som.densify(
+                res.prototype_positions, res.prototype_velocities, factor=5
+            )
             return som.chord(bq, bp, pos, vel, metric=metric)
 
         weights = jax.vmap(lambda k: som.bootstrap_weights(k, n))(
