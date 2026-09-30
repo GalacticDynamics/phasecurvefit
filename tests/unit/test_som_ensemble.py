@@ -126,6 +126,17 @@ class TestBootstrapWeights:
         left_out = float((w == 0).mean())
         assert left_out == pytest.approx(1 / np.e, abs=0.05)
 
+    @pytest.mark.parametrize("n_obs", [0, -1], ids=["zero", "negative"])
+    def test_rejects_a_non_positive_size(self, n_obs):
+        """Guarded eagerly because the failure underneath is unhelpful.
+
+        ``jax.random.randint`` with ``maxval <= minval`` does not name the
+        caller's mistake, and an empty weight vector would otherwise flow into
+        ``fit`` and only surface there as a shape mismatch.
+        """
+        with pytest.raises(ValueError, match="n_obs must be >= 1"):
+            som.bootstrap_weights(jax.random.key(0), n_obs)
+
     def test_vmaps_over_keys(self):
         """An ensemble maps over keys, so the draw must vmap and differ per key."""
         keys = jax.random.split(jax.random.key(0), 5)
