@@ -117,7 +117,7 @@ import phasecurvefit as lfw
 walkresult = lfw.walk_local_flow(pos, vel, ...)
 normalizer = lfw.nn.StandardScalerNormalizer(pos, vel)
 model = lfw.nn.PathAutoencoder.make(
-    normalizer, gamma_range=walkresult, key=jax.random.key(0)
+    normalizer, gamma_range=walkresult.gamma_range, key=jax.random.key(0)
 )
 result, *_ = lfw.nn.train_autoencoder(model, walkresult, key=jax.random.key(1))
 ```

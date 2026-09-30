@@ -56,7 +56,8 @@ extensions = [
     "sphinxcontrib.bibtex",
 ]
 
-bibtex_bibfiles = ["paper.bib"]
+# Relative to this file: the bibliography lives with the JOSS paper.
+bibtex_bibfiles = ["../paper/paper.bib"]
 bibtex_default_style = "plain"
 
 python_use_unqualified_type_names = True

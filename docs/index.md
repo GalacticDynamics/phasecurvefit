@@ -47,7 +47,6 @@ migration
 :hidden:
 :caption: More
 
-paper
 contributing
 ```
 
