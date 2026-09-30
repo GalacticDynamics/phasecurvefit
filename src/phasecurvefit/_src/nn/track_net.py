@@ -319,8 +319,8 @@ def decoder_loss(
     The mathematical form is:
 
     $$ \\ell_{\\theta}(\\theta) = \\sum_{n=1}^N w_n \\left[
-        \\lambda_q \\|x_n - x_{\\theta}(\\gamma_\\theta(x_n, v_n))\\|^2
-        + \\lambda_p \\|T_n - T_{\\theta}(\\gamma_\\theta(x_n, v_n))\\|^2
+        \\lambda_q \\|x_n - x_{\\theta}(\\gamma_{\\theta}(x_n, v_n))\\|^2
+        + \\lambda_p \\|T_n - T_{\\theta}(\\gamma_{\\theta}(x_n, v_n))\\|^2
     \\right] $$
 
     where:
