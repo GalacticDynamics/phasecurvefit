@@ -257,11 +257,66 @@ core ({func}`~phasecurvefit.som.fit`, {func}`~phasecurvefit.som.densify`,
 {func}`~phasecurvefit.som.chord`) is traceable either way, as the ensemble
 section below relies on.
 
-## A note on ensembles
+## Ensembles
 
-{mod}`phasecurvefit.som` is `vmap`-able. An ensemble additionally needs a
-diversity source — batch Kohonen is strongly contractive, so jittered
-initializations alone converge to bit-identical members.
+{mod}`phasecurvefit.som` is `vmap`-able, but that alone does not buy you an
+ensemble. Batch Kohonen is strongly contractive: each epoch replaces every
+prototype outright with a neighbourhood-weighted mean of the data, so a
+prototype survives only through *which datum it wins*. Once two members agree
+on their assignments — which happens within a few epochs on a smooth, well
+sampled curve — every later epoch is byte-identical and they stay merged.
+
+So perturbing a shared initialization does not work. Jittered members converge
+to *exactly* zero separation, which is pinned as a test rather than left as a
+warning.
+
+The diversity has to come from the data, which is what `weights` is for:
+
+```python
+import jax
+import jax.numpy as jnp
+
+import phasecurvefit as pcf
+from phasecurvefit import som
+
+t = jnp.linspace(0.0, 2.0, 300)
+pos = {"x": jnp.cos(t) * 3, "y": jnp.sin(t) * 3}
+vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
+metric = pcf.metrics.SpatialDistanceMetric()
+proto_q, proto_p = som.init_prototypes(pos, vel, n_prototypes=20)
+
+# One bootstrap resample per member, as counts.
+keys = jax.random.split(jax.random.key(0), 8)
+weights = jax.vmap(lambda k: som.bootstrap_weights(k, 300))(keys)
+
+
+def member(w):
+    fq, fp = som.fit(proto_q, proto_p, pos, vel, metric=metric, weights=w)
+    bq, bp = som.densify(fq, fp, factor=5)
+    return som.chord(bq, bp, pos, vel, metric=metric)
+
+
+chords = jax.vmap(member)(weights)
+assert chords.shape == (8, 300)
+assert float(jnp.std(chords, axis=0).mean()) > 0  # a real posterior
+```
+
+{func}`~phasecurvefit.som.bootstrap_weights` draws `N` indices with replacement
+and returns how often each datum came up, so roughly `1/e` of the data is left
+out of any given member. Weights rather than gathered indices keeps every array
+at shape `(N,)`: the ensemble is a `vmap` over an `(M, N)` weight matrix with
+the data passed once, not `M` copies of the data.
+
+The weight is a multiplicity, exactly. A weight of zero is the datum being
+absent — bit-identically so, not approximately — and an integer weight of `k`
+is the datum appearing `k` times. That is what makes multinomial counts a
+genuine bootstrap, and it means 0/1 weights are a subsample if you want the
+cheaper option.
+
+What the spread then *means* depends on what you varied. Resampling the data
+propagates sampling noise, which is usually the thing worth reporting. Varying
+only the initial lattice measures initialization sensitivity instead — a
+different question, and rarely the one being asked.
 
 ## References
 

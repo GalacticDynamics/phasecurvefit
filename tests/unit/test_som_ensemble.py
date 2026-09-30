@@ -6,6 +6,8 @@ Python branching on a traced value -- fix the core, not the test.
 
 import jax
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 import phasecurvefit as pcf
 from phasecurvefit import som
@@ -98,3 +100,200 @@ def test_whole_pipeline_jits_end_to_end(helix):
         return som.chord(bq, bp, pos, vel, metric=metric)
 
     assert pipeline(pq, pp).shape == (100,)
+
+
+class TestWeightedFit:
+    """``weights`` generalises the batch update to a weighted mean.
+
+    The semantics are pinned by equivalences rather than by recorded numbers:
+    a zero weight must be the datum being absent, and an integer weight must
+    be the datum repeated. Those two are what make multinomial counts a
+    genuine bootstrap rather than a vaguely similar perturbation.
+    """
+
+    @staticmethod
+    def _setup(n=60, k=8):
+        t = jnp.linspace(0.0, 2.0, n)
+        pos = {"x": jnp.cos(t) * 3, "y": jnp.sin(t) * 3}
+        vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
+        pq, pp = som.init_prototypes(pos, vel, n_prototypes=k)
+        return pos, vel, pq, pp, pcf.metrics.SpatialDistanceMetric()
+
+    def test_none_is_exactly_ones(self):
+        """The default must be the old path untouched, not merely close."""
+        pos, vel, pq, pp, metric = self._setup()
+        n = next(iter(pos.values())).shape[0]
+        a, _ = som.fit(pq, pp, pos, vel, metric=metric, n_epochs=8)
+        b, _ = som.fit(pq, pp, pos, vel, metric=metric, n_epochs=8, weights=jnp.ones(n))
+        assert jnp.array_equal(a["x"], b["x"])
+
+    def test_zero_weight_is_the_datum_being_absent(self):
+        """Exactly absent: the segment sums never accumulate it.
+
+        This is the strongest statement of what a weight means, and it is why
+        0/1 weights are a subsample rather than an approximation of one.
+        """
+        pos, vel, pq, pp, metric = self._setup()
+        n = next(iter(pos.values())).shape[0]
+        keep = jnp.arange(n) % 5 != 0
+
+        masked, _ = som.fit(
+            pq, pp, pos, vel, metric=metric, n_epochs=8, weights=keep.astype(float)
+        )
+        subset, _ = som.fit(
+            pq,
+            pp,
+            {k: v[keep] for k, v in pos.items()},
+            {k: v[keep] for k, v in vel.items()},
+            metric=metric,
+            n_epochs=8,
+        )
+        assert jnp.array_equal(masked["x"], subset["x"])
+
+    def test_integer_weight_is_repetition(self):
+        """Weight ``k`` is the datum appearing ``k`` times -- the bootstrap."""
+        pos, vel, pq, pp, metric = self._setup()
+        n = next(iter(pos.values())).shape[0]
+
+        weighted, _ = som.fit(
+            pq,
+            pp,
+            pos,
+            vel,
+            metric=metric,
+            n_epochs=8,
+            weights=jnp.ones(n).at[3].set(3.0),
+        )
+        repeated, _ = som.fit(
+            pq,
+            pp,
+            {k: jnp.concatenate([v, v[3:4], v[3:4]]) for k, v in pos.items()},
+            {k: jnp.concatenate([v, v[3:4], v[3:4]]) for k, v in vel.items()},
+            metric=metric,
+            n_epochs=8,
+        )
+        np.testing.assert_allclose(weighted["x"], repeated["x"], atol=1e-5)
+
+    def test_rejects_a_wrong_length(self):
+        """One weight per datum; the shape is static, so check it eagerly."""
+        pos, vel, pq, pp, metric = self._setup()
+        with pytest.raises(ValueError, match="weights must have shape"):
+            som.fit(pq, pp, pos, vel, metric=metric, weights=jnp.ones(7))
+
+    def test_rejects_negative_weights(self):
+        """A negative weight would pull a prototype away from its own data."""
+        pos, vel, pq, pp, metric = self._setup()
+        n = next(iter(pos.values())).shape[0]
+        with pytest.raises(Exception, match="non-negative"):
+            som.fit(
+                pq,
+                pp,
+                pos,
+                vel,
+                metric=metric,
+                weights=jnp.ones(n).at[0].set(-1.0),
+            )
+
+
+class TestBootstrapWeights:
+    """``bootstrap_weights`` draws one resample, expressed as counts."""
+
+    def test_counts_sum_to_n(self):
+        """N draws with replacement, so the counts total N."""
+        w = som.bootstrap_weights(jax.random.key(0), 300)
+        assert w.shape == (300,)
+        assert float(w.sum()) == pytest.approx(300.0)
+
+    def test_leaves_out_about_one_in_e(self):
+        """~1/e of the data missing per member is where the spread comes from.
+
+        A sampler that quietly returned all-ones would satisfy the sum check
+        above and produce a dead ensemble, so pin the omissions too.
+        """
+        w = som.bootstrap_weights(jax.random.key(0), 2000)
+        left_out = float((w == 0).mean())
+        assert left_out == pytest.approx(1 / np.e, abs=0.05)
+
+    def test_vmaps_over_keys(self):
+        """An ensemble maps over keys, so the draw must vmap and differ per key."""
+        keys = jax.random.split(jax.random.key(0), 5)
+        ws = jax.vmap(lambda k: som.bootstrap_weights(k, 120))(keys)
+        assert ws.shape == (5, 120)
+        assert not jnp.array_equal(ws[0], ws[1])
+
+
+class TestEnsembleDiversityComesFromTheData:
+    """The point of the weights: a posterior over *data*, not over inits.
+
+    An ensemble whose only diversity is the starting lattice measures
+    initialization sensitivity. These tests pin the contrast directly --
+    the same shared init is degenerate without weights and alive with them --
+    so a future change that re-merges the ensemble fails here rather than
+    quietly returning a zero-width posterior.
+    """
+
+    @staticmethod
+    def _setup(n=300, k=20):
+        t = jnp.linspace(0.0, 2.0, n)
+        pos = {"x": jnp.cos(t) * 3, "y": jnp.sin(t) * 3}
+        vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
+        pq, pp = som.init_prototypes(pos, vel, n_prototypes=k)
+        return pos, vel, pq, pp, pcf.metrics.SpatialDistanceMetric()
+
+    def test_jittering_a_shared_init_collapses(self):
+        """The degenerate construction, kept executable as the baseline.
+
+        This is not a wish -- it is what batch Kohonen does. A prototype is
+        replaced outright by a mean of the data, so it survives only through
+        which datum it wins; once two members agree on their assignments they
+        are merged for every later epoch. Measured here as *exactly* zero
+        separation, not merely small.
+        """
+        pos, vel, pq, pp, metric = self._setup()
+
+        def jittered(key):
+            noisy = {
+                k: v + jax.random.normal(key, v.shape) * 0.05 for k, v in pq.items()
+            }
+            return som.fit(noisy, pp, pos, vel, metric=metric, n_epochs=10)[0]
+
+        fitted = jax.vmap(jittered)(jax.random.split(jax.random.key(0), 8))
+        spread = jnp.abs(fitted["x"][:, None, :] - fitted["x"][None, :, :]).max()
+        assert float(spread) == 0.0
+
+    def test_bootstrap_weights_keep_members_apart(self):
+        """Same shared init, same everything -- only the weights differ."""
+        pos, vel, pq, pp, metric = self._setup()
+        n = next(iter(pos.values())).shape[0]
+
+        weights = jax.vmap(lambda k: som.bootstrap_weights(k, n))(
+            jax.random.split(jax.random.key(0), 8)
+        )
+        fitted, _ = jax.vmap(
+            lambda w: som.fit(pq, pp, pos, vel, metric=metric, n_epochs=10, weights=w)
+        )(weights)
+
+        off_diagonal = jnp.abs(fitted["x"][:, None, :] - fitted["x"][None, :, :]).max(
+            -1
+        )[~jnp.eye(8, dtype=bool)]
+        # Orders of magnitude above float32 noise, and above the exactly-zero
+        # collapse the jittered construction produces.
+        assert float(off_diagonal.min()) > 1e-3
+
+    def test_the_chord_posterior_has_width(self):
+        """What an ensemble is actually for: spread on the ordering itself."""
+        pos, vel, pq, pp, metric = self._setup()
+        n = next(iter(pos.values())).shape[0]
+
+        def member(w):
+            fq, fp = som.fit(pq, pp, pos, vel, metric=metric, n_epochs=10, weights=w)
+            bq, bp = som.densify(fq, fp, factor=5)
+            return som.chord(bq, bp, pos, vel, metric=metric)
+
+        weights = jax.vmap(lambda k: som.bootstrap_weights(k, n))(
+            jax.random.split(jax.random.key(0), 8)
+        )
+        chords = jax.vmap(member)(weights)
+
+        assert chords.shape == (8, n)
+        assert float(jnp.std(chords, axis=0).mean()) > 1e-3

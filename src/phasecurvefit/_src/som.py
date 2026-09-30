@@ -31,11 +31,11 @@ import jax
 import jax.numpy as jnp
 import jax.tree as jt
 import numpy as np
-from jaxtyping import Array, Float
+from jaxtyping import Array, Float, PRNGKeyArray
 
 from zeroth import zeroth
 
-from phasecurvefit._src.custom_types import FSz0, ISzN, VectorComponents
+from phasecurvefit._src.custom_types import FSz0, FSzN, ISzN, VectorComponents
 from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
     SpatialDistanceMetric,
@@ -281,6 +281,7 @@ def fit(
     n_epochs: int = 10,
     sigma_start: float | None = None,
     sigma_end: float = 0.7,
+    weights: FSzN | None = None,
 ) -> tuple[VectorComponents, VectorComponents]:
     r"""Train a 1-D SOM by batch Kohonen updates.
 
@@ -297,6 +298,16 @@ def fit(
     learning rate. This batch form is the fixed point of the conventional
     online Kohonen update, whose increment is proportional to ``w - p^(k)``
     (:doc:`/guides/som` notes how that differs from (A9) as printed).
+
+    With ``weights`` the sums above become :math:`\\sum_n w_n h_{c(n),k}`, which
+    is what makes an *ensemble* of SOMs possible. Batch Kohonen is strongly
+    contractive -- a prototype is replaced outright by a mean of the data, so
+    it survives only through which datum it wins -- and members that agree on
+    their assignments stay merged for every later epoch. Perturbing a shared
+    initialization therefore does not produce a posterior; weighting the data
+    does, because each member then fits *different data*. Drawing multinomial
+    counts (:func:`bootstrap_weights`) is a bootstrap resample expressed as
+    weights, and 0/1 weights are a subsample.
 
     ``sigma`` anneals geometrically from ``sigma_start`` to ``sigma_end``, so the
     global ordering forms first and local detail is refined afterwards.
@@ -324,6 +335,12 @@ def fit(
         the anneal is never inverted on a very small lattice.
     sigma_end
         Final neighbourhood width in lattice units.
+    weights
+        Per-datum non-negative weights, shape ``(N,)``. ``None`` weights every
+        datum equally, which is the plain fit. Assignment to a best-matching
+        unit is unweighted -- a zero-weight datum is still assigned, it just
+        contributes nothing to the mean -- so the shapes never depend on the
+        weights and this stays ``vmap``-able.
 
     Returns
     -------
@@ -372,6 +389,15 @@ def fit(
             f"densified into a backbone."
         )
         raise ValueError(msg)
+    n_obs = len(zeroth(positions.values()))
+    if weights is not None and jnp.shape(weights) != (n_obs,):
+        # Shape is static even under a transform, so this is safe to check here.
+        msg = (
+            f"weights must have shape ({n_obs},), one per datum; got "
+            f"{jnp.shape(weights)}."
+        )
+        raise ValueError(msg)
+
     start = max(n_prototypes / 4.0, sigma_end) if sigma_start is None else sigma_start
     if start <= 0:
         msg = f"sigma_start must be positive, got {start}."
@@ -399,6 +425,14 @@ def fit(
     # off-diagonal and their Gaussian underflows to zero regardless.
     lat = lattice.astype(stacked.dtype)
     lattice_sq = (lat[:, None] - lat[None, :]) ** 2
+    # Unweighted is `w = 1`, which makes the two segment sums below a count and
+    # a plain total -- identical to the unweighted form, not merely close.
+    w = (
+        jnp.ones((n_obs,), dtype=stacked.dtype)
+        if weights is None
+        else jnp.asarray(weights).astype(stacked.dtype)
+    )
+    w = eqx.error_if(w, jnp.any(w < 0), "weights must be non-negative.")
 
     def epoch(
         carry: tuple[VectorComponents, VectorComponents], step: Array
@@ -415,10 +449,10 @@ def fit(
         # consumers -- a column sum and a matmul -- which blocked XLA from
         # fusing the whole (N, K) chain, so it materialized: `fit` peaked at
         # 416 MB for N=1e6, K=100 against 16 MB this way.
-        counts = jax.ops.segment_sum(
-            jnp.ones_like(bmu, dtype=stacked.dtype), bmu, num_segments=n_prototypes
+        counts = jax.ops.segment_sum(w, bmu, num_segments=n_prototypes)
+        totals = jax.ops.segment_sum(
+            w[:, None] * stacked, bmu, num_segments=n_prototypes
         )
-        totals = jax.ops.segment_sum(stacked, bmu, num_segments=n_prototypes)
         neighbourhood = jnp.exp(-lattice_sq / (2.0 * sigma**2))
         weight = counts @ neighbourhood
         # A lattice unit no datum reaches has zero weight *and* zero numerator
@@ -436,6 +470,64 @@ def fit(
     init = (jt.map(jnp.asarray, proto_positions), jt.map(jnp.asarray, proto_velocities))
     (trained_q, trained_p), _ = jax.lax.scan(epoch, init, jnp.arange(n_epochs))
     return trained_q, trained_p
+
+
+def bootstrap_weights(key: PRNGKeyArray, n_obs: int, /) -> FSzN:
+    """Multinomial counts for one bootstrap resample, as weights for :func:`fit`.
+
+    Draws ``n_obs`` indices with replacement and returns how often each datum
+    was drawn. Passed as ``weights`` this is exactly a bootstrap resample: a
+    datum drawn twice counts twice in the neighbourhood-weighted mean, and one
+    never drawn counts not at all. Roughly ``1/e`` of the data is left out of
+    any given member, which is where the spread comes from.
+
+    Weights rather than gathered indices, because the weights keep every array
+    at shape ``(N,)``. An ensemble is then a ``vmap`` over a ``(M, N)`` weight
+    matrix, with the data passed once, instead of ``M`` gathered copies of it.
+
+    Parameters
+    ----------
+    key
+        A :func:`jax.random.key`. Split it per ensemble member.
+    n_obs
+        Number of observations, ``N``. Static.
+
+    Returns
+    -------
+    Array, shape (N,)
+        Counts summing to ``n_obs``.
+
+    Examples
+    --------
+    >>> import jax
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+    >>> from phasecurvefit import som
+
+    >>> pos = {"x": jnp.linspace(0.0, 9.0, 50), "y": jnp.zeros(50)}
+    >>> vel = {"x": jnp.ones(50), "y": jnp.zeros(50)}
+    >>> w = som.bootstrap_weights(jax.random.key(0), 50)
+    >>> w.shape, float(w.sum())
+    ((50,), 50.0)
+
+    An ensemble maps over the weights, not over copies of the data:
+
+    >>> keys = jax.random.split(jax.random.key(0), 4)
+    >>> ws = jax.vmap(lambda k: som.bootstrap_weights(k, 50))(keys)
+    >>> pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
+    >>> metric = pcf.metrics.SpatialDistanceMetric()
+    >>> fq, _ = jax.vmap(lambda w: som.fit(pq, pp, pos, vel, metric=metric, weights=w))(
+    ...     ws
+    ... )
+    >>> fq["x"].shape
+    (4, 6)
+
+    """
+    if n_obs < 1:
+        msg = f"n_obs must be >= 1, got {n_obs}."
+        raise ValueError(msg)
+    drawn = jax.random.randint(key, (n_obs,), 0, n_obs)
+    return jnp.bincount(drawn, length=n_obs).astype(float)
 
 
 def _catmull_rom(
@@ -833,9 +925,18 @@ class SOM1D(eqx.Module):
         return len(zeroth(self.prototype_positions.values()))
 
     def fit(
-        self, positions: VectorComponents, velocities: VectorComponents, /
+        self,
+        positions: VectorComponents,
+        velocities: VectorComponents,
+        /,
+        *,
+        weights: FSzN | None = None,
     ) -> "SOM1D":
-        """Train on the data, returning a new SOM with updated prototypes."""
+        """Train on the data, returning a new SOM with updated prototypes.
+
+        ``weights`` is forwarded to :func:`fit`; see it for what weighting the
+        data buys, and :func:`bootstrap_weights` for drawing them.
+        """
         pq, pp = fit(
             self.prototype_positions,
             self.prototype_velocities,
@@ -846,6 +947,7 @@ class SOM1D(eqx.Module):
             n_epochs=self.n_epochs,
             sigma_start=self.sigma_start,
             sigma_end=self.sigma_end,
+            weights=weights,
         )
         return eqx.tree_at(
             lambda m: (m.prototype_positions, m.prototype_velocities), self, (pq, pp)
