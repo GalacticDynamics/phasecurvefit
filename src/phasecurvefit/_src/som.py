@@ -17,12 +17,20 @@ Starkman, N., Bovy, J., Webb, J. J., Calvetti, D., & Somersalo, E. (2023).
 MNRAS 522(4), 5022-5036. https://arxiv.org/abs/2212.00949
 
 If you use this SOM stage in published work, please cite that paper. It
-deviates from the paper's method in eight places, listed in
+deviates from the paper's method in nine places, listed in
 :doc:`/guides/som`.
 
 """
 
-__all__: tuple[str, ...] = ("SOM1D", "chord", "densify", "fit", "init_prototypes")
+__all__: tuple[str, ...] = (
+    "SOM1D",
+    "bmu_distance",
+    "chord",
+    "densify",
+    "fit",
+    "fit_with_outlier_clip",
+    "init_prototypes",
+)
 
 from typing import ClassVar, Final
 
@@ -31,8 +39,9 @@ import jax
 import jax.numpy as jnp
 import jax.tree as jt
 import numpy as np
-from jaxtyping import Array, Float
+from jaxtyping import Array, Bool, Float
 
+from jaxmore import bounded_while_loop
 from zeroth import zeroth
 
 from phasecurvefit._src.custom_types import FSz0, ISzN, VectorComponents
@@ -42,6 +51,12 @@ from phasecurvefit._src.metrics import (
 )
 
 _TINY: Final = 1e-12
+# Mirrors `MSTOrderer`'s `_EDGE_CLIP_MIN_RATIO`: a point's distance to its
+# best-matching unit must be at least this multiple of the (kept) median before
+# it is a clip candidate, floors the (multiplicative) threshold so a well-fit
+# lattice -- where the robust spread collapses to ~0 -- is not shredded by
+# microscopic quantization-error variation.
+_OUTLIER_CLIP_MIN_RATIO: Final = 2.0
 
 
 def _check_matching_keys(**components: VectorComponents) -> None:
@@ -281,6 +296,7 @@ def fit(
     n_epochs: int = 10,
     sigma_start: float | None = None,
     sigma_end: float = 0.7,
+    weights: Float[Array, " N"] | None = None,
 ) -> tuple[VectorComponents, VectorComponents]:
     r"""Train a 1-D SOM by batch Kohonen updates.
 
@@ -289,14 +305,18 @@ def fit(
 
     .. math::
 
-        p_k \leftarrow \frac{\sum_n h_{c(n),k}\, w_n}{\sum_n h_{c(n),k}},
+        p_k \leftarrow \frac{\sum_n h_{c(n),k}\, \omega_n\, w_n}
+                             {\sum_n h_{c(n),k}\, \omega_n},
         \qquad h_{ij} = \exp\!\left(-\frac{(i-j)^2}{2\sigma^2}\right)
 
     The neighbourhood is equation (A8) of the paper on the paper's linear
     lattice. The update replaces the paper's online form (A9)/(A10): there is no
     learning rate. This batch form is the fixed point of the conventional
     online Kohonen update, whose increment is proportional to ``w - p^(k)``
-    (:doc:`/guides/som` notes how that differs from (A9) as printed).
+    (:doc:`/guides/som` notes how that differs from (A9) as printed). ``omega_n``
+    is ``weights``, defaulting to ``1`` for every datum -- the paper has no such
+    term, so this is an addition, not a further deviation from (A9)/(A10): with
+    the default, the sum above is exactly the un-weighted one.
 
     ``sigma`` anneals geometrically from ``sigma_start`` to ``sigma_end``, so the
     global ordering forms first and local detail is refined afterwards.
@@ -324,6 +344,12 @@ def fit(
         the anneal is never inverted on a very small lattice.
     sigma_end
         Final neighbourhood width in lattice units.
+    weights
+        Per-datum weight ``omega_n`` in the update above, shape ``(N,)``.
+        ``None`` (default) weighs every datum equally. A datum weighted ``0``
+        contributes to no prototype's update without changing any array's
+        shape -- used by :func:`fit_with_outlier_clip` and
+        :class:`~phasecurvefit.orderers.SOMOrderer`'s ``outlier_clip_sigma``.
 
     Returns
     -------
@@ -399,6 +425,12 @@ def fit(
     # off-diagonal and their Gaussian underflows to zero regardless.
     lat = lattice.astype(stacked.dtype)
     lattice_sq = (lat[:, None] - lat[None, :]) ** 2
+    omega = (
+        jnp.ones(stacked.shape[0], dtype=stacked.dtype)
+        if weights is None
+        else jnp.asarray(weights, dtype=stacked.dtype)
+    )
+    weighted_stacked = stacked * omega[:, None]
 
     def epoch(
         carry: tuple[VectorComponents, VectorComponents], step: Array
@@ -415,10 +447,8 @@ def fit(
         # consumers -- a column sum and a matmul -- which blocked XLA from
         # fusing the whole (N, K) chain, so it materialized: `fit` peaked at
         # 416 MB for N=1e6, K=100 against 16 MB this way.
-        counts = jax.ops.segment_sum(
-            jnp.ones_like(bmu, dtype=stacked.dtype), bmu, num_segments=n_prototypes
-        )
-        totals = jax.ops.segment_sum(stacked, bmu, num_segments=n_prototypes)
+        counts = jax.ops.segment_sum(omega, bmu, num_segments=n_prototypes)
+        totals = jax.ops.segment_sum(weighted_stacked, bmu, num_segments=n_prototypes)
         neighbourhood = jnp.exp(-lattice_sq / (2.0 * sigma**2))
         weight = counts @ neighbourhood
         # A lattice unit no datum reaches has zero weight *and* zero numerator
@@ -436,6 +466,196 @@ def fit(
     init = (jt.map(jnp.asarray, proto_positions), jt.map(jnp.asarray, proto_velocities))
     (trained_q, trained_p), _ = jax.lax.scan(epoch, init, jnp.arange(n_epochs))
     return trained_q, trained_p
+
+
+def bmu_distance(
+    metric: AbstractDistanceMetric,
+    metric_scale: float | FSz0,
+    positions: VectorComponents,
+    velocities: VectorComponents,
+    proto_positions: VectorComponents,
+    proto_velocities: VectorComponents,
+    /,
+) -> Float[Array, " N"]:
+    """Each datum's phase-space distance to its own best-matching prototype.
+
+    The quantization error `fit` minimizes but never returns: a large value
+    means a datum sits far from every prototype, whether because it is an
+    outlier or because the lattice is too coarse to reach it. Used by
+    :func:`fit_with_outlier_clip` to decide which is which.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+    >>> from phasecurvefit import som
+
+    >>> pos = {"x": jnp.linspace(0.0, 9.0, 50), "y": jnp.zeros(50)}
+    >>> vel = {"x": jnp.ones(50), "y": jnp.zeros(50)}
+    >>> pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
+    >>> fq, fp = som.fit(
+    ...     pq, pp, pos, vel, metric=pcf.metrics.SpatialDistanceMetric(), n_epochs=20
+    ... )
+    >>> d = som.bmu_distance(pcf.metrics.SpatialDistanceMetric(), 0.0, pos, vel, fq, fp)
+    >>> d.shape
+    (50,)
+    >>> bool(jnp.all(d >= 0))
+    True
+
+    """
+    d = _distance_matrix(
+        metric, metric_scale, positions, velocities, proto_positions, proto_velocities
+    )
+    return jnp.min(d, axis=1)
+
+
+def fit_with_outlier_clip(
+    proto_positions: VectorComponents,
+    proto_velocities: VectorComponents,
+    positions: VectorComponents,
+    velocities: VectorComponents,
+    /,
+    *,
+    metric: AbstractDistanceMetric,
+    metric_scale: float | FSz0 = 0.0,
+    n_epochs: int = 10,
+    sigma_start: float | None = None,
+    sigma_end: float = 0.7,
+    outlier_clip_sigma: float,
+    outlier_clip_max_iters: int = 5,
+) -> tuple[VectorComponents, VectorComponents, Bool[Array, " N"]]:
+    r"""Train a 1-D SOM with iterated, robust rejection of quantization-error outliers.
+
+    Mirrors :attr:`~phasecurvefit.orderers.MSTOrderer.edge_clip_sigma` /
+    ``edge_clip_max_iters`` in both mechanism and iteration, applied to each
+    datum's distance to its best-matching unit (:func:`bmu_distance`) rather
+    than MST edge length. Each iteration:
+
+    1. refits with the current per-datum weight (:func:`fit`'s ``weights``:
+       ``1`` for a kept datum, ``0`` for a rejected one -- so rejected data
+       stop pulling on any prototype without changing any array's shape);
+    2. among the still-kept data, in log space (distances are positive and
+       heavy-tailed): computes the median and a robust spread
+       (``1.4826 * MAD``), then rejects everything beyond
+       ``median + max(outlier_clip_sigma * spread, log(2))`` -- the floor
+       keeps a well-fit lattice, where the spread collapses to ~0, from being
+       shredded by microscopic quantization-error variation;
+    3. stops when a round rejects nothing new, or after
+       ``outlier_clip_max_iters`` rounds, whichever first -- a rejection is
+       never undone once made.
+
+    There is no graph here, so there is no analogue of MST's component-size
+    veto (a long edge that would fragment the graph is kept); a quantization
+    error is a per-datum quantity, not shared between data, so nothing here
+    can "reconnect" the way a spared MST edge can.
+
+    Parameters
+    ----------
+    proto_positions
+        As :func:`fit`.
+    proto_velocities
+        As :func:`fit`.
+    positions
+        As :func:`fit`.
+    velocities
+        As :func:`fit`.
+    metric
+        As :func:`fit`.
+    metric_scale, n_epochs, sigma_start, sigma_end
+        As :func:`fit`.
+    outlier_clip_sigma
+        Robust-sigma threshold in log space. Must be positive.
+    outlier_clip_max_iters
+        Maximum number of refit-and-reclip rounds. Static; must be >= 1.
+
+    Returns
+    -------
+    tuple[dict, dict, Array]
+        Trained prototype positions and velocities, and a boolean ``(N,)``
+        mask: ``True`` for data that survived every round.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+    >>> from phasecurvefit import som
+
+    >>> pos = {"x": jnp.linspace(0.0, 9.0, 50), "y": jnp.zeros(50)}
+    >>> vel = {"x": jnp.ones(50), "y": jnp.zeros(50)}
+    >>> pos["y"] = pos["y"].at[25].set(50.0)  # one wild outlier
+    >>> pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
+    >>> fq, fp, kept = som.fit_with_outlier_clip(
+    ...     pq,
+    ...     pp,
+    ...     pos,
+    ...     vel,
+    ...     metric=pcf.metrics.SpatialDistanceMetric(),
+    ...     n_epochs=20,
+    ...     outlier_clip_sigma=3.0,
+    ... )
+    >>> bool(kept[25])
+    False
+    >>> int(kept.sum())
+    49
+
+    """
+    if outlier_clip_sigma <= 0:
+        msg = f"outlier_clip_sigma must be positive, got {outlier_clip_sigma}."
+        raise ValueError(msg)
+    if outlier_clip_max_iters < 1:
+        msg = f"outlier_clip_max_iters must be >= 1, got {outlier_clip_max_iters}."
+        raise ValueError(msg)
+
+    n = len(zeroth(positions.values()))
+    dtype = zeroth(positions.values()).dtype
+    log_floor = jnp.log(_OUTLIER_CLIP_MIN_RATIO)
+
+    def refit(kept: Bool[Array, " N"]) -> tuple[VectorComponents, VectorComponents]:
+        return fit(
+            proto_positions,
+            proto_velocities,
+            positions,
+            velocities,
+            metric=metric,
+            metric_scale=metric_scale,
+            n_epochs=n_epochs,
+            sigma_start=sigma_start,
+            sigma_end=sigma_end,
+            weights=kept.astype(dtype),
+        )
+
+    State = tuple[Bool[Array, " N"], VectorComponents, VectorComponents, Array]
+
+    def cond_fn(state: State) -> Array:
+        return state[-1]
+
+    def body_fn(state: State) -> State:
+        kept, _pq, _pp, _cut_any = state
+        pq, pp = refit(kept)
+        dist = bmu_distance(metric, metric_scale, positions, velocities, pq, pp)
+        candidate = kept & (dist > 0)
+        loglen = jnp.where(candidate, jnp.log(jnp.where(candidate, dist, 1.0)), jnp.nan)
+        med = jnp.nanmedian(loglen)
+        mad = jnp.nanmedian(jnp.abs(loglen - med))
+        threshold = med + jnp.maximum(outlier_clip_sigma * 1.4826 * mad, log_floor)
+        cut = candidate & (loglen > threshold)
+        return kept & ~cut, pq, pp, jnp.any(cut)
+
+    run_first_iteration = True
+    init_state: State = (
+        jnp.ones(n, dtype=bool),
+        jt.map(jnp.asarray, proto_positions),
+        jt.map(jnp.asarray, proto_velocities),
+        jnp.asarray(run_first_iteration),
+    )
+    kept, trained_q, trained_p, _ = bounded_while_loop(
+        cond_fn,
+        body_fn,
+        init_state,
+        max_steps=outlier_clip_max_iters,
+        check_termination=False,
+    )
+    return trained_q, trained_p, kept
 
 
 def _catmull_rom(

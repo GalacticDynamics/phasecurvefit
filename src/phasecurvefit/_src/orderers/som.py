@@ -13,7 +13,7 @@ Starkman, N., Bovy, J., Webb, J. J., Calvetti, D., & Somersalo, E. (2023).
 MNRAS 522(4), 5022-5036. https://arxiv.org/abs/2212.00949
 
 If you use this orderer in published work, please cite that paper. It
-deviates from the paper's method in eight places, listed in full in
+deviates from the paper's method in nine places, listed in full in
 :doc:`/guides/som` -- they matter to anyone citing it for results
 produced here.
 
@@ -29,12 +29,14 @@ import jax
 import jax.numpy as jnp
 import plum
 
+from zeroth import zeroth
+
 from .base import AbstractOrderer, _check_component_keys
 from .result import OrderingResult
 from phasecurvefit._src import som as _som
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
-from phasecurvefit._src.custom_types import FSz0, FSzN, ISzN, VectorComponents
+from phasecurvefit._src.custom_types import BSzN, FSz0, FSzN, ISzN, VectorComponents
 from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
     FullPhaseSpaceDistanceMetric,
@@ -56,34 +58,52 @@ def _train_and_project(
     sigma_start: float | None,
     metric: AbstractDistanceMetric,
     metric_scale: float | FSz0,
-) -> tuple[VectorComponents, VectorComponents, FSzN]:
+) -> tuple[VectorComponents, VectorComponents, FSzN, BSzN]:
     """Run fit -> densify -> chord as one XLA program.
 
     Jitted so the metric's ``(N, M)`` intermediates fuse; run eagerly each is
     materialized separately, costing roughly 15x the memory at catalogue scale.
     ``init_prototypes`` stays outside so its ``eqx.error_if`` guard raises as an
     ordinary Python exception.
+
+    ``orderer.outlier_clip_sigma`` is a static field, so branching on it here
+    picks a Python function, not a traced value; the branch not taken is never
+    compiled.
     """
-    model = _som.SOM1D(
-        proto_q,
-        proto_p,
-        metric,
-        metric_scale=metric_scale,
-        n_epochs=orderer.n_epochs,
-        sigma_start=sigma_start,
-        sigma_end=orderer.sigma_end,
-        densify_factor=orderer.densify_factor,
-    ).fit(sub_q, sub_p)
-    backbone_q, backbone_p = model.backbone()
-    # The functional `chord` against the backbone already in hand, rather than
-    # `model.chord(...)`, which densifies a second time internally. XLA's CSE
-    # collapses the duplicate, so this costs no measurable compile or run time
-    # -- but it hands the tracer ~200 fewer StableHLO lines to build and then
-    # optimize away (1149 -> 949 at n=5e3, K=40).
+    if orderer.outlier_clip_sigma is None:
+        trained_q, trained_p = _som.fit(
+            proto_q,
+            proto_p,
+            sub_q,
+            sub_p,
+            metric=metric,
+            metric_scale=metric_scale,
+            n_epochs=orderer.n_epochs,
+            sigma_start=sigma_start,
+            sigma_end=orderer.sigma_end,
+        )
+        kept = jnp.ones(len(zeroth(sub_q.values())), dtype=bool)
+    else:
+        trained_q, trained_p, kept = _som.fit_with_outlier_clip(
+            proto_q,
+            proto_p,
+            sub_q,
+            sub_p,
+            metric=metric,
+            metric_scale=metric_scale,
+            n_epochs=orderer.n_epochs,
+            sigma_start=sigma_start,
+            sigma_end=orderer.sigma_end,
+            outlier_clip_sigma=orderer.outlier_clip_sigma,
+            outlier_clip_max_iters=orderer.outlier_clip_max_iters,
+        )
+    backbone_q, backbone_p = _som.densify(
+        trained_q, trained_p, factor=orderer.densify_factor
+    )
     lam = _som.chord(
         backbone_q, backbone_p, sub_q, sub_p, metric=metric, metric_scale=metric_scale
     )
-    return backbone_q, backbone_p, lam
+    return backbone_q, backbone_p, lam, kept
 
 
 def _scale_is_nonzero(scale: float | FSz0, /, *, remedy: str) -> bool:
@@ -191,6 +211,23 @@ class SOMOrderer(AbstractOrderer):
         to it: chained after a stage that already fixed one, setting this can
         silently reverse that stage's choice. Default ``False``, matching
         ``MSTOrderer``.
+    outlier_clip_sigma, outlier_clip_max_iters
+        Optional, robust rejection of quantization-error outliers, mirroring
+        :attr:`~phasecurvefit.orderers.MSTOrderer.edge_clip_sigma` /
+        ``edge_clip_max_iters`` in mechanism and naming. ``None`` (default)
+        disables it: the SOM has no outlier rejection of its own and field
+        contamination drags the backbone off the curve, silently -- the
+        *ordering* stays good (the fit only needs the backbone roughly right
+        along-track), but the reconstructed track, the actual deliverable, does
+        not. Set ``outlier_clip_sigma`` to a robust-sigma threshold (in log
+        space) to reject data whose distance to their best-matching prototype
+        is an outlier among the rest; ``outlier_clip_max_iters`` bounds how many
+        refit-and-reclip rounds run (default 5, matching ``MSTOrderer``'s
+        default). A rejected datum gets ``-1`` in :attr:`OrderingResult.indices`
+        and ``nan`` in :attr:`OrderingResult.chord`, the same contract as a point
+        a prior stage never visited -- composing with, not overriding, a prior
+        stage's own rejections. See :func:`phasecurvefit.som.fit_with_outlier_clip`
+        for the algorithm.
 
     Notes
     -----
@@ -242,6 +279,8 @@ class SOMOrderer(AbstractOrderer):
     sigma_end: float = eqx.field(static=True, default=0.7)
     densify_factor: int = eqx.field(static=True, default=5)
     orient_by_velocity: bool = eqx.field(static=True, default=False)
+    outlier_clip_sigma: float | None = eqx.field(static=True, default=None)
+    outlier_clip_max_iters: int = eqx.field(static=True, default=5)
 
     __citation__: ClassVar[str] = "https://arxiv.org/abs/2212.00949"
 
@@ -267,6 +306,18 @@ class SOMOrderer(AbstractOrderer):
             raise ValueError(msg)
         if self.sigma_end <= 0:
             msg = f"sigma_end must be positive, got {self.sigma_end}."
+            raise ValueError(msg)
+        if self.outlier_clip_sigma is not None and self.outlier_clip_sigma <= 0:
+            msg = (
+                f"outlier_clip_sigma must be None or positive, got "
+                f"{self.outlier_clip_sigma}."
+            )
+            raise ValueError(msg)
+        if self.outlier_clip_max_iters < 1:
+            msg = (
+                f"outlier_clip_max_iters must be >= 1, got "
+                f"{self.outlier_clip_max_iters}."
+            )
             raise ValueError(msg)
         if self.metric_scale is not None and jnp.ndim(self.metric_scale) != 0:
             # Shape is static even for a tracer, so this is safe to check when
@@ -543,7 +594,7 @@ class SOMOrderer(AbstractOrderer):
             else self.sigma_start
         )
         metric, metric_scale = self._resolve_metric(sub_q, sub_p, init)
-        backbone_q, backbone_p, lam = _train_and_project(
+        backbone_q, backbone_p, lam, kept = _train_and_project(
             self, proto_q, proto_p, sub_q, sub_p, sigma_start, metric, metric_scale
         )
         if self.orient_by_velocity:
@@ -566,16 +617,26 @@ class SOMOrderer(AbstractOrderer):
 
         # ``stable=True`` is JAX's default, made explicit because the tie
         # behaviour is a contract: observations with equal chord values keep
-        # the order they arrived in, i.e. the prior stage's ordering.
-        perm = jnp.argsort(lam, stable=True)
+        # the order they arrived in, i.e. the prior stage's ordering. A point
+        # ``outlier_clip_sigma`` rejected sorts to the end (its key is +inf,
+        # never its -- possibly tied -- ``lam``) rather than being dropped from
+        # ``work``, which would make its shape data-dependent; ``kept`` is
+        # all-``True`` when outlier rejection is off, reproducing the old sort
+        # and scatter exactly.
+        sort_key = jnp.where(kept, lam, jnp.inf)
+        perm = jnp.argsort(sort_key, stable=True)
         self._warn_if_disagrees(perm, sub_q, init)
-        ordered = work[perm]
+        ordered = jnp.where(kept[perm], work[perm], -1)
         indices = (
             jnp.full(n_obs, -1, dtype=jnp.int32)
             .at[: ordered.shape[0]]
             .set(ordered.astype(jnp.int32))
         )
-        chord_full = jnp.full(n_obs, jnp.nan, dtype=lam.dtype).at[work].set(lam)
+        chord_full = (
+            jnp.full(n_obs, jnp.nan, dtype=lam.dtype)
+            .at[work]
+            .set(jnp.where(kept, lam, jnp.nan))
+        )
 
         return OrderingResult(
             positions=full_q,

@@ -931,3 +931,154 @@ class TestTracingAStandaloneVersusChainedStage:
         result = pcf.order(pos, vel, chain)
         assert int(result.n_visited) == 60
         assert np.isfinite(np.asarray(result.chord)).all()
+
+
+def _contaminated_half_arc(n_arc=300, n_out=60, scatter=0.21, radius=5.0, seed=0):
+    """Half-turn arc plus uniform background contamination, per `#61`'s own measurement.
+
+    Cross-track scatter 0.21, uniform background sprinkled through the
+    bounding box. Returns ``(pos, vel, is_outlier)`` with the contaminants
+    appended after the arc points, each carrying a velocity uncorrelated with
+    the arc.
+    """
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0.0, 1.0, n_arc)
+    ang = np.pi * t
+    x = radius * np.cos(ang) + rng.normal(0.0, scatter, n_arc)
+    y = radius * np.sin(ang) + rng.normal(0.0, scatter, n_arc)
+    xi = rng.uniform(x.min(), x.max(), n_out)
+    yi = rng.uniform(y.min(), y.max(), n_out)
+    pos = {"x": jnp.asarray(np.r_[x, xi]), "y": jnp.asarray(np.r_[y, yi])}
+    vel = {
+        "x": jnp.asarray(np.r_[-np.sin(ang), rng.normal(0.0, 1.0, n_out)]),
+        "y": jnp.asarray(np.r_[np.cos(ang), rng.normal(0.0, 1.0, n_out)]),
+    }
+    is_outlier = np.r_[np.zeros(n_arc, bool), np.ones(n_out, bool)]
+    return pos, vel, is_outlier
+
+
+def _mean_dist_to_true_arc(backbone_q, radius=5.0, n_ref=2000):
+    """Mean distance from backbone points to the nearest point on the true arc.
+
+    The regression measure `#61` itself asks for: backbone error against
+    ground truth, not ordering quality -- ordering quality (rank correlation)
+    stays high under contamination even as the reconstructed track degrades,
+    so it cannot detect this failure.
+    """
+    ang = np.linspace(0.0, np.pi, n_ref)
+    ref = np.stack([radius * np.cos(ang), radius * np.sin(ang)], axis=-1)
+    bb = np.stack([np.asarray(backbone_q["x"]), np.asarray(backbone_q["y"])], axis=-1)
+    tree = cKDTree(ref)
+    dist, _ = tree.query(bb)
+    return float(dist.mean())
+
+
+class TestSOMOutlierClip:
+    """Optional sigma-clipping of SOM quantization error (``outlier_clip_sigma``)."""
+
+    def test_none_is_a_noop(self):
+        """``outlier_clip_sigma=None`` (default) leaves every point visited."""
+        pos, vel, _ = _contaminated_half_arc(n_out=0)
+        res = pcf.orderers.SOMOrderer(n_prototypes=25).order(pos, vel)
+        assert int(res.n_skipped) == 0
+
+    def test_rejects_contamination_keeps_arc(self):
+        """Clipping rejects most of the scattered background, keeps the arc.
+
+        Not all of it: some contaminants land close enough to the curve, by
+        chance, to be indistinguishable from genuine scatter (measured: 34/60
+        at this seed). That is the nature of the fixture, not a bug.
+        """
+        pos, vel, is_outlier = _contaminated_half_arc(n_arc=300, n_out=60)
+        res = pcf.orderers.SOMOrderer(n_prototypes=25, outlier_clip_sigma=3.0).order(
+            pos, vel
+        )
+        visited = {int(i) for i in np.asarray(res.indices) if i >= 0}
+        rejected = set(range(is_outlier.size)) - visited
+        n_out_rejected = sum(is_outlier[i] for i in rejected)
+        n_in_rejected = sum(1 for i in rejected if not is_outlier[i])
+        assert n_out_rejected >= 0.5 * int(is_outlier.sum())  # most background gone
+        assert n_in_rejected <= 0.05 * int((~is_outlier).sum())  # few genuine cut
+
+    def test_clean_arc_not_clipped(self):
+        """A clean arc with no contamination loses no genuine points.
+
+        Not a universal guarantee: a fixed-sigma threshold has a small,
+        expected false-positive rate over many points (measured: 0 or 1 of 300
+        depending on the noise draw). This seed's draw happens to clip none.
+        """
+        pos, vel, _ = _contaminated_half_arc(n_out=0, seed=1)
+        res = pcf.orderers.SOMOrderer(n_prototypes=25, outlier_clip_sigma=3.0).order(
+            pos, vel
+        )
+        assert int(res.n_skipped) == 0
+
+    def test_backbone_error_improves_under_contamination(self):
+        """The failure #61 measured: ordering quality hides it, backbone error does not.
+
+        The default degrades sharply as contamination rises; clipping keeps
+        the error a fraction of the unclipped default at the same
+        contamination level.
+        """
+        default_err, clipped_err = [], []
+        for n_out in (0, 60):
+            pos, vel, _ = _contaminated_half_arc(n_arc=300, n_out=n_out)
+            res_default = pcf.orderers.SOMOrderer(n_prototypes=25).order(pos, vel)
+            res_clipped = pcf.orderers.SOMOrderer(
+                n_prototypes=25, outlier_clip_sigma=3.0
+            ).order(pos, vel)
+            default_err.append(_mean_dist_to_true_arc(res_default.backbone))
+            clipped_err.append(_mean_dist_to_true_arc(res_clipped.backbone))
+
+        assert default_err[1] > 2.0 * default_err[0]  # unclipped: degrades sharply
+        assert clipped_err[1] < 0.5 * default_err[1]  # clipped: at least half the error
+
+    def test_invalid_sigma_raises(self):
+        """A non-positive ``outlier_clip_sigma`` is rejected at construction."""
+        with pytest.raises(ValueError, match="outlier_clip_sigma"):
+            pcf.orderers.SOMOrderer(outlier_clip_sigma=0.0)
+
+    def test_invalid_max_iters_raises(self):
+        """``outlier_clip_max_iters < 1`` is rejected at construction."""
+        with pytest.raises(ValueError, match="outlier_clip_max_iters"):
+            pcf.orderers.SOMOrderer(outlier_clip_sigma=3.0, outlier_clip_max_iters=0)
+
+    def test_composes_with_a_prior_stage(self):
+        """Chained: the SOM's own rejections narrow, never override, init's.
+
+        ``MSTOrderer(jump_cap=3.0, ...)`` here is loose enough to leave most of
+        the contamination in its own working set (measured: 59/60), which is
+        the point -- it isolates what the SOM's own clipping contributes on
+        top of whatever ``init`` already decided, rather than depending on a
+        prior stage to have done the rejecting.
+        """
+        pos, vel, is_outlier = _contaminated_half_arc(n_arc=300, n_out=60)
+        mst = pcf.orderers.MSTOrderer(k=10, jump_cap=3.0, edge_clip_sigma=3.0)
+        init = mst.order(pos, vel)
+        prior_visited = {int(i) for i in np.asarray(init.indices) if i >= 0}
+
+        baseline = pcf.orderers.SOMOrderer(n_prototypes=25).order(pos, vel, init=init)
+        chained = pcf.orderers.SOMOrderer(
+            n_prototypes=25, outlier_clip_sigma=3.0
+        ).order(pos, vel, init=init)
+        baseline_visited = {int(i) for i in np.asarray(baseline.indices) if i >= 0}
+        visited = {int(i) for i in np.asarray(chained.indices) if i >= 0}
+
+        assert visited <= prior_visited  # never readmits what init rejected
+        assert visited <= baseline_visited  # the clip only ever removes
+        newly_rejected = baseline_visited - visited
+        assert len(newly_rejected) > 0  # the clip does something on this init
+        assert sum(is_outlier[i] for i in newly_rejected) >= 0.9 * len(newly_rejected)
+
+    def test_standalone_traces_under_jit_and_vmap(self):
+        """Matches the module's own standalone traceability contract."""
+        pos, vel, _ = _contaminated_half_arc(n_arc=60, n_out=0)
+        orderer = pcf.orderers.SOMOrderer(n_prototypes=10, outlier_clip_sigma=3.0)
+
+        chord = jax.jit(lambda q, p: orderer.order(q, p).chord)(pos, vel)
+        assert chord.shape == (60,)
+
+        batched_pos = {k: jnp.stack([v, v]) for k, v in pos.items()}
+        batched_vel = {k: jnp.stack([v, v]) for k, v in vel.items()}
+        out = jax.vmap(lambda q, p: orderer.order(q, p).chord)(batched_pos, batched_vel)
+        assert out.shape == (2, 60)

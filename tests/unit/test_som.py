@@ -106,6 +106,121 @@ def test_fit_is_deterministic(helix):
     assert jnp.allclose(a["x"], b["x"])
 
 
+def test_fit_weights_none_matches_all_ones(helix):
+    """``weights=None`` (default) is exactly the equally-weighted update."""
+    pos, vel, _ = helix(n=100)
+    pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
+    metric = pcf.metrics.SpatialDistanceMetric()
+    a, _ = som.fit(pq, pp, pos, vel, metric=metric, n_epochs=10)
+    b, _ = som.fit(pq, pp, pos, vel, metric=metric, n_epochs=10, weights=jnp.ones(100))
+    assert jnp.allclose(a["x"], b["x"])
+
+
+def test_fit_zero_weight_excludes_a_datum(helix):
+    """A zero-weighted datum pulls on no prototype, without changing any shape."""
+    pos, vel, _ = helix(n=100)
+    pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
+    metric = pcf.metrics.SpatialDistanceMetric()
+    weights = jnp.ones(100).at[0].set(0.0)
+    # Moving the excluded datum far away must not move any trained prototype,
+    # since its weighted contribution to every segment sum is zero either way.
+    moved = {k: v.at[0].add(1e3) for k, v in pos.items()}
+    a, _ = som.fit(pq, pp, pos, vel, metric=metric, n_epochs=10, weights=weights)
+    b, _ = som.fit(pq, pp, moved, vel, metric=metric, n_epochs=10, weights=weights)
+    assert jnp.allclose(a["x"], b["x"])
+
+
+def test_bmu_distance_shape_and_sign(helix):
+    pos, vel, _ = helix(n=60)
+    pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
+    fq, fp = som.fit(
+        pq, pp, pos, vel, metric=pcf.metrics.SpatialDistanceMetric(), n_epochs=20
+    )
+    d = som.bmu_distance(pcf.metrics.SpatialDistanceMetric(), 0.0, pos, vel, fq, fp)
+    assert d.shape == (60,)
+    assert bool(jnp.all(d >= 0))
+
+
+class TestFitWithOutlierClip:
+    """``fit_with_outlier_clip``: robust, iterated rejection by quantization error."""
+
+    def test_rejects_a_wild_outlier(self, helix):
+        """A single point flung far off the curve is rejected, the rest kept."""
+        pos, vel, _ = helix(n=100, scatter=0.0)
+        pos = dict(pos)
+        pos["x"] = pos["x"].at[7].add(50.0)  # one point flung far off the curve
+        pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
+        _fq, _fp, kept = som.fit_with_outlier_clip(
+            pq,
+            pp,
+            pos,
+            vel,
+            metric=pcf.metrics.SpatialDistanceMetric(),
+            n_epochs=20,
+            outlier_clip_sigma=3.0,
+        )
+        assert not bool(kept[7])
+        assert int(kept.sum()) == 99
+
+    def test_clean_data_keeps_everything(self, helix):
+        """No spurious rejections on a curve with no outliers."""
+        pos, vel, _ = helix(n=100)
+        pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
+        _fq, _fp, kept = som.fit_with_outlier_clip(
+            pq,
+            pp,
+            pos,
+            vel,
+            metric=pcf.metrics.SpatialDistanceMetric(),
+            n_epochs=20,
+            outlier_clip_sigma=3.0,
+        )
+        assert bool(jnp.all(kept))
+
+    def test_is_jittable(self, helix):
+        """The whole refit-and-reclip loop compiles under jit."""
+        pos, vel, _ = helix(n=60)
+        pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
+        metric = pcf.metrics.SpatialDistanceMetric()
+        fn = jax.jit(
+            lambda a, b, c, d: som.fit_with_outlier_clip(
+                a, b, c, d, metric=metric, n_epochs=10, outlier_clip_sigma=3.0
+            )
+        )
+        out_q, _out_p, kept = fn(pq, pp, pos, vel)
+        assert out_q["x"].shape == (8,)
+        assert kept.shape == (60,)
+
+    def test_rejects_a_non_positive_sigma(self, helix):
+        """A non-positive ``outlier_clip_sigma`` is rejected, not silently accepted."""
+        pos, vel, _ = helix(n=30)
+        pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
+        with pytest.raises(ValueError, match="outlier_clip_sigma"):
+            som.fit_with_outlier_clip(
+                pq,
+                pp,
+                pos,
+                vel,
+                metric=pcf.metrics.SpatialDistanceMetric(),
+                outlier_clip_sigma=0.0,
+            )
+
+    def test_rejects_a_too_small_max_iters(self, helix):
+        """``outlier_clip_max_iters < 1`` is rejected, not silently accepted."""
+        pos, vel, _ = helix(n=30)
+        pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
+        with pytest.raises(ValueError, match="outlier_clip_max_iters"):
+            som.fit_with_outlier_clip(
+                pq,
+                pp,
+                pos,
+                vel,
+                metric=pcf.metrics.SpatialDistanceMetric(),
+                outlier_clip_sigma=3.0,
+                outlier_clip_max_iters=0,
+            )
+
+
 def test_densify_vertex_count(line):
     pos, vel = line(5, 4.0)
     bq, bp = som.densify(pos, vel, factor=10)
