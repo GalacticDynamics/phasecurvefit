@@ -38,7 +38,9 @@ index that picked them.
 
 __all__: tuple[str, ...] = ("MSTOrderer",)
 
+import threading
 import warnings
+from collections.abc import Callable
 from typing import Literal
 
 import equinox as eqx
@@ -71,6 +73,34 @@ _EDGE_CLIP_MIN_RATIO = 2.0
 # fewer than this fraction of the working points. Larger pieces are kept and
 # reconnected, so cutting a genuine sparse-region edge never discards stream.
 _EDGE_CLIP_SMALL_FRAC = 0.01
+
+
+def _run_in_thread[T](fn: Callable[[], T]) -> T:
+    """Run ``fn`` on a freshly spawned thread and return its result, re-raising.
+
+    Works around a segfault observed when scipy's ``cKDTree``/sparse-graph C
+    extensions run on the native thread ``jax.pure_callback`` dispatches the
+    host call onto: that thread's stack appears to be far smaller than a
+    normal Python thread's, and certain (non-adversarial, just unlucky) kNN
+    tree shapes recurse deep enough during ``cKDTree.query`` to overflow it.
+    Giving the computation its own ``threading.Thread`` -- with the platform's
+    normal default stack size -- was confirmed (by direct testing) to make the
+    same inputs that previously crashed the process run cleanly instead.
+    """
+    box: dict[str, object] = {}
+
+    def _target() -> None:
+        try:
+            box["result"] = fn()
+        except BaseException as exc:  # noqa: BLE001 -- re-raised below, on the caller's thread
+            box["exc"] = exc
+
+    thread = threading.Thread(target=_target)
+    thread.start()
+    thread.join()
+    if "exc" in box:
+        raise box["exc"]  # type: ignore[misc]
+    return box["result"]  # type: ignore[return-value]
 
 
 def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
@@ -515,12 +545,10 @@ class MSTOrderer(AbstractOrderer):
         V_static = jax.lax.stop_gradient(V)
 
         if not (isinstance(P, jax.core.Tracer) or isinstance(V, jax.core.Tracer)):
-            # Eager call (the common case): run directly on this thread. Same
-            # computation as the traced branch below, but without a round trip
-            # through jax.pure_callback -- whose CPU host-callback thread has
-            # been observed to segfault scipy's cKDTree/sparse-graph C
-            # extensions on some inputs (a JAX/SciPy threading interaction, not
-            # a bug in this module's logic).
+            # Eager call (the common case): run directly on this thread, no
+            # JAX overhead -- confirmed safe without _run_in_thread's fix (see
+            # below), since it's only pure_callback's own dispatch thread that
+            # triggers the crash.
             idx_full, backbone_idx_full, backbone_len = _host(P_static, V_static)
             idx_full = jnp.asarray(idx_full)
             backbone_idx_full = jnp.asarray(backbone_idx_full)
@@ -531,6 +559,15 @@ class MSTOrderer(AbstractOrderer):
                 jax.ShapeDtypeStruct((n,), jnp.int32),
                 jax.ShapeDtypeStruct((), jnp.int32),
             )
+
+            def _host_threaded(p: np.ndarray, v: np.ndarray) -> tuple:
+                # _run_in_thread works around a segfault: jax.pure_callback
+                # dispatches the host call onto a native thread whose stack is
+                # too small for some (unlucky, not adversarial) cKDTree query
+                # shapes, so give the computation a normal Python thread's
+                # stack instead. See _run_in_thread's docstring.
+                return _run_in_thread(lambda: _host(p, v))
+
             # Note: under an outer jax.jit/vmap, pure_callback only *records*
             # this call during tracing -- ``_host`` (and any
             # ``on_disconnected="raise"`` ValueError it raises) actually runs
@@ -539,7 +576,11 @@ class MSTOrderer(AbstractOrderer):
             # ``jax.errors.JaxRuntimeError`` (wrapping the original message),
             # not ``ValueError`` as it does eagerly.
             idx_full, backbone_idx_full, backbone_len = jax.pure_callback(
-                _host, result_shapes, P_static, V_static, vmap_method="sequential"
+                _host_threaded,
+                result_shapes,
+                P_static,
+                V_static,
+                vmap_method="sequential",
             )
 
         backbone_full = P[backbone_idx_full]  # JAX gather: gradient flows via P

@@ -302,6 +302,28 @@ class TestMSTJaxTraceability:
 
         assert jnp.any(jax.grad(loss)(pos["x"]) != 0.0)
 
+    def test_jit_does_not_crash_the_process_on_unlucky_knn_shapes(self):
+        """Regression test for a real segfault, not just a failing assertion.
+
+        ``jax.pure_callback``'s host-dispatch thread was found to have too
+        small a stack for some (unlucky, not adversarial) ``cKDTree`` query
+        shapes -- this exact input reliably crashed the whole process (not a
+        catchable exception) before ``_run_in_thread`` gave the host
+        computation a normal thread's stack instead. If that regresses, this
+        test does not fail cleanly -- it takes the interpreter down.
+        """
+        xs = jnp.concatenate([jnp.linspace(0.0, 9.0, 40), jnp.array([30.0])])
+        ys = jnp.concatenate([jnp.zeros(40), jnp.array([30.0])])
+        vel = {"x": jnp.ones(41), "y": jnp.zeros(41)}
+        clipper = pcf.orderers.MSTOrderer(k=10, jump_cap=50.0, edge_clip_sigma=3.0)
+
+        @jax.jit
+        def run(pos, vel):
+            return clipper.order(pos, vel).indices
+
+        out = run({"x": xs, "y": ys}, vel)
+        assert int((out >= 0).sum()) == 40  # the lone interloper still rejected
+
     def test_grad_of_indices_is_zero(self):
         """The discrete ordering/backbone_size have no gradient (backbone coords do)."""
         pos, vel, _t = _open_arc(n=60)
