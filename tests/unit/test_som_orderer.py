@@ -491,8 +491,9 @@ def test_som_warns_when_it_overhauls_the_prior_ordering():
     rng = np.random.default_rng(0)
     perm = jnp.asarray(rng.permutation(int((prior.indices >= 0).sum())))
     sub = {k: v[prior.ordering] for k, v in pos.items()}
+    kept = jnp.ones(perm.shape[0], dtype=bool)
     with pytest.warns(UserWarning, match="disagrees with the one it was given"):
-        som._warn_if_disagrees(perm, sub, prior)
+        som._warn_if_disagrees(perm, kept, sub, prior)
 
 
 def test_som_is_quiet_when_it_agrees_with_the_prior_ordering(arc):
@@ -503,9 +504,10 @@ def test_som_is_quiet_when_it_agrees_with_the_prior_ordering(arc):
     som = pcf.orderers.SOMOrderer(n_prototypes=40)
     sub = {k: v[prior.ordering] for k, v in pos.items()}
     perm = jnp.arange(int((prior.indices >= 0).sum()))
+    kept = jnp.ones(perm.shape[0], dtype=bool)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        som._warn_if_disagrees(perm, sub, prior)
+        som._warn_if_disagrees(perm, kept, sub, prior)
 
 
 def test_velocity_aware_stays_concrete_under_grad():
@@ -857,9 +859,10 @@ class TestDisagreementWarningIsBestEffort:
         orderer = pcf.orderers.SOMOrderer(n_prototypes=8)
         perm = self._disagreeing_perm(n, som_orderer._DISAGREE_WARN)
         sub_q = {"x": jnp.zeros(n), "y": jnp.zeros(n)}
+        kept = jnp.ones(n, dtype=bool)
 
         with pytest.warns(UserWarning, match="disagrees with the one it was given"):
-            orderer._warn_if_disagrees(perm, sub_q, self._Init())
+            orderer._warn_if_disagrees(perm, kept, sub_q, self._Init())
 
     def test_the_reported_fraction_is_unchanged_on_a_normal_track(self):
         """Cancelling ``length`` must not alter the number it used to print.
@@ -872,12 +875,36 @@ class TestDisagreementWarningIsBestEffort:
         orderer = pcf.orderers.SOMOrderer(n_prototypes=8, sigma_end=0.7)
         perm = self._disagreeing_perm(n, som_orderer._DISAGREE_WARN)
         sub_q = {"x": jnp.linspace(0.0, 3.0, n), "y": jnp.zeros(n)}
+        kept = jnp.ones(n, dtype=bool)
 
         with pytest.warns(UserWarning, match="% of the track") as record:
-            orderer._warn_if_disagrees(perm, sub_q, self._Init())
+            orderer._warn_if_disagrees(perm, kept, sub_q, self._Init())
 
         expected = 100 * 0.7 / (8 - 1)
         assert f"{expected:.1f}% of the track" in str(record[0].message)
+
+    def test_rejected_points_do_not_count_as_reordering(self):
+        """A sort key of +inf sends every rejected point to the tail of ``perm``.
+
+        Naively correlating that against its original position reads as
+        wholesale reordering even when the *kept* points kept perfect rank
+        order (correlation ~1.0 restricted to them) -- rejection showing up as
+        reordering, not reordering itself. Here half the points are rejected
+        and dumped in reverse at the tail: the full-set correlation is -0.75
+        (would have warned under the old, unfiltered computation), the
+        kept-only correlation is ~1.0 (must not warn).
+        """
+        n = 20
+        orderer = pcf.orderers.SOMOrderer(n_prototypes=8, sigma_end=0.7)
+        perm = jnp.asarray(
+            [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+        )
+        kept = jnp.arange(n) >= 10
+        sub_q = {"x": jnp.linspace(0.0, 3.0, n), "y": jnp.zeros(n)}
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            orderer._warn_if_disagrees(perm, kept, sub_q, self._Init())
 
 
 class TestTracingAStandaloneVersusChainedStage:

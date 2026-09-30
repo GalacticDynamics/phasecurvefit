@@ -438,7 +438,11 @@ class SOMOrderer(AbstractOrderer):
         return metric, scale
 
     def _warn_if_disagrees(
-        self, perm: ISzN, sub_q: VectorComponents, init: AbstractResult | None
+        self,
+        perm: ISzN,
+        kept: BSzN,
+        sub_q: VectorComponents,
+        init: AbstractResult | None,
     ) -> None:
         """Warn when the refined ordering disagrees wholesale with its input.
 
@@ -462,9 +466,15 @@ class SOMOrderer(AbstractOrderer):
         n = perm.shape[0]
         prior = jnp.arange(n)
         rank = jnp.zeros(n, dtype=perm.dtype).at[perm].set(prior)
-        # No concreteness guard here: this returns above when ``init is None``,
-        # and with an ``init`` the working-set selection in ``order`` has
-        # already refused to trace. Nothing reaches this line without values.
+        # A point ``outlier_clip_sigma`` rejected sorts to the tail regardless
+        # of its prior rank, which is rejection showing up as reordering, not
+        # reordering itself. No concreteness guard needed for this mask: this
+        # returns above when ``init is None``, and with an ``init`` the
+        # working-set selection in ``order`` has already refused to trace.
+        # Nothing reaches this line without values.
+        prior, rank = prior[kept], rank[kept]
+        if prior.shape[0] < 3:
+            return
         rho = float(jnp.abs(jnp.corrcoef(prior, rank)[0, 1]))
         if rho >= _DISAGREE_WARN:
             return
@@ -625,7 +635,7 @@ class SOMOrderer(AbstractOrderer):
         # and scatter exactly.
         sort_key = jnp.where(kept, lam, jnp.inf)
         perm = jnp.argsort(sort_key, stable=True)
-        self._warn_if_disagrees(perm, sub_q, init)
+        self._warn_if_disagrees(perm, kept, sub_q, init)
         ordered = jnp.where(kept[perm], work[perm], -1)
         indices = (
             jnp.full(n_obs, -1, dtype=jnp.int32)
