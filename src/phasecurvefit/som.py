@@ -13,6 +13,22 @@ If you use this module, please cite that paper.
 
 """
 
-__all__: tuple[str, ...] = ("SOM1D", "chord", "densify", "fit", "init_prototypes")
+__all__: tuple[str, ...] = (
+    "SOM1D",
+    "FitResult",
+    "bmu_distance",
+    "chord",
+    "densify",
+    "fit",
+    "init_prototypes",
+)
 
-from ._src.som import SOM1D, chord, densify, fit, init_prototypes
+from ._src.som import (
+    SOM1D,
+    FitResult,
+    bmu_distance,
+    chord,
+    densify,
+    fit,
+    init_prototypes,
+)
