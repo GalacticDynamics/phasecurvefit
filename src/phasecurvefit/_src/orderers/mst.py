@@ -38,6 +38,7 @@ index that picked them.
 
 __all__: tuple[str, ...] = ("MSTOrderer",)
 
+import faulthandler
 import threading
 import warnings
 from collections.abc import Callable
@@ -75,28 +76,55 @@ _EDGE_CLIP_MIN_RATIO = 2.0
 _EDGE_CLIP_SMALL_FRAC = 0.01
 
 
+# A generous, explicit stack size for _run_in_thread's worker thread, rather
+# than relying on whatever a given platform/container happens to default a new
+# thread's stack to (that default was insufficient on Linux CI even though it
+# was plenty on macOS -- see _run_in_thread's docstring). Reserving this much
+# address space is cheap: a thread's stack is committed lazily, page by page,
+# as it's actually used.
+_THREAD_STACK_SIZE = 64 * 1024 * 1024  # 64 MiB
+_stack_size_lock = threading.Lock()
+
+
 def _run_in_thread[T](fn: Callable[[], T]) -> T:
     """Run ``fn`` on a freshly spawned thread and return its result, re-raising.
 
     Works around a segfault observed when scipy's ``cKDTree``/sparse-graph C
     extensions run on the native thread ``jax.pure_callback`` dispatches the
-    host call onto: that thread's stack appears to be far smaller than a
-    normal Python thread's, and certain (non-adversarial, just unlucky) kNN
-    tree shapes recurse deep enough during ``cKDTree.query`` to overflow it.
-    Giving the computation its own ``threading.Thread`` -- with the platform's
-    normal default stack size -- was confirmed (by direct testing) to make the
-    same inputs that previously crashed the process run cleanly instead.
+    host call onto: certain (non-adversarial, just unlucky) kNN tree shapes
+    recurse deep enough during ``cKDTree.query`` to overflow that thread's
+    stack. Giving the computation its own ``threading.Thread`` with an
+    explicit, generous stack size (rather than depending on a platform's
+    default, which is not reliably big enough -- see ``_THREAD_STACK_SIZE``)
+    was confirmed, by direct testing, to make inputs that previously crashed
+    the process run cleanly instead.
+
+    ``faulthandler.enable()`` is re-armed on the new thread: a crash's
+    registered signal handler is otherwise only guaranteed for the thread that
+    called it (typically the main thread, e.g. via pytest's own startup), so
+    without this a crash here would stay silent instead of printing a
+    traceback.
     """
     box: dict[str, object] = {}
 
     def _target() -> None:
+        faulthandler.enable(all_threads=True)
         try:
             box["result"] = fn()
         except BaseException as exc:  # noqa: BLE001 -- re-raised below, on the caller's thread
             box["exc"] = exc
 
-    thread = threading.Thread(target=_target)
-    thread.start()
+    with _stack_size_lock:
+        # threading.stack_size() is process-global (applies to every thread
+        # subsequently created, not just this one), so this only widens it for
+        # as long as it takes to start our own thread, then restores it.
+        previous_stack_size = threading.stack_size()
+        threading.stack_size(_THREAD_STACK_SIZE)
+        try:
+            thread = threading.Thread(target=_target)
+            thread.start()
+        finally:
+            threading.stack_size(previous_stack_size)
     thread.join()
     if "exc" in box:
         raise box["exc"]  # type: ignore[misc]
