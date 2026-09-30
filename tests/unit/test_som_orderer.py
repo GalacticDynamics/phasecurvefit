@@ -279,7 +279,7 @@ def test_fit_with_the_default_metric_covers_the_data():
 
     orderer = pcf.orderers.SOMOrderer(n_prototypes=11)
     pq, pp = som.init_prototypes(pos, vel, n_prototypes=11)
-    fq, _ = som.fit(
+    result = som.fit(
         pq,
         pp,
         pos,
@@ -291,7 +291,7 @@ def test_fit_with_the_default_metric_covers_the_data():
 
     # Ideal spacing for 11 prototypes over 10 units is 1.0, so a lattice that
     # tracks the data leaves a gap well under 1; a collapsed one leaves > 2.
-    assert _max_coverage_gap(fq, pos) < 1.0
+    assert _max_coverage_gap(result.prototype_positions, pos) < 1.0
 
 
 def test_som_orderer_default_metric_is_symmetric(arc):

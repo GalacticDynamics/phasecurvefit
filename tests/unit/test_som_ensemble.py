@@ -44,9 +44,10 @@ def test_fit_vmaps_over_an_ensemble(helix):
     metric = pcf.metrics.SpatialDistanceMetric()
     eq, ep = _ensemble_inits(pos, vel, jax.random.key(0))
 
-    fq, _ = jax.vmap(lambda a, b: som.fit(a, b, pos, vel, metric=metric, n_epochs=10))(
+    result = jax.vmap(lambda a, b: som.fit(a, b, pos, vel, metric=metric, n_epochs=10))(
         eq, ep
     )
+    fq = result.prototype_positions
 
     # Indexed by component name, not `jt.leaves(...)[0]`: leaf order is an
     # implementation detail of the pytree, so a positional index silently
@@ -66,8 +67,10 @@ def test_chord_vmaps_to_a_posterior_of_orderings(helix):
     eq, ep = _ensemble_inits(pos, vel, jax.random.key(0))
 
     def one(a, b):
-        fq, fp = som.fit(a, b, pos, vel, metric=metric, n_epochs=10)
-        bq, bp = som.densify(fq, fp, factor=5)
+        result = som.fit(a, b, pos, vel, metric=metric, n_epochs=10)
+        bq, bp = som.densify(
+            result.prototype_positions, result.prototype_velocities, factor=5
+        )
         return som.chord(bq, bp, pos, vel, metric=metric)
 
     def untrained(a, b):
@@ -93,8 +96,10 @@ def test_whole_pipeline_jits_end_to_end(helix):
 
     @jax.jit
     def pipeline(a, b):
-        fq, fp = som.fit(a, b, pos, vel, metric=metric, n_epochs=5)
-        bq, bp = som.densify(fq, fp, factor=5)
+        result = som.fit(a, b, pos, vel, metric=metric, n_epochs=5)
+        bq, bp = som.densify(
+            result.prototype_positions, result.prototype_velocities, factor=5
+        )
         return som.chord(bq, bp, pos, vel, metric=metric)
 
     assert pipeline(pq, pp).shape == (100,)

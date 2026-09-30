@@ -29,8 +29,6 @@ import jax
 import jax.numpy as jnp
 import plum
 
-from zeroth import zeroth
-
 from .base import AbstractOrderer, _check_component_keys
 from .result import OrderingResult
 from phasecurvefit._src import som as _som
@@ -66,44 +64,31 @@ def _train_and_project(
     ``init_prototypes`` stays outside so its ``eqx.error_if`` guard raises as an
     ordinary Python exception.
 
-    ``orderer.outlier_clip_sigma`` is a static field, so branching on it here
-    picks a Python function, not a traced value; the branch not taken is never
-    compiled.
+    ``outlier_clip_sigma=None`` (the default) makes ``fit`` run exactly one
+    batch-Kohonen pass, same as before this parameter existed.
     """
-    if orderer.outlier_clip_sigma is None:
-        trained_q, trained_p = _som.fit(
-            proto_q,
-            proto_p,
-            sub_q,
-            sub_p,
-            metric=metric,
-            metric_scale=metric_scale,
-            n_epochs=orderer.n_epochs,
-            sigma_start=sigma_start,
-            sigma_end=orderer.sigma_end,
-        )
-        kept = jnp.ones(len(zeroth(sub_q.values())), dtype=bool)
-    else:
-        trained_q, trained_p, kept = _som.fit_with_outlier_clip(
-            proto_q,
-            proto_p,
-            sub_q,
-            sub_p,
-            metric=metric,
-            metric_scale=metric_scale,
-            n_epochs=orderer.n_epochs,
-            sigma_start=sigma_start,
-            sigma_end=orderer.sigma_end,
-            outlier_clip_sigma=orderer.outlier_clip_sigma,
-            outlier_clip_max_iters=orderer.outlier_clip_max_iters,
-        )
+    result = _som.fit(
+        proto_q,
+        proto_p,
+        sub_q,
+        sub_p,
+        metric=metric,
+        metric_scale=metric_scale,
+        n_epochs=orderer.n_epochs,
+        sigma_start=sigma_start,
+        sigma_end=orderer.sigma_end,
+        outlier_clip_sigma=orderer.outlier_clip_sigma,
+        outlier_clip_max_iters=orderer.outlier_clip_max_iters,
+    )
     backbone_q, backbone_p = _som.densify(
-        trained_q, trained_p, factor=orderer.densify_factor
+        result.prototype_positions,
+        result.prototype_velocities,
+        factor=orderer.densify_factor,
     )
     lam = _som.chord(
         backbone_q, backbone_p, sub_q, sub_p, metric=metric, metric_scale=metric_scale
     )
-    return backbone_q, backbone_p, lam, kept
+    return backbone_q, backbone_p, lam, result.kept
 
 
 def _scale_is_nonzero(scale: float | FSz0, /, *, remedy: str) -> bool:
@@ -226,8 +211,8 @@ class SOMOrderer(AbstractOrderer):
         default). A rejected datum gets ``-1`` in :attr:`OrderingResult.indices`
         and ``nan`` in :attr:`OrderingResult.chord`, the same contract as a point
         a prior stage never visited -- composing with, not overriding, a prior
-        stage's own rejections. See :func:`phasecurvefit.som.fit_with_outlier_clip`
-        for the algorithm.
+        stage's own rejections. See :func:`phasecurvefit.som.fit`'s
+        ``outlier_clip_sigma`` parameter for the algorithm.
 
     Notes
     -----
