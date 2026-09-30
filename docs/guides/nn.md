@@ -62,16 +62,14 @@ ordered_all = result.indices
 ```
 
 These four steps -- order, normalize, build, train -- collapse into one call
-via {func}`~phasecurvefit.fit_track`, which also runs
-{func}`~phasecurvefit.orderers.default_pipeline` (the walk refined by a SOM
-stage) instead of the bare walk:
+via {func}`~phasecurvefit.fit_track`:
 
 ```python
-fast_config = pcf.nn.TrainingConfig(
+_fast_config = pcf.nn.TrainingConfig(  # to make the examples fast.
     n_epochs_encoder=5, n_epochs_decoder=5, n_epochs_both=5, show_pbar=False
 )
 ordering, result, losses = pcf.fit_track(
-    pos, vel, key=jax.random.key(0), training_config=fast_config
+    pos, vel, key=jax.random.key(0), training_config=_fast_config
 )
 ```
 

@@ -21,7 +21,7 @@ from phasecurvefit._src.nn import (
     TrainingConfig,
     train_autoencoder,
 )
-from phasecurvefit._src.orderers.base import default_pipeline
+from phasecurvefit._src.orderers.default_pipeline import default_pipeline
 
 
 def fit_track(
