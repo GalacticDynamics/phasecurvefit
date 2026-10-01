@@ -39,7 +39,7 @@ import jax
 import jax.numpy as jnp
 import jax.tree as jt
 import numpy as np
-from jaxtyping import Array, Bool, Float
+from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from jaxmore import bounded_while_loop
 from zeroth import zeroth
@@ -693,6 +693,71 @@ def fit(
         check_termination=False,
     )
     return FitResult(trained_q, trained_p, kept)
+
+
+def bootstrap_weights(key: PRNGKeyArray, n_obs: int, /) -> Float[Array, " N"]:
+    """Multinomial counts for one bootstrap resample, as ``weights`` for :func:`fit`.
+
+    Draws ``n_obs`` indices with replacement and returns how often each datum
+    was drawn. Handed to ``fit`` as ``weights`` this *is* a bootstrap resample:
+    a datum drawn twice counts twice in the neighbourhood-weighted mean, and
+    one never drawn counts not at all. Roughly ``1/e`` of the data is left out
+    of any member, which is where an ensemble's spread comes from.
+
+    This exists because ``vmap`` alone does not give you an ensemble. Batch
+    Kohonen replaces each prototype outright with a mean of the data, so a
+    prototype survives only through which datum it wins; members that agree on
+    their assignments stay merged for every later epoch, and perturbing a
+    shared initialization converges to bit-identical members. The diversity has
+    to come from the data.
+
+    Counts rather than gathered indices, because counts keep every array at
+    shape ``(N,)``: an ensemble is a ``vmap`` over an ``(M, N)`` weight matrix
+    with the data passed once, not ``M`` copies of the data.
+
+    Parameters
+    ----------
+    key
+        A :func:`jax.random.key`. Split it per ensemble member.
+    n_obs
+        Number of observations, ``N``. Static.
+
+    Returns
+    -------
+    Array, shape (N,)
+        Counts summing to ``n_obs``.
+
+    Examples
+    --------
+    >>> import jax
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+    >>> from phasecurvefit import som
+
+    >>> pos = {"x": jnp.linspace(0.0, 9.0, 50), "y": jnp.zeros(50)}
+    >>> vel = {"x": jnp.ones(50), "y": jnp.zeros(50)}
+    >>> w = som.bootstrap_weights(jax.random.key(0), 50)
+    >>> w.shape, float(w.sum())
+    ((50,), 50.0)
+
+    An ensemble maps over the weights, not over copies of the data:
+
+    >>> keys = jax.random.split(jax.random.key(0), 4)
+    >>> ws = jax.vmap(lambda k: som.bootstrap_weights(k, 50))(keys)
+    >>> pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
+    >>> metric = pcf.metrics.SpatialDistanceMetric()
+    >>> fq = jax.vmap(lambda w: som.fit(pq, pp, pos, vel, metric=metric, weights=w))(
+    ...     ws
+    ... ).prototype_positions
+    >>> fq["x"].shape
+    (4, 6)
+
+    """
+    if n_obs < 1:
+        msg = f"n_obs must be >= 1, got {n_obs}."
+        raise ValueError(msg)
+    drawn = jax.random.randint(key, (n_obs,), 0, n_obs)
+    return jnp.bincount(drawn, length=n_obs).astype(float)
 
 
 def _catmull_rom(

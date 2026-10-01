@@ -220,6 +220,9 @@ Self-Organizing Map ordering, after Starkman et al. (2023). See
 
 .. autofunction:: phasecurvefit.som.chord
    :no-index:
+
+.. autofunction:: phasecurvefit.som.bootstrap_weights
+   :no-index:
 ```
 
 ## Index
