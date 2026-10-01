@@ -192,7 +192,7 @@ class TestAlignedMomentumDistanceMetric:
         assert distances.shape == (3,)
 
     def test_integration_with_algorithm(self):
-        """Test that metric works correctly with walk_local_flow."""
+        """Test that metric works correctly with the local-flow walk."""
         metric = pcf.metrics.AlignedMomentumDistanceMetric()
 
         # Simple line with aligned velocities
@@ -316,7 +316,7 @@ class TestSpatialDistanceMetric:
         assert distances.shape == (3,)
 
     def test_integration_with_algorithm(self):
-        """Test that metric works correctly with walk_local_flow."""
+        """Test that metric works correctly with the local-flow walk."""
         metric = pcf.metrics.SpatialDistanceMetric()
 
         # Points along a line - should order by spatial proximity only
@@ -584,7 +584,7 @@ class TestFullPhaseSpaceDistanceMetric:
         assert distances.shape == (3,)
 
     def test_integration_with_algorithm(self):
-        """Test that metric works correctly with walk_local_flow."""
+        """Test that metric works correctly with the local-flow walk."""
         metric = pcf.metrics.FullPhaseSpaceDistanceMetric()
 
         # Points along a line with varying velocities

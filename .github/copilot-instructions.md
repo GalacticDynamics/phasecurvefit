@@ -13,8 +13,9 @@ using a variety of tools.
 
 ### Core Algorithm
 
-- `walk_local_flow(positions, velocities, ...)`: Main entry point for ordering
-  phase-space data. Returns `WalkLocalFlowResult` with ordered indices.
+- `order(positions, velocities, orderer=None)`: Main entry point for ordering
+  phase-space data. With no orderer it runs the MST | SOM default pipeline; pass
+  e.g. `LocalFlowOrderer(...)` for the local-flow walk (`WalkLocalFlowResult`).
 - Phase-space data: Two dicts with matching keys, e.g.,
   `{"x": array, "y": array}` for positions and velocities.
 
@@ -45,25 +46,29 @@ Neural network for interpolating skipped tracers (Appendix A.2 of the paper):
 
 ### Unit Support (`unxt` integration)
 
-When `unxt` is installed, `walk_local_flow` accepts `Quantity` values:
+When `unxt` is installed, orderers accept `Quantity` values (with a unit system
+in `metadata`):
 
 ```python
 import unxt as u
 
 pos = {"x": u.Q([0, 1, 2], "kpc"), "y": u.Q([0, 0.5, 1], "kpc")}
 vel = {"x": u.Q([1, 1, 1], "km/s"), "y": u.Q([0.5, 0.5, 0.5], "km/s")}
-result = pcf.walk_local_flow(pos, vel, start_idx=0, lam=u.Q(1.0, "kpc"))
+orderer = pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=u.Q(1.0, "kpc"))
+result = pcf.order(
+    pos, vel, orderer, metadata=pcf.StateMetadata(usys=u.unitsystems.galactic)
+)
 ```
 
 ## Folder Structure
 
 - `/src/phasecurvefit/`: Public API
-  - `__init__.py`: Main exports (`walk_local_flow`, strategies, result types)
+  - `__init__.py`: Main exports (`order`, strategies, result types)
   - `metrics.py`: Distance metric classes
   - `nn.py`: Autoencoder neural network module
   - `w.py`: Phase-space accessor utilities
 - `/src/phasecurvefit/_src/`: Private implementation
-  - `algorithm.py`: Core `walk_local_flow` implementation
+  - `algorithm.py`: Core local-flow walk implementation
   - `autoencoder.py`: Neural network implementation (Equinox)
   - `metrics.py`: Metric base classes and implementations
   - `strategies.py`: Query strategy classes

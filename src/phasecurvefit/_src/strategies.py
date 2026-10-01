@@ -1,6 +1,6 @@
 """Neighbor query strategies and configuration for the walk.
 
-Provides instance-based strategies used by ``walk_local_flow`` to find nearby
+Provides instance-based strategies used by the local-flow walk to find nearby
 neighbors:
 - ``BruteForce()``: Compute distances to all remaining points (default)
 - ``KDTree(k=...)``: Use a KD-tree for spatial prefiltering

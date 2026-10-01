@@ -1,6 +1,6 @@
 """Tests for unxt (physical-units) support in the orderers.
 
-Mirrors ``walk_local_flow``'s Quantity-in / Quantity-out UX. Because MST is
+Mirrors the local-flow walk's Quantity-in / Quantity-out UX. Because MST is
 host-side, unit handling is a simple strip-in / reattach-out.
 """
 

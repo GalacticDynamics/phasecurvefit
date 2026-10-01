@@ -283,9 +283,8 @@ and the alternative to them, are:
 - **`SOMOrderer`** — a Self-Organizing Map refinement. Its prototypes average
   over many tracers, so the backbone it produces is far less sensitive to local
   noise than a single walk's or MST's individual decisions.
-- **`LocalFlowOrderer`** — the velocity-following walk (wraps
-  `walk_local_flow`). Follows a coherent flow from a start point, and is fully
-  JAX-traceable.
+- **`LocalFlowOrderer`** — the velocity-following walk. Follows a coherent flow
+  from a start point, and is fully JAX-traceable.
 
 ```python
 import jax.numpy as jnp

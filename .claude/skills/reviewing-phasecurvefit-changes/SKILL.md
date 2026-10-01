@@ -3,7 +3,7 @@ name: reviewing-phasecurvefit-changes
 description:
   Use when reviewing a diff, branch, or pull request in phasecurvefit, or
   self-reviewing a change before committing or opening a PR — orderers, metrics,
-  query strategies, walk_local_flow / order(), nn autoencoders, SOMs, or the
+  query strategies, order() / LocalFlowOrderer, nn autoencoders, SOMs, or the
   unxt interop.
 ---
 
@@ -43,7 +43,7 @@ defect is a sample of a class — review the class.
 | Integer width     | `arange(m) * n`, flat indices, `astype(jnp.int32)` — overflow once N·K > 2³¹.                                                                                                                                                                             |
 | Off-by-one / self | Neighbor queries returning the query point (not guaranteed at slot 0 when points coincide — mask by index, not `[:, 1:]`); `k` larger than the dataset (default `KDTree(k=50)` on small inputs); `-1` sentinel for skipped indices leaking into indexing. |
 | Units (`unxt`)    | Quantities must flow through the algorithm — no `.value`/`ustrip` at the public API. New ops need a plum or Quax dispatch in `_interop/`; check `func.methods` for existing ones. Test in `tests/test_*unxt*.py` / `test_quantity_support.py`.            |
-| Public API        | `__all__` tuple defined before imports; no `from __future__ import annotations` (breaks plum); new symbols exported in `src/phasecurvefit/*.py`; deprecated paths (`walk_local_flow`) warn on direct call only, not via `order()`.                        |
+| Public API        | `__all__` tuple defined before imports; no `from __future__ import annotations` (breaks plum); new symbols exported in `src/phasecurvefit/*.py`; deprecated paths warn on direct call only, not via `order()`.                                            |
 | Tests             | Regression test hits a _different_ instance than the reported one; atomic asserts (no `assert a and b`); docs examples must show/assert the result — Sybil only catches crashes, not wrong output.                                                        |
 
 ## Output format

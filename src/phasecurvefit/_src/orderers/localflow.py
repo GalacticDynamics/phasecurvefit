@@ -82,8 +82,7 @@ class LocalFlowOrderer(AbstractOrderer):
     ``pcf.order(positions, velocities, pcf.orderers.LocalFlowOrderer())``. It is
     *not* what ``pcf.order`` runs with no orderer -- that is the MST | SOM
     default pipeline. ``order()`` handles ``direction="both"`` internally via
-    ``combine_results``. (The module-level ``walk_local_flow`` is a deprecated
-    alias for the same computation.)
+    ``combine_results``.
 
     The walk, with its momentum-weighted metric, is the algorithm of Nibauer et
     al. (2022); if you use it in published work, please cite that paper (see
