@@ -55,7 +55,7 @@ class TestDefaultPipeline:
     def _explicit_chain(n_prototypes):
         """Build the chain ``default_pipeline`` documents itself as running."""
         mst = pcf.orderers.MSTOrderer(
-            jump_cap=float("inf"), orient_by_velocity=True, on_disconnected="warn"
+            jump_cap=float("inf"), orient_by_velocity=True, on_disconnected="connect"
         )
         return mst | pcf.orderers.SOMOrderer(n_prototypes=n_prototypes)
 
@@ -66,6 +66,20 @@ class TestDefaultPipeline:
         expected = self._explicit_chain(12).order(pos, vel)
         assert isinstance(result, pcf.orderers.OrderingResult)
         assert result.gamma_range == (-1.0, 1.0)
+        assert eqx.tree_equal(result, expected)
+
+    def test_chain_matches_on_a_stream_with_a_gap(self):
+        """The same equality where the neighbour graph disconnects.
+
+        On connected data every ``on_disconnected`` policy coincides, so the test
+        above cannot tell them apart; a gap can.
+        """
+        t = np.concatenate([np.linspace(0, 1, 60), np.linspace(1.2, 2.2, 60)])
+        pos = {"x": jnp.asarray(t), "y": jnp.zeros(t.size)}
+        vel = {"x": jnp.ones(t.size), "y": jnp.zeros(t.size)}
+        result = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
+        expected = self._explicit_chain(12).order(pos, vel)
+        assert int(result.n_visited) == 120
         assert eqx.tree_equal(result, expected)
 
     def test_bare_order_runs_the_default_pipeline(self, arc):
