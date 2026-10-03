@@ -24,11 +24,9 @@ Array([0, 1, 2, 3], dtype=int32)
 __all__: tuple[str, ...] = (
     "WalkLocalFlowResult",
     "StateMetadata",
-    "walk_local_flow",
     "combine_results",
 )
 
-import warnings
 from collections.abc import Iterator, KeysView, Set
 from typing import Literal, TypeAlias
 
@@ -52,7 +50,7 @@ vec_euclidean_distance = jax.jit(jax.vmap(euclidean_distance, in_axes=(None, 0))
 
 
 class StateMetadata(quax.Value):
-    """Metadata container for walk_local_flow state.
+    """Metadata container for the local-flow walk's state.
 
     This holds optional context like unit systems that need to be passed
     through the algorithm state without participating in computation.
@@ -296,9 +294,8 @@ def _local_flow_walk(
 ) -> WalkLocalFlowResult:
     r"""Find an ordered path through phase-space using the local flow.
 
-    The implementation behind `LocalFlowOrderer` and the (deprecated) public
-    `walk_local_flow`. Prefer ``pcf.order(positions, velocities,
-    pcf.orderers.LocalFlowOrderer())`` at call sites.
+    The implementation behind `LocalFlowOrderer`. Call sites should use
+    ``pcf.order(positions, velocities, pcf.orderers.LocalFlowOrderer())``.
 
     Parameters
     ----------
@@ -470,7 +467,7 @@ def _local_flow_walk(
             jnp.logical_and(step < n_max, jnp.logical_not(stop)), should_not_terminate
         )
 
-    # NOTE: body_fn stays un-jitted; when walk_local_flow is wrapped in jax.jit,
+    # NOTE: body_fn stays un-jitted; when the walk is wrapped in jax.jit,
     # equinox.internal.while_loop traces this body once per iteration, so a
     # local jit would be redundant. The bounded while_loop is scan-based and
     # more efficient.
@@ -528,7 +525,7 @@ def _local_flow_walk(
         return (new_path, new_unvisited, new_cur_idx, new_step, new_stop, metadata)
 
     # Use custom bounded_while_loop for efficient scan-based implementation that
-    # skips iterations once condition is met.  The parent walk_local_flow
+    # skips iterations once condition is met.  The parent walk
     # wrapper handles quaxification, so we don't quaxify here.
     final_state = bounded_while_loop(cond_fn, body_fn, state, max_steps=n_max)
 
@@ -543,8 +540,7 @@ def _local_flow_walk(
     # Velocity-awareness is a property of the metric, not of ``metric_scale``: a
     # zero scale makes a phase-space metric numerically position-only, but the
     # walk is still configured to follow the flow. Set here rather than in
-    # `LocalFlowOrderer.order` so direct callers -- including the deprecated
-    # `walk_local_flow` -- report it too.
+    # `LocalFlowOrderer.order` so direct callers report it too.
     return WalkLocalFlowResult(
         positions=dict(xs),
         velocities=dict(vs_original),
@@ -552,30 +548,6 @@ def _local_flow_walk(
         gamma_range=gamma_range,
         velocity_aware=config.metric.uses_velocity,
     )
-
-
-def walk_local_flow(*args: object, **kwargs: object) -> WalkLocalFlowResult:
-    """Order tracers with the local-flow walk (deprecated; use `order`).
-
-    .. deprecated:: 0.3
-        ``walk_local_flow`` will be removed in a future release. Use
-        ``pcf.order(positions, velocities, pcf.orderers.LocalFlowOrderer(...))``
-        (or ``LocalFlowOrderer(...).order(...)``), which routes through the same
-        implementation without a warning. Note that ``pcf.order`` with no
-        orderer no longer runs the walk; it runs the MST | SOM default pipeline.
-
-    Thin wrapper that emits a `DeprecationWarning` and forwards to the private
-    implementation (plain and Quantity dispatch), returning an unchanged
-    `WalkLocalFlowResult`.
-    """
-    warnings.warn(
-        "`walk_local_flow` is deprecated and will be removed in a future release; use "
-        "`pcf.order(positions, velocities, pcf.orderers.LocalFlowOrderer(...))` "
-        "(or `pcf.orderers.LocalFlowOrderer(...).order(...)`) instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return _local_flow_walk(*args, **kwargs)
 
 
 def order_w(res: WalkLocalFlowResult, /) -> tuple[VectorComponents, VectorComponents]:
@@ -587,7 +559,7 @@ def order_w(res: WalkLocalFlowResult, /) -> tuple[VectorComponents, VectorCompon
     Parameters
     ----------
     res
-        The result from walk_local_flow.
+        The result from the local-flow walk.
 
     Returns
     -------
@@ -666,7 +638,7 @@ def combine_results(
 ) -> WalkLocalFlowResult:
     r"""Combine forward and reverse flow walk results into a single result.
 
-    Takes the results from two separate walk_local_flow calls (one forward, one
+    Takes the results from two separate local-flow walks (one forward, one
     reverse) and combines them into a single coherent ordering. This is useful
     for tracing complete stellar streams that extend in both directions from a
     starting point.

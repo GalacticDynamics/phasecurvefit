@@ -106,7 +106,7 @@ def fill_ordering_gaps(
     model : PathAutoencoder
         Trained autoencoder model.
     result : AbstractResult
-        Result from walk_local_flow.
+        Result from an orderer.
     prob_threshold : float, optional
         Minimum membership probability to include. Default: 0.5.
 

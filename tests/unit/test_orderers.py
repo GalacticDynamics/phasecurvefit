@@ -8,6 +8,7 @@ import pytest
 
 import phasecurvefit as pcf
 from phasecurvefit._src.abstract_result import AbstractResult
+from phasecurvefit._src.algorithm import _local_flow_walk
 
 
 class TestOrdererNamespace:
@@ -222,7 +223,11 @@ class TestDefaultPipeline:
         """Passing an orderer is unaffected by the default changing."""
         pos, vel, _ = arc(n=30)
         lfo = pcf.orderers.LocalFlowOrderer()
-        assert isinstance(pcf.order(pos, vel, lfo), pcf.WalkLocalFlowResult)
+        walk = pcf.order(pos, vel, lfo)
+        assert isinstance(walk, pcf.WalkLocalFlowResult)
+        # The walk's gamma_range is (0, 1); the default pipeline's is (-1, 1).
+        assert walk.gamma_range == (0.0, 1.0)
+        assert pcf.order(pos, vel).gamma_range == (-1.0, 1.0)
 
 
 class TestOrderingResultUnification:
@@ -287,7 +292,7 @@ class TestOrderingResultUnification:
 
 
 class TestLocalFlowOrdererRegression:
-    """LocalFlowOrderer.order reproduces walk_local_flow bit-for-bit."""
+    """``LocalFlowOrderer.order`` and ``order(..., LocalFlowOrderer)`` agree."""
 
     @pytest.fixture
     def data(self):
@@ -297,7 +302,7 @@ class TestLocalFlowOrdererRegression:
         return q, p
 
     @pytest.mark.parametrize("direction", ["forward", "backward", "both"])
-    def test_matches_walk_local_flow(self, data, direction):
+    def test_order_matches_orderer_method(self, data, direction):
         """Matches walk local flow."""
         q, p = data
         direct = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(direction=direction))
@@ -417,17 +422,15 @@ class TestVelocityAwareness:
         float(jax.grad(lambda s: run(s, metric=spatial, expected=False))(1.0))
         float(jax.jit(lambda s: run(s, metric=spatial, expected=False))(1.0))
 
-    def test_the_deprecated_walk_reports_it_too(self, arc):
+    def test_the_bare_walk_reports_it_too(self, arc):
         """The flag is set by the walk, not by the orderer wrapping it.
 
-        Direct callers of the walk -- including the deprecated
-        ``walk_local_flow`` -- get the same answer as ``order``, so a
+        Direct callers of the walk get the same answer as ``order``, so a
         downstream stage reading ``init.velocity_aware`` is not misled by
         which entry point produced the result.
         """
         pos, vel, _ = arc()
-        with pytest.warns(DeprecationWarning, match="deprecated"):
-            assert pcf.walk_local_flow(pos, vel).velocity_aware is True
+        assert _local_flow_walk(pos, vel).velocity_aware is True
 
     def test_mst_reports_velocity_awareness(self, arc):
         """Only settings that steer the ordering count, not orient_by_velocity."""

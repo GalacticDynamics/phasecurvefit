@@ -18,8 +18,6 @@ order : function
     another algorithm.
 fit_track : function
     Order, refine and fit a smooth track in one call.
-walk_local_flow : function
-    Deprecated; use ``pcf.order`` with ``pcf.orderers.LocalFlowOrderer``.
 combine_results : function
     Combine results from forward and backward walks into a single ordering.
 WalkLocalFlowResult : NamedTuple
@@ -86,7 +84,6 @@ __all__: tuple[str, ...] = (
     "strats",
     "orderers",
     # Algorithm
-    "walk_local_flow",
     "combine_results",
     "WalkLocalFlowResult",
     "StateMetadata",
@@ -106,7 +103,6 @@ from ._src.algorithm import (
     WalkLocalFlowResult,
     combine_results,
     order_w,
-    walk_local_flow,
 )
 from ._src.orderers.base import order
 from ._src.pipeline import fit_track

@@ -1,4 +1,4 @@
-r"""Distance metrics for the ``walk_local_flow`` algorithm.
+r"""Distance metrics for the local-flow walk.
 
 The metric system provides pluggable distance calculations that determine how
 the algorithm selects the next point in a phase-space trajectory. Different

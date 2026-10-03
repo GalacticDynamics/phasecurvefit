@@ -1,7 +1,6 @@
 """Tests for unxt interoperability with phasespace functions."""
 
 import re
-import warnings
 
 import pytest
 
@@ -185,9 +184,8 @@ class TestCosineSimilarityQuantity:
 class TestUsysGuidance:
     """The missing-``usys`` error must name a way in that the caller has.
 
-    ``_require_usys`` is shared. The orderer dispatches accept ``metadata``
-    only, while ``walk_local_flow`` also takes ``usys`` directly, so a single
-    hardcoded example is wrong for one of them either way.
+    The orderer dispatches accept ``metadata`` only, so the example in the error
+    must be the ``metadata`` route, not a ``usys`` kwarg that does not exist.
     """
 
     @staticmethod
@@ -196,25 +194,6 @@ class TestUsysGuidance:
             {"x": u.Q(jnp.array([0.0, 1.0, 2.0]), "m")},
             {"x": u.Q(jnp.array([1.0, 1.0, 1.0]), "m/s")},
         )
-
-    @staticmethod
-    def _walk(pos, vel, **kwargs):
-        """Call the deprecated ``walk_local_flow``, suppressing its warning.
-
-        Its deprecation is orthogonal to what these tests pin, and the
-        ``usys`` kwarg lives on this dispatch only.
-        """
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            return pcf.walk_local_flow(pos, vel, **kwargs)
-
-    def test_walk_names_the_usys_kwarg_it_actually_accepts(self):
-        """``walk_local_flow`` takes ``usys`` directly, so the error says so."""
-        q, p = self._quantity_data()
-        with pytest.raises(
-            TypeError, match=re.escape("walk_local_flow(..., usys=...)")
-        ):
-            self._walk(q, p, start_idx=0, metric_scale=u.Q(1.0, "m"))
 
     def test_order_names_the_metadata_route_it_actually_accepts(self):
         """``order`` has no ``usys`` kwarg, so suggesting one would misdirect."""
@@ -225,12 +204,10 @@ class TestUsysGuidance:
     def test_metadata_and_usys_together_merge(self):
         """The path that ``dict(metadata)`` used to break outright."""
         q, p = self._quantity_data()
-        result = self._walk(
+        result = pcf.order(
             q,
             p,
-            start_idx=0,
-            metric_scale=u.Q(1.0, "m"),
-            metadata=pcf.StateMetadata(note="carried"),
-            usys=u.unitsystems.si,
+            pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=u.Q(1.0, "m")),
+            metadata=pcf.StateMetadata(note="carried", usys=u.unitsystems.si),
         )
         assert result.indices.shape == (3,)

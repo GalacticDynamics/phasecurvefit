@@ -22,7 +22,7 @@ SOMOrderer
     Self-Organizing Map refinement: trains a 1-D SOM and orders by arc-length
     projection onto its backbone. Cite Starkman et al. (2023).
 LocalFlowOrderer
-    Velocity-following greedy walk (wraps :func:`~phasecurvefit.walk_local_flow`).
+    Velocity-following greedy walk.
     Momentum-weighted ordering: cite Nibauer et al. (2022).
 ChainOrderer
     Runs orderers in sequence, threading each result into the next as

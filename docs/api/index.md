@@ -22,18 +22,6 @@ MST backbone refined by a SOM; `fit_track` goes on to fit the autoencoder.
    :no-index:
 ```
 
-### Deprecated
-
-`walk_local_flow` is deprecated in favor of `order` with a
-{class}`~phasecurvefit.orderers.LocalFlowOrderer`; see the
-migration guides ([v0.2 → v0.3](../migration/v0.2-to-v0.3.md),
-[v0.3 → v0.4](../migration/v0.3-to-v0.4.md)).
-
-```{eval-rst}
-.. autofunction:: walk_local_flow
-   :no-index:
-```
-
 ## Result Accessor
 
 Helper function to extract ordered data from results.

@@ -1,4 +1,4 @@
-r"""Search Strategies for the ``walk_local_flow`` algorithm."""
+r"""Search Strategies for the local-flow walk."""
 
 __all__: tuple[str, ...] = (
     "AbstractQueryStrategy",

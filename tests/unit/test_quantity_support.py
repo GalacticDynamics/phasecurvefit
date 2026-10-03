@@ -1,6 +1,6 @@
-"""Tests for Quantity support in pcf.walk_local_flow.
+"""Tests for Quantity support in the local-flow walk.
 
-These tests verify that pcf.walk_local_flow works correctly with unxt Quantity inputs
+These tests verify that the local-flow walk works correctly with unxt Quantity inputs
 and that unit system information flows properly through the state tuple.
 """
 
@@ -102,10 +102,10 @@ class TestStateMetadata:
 
 
 class TestWalkLocalFlowWithPlainArrays:
-    """Tests for pcf.walk_local_flow with plain array inputs (baseline)."""
+    """Tests for the local-flow walk with plain array inputs (baseline)."""
 
     def test_walk_local_flow_plain_arrays(self, plain_positions, plain_velocities):
-        """Test pcf.walk_local_flow works with plain array inputs."""
+        """Test the local-flow walk works with plain array inputs."""
         result = pcf.order(
             plain_positions,
             plain_velocities,
@@ -120,7 +120,7 @@ class TestWalkLocalFlowWithPlainArrays:
     def test_walk_local_flow_plain_arrays_with_kdtree_strategy(
         self, plain_positions, plain_velocities
     ):
-        """Test walk_local_flow with plain arrays and KDTree strategy.
+        """Test the local-flow walk with plain arrays and KDTree strategy.
 
         Note: KDTree strategy uses jaxkd which requires plain array data.
         It cannot directly work with Quantity objects (which would need to be
@@ -142,12 +142,12 @@ class TestWalkLocalFlowWithPlainArrays:
 
 
 class TestWalkLocalFlowWithQuantities:
-    """Tests for pcf.walk_local_flow with Quantity inputs."""
+    """Tests for the local-flow walk with Quantity inputs."""
 
     def test_walk_local_flow_quantities_basic(
         self, quantity_positions, quantity_velocities, unit_system
     ):
-        """Test pcf.walk_local_flow works with Quantity inputs."""
+        """Test the local-flow walk works with Quantity inputs."""
         lam_quantity = u.Q(0.5, "m")
 
         result = pcf.order(
@@ -165,7 +165,7 @@ class TestWalkLocalFlowWithQuantities:
     def test_walk_local_flow_quantities_preserves_units(
         self, quantity_positions, quantity_velocities, unit_system
     ):
-        """Test that pcf.walk_local_flow preserves Quantity units in output."""
+        """Test that the local-flow walk preserves Quantity units in output."""
         lam_quantity = u.Q(0.5, "m")
 
         result = pcf.order(
@@ -232,7 +232,7 @@ class TestWalkLocalFlowWithQuantities:
     def test_walk_local_flow_quantities_custom_lam(
         self, quantity_positions, quantity_velocities, unit_system
     ):
-        """Test pcf.walk_local_flow with different lambda values."""
+        """Test the local-flow walk with different lambda values."""
         # Test with higher lambda value (more momentum-dependent)
         lam_quantity = u.Q(2.0, "m")
 
@@ -250,7 +250,7 @@ class TestWalkLocalFlowWithQuantities:
     def test_walk_local_flow_quantities_with_max_dist(
         self, quantity_positions, quantity_velocities, unit_system
     ):
-        """Test pcf.walk_local_flow with max_dist constraint."""
+        """Test the local-flow walk with max_dist constraint."""
         lam_quantity = u.Q(0.5, "m")
         max_dist = u.Q(1.5, "m")
 
@@ -268,9 +268,9 @@ class TestWalkLocalFlowWithQuantities:
     def test_walk_local_flow_quantities_with_kdtree_strategy(
         self, quantity_positions, quantity_velocities, unit_system
     ):
-        """Test walk_local_flow with Quantities and KDTree strategy.
+        """Test the local-flow walk with Quantities and KDTree strategy.
 
-        This test verifies that walk_local_flow works with both Quantities
+        This test verifies that the local-flow walk works with both Quantities
         and KDTree strategy enabled. This is the real use case from the
         notebook that requires proper quaxification.
         """
@@ -364,7 +364,7 @@ class TestEpitrochoidExample:
         assert str(vel["x"].unit) == "m / s"
 
     def test_epitrochoid_walk_with_momentum(self):
-        """Test walk_local_flow on epitrochoid with different momentum values."""
+        """Test the local-flow walk on epitrochoid with different momentum values."""
         key = jr.key(0)
 
         # Create stream

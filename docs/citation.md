@@ -22,7 +22,7 @@ the ordering needs the SOM paper and no other:
 | --- | --- |
 | the default pipeline: `pcf.order(pos, vel)` with no orderer, {func}`~phasecurvefit.orderers.default_pipeline` | Starkman et al. (2023) |
 | {class}`~phasecurvefit.orderers.SOMOrderer`, the {mod}`phasecurvefit.som` module | Starkman et al. (2023) |
-| **momentum-weighted ordering**: {class}`~phasecurvefit.orderers.LocalFlowOrderer` (and the deprecated `pcf.walk_local_flow`), the default {class}`~phasecurvefit.metrics.AlignedMomentumDistanceMetric` | Nibauer et al. (2022) |
+| **momentum-weighted ordering**: {class}`~phasecurvefit.orderers.LocalFlowOrderer`, the default {class}`~phasecurvefit.metrics.AlignedMomentumDistanceMetric` | Nibauer et al. (2022) |
 | the **autoencoder**: {class}`~phasecurvefit.nn.PathAutoencoder`, {func}`~phasecurvefit.nn.train_autoencoder`, {func}`~phasecurvefit.fit_track` | Nibauer et al. (2022) |
 | **mixture-model membership** for outlier rejection: {class}`~phasecurvefit.nn.MixtureMembershipConfig` (see {doc}`guides/outliers`) | Hogg, Bovy & Lang (2010) |
 | {class}`~phasecurvefit.orderers.MSTOrderer` alone | nothing beyond the package |

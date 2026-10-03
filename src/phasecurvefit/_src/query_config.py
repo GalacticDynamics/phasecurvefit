@@ -9,7 +9,7 @@ from .strategies import AbstractQueryStrategy, BruteForce
 
 
 class WalkConfig(eqx.Module):
-    """Configuration for neighbor queries in walk_local_flow.
+    """Configuration for neighbor queries in the local-flow walk.
 
     Composes a distance metric with a query strategy. This is the primary
     way to configure how the algorithm selects the next point.

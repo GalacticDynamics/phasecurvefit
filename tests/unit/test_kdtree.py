@@ -1,4 +1,4 @@
-"""Tests for KD-tree strategy in walk_local_flow."""
+"""Tests for KD-tree strategy in the local-flow walk."""
 
 import jax.numpy as jnp
 import pytest

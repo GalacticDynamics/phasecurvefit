@@ -708,7 +708,7 @@ def _local_flow_walk(
         carried = dict(metadata) if metadata is not None else {}
         metadata = StateMetadata(**(carried | {"usys": usys}))
 
-    usys = _require_usys(metadata, hint=_USYS_VIA_WALK)
+    usys = _require_usys(metadata)
 
     if not isinstance(metric_scale, u.AbstractQuantity):
         msg = "`metric_scale` must be an `unxt.AbstractQuantity`."  # type: ignore[unreachable]
@@ -722,7 +722,7 @@ def _local_flow_walk(
     q_values = {k: u.ustrip(usys, v) for k, v in positions.items()}
     p_values = {k: u.ustrip(usys, v) for k, v in velocities.items()}
 
-    # Quaxify the walk_local_flow so Quantities are handled properly
+    # Quaxify the walk so Quantities are handled properly
     # by custom dispatches in the quax context. StateMetadata is part of init
     # so the scan_p handler can dispatch on it directly.
     result: WalkLocalFlowResult = quax.quaxify(_local_flow_walk_plain)(
@@ -780,24 +780,15 @@ def transform(
 # ==============================================================================
 
 
-# How to supply the unit system, per entry point. The orderer dispatches take
-# ``metadata`` only; ``walk_local_flow`` also accepts ``usys`` directly, so
-# naming just one of them there would send the caller the long way round.
 _USYS_VIA_ORDER = "order(q, p, metadata=StateMetadata(usys=...))"
-_USYS_VIA_WALK = (
-    "walk_local_flow(..., usys=...) or "
-    "walk_local_flow(..., metadata=StateMetadata(usys=...))"
-)
 
 
-def _require_usys(
-    metadata: StateMetadata | None, /, *, hint: str = _USYS_VIA_ORDER
-) -> u.AbstractUnitSystem:
+def _require_usys(metadata: StateMetadata | None, /) -> u.AbstractUnitSystem:
     # ``metadata`` is None whenever the caller omitted it: both the ``order``
     # facade and ChainOrderer forward it unconditionally.
     usys = metadata.get("usys") if metadata is not None else None
     if not isinstance(usys, u.AbstractUnitSystem):
-        msg = f"`usys` must be provided for Quantity inputs, e.g. {hint}."
+        msg = f"`usys` must be provided for Quantity inputs, e.g. {_USYS_VIA_ORDER}."
         raise TypeError(msg)
     return usys
 
@@ -919,7 +910,7 @@ def order(
 ) -> WalkLocalFlowResult:
     """Order Quantity-valued tracers with the local-flow walk.
 
-    Delegates to the ``walk_local_flow`` Quantity dispatch. Scalar
+    Delegates to the local-flow walk's Quantity dispatch. Scalar
     hyperparameters (``metric_scale``, ``max_dist``) that are plain numbers are
     interpreted in the ``usys`` length unit.
 

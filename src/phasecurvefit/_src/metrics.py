@@ -1,7 +1,7 @@
 """Distance metrics for phase-space walks.
 
 This module provides pluggable distance metrics that control how the
-`walk_local_flow` algorithm selects the next point in a trajectory.
+local-flow walk selects the next point in a trajectory.
 """
 
 __all__: tuple[str, ...] = (
@@ -50,7 +50,7 @@ class AbstractDistanceMetric(eqx.Module):
     --------
     >>> import phasecurvefit as pcf
     >>> metric = pcf.metrics.AlignedMomentumDistanceMetric()
-    >>> # Use with walk_local_flow via metric parameter
+    >>> # Use with the local-flow walk via the metric parameter
 
     """
 
