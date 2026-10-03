@@ -1,6 +1,6 @@
 # Autoencoder for Gap Filling
 
-An orderer can leave tracers unvisited — the local-flow walk skips some because of its momentum condition, and the default MST | SOM pipeline leaves out any the MST graph does not connect. This guide explains how to use an autoencoder to assign ordering values ($\gamma$) to these skipped tracers, and to fit a smooth track through the lot.
+An orderer can leave tracers unvisited — the local-flow walk skips some because of its momentum condition, and the default MST | SOM pipeline can leave out tracers an outlier-rejecting chain (`edge_clip_sigma`) has dropped. This guide explains how to use an autoencoder to assign ordering values ($\gamma$) to these skipped tracers, and to fit a smooth track through the lot.
 
 ```{note}
 The examples below start from the default pipeline, but `train_autoencoder` accepts **any**

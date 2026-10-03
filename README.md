@@ -27,9 +27,9 @@ breaks down in exactly the cases that matter:
   of the curve itself, so no progenitor position or hand-picked start index is
   needed
   ([MST tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_mst.html)).
-- **Incomplete orderings.** A conservative walk orders a reliable subset; an
-  autoencoder then assigns an ordering coordinate γ to every sample and learns a
-  smooth mean track through them
+- **Incomplete orderings.** An orderer may order only a reliable subset (the
+  local-flow walk does); an autoencoder then assigns an ordering coordinate γ to
+  every sample and learns a smooth mean track through them
   ([stream autoencoder tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_autoencoder.html)).
 - **Contamination.** A stream-plus-background mixture model gives each sample a
   calibrated membership probability, so interlopers can be down-weighted or
@@ -500,7 +500,7 @@ DOI, together with the paper behind whichever component you used.
   [arXiv:2212.00949](https://arxiv.org/abs/2212.00949)
 - **momentum-weighted ordering** (`LocalFlowOrderer`) **or the autoencoder**
   (`PathAutoencoder`, `fit_track`) — Nibauer et al. (2022),
-  [arXiv:2201.12042](https://arxiv.org/abs/2201.12042)
+  [arXiv:2205.11767](https://arxiv.org/abs/2205.11767)
 - **mixture-model membership / outlier rejection** — Hogg, Bovy & Lang (2010),
   [arXiv:1008.4686](https://arxiv.org/abs/1008.4686)
 

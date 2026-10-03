@@ -42,6 +42,7 @@ api/index
 
 migration/v0.3-to-v0.4
 migration/v0.2-to-v0.3
+migration/v0.1-to-v0.2
 ```
 
 ```{toctree}
@@ -86,9 +87,10 @@ breaks down in exactly the cases that matter:
   nearest point is often on the wrong strand. phasecurvefit uses velocities as
   well as positions, so the ordering stays on the right strand
   (see the [epitrochoid tutorials](tutorials/epitrochoid_autoencoder.ipynb)).
-- **No known starting point.** The MST orderer finds the two ends of the curve
-  itself, so no progenitor position or hand-picked start index is needed ([MST tutorial](tutorials/stream_mst.ipynb)).
-- **Incomplete orderings.** A conservative walk orders a reliable subset; an
+- **No known starting point.** The default MST | SOM pipeline finds the two ends of
+  the curve itself, so no progenitor position or hand-picked start index is needed ([MST tutorial](tutorials/stream_mst.ipynb)).
+- **Incomplete orderings.** An orderer may order only a reliable subset (the
+  local-flow walk does); an
   autoencoder then assigns an ordering coordinate $\gamma$ to every sample and
   learns a smooth mean track through them ([stream autoencoder tutorial](tutorials/stream_autoencoder.ipynb)).
 - **Contamination.** A stream-plus-background mixture model gives each sample a
@@ -213,8 +215,8 @@ print(result.indices)  # Array([0, 1, 2, 3, 4])
 
 ## Features
 
-- ✅ **JAX-native**: Full support for JIT compilation, vectorization, and auto-differentiation
-- ✅ **High performance**: Optimized with `jax.lax.while_loop` for speed
+- ✅ **JAX-native**: The local-flow walk, the MST orderer and the neural networks support JIT compilation, vectorization, and auto-differentiation (the default MST | SOM pipeline needs an explicit orderer under `jit`/`vmap`; see the [JAX guide](guides/jax-integration))
+- ✅ **High performance**: The walk is optimized with `jax.lax.while_loop`
 - ✅ **No start point needed**: the default MST | SOM pipeline finds both ends of the curve itself
 - ✅ **Gap filling**: Autoencoder neural network interpolates skipped tracers
 - ✅ **Flexible**: Works in any number of dimensions
@@ -255,7 +257,7 @@ The library ships with multiple built-in metrics (e.g., momentum-weighted,
 spatial-only), and you can implement custom metrics for domain-specific use cases.
 See the [Metrics Guide](guides/metrics) for full details and examples.
 
-For the mathematical background on momentum-weighted ordering, refer to the [NN+p paper](https://arxiv.org/abs/2201.12042).
+For the mathematical background on momentum-weighted ordering, refer to the [NN+p paper](https://arxiv.org/abs/2205.11767).
 
 ## Local-Flow Walk Options
 

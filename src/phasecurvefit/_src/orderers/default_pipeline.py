@@ -24,7 +24,6 @@ def default_pipeline(
     velocities: VectorComponents,
     *,
     metadata: StateMetadata | None = None,
-    init: AbstractResult | None = None,
     n_prototypes: int = 15,
     **som_kwargs: object,
 ) -> AbstractResult:
@@ -39,15 +38,16 @@ def default_pipeline(
     far less sensitive to local noise than the MST's individual graph edges. See
     :doc:`/guides/som`.
 
-    The MST stage is configured to work on data of any scale and to fail soft,
-    not to be tuned: ``jump_cap=inf`` (the default ``jump_cap`` is an absolute
-    length, which severs every edge of a sparse or large-scale dataset),
-    ``orient_by_velocity=True`` (so ``gamma`` increases along the flow rather
-    than in an arbitrary tip-to-tip direction), and ``on_disconnected="warn"``
-    (order the largest connected piece and warn, rather than raise). For
-    anything else -- a finite ``jump_cap``, velocity-aware edges, outlier
-    clipping -- build the chain yourself and pass it to
-    :func:`~phasecurvefit.order`.
+    The MST stage is configured to work on data of any scale and to lose
+    nothing, not to be tuned: ``jump_cap=inf`` (the default ``jump_cap`` is an
+    absolute length, which severs every edge of a sparse or large-scale
+    dataset), ``orient_by_velocity=True`` (so ``gamma`` increases along the flow
+    rather than in an arbitrary tip-to-tip direction), and
+    ``on_disconnected="connect"`` (a gap in the stream splits the neighbour
+    graph; the pieces are joined along their shortest links instead of keeping
+    only the largest). For anything else -- a finite ``jump_cap``,
+    velocity-aware edges, outlier clipping, a different ``k`` -- build the chain
+    yourself and pass it to :func:`~phasecurvefit.order`.
 
     Falls back to the MST alone when fewer tracers were visited than
     ``n_prototypes`` -- the SOM's own minimum
@@ -68,10 +68,6 @@ def default_pipeline(
         Phase-space tracers, as for :func:`~phasecurvefit.order`.
     metadata
         Passed through to both stages.
-    init
-        A prior ordering result, passed to the first (MST) stage, which -- like
-        any orderer that cannot refine a prior ordering -- accepts and ignores
-        it.
     n_prototypes
         Passed to :class:`~phasecurvefit.orderers.SOMOrderer`; also the
         threshold below which the SOM stage is skipped.
@@ -107,9 +103,9 @@ def default_pipeline(
 
     """
     mst = MSTOrderer(
-        jump_cap=float("inf"), orient_by_velocity=True, on_disconnected="warn"
+        jump_cap=float("inf"), orient_by_velocity=True, on_disconnected="connect"
     )
-    mst_result = mst.order(positions, velocities, metadata=metadata, init=init)
+    mst_result = mst.order(positions, velocities, metadata=metadata)
     try:
         n_visited = int(mst_result.n_visited)
     except jax.errors.ConcretizationTypeError as exc:

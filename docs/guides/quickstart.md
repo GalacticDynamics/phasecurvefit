@@ -78,6 +78,7 @@ result = pcf.order(position, velocity)
 
 print(result.ordering)
 # Array([0, 1, 2, 3, 4])
+assert result.gamma_range == (-1.0, 1.0)  # the default pipeline's, not the walk's
 ```
 
 The SOM needs at least 15 tracers (its default number of prototypes) to fit; with

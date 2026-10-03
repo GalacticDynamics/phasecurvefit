@@ -103,9 +103,11 @@ assert int(res.n_visited) == 20
 `jump_cap` severs edges longer than its value before building the MST; it should
 exceed the typical inter-tracer spacing but stay below the loop-opening /
 arm-separation scale. If the kNN graph is disconnected (e.g. `jump_cap` too
-small), `on_disconnected` controls the response: `"raise"` (default), `"warn"`
-(order the largest component, leave the rest unvisited), or `"largest"` (same,
-silently).
+small, or a gap in the stream wider than the `k` neighbours reach), `on_disconnected`
+controls the response: `"raise"` (default), `"warn"` (order the largest component,
+leave the rest unvisited), `"largest"` (same, silently), or `"connect"` (join the
+pieces along their shortest links and order everything; the bridge links ignore
+`jump_cap` and velocity severing, which is what split the graph).
 
 ### Velocity is opt-in
 
@@ -200,16 +202,28 @@ chain differs from one written by hand in three ways:
 
 - it falls back to the MST alone when there are fewer visited tracers than
   `n_prototypes` (15 by default), rather than raising;
-- its MST stage is configured to work at any data scale --
-  `jump_cap=inf`, `orient_by_velocity=True`, `on_disconnected="warn"` -- where
+- its MST stage is configured to work at any data scale and to lose nothing --
+  `jump_cap=inf`, `orient_by_velocity=True`, `on_disconnected="connect"` -- where
   `MSTOrderer()`'s own `jump_cap=3.0` is an absolute length that severs every edge
-  of a sparse or large-scale dataset;
+  of a sparse or large-scale dataset, and its `"raise"` policy would stop on the
+  first gap in a stream (the neighbour graph disconnects there; `"connect"` bridges
+  the pieces rather than ordering only the larger one);
 - it cannot run under `jit` or `vmap`: whether the SOM stage runs depends on the
   number of tracers the MST visited.
 
 ```python
 result = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
 assert int(result.n_visited) == 60
+assert result.gamma_range == (-1.0, 1.0)
+```
+
+A gap in the stream wider than the neighbours reach does not cost you a side of it:
+
+```python
+t = jnp.concatenate([jnp.linspace(0.0, 1.0, 60), jnp.linspace(1.2, 2.2, 60)])
+gappy = {"x": t, "y": jnp.zeros(120)}
+flow = {"x": jnp.ones(120), "y": jnp.zeros(120)}
+assert int(pcf.order(gappy, flow).n_visited) == 120
 ```
 
 Any {class}`~phasecurvefit.orderers.SOMOrderer` keyword (`sigma_end`,

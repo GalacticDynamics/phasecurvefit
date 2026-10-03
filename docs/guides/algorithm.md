@@ -378,4 +378,4 @@ Potential future extensions:
 
 ## References
 
-Nibauer, J., et al. (2022). "Charting Galactic Accelerations with Stellar Streams and Machine Learning." arXiv:2201.12042.
+Nibauer, J., Belokurov, V., Cranmer, M., Goodman, J., & Ho, S. (2022). "Charting Galactic Accelerations with Stellar Streams and Machine Learning." ApJ 940, 22. [arXiv:2205.11767](https://arxiv.org/abs/2205.11767), doi:[10.3847/1538-4357/ac93ee](https://doi.org/10.3847/1538-4357/ac93ee).
