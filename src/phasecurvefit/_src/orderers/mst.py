@@ -240,7 +240,7 @@ def _connect_components(P: np.ndarray, graph: csr_matrix) -> csr_matrix:
     rounds. The bridge edges are spatial lengths only -- they deliberately
     ignore ``jump_cap`` and velocity severing, which are what split the graph.
 
-    ponytail: one k-d tree per component per round, ``O(m n log n)``. Fine for
+    Performance: one k-d tree per component per round, ``O(m n log n)``. Fine for
     the few pieces a gap or a clump produces; a ``jump_cap`` far below the
     spacing shatters the graph into ~``n`` pieces and makes this slow. Switch to
     a single k-d tree with a growing ``k`` if that case ever matters.
