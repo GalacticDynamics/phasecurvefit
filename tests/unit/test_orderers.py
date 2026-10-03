@@ -3,6 +3,7 @@
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 import phasecurvefit as pcf
@@ -134,6 +135,59 @@ class TestDefaultPipeline:
         # Different smoothing must produce a different backbone -- otherwise
         # sigma_end silently never reached the SOM.
         assert not jnp.array_equal(tight.backbone["x"], loose.backbone["x"])
+
+    def test_a_gap_in_the_stream_does_not_drop_a_side(self):
+        """Two arcs with a gap wider than ``k`` neighbours reach: both are ordered.
+
+        Without bridging, the kNN graph disconnects at the gap and only the
+        larger half would be ordered (and warned about).
+        """
+        t = np.concatenate([np.linspace(0, 1, 60), np.linspace(1.2, 2.2, 60)])
+        pos = {"x": jnp.asarray(t), "y": jnp.zeros(t.size)}
+        vel = {"x": jnp.ones(t.size), "y": jnp.zeros(t.size)}
+        result = pcf.order(pos, vel)  # `filterwarnings = error`: no warning either
+        assert int(result.n_visited) == 120
+        x = np.asarray(pos["x"])[np.asarray(result.ordering)]
+        assert np.all(np.diff(x) >= 0)  # along the flow, across the gap
+
+    def test_default_n_prototypes_is_15(self, arc):
+        """The documented threshold: 14 tracers fall back, 15 run the SOM."""
+        for n, som_ran in ((14, False), (15, True)):
+            pos, vel, _ = arc(n=n)
+            result = pcf.order(pos, vel)
+            assert (result.backbone_size is None) is som_ran, n
+
+    def test_orientation_follows_the_flow_on_shuffled_data(self, arc):
+        """Signed, not just |rho|: ``gamma`` rises with the true parameter.
+
+        ``arc``'s velocity runs along increasing ``t``, and the tracers arrive
+        shuffled, so a correct orientation is not a storage-order accident.
+        """
+        curve = arc(n=80)
+        result = pcf.order(curve.positions, curve.velocities)
+        t_along = np.asarray(curve.t)[np.asarray(result.ordering)]
+        assert np.corrcoef(np.arange(t_along.size), t_along)[0, 1] > 0.99
+
+    def test_one_nan_velocity_does_not_flip_the_orientation(self):
+        """A NaN velocity must not turn the orientation test into a coin flip."""
+        n = 30
+        x = jnp.linspace(0.0, 3.0, n)
+        vel_x = jnp.ones(n).at[7].set(jnp.nan)
+        for seed in range(5):
+            perm = np.random.default_rng(seed).permutation(n)
+            pos = {"x": x[perm], "y": jnp.zeros(n)}
+            vel = {"x": vel_x[perm], "y": jnp.zeros(n)}
+            ordered_x = np.asarray(pos["x"])[np.asarray(pcf.order(pos, vel).ordering)]
+            assert ordered_x[0] < ordered_x[-1], seed
+
+    def test_init_is_rejected_rather_than_silently_dropped(self, arc):
+        """The default has no use for ``init``: say so, do not discard it."""
+        pos, vel, _ = arc(n=30)
+        prior = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
+        with pytest.raises(ValueError, match="init"):
+            pcf.order(pos, vel, init=prior)
+        # An explicit orderer still takes ``init``.
+        pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(), init=prior)
 
     def test_tracing_the_default_says_to_pass_an_orderer(self, arc):
         """Under jit/vmap the default cannot decide whether to run the SOM: say so."""

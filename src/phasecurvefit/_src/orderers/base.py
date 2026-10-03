@@ -158,7 +158,9 @@ def order(
     With no ``orderer``, ``order(positions, velocities)`` runs
     :func:`~phasecurvefit.orderers.default_pipeline`: an MST backbone ordering
     refined by a SOM (``MSTOrderer() | SOMOrderer()``), falling back to the MST
-    alone when there are too few tracers for the SOM. Pass any
+    alone when there are too few tracers for the SOM, and bridging any gap in the
+    stream rather than dropping a side of it. It takes no ``init`` (a
+    ``ValueError`` says so). Pass any
     :class:`AbstractOrderer` -- e.g. ``LocalFlowOrderer()`` for the
     velocity-following walk -- to select a different algorithm.
 
@@ -174,6 +176,8 @@ def order(
 
     >>> pcf.order(q, p).indices
     Array([0, 1, 2], dtype=int32)
+    >>> pcf.order(q, p).gamma_range  # the walk's would be (0.0, 1.0)
+    (-1.0, 1.0)
 
     Or pass an orderer explicitly, e.g. the velocity-following walk:
 
@@ -203,7 +207,18 @@ def order(
             default_pipeline,
         )
 
-        return default_pipeline(positions, velocities, metadata=metadata, init=init)
+        if init is not None:
+            # The default is MST | SOM: the MST cannot refine a prior ordering,
+            # and the SOM is fed the MST's. Dropping ``init`` silently would
+            # change the answer without telling the caller (the old walk default
+            # took its start index from it).
+            msg = (
+                "`init` is not used by the default ordering pipeline (MST | SOM); "
+                "pass an explicit orderer that takes it, e.g. "
+                "`pcf.orderers.LocalFlowOrderer()`."
+            )
+            raise ValueError(msg)
+        return default_pipeline(positions, velocities, metadata=metadata)
     if init is None:
         # Omit ``init`` entirely so orderers predating it still work.
         return orderer.order(positions, velocities, metadata=metadata)

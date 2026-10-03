@@ -2,19 +2,19 @@ r"""Autoencoder Neural Network for interpolating skipped tracers.
 
 This module implements the autoencoder neural network from Appendix A.2 of
 Nibauer et al. (2022) for assigning $\gamma$ values to stream tracers that were
-skipped by the phase-flow walk algorithm.
+left unvisited by an orderer.
 
 The autoencoder consists of two parts:
 
 1. **Interpolation Network**: Maps phase-space coordinates $(x, v) \to (\gamma,
-   p)$ where $\gamma \in [0, 1]$ is the ordering parameter and $p \in [0, 1]$
-   is the membership probability.
+   p)$ where $\gamma$ (over the result's `gamma_range`) is the ordering
+   parameter and $p \in [0, 1]$ is the membership probability.
 2. **Param-Net (Decoder)**: Maps $\gamma \to x$, reconstructing the position
    from the ordering parameter.
 
 Training follows a two-step process:
 
-1. Train the interpolation network on ordered tracers from phase-flow walk.
+1. Train the interpolation network on ordered tracers from the orderer.
 2. Jointly train both networks with a momentum condition to refine $\gamma$
    values.
 

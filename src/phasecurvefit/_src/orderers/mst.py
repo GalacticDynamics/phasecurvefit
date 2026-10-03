@@ -63,7 +63,7 @@ from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
 
-OnDisconnected = Literal["raise", "warn", "largest"]
+OnDisconnected = Literal["raise", "warn", "largest", "connect"]
 _TINY = 1e-12
 # An edge must be at least this multiple of the median length to be a clip
 # candidate. Floors the (multiplicative) threshold so a uniformly-sampled
@@ -231,6 +231,71 @@ def _sigma_clip_edges(
     return current
 
 
+def _connect_components(P: np.ndarray, graph: csr_matrix) -> csr_matrix:
+    """Join a graph's connected components along their shortest links.
+
+    Each round, every component adds one edge: the shortest spatial link from
+    one of its points to any point outside it. Components that pick each other
+    merge, so the count at least halves and the loop ends in ``O(log m)``
+    rounds. The bridge edges are spatial lengths only -- they deliberately
+    ignore ``jump_cap`` and velocity severing, which are what split the graph.
+
+    ponytail: one k-d tree per component per round, ``O(m n log n)``. Fine for
+    the few pieces a gap or a clump produces; a ``jump_cap`` far below the
+    spacing shatters the graph into ~``n`` pieces and makes this slow. Switch to
+    a single k-d tree with a growing ``k`` if that case ever matters.
+    """
+    n = P.shape[0]
+    tiny = np.finfo(graph.dtype).tiny  # scipy treats zero weights as missing
+    n_comp, labels = connected_components(graph, directed=False)
+    while n_comp > 1:
+        rows, cols, lengths = [], [], []
+        for c in range(n_comp):
+            inside = np.flatnonzero(labels == c)
+            outside = np.flatnonzero(labels != c)
+            dist, nearest = cKDTree(P[inside]).query(P[outside])
+            best = int(np.argmin(dist))
+            rows.append(inside[nearest[best]])
+            cols.append(outside[best])
+            lengths.append(dist[best])
+        bridges = csr_matrix((np.maximum(lengths, tiny), (rows, cols)), shape=(n, n))
+        graph = graph.maximum(bridges.maximum(bridges.T))
+        n_comp, labels = connected_components(graph, directed=False)
+    return graph
+
+
+def _disconnected_message(
+    n_comp: int, k: int, jump_cap: float, sever_cos_threshold: float | None
+) -> str:
+    """Explain a disconnected kNN graph, blaming only what could be the cause."""
+    causes = [f"k={k} too low"]
+    if np.isfinite(jump_cap):  # an infinite cap cannot be "too small"
+        causes.insert(0, f"jump_cap={jump_cap} too small")
+    if sever_cos_threshold is not None:
+        causes.append("severing too aggressive")
+    return (
+        f"kNN graph is disconnected into {n_comp} components "
+        f"({', '.join(causes)}). Set on_disconnected='connect' to bridge the "
+        "pieces along their shortest links, or increase k (and jump_cap, relax "
+        "sever_cos_threshold) to connect them; 'warn'/'largest' order only the "
+        "largest piece and leave the rest unvisited."
+    )
+
+
+def _orient_along_velocity(
+    order_idx: np.ndarray, backbone_nodes: np.ndarray, Cb: np.ndarray, V: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Reverse the ordering if it runs against the mean velocity."""
+    tang = np.diff(Cb, axis=0)
+    vseg = V[backbone_nodes]
+    vmid = 0.5 * (vseg[:-1] + vseg[1:])
+    # nansum: one NaN velocity must not turn this test into a coin flip
+    # (``nan < 0`` is False, so the flip would silently never happen).
+    if np.nansum(tang * vmid) < 0.0:
+        return order_idx[::-1], backbone_nodes[::-1]
+    return order_idx, backbone_nodes
+
+
 def _mst_backbone(
     P: np.ndarray,
     V: np.ndarray,
@@ -286,17 +351,14 @@ def _mst_backbone(
 
     graph = csr_matrix((weights[keep], (rows[keep], cols[keep])), shape=(n, n))
     graph = graph.maximum(graph.T)  # symmetrise
+    if on_disconnected == "connect":  # bridge the pieces instead of dropping any
+        graph = _connect_components(P, graph)
     tree = minimum_spanning_tree(graph)
     tree = tree + tree.T
 
     n_comp, labels = connected_components(tree, directed=False)
     if n_comp != 1:
-        msg = (
-            f"kNN graph is disconnected into {n_comp} components "
-            f"(jump_cap={jump_cap} too small, k={k} too low, or severing too "
-            "aggressive). Increase jump_cap/k, relax sever_cos_threshold, or set "
-            "on_disconnected='warn'/'largest'."
-        )
+        msg = _disconnected_message(n_comp, k, jump_cap, sever_cos_threshold)
         if on_disconnected == "raise":
             raise ValueError(msg)
         if on_disconnected == "warn":
@@ -314,12 +376,9 @@ def _mst_backbone(
     order_idx, backbone_nodes, Cb = _backbone_on_component(P, tree, nodes)
 
     if orient_by_velocity:  # Mechanism 3: orient gamma along mean velocity
-        tang = np.diff(Cb, axis=0)
-        vseg = V[backbone_nodes]
-        vmid = 0.5 * (vseg[:-1] + vseg[1:])
-        if np.sum(tang * vmid) < 0.0:
-            order_idx = order_idx[::-1]
-            backbone_nodes = backbone_nodes[::-1]
+        order_idx, backbone_nodes = _orient_along_velocity(
+            order_idx, backbone_nodes, Cb, V
+        )
 
     return order_idx, backbone_nodes
 
@@ -395,9 +454,13 @@ class MSTOrderer(AbstractOrderer):
         Mechanism 3. If ``True``, flip the ordering so ``gamma`` increases along
         the mean velocity.
     on_disconnected
-        Policy when the graph splits into multiple components: ``"raise"``
-        (default), ``"warn"`` (order the largest component, warn, leave the rest
-        unvisited), or ``"largest"`` (same, silently).
+        Policy when the graph splits into multiple components (a gap in the
+        stream, or a ``jump_cap``/``sever_cos_threshold`` that is too tight):
+        ``"raise"`` (default), ``"warn"`` (order the largest component, warn,
+        leave the rest unvisited), ``"largest"`` (same, silently), or
+        ``"connect"`` (join the pieces along their shortest links and order
+        everything; the bridge links ignore ``jump_cap`` and velocity severing,
+        which is what split the graph).
     edge_clip_sigma
         Optional outlier rejection by MST edge length. If not ``None``, robustly
         sigma-clip the backbone's *spatial* edge lengths in log space: cut edges
@@ -491,7 +554,7 @@ class MSTOrderer(AbstractOrderer):
 
     def __check_init__(self) -> None:
         """Reject invalid configuration early, at construction."""
-        allowed = ("raise", "warn", "largest")
+        allowed = ("raise", "warn", "largest", "connect")
         if self.on_disconnected not in allowed:
             msg = (
                 f"on_disconnected must be one of {allowed}; "

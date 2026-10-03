@@ -558,7 +558,7 @@ def walk_local_flow(*args: object, **kwargs: object) -> WalkLocalFlowResult:
     """Order tracers with the local-flow walk (deprecated; use `order`).
 
     .. deprecated:: 0.3
-        ``walk_local_flow`` will be removed in v0.4. Use
+        ``walk_local_flow`` will be removed in a future release. Use
         ``pcf.order(positions, velocities, pcf.orderers.LocalFlowOrderer(...))``
         (or ``LocalFlowOrderer(...).order(...)``), which routes through the same
         implementation without a warning. Note that ``pcf.order`` with no
@@ -569,7 +569,7 @@ def walk_local_flow(*args: object, **kwargs: object) -> WalkLocalFlowResult:
     `WalkLocalFlowResult`.
     """
     warnings.warn(
-        "`walk_local_flow` is deprecated and will be removed in v0.4; use "
+        "`walk_local_flow` is deprecated and will be removed in a future release; use "
         "`pcf.order(positions, velocities, pcf.orderers.LocalFlowOrderer(...))` "
         "(or `pcf.orderers.LocalFlowOrderer(...).order(...)`) instead.",
         DeprecationWarning,

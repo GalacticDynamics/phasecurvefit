@@ -22,13 +22,24 @@ references:
     authors:
       - family-names: Nibauer
         given-names: Jacob
+      - family-names: Belokurov
+        given-names: Vasily
+      - family-names: Cranmer
+        given-names: Miles
+      - family-names: Goodman
+        given-names: Jeremy
+      - family-names: Ho
+        given-names: Shirley
+    journal: The Astrophysical Journal
+    volume: 940
     year: 2022
+    doi: 10.3847/1538-4357/ac93ee
     notes: >-
       Cite if you use momentum-weighted ordering (LocalFlowOrderer) or the
       autoencoder (PathAutoencoder, train_autoencoder, fit_track).
     identifiers:
       - type: url
-        value: 'https://arxiv.org/abs/2201.12042'
+        value: 'https://arxiv.org/abs/2205.11767'
   - type: article
     title: 'On the Fast Track: Rapid construction of stellar stream paths'
     authors:

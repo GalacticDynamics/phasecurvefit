@@ -43,9 +43,16 @@ you called `pcf.order`.
 ```bibtex
 @article{nibauer2022charting,
   title={Charting Galactic Accelerations with Stellar Streams and Machine Learning},
-  author={Nibauer, Jacob and others},
-  journal={arXiv preprint arXiv:2201.12042},
-  year={2022}
+  author={Nibauer, Jacob and Belokurov, Vasily and Cranmer, Miles and
+          Goodman, Jeremy and Ho, Shirley},
+  journal={The Astrophysical Journal},
+  volume={940},
+  pages={22},
+  year={2022},
+  doi={10.3847/1538-4357/ac93ee},
+  eprint={2205.11767},
+  archivePrefix={arXiv},
+  primaryClass={astro-ph.GA}
 }
 ```
 
