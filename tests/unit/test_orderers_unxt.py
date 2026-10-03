@@ -66,6 +66,31 @@ class TestMSTUnxt:
             pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(q, p)
 
 
+class TestDefaultPipelineUnxt:
+    """``order()``'s default (MST | SOM) takes Quantities like any orderer."""
+
+    def test_quantity_matches_stripped_run_through_the_som_stage(self):
+        """120 tracers, so the SOM stage runs; Quantity matches the plain run."""
+        q, p = _arc_quantity()
+        usys = u.unitsystems.galactic
+        res_q = pcf.order(q, p, metadata=StateMetadata(usys=usys))
+
+        q_plain = {k: u.ustrip(usys, v) for k, v in q.items()}
+        p_plain = {k: u.ustrip(usys, v) for k, v in p.items()}
+        res_plain = pcf.order(q_plain, p_plain)
+
+        assert res_q.backbone_size is None  # the SOM stage ran
+        assert isinstance(res_q.positions["x"], u.AbstractQuantity)
+        assert jnp.array_equal(res_q.indices, res_plain.indices)
+
+    def test_quantity_falls_back_to_the_mst_alone_below_n_prototypes(self):
+        """5 < 15 tracers: the MST alone, still unit-aware."""
+        q, p = _arc_quantity(n=5)
+        res = pcf.order(q, p, metadata=StateMetadata(usys=u.unitsystems.galactic))
+        assert res.backbone_size is not None  # the MST stage alone ran
+        assert isinstance(res.positions["x"], u.AbstractQuantity)
+
+
 class TestLocalFlowUnxt:
     """Tests for local flow unxt."""
 

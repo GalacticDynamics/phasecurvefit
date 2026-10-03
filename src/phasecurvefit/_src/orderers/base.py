@@ -155,11 +155,14 @@ def order(
 ) -> AbstractResult:
     """Order tracers with ``orderer`` -- the primary ordering entry point.
 
-    ``orderer`` defaults to :class:`~phasecurvefit.orderers.LocalFlowOrderer`, so
-    ``order(positions, velocities)`` runs the velocity-following local-flow walk
-    (equivalent to the deprecated ``walk_local_flow(positions, velocities)``).
-    Pass any :class:`AbstractOrderer` (e.g. ``MSTOrderer``) to select a different
-    algorithm.
+    With no ``orderer``, ``order(positions, velocities)`` runs
+    :func:`~phasecurvefit.orderers.default_pipeline`: an MST backbone ordering
+    refined by a SOM (``MSTOrderer() | SOMOrderer()``), falling back to the MST
+    alone when there are too few tracers for the SOM, and bridging any gap in the
+    stream rather than dropping a side of it. It takes no ``init`` (a
+    ``ValueError`` says so). Pass any
+    :class:`AbstractOrderer` -- e.g. ``LocalFlowOrderer()`` for the
+    velocity-following walk -- to select a different algorithm.
 
     Examples
     --------
@@ -168,12 +171,15 @@ def order(
     >>> q = {"x": jnp.array([0.0, 1.0, 2.0])}
     >>> p = {"x": jnp.array([1.0, 1.0, 1.0])}
 
-    The default orderer is the local-flow walk:
+    The default is an MST backbone refined by a SOM. Three tracers are too few
+    for the SOM, so here it is the MST alone, oriented along the velocity:
 
     >>> pcf.order(q, p).indices
     Array([0, 1, 2], dtype=int32)
+    >>> pcf.order(q, p).gamma_range  # the walk's would be (0.0, 1.0)
+    (-1.0, 1.0)
 
-    Or pass an orderer explicitly:
+    Or pass an orderer explicitly, e.g. the velocity-following walk:
 
     >>> res = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(metric_scale=1.0))
     >>> res.indices
@@ -195,10 +201,24 @@ def order(
         # rather than this one's misleading "both empty" message.
         raise ValueError(msg)
     if orderer is None:
-        # Lazy import: localflow imports AbstractOrderer from this module.
-        from phasecurvefit._src.orderers import localflow  # noqa: PLC0415
+        # Lazy import: default_pipeline imports the orderers, which import
+        # AbstractOrderer from this module.
+        from phasecurvefit._src.orderers.default_pipeline import (  # noqa: PLC0415
+            default_pipeline,
+        )
 
-        orderer = localflow.LocalFlowOrderer()
+        if init is not None:
+            # The default is MST | SOM: the MST cannot refine a prior ordering,
+            # and the SOM is fed the MST's. Dropping ``init`` silently would
+            # change the answer without telling the caller (the old walk default
+            # took its start index from it).
+            msg = (
+                "`init` is not used by the default ordering pipeline (MST | SOM); "
+                "pass an explicit orderer that takes it, e.g. "
+                "`pcf.orderers.LocalFlowOrderer()`."
+            )
+            raise ValueError(msg)
+        return default_pipeline(positions, velocities, metadata=metadata)
     if init is None:
         # Omit ``init`` entirely so orderers predating it still work.
         return orderer.order(positions, velocities, metadata=metadata)

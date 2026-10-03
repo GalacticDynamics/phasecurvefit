@@ -23,12 +23,13 @@ breaks down in exactly the cases that matter:
   nearest point is often on the wrong strand. phasecurvefit uses velocities as
   well as positions, so the ordering stays on the right strand (see the
   [epitrochoid tutorials](https://phasecurvefit.readthedocs.io/en/latest/tutorials/epitrochoid_autoencoder.html)).
-- **No known starting point.** The MST orderer finds the two ends of the curve
-  itself, so no progenitor position or hand-picked start index is needed
+- **No known starting point.** The default MST | SOM pipeline finds the two ends
+  of the curve itself, so no progenitor position or hand-picked start index is
+  needed
   ([MST tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_mst.html)).
-- **Incomplete orderings.** A conservative walk orders a reliable subset; an
-  autoencoder then assigns an ordering coordinate γ to every sample and learns a
-  smooth mean track through them
+- **Incomplete orderings.** An orderer may order only a reliable subset (the
+  local-flow walk does); an autoencoder then assigns an ordering coordinate γ to
+  every sample and learns a smooth mean track through them
   ([stream autoencoder tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_autoencoder.html)).
 - **Contamination.** A stream-plus-background mixture model gives each sample a
   calibrated membership probability, so interlopers can be down-weighted or
@@ -41,10 +42,11 @@ breaks down in exactly the cases that matter:
   every step of an MCMC
   ([running-mean tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_runningmean.html)).
 
-phasecurvefit is a reusable, tested library for momentum-weighted ordering, with
-alternative orderers, gap filling, outlier rejection and optional physical units
-(via `unxt`). It was built for stellar streams but applies to any ordered
-phase-space data.
+phasecurvefit is a reusable, tested library for ordering samples along a curve
+in phase space, by default with an MST backbone refined by a Self-Organizing
+Map, with alternative orderers (including momentum-weighted ordering), gap
+filling, outlier rejection and optional physical units (via `unxt`). It was
+built for stellar streams but applies to any ordered phase-space data.
 
 ## Features
 
@@ -57,8 +59,9 @@ phase-space data.
   interpretations
 - **Pluggable query strategies**: Flexible neighbor search strategies (e.g.,
   brute-force, KD-tree) to optimize performance
-- **Pluggable orderers**: One interface over multiple ordering algorithms — the
-  velocity-following walk and an MST backbone for near-closed loops
+- **Pluggable orderers**: One interface over multiple ordering algorithms — by
+  default an MST backbone refined by a SOM, with the velocity-following walk as
+  an alternative
 - **Highly customizable ML setup and training**: Well-chosen defaults with
   highly flexible customization for specific use-cases.
 - **Physical units**: Optional support via `unxt` for unit-aware calculations
@@ -196,9 +199,9 @@ vel = {
     "y": jnp.array([0.5, 0.5, 0.5, 0.5, 0.5]),
 }
 
-# Step 1: Order the observations (use KD-tree for spatial neighbor prefiltering)
-config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=3))  # k=3 for this small dataset
-result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
+# Step 1: Order the observations: an MST backbone refined by a SOM. (With fewer
+# than 15 points, as here, the SOM is skipped and the MST is used alone.)
+result = pcf.order(pos, vel)
 print(result.indices)  # Initial ordering
 
 # Step 2: Create normalizer and autoencoder
@@ -268,14 +271,21 @@ result, _, losses = pcf.nn.train_autoencoder(
 
 The ordering step is pluggable. Every orderer implements the same interface —
 `order(positions, velocities)` — and returns an `OrderingResult` that feeds the
-autoencoder unchanged, so orderers are interchangeable:
+autoencoder unchanged, so orderers are interchangeable. With no orderer,
+`pcf.order(pos, vel)` runs the **default pipeline**, an MST backbone refined by
+a SOM (`MSTOrderer() | SOMOrderer()`). The built-in orderers it is made from,
+and the alternative to them, are:
 
-- **`LocalFlowOrderer`** — the velocity-following walk (wraps
-  `walk_local_flow`). Follows a coherent flow from a start point.
 - **`MSTOrderer`** — a minimum-spanning-tree backbone. It needs no start point
   (the graph diameter finds the two tips itself), which makes it ideal for
   **near-closed loops** where the velocity field reverses and a single walk
-  covers only one arm. Requires the `mst` extra.
+  covers only one arm.
+- **`SOMOrderer`** — a Self-Organizing Map refinement. Its prototypes average
+  over many tracers, so the backbone it produces is far less sensitive to local
+  noise than a single walk's or MST's individual decisions.
+- **`LocalFlowOrderer`** — the velocity-following walk (wraps
+  `walk_local_flow`). Follows a coherent flow from a start point, and is fully
+  JAX-traceable.
 
 ```python
 import jax.numpy as jnp
@@ -286,16 +296,19 @@ t = jnp.linspace(0.0, 1.0, 60)
 pos = {"x": 10.0 * t, "y": jnp.sin(3.0 * t)}
 vel = {"x": jnp.ones(60), "y": 3.0 * jnp.cos(3.0 * t)}
 
+# The default: MST backbone refined by a SOM (no start point needed)
+result = pcf.order(pos, vel)
+
 # The velocity-following walk, via the orderer interface
 walk_orderer = pcf.orderers.LocalFlowOrderer(metric_scale=1.0, start_idx=0)
 walk_result = walk_orderer.order(pos, vel)
 
-# The MST backbone (no start point needed)
-mst_orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0)
-mst_result = pcf.order(pos, vel, mst_orderer)  # or mst_orderer.order(pos, vel)
+# A custom chain: tune the MST, then refine with a SOM
+chain = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0) | pcf.orderers.SOMOrderer()
+chain_result = pcf.order(pos, vel, chain)
 
 # Either result feeds the autoencoder unchanged
-print(mst_result.gamma_range)  # (-1.0, 1.0)
+print(result.gamma_range)  # (-1.0, 1.0)
 ```
 
 `MSTOrderer` also has opt-in velocity mechanisms (`velocity_weight`,
@@ -303,7 +316,8 @@ print(mst_result.gamma_range)  # (-1.0, 1.0)
 the
 [Orderers Guide](https://phasecurvefit.readthedocs.io/en/latest/guides/orderers.html)
 and the
-[Migration Guide](https://phasecurvefit.readthedocs.io/en/latest/migration.html).
+[v0.3 → v0.4 Migration Guide](https://phasecurvefit.readthedocs.io/en/latest/migration/v0.3-to-v0.4.html),
+which covers the change of default from the walk to MST | SOM.
 
 ## Distance Metrics
 
@@ -482,16 +496,19 @@ DOI, together with the paper behind whichever component you used.
 <details>
   <summary>component papers</summary>
 
-- **momentum-weighted ordering** — Nibauer et al. (2022),
-  [arXiv:2201.12042](https://arxiv.org/abs/2201.12042)
-- **SOM ordering** — Starkman et al. (2023), MNRAS 522, 5022,
+- **default pipeline / SOM ordering** (`pcf.order(pos, vel)`, `SOMOrderer`,
+  `phasecurvefit.som`) — Starkman et al. (2023), MNRAS 522, 5022,
   [arXiv:2212.00949](https://arxiv.org/abs/2212.00949)
+- **momentum-weighted ordering** (`LocalFlowOrderer`) **or the autoencoder**
+  (`PathAutoencoder`, `fit_track`) — Nibauer et al. (2022),
+  [arXiv:2205.11767](https://arxiv.org/abs/2205.11767)
 - **mixture-model membership / outlier rejection** — Hogg, Bovy & Lang (2010),
   [arXiv:1008.4686](https://arxiv.org/abs/1008.4686)
 
 Machine-readable metadata for all of these is in
 [`CITATION.cff`](https://github.com/GalacticDynamics/phasecurvefit/blob/main/CITATION.cff);
-BibTeX entries are in the [documentation](https://phasecurvefit.readthedocs.io).
+what to cite for which component, with BibTeX entries, is on the
+[Citation page](https://phasecurvefit.readthedocs.io/en/latest/citation.html).
 
 </details>
 

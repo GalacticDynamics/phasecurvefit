@@ -317,7 +317,7 @@ class TestTrainEncoderExternalDecoder:
         positions = sample_data["positions"]
         velocities = sample_data["velocities"]
 
-        result = pcf.order(positions, velocities)
+        result = pcf.order(positions, velocities, pcf.orderers.LocalFlowOrderer())
 
         # Create model
         normalizer = pcf.nn.StandardScalerNormalizer(positions, velocities)

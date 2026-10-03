@@ -4,8 +4,9 @@ Get started with phasecurvefit in 5 minutes!
 
 phasecurvefit takes points in phase space (positions *and* velocities) whose
 order along a curve is unknown, and works out that order. This guide covers the
-first step, **ordering** the points with the local-flow walk, and the settings
-that control it. The [Autoencoder guide](nn.md) covers the next step: giving
+first step, **ordering** the points: first with the default pipeline, an MST
+backbone refined by a SOM, then with the local-flow walk and the settings that
+control it. The [Autoencoder guide](nn.md) covers the next step: giving
 every point an ordering coordinate and fitting a smooth track. For worked
 examples on realistic data, see the [tutorials](../tutorials/index.md).
 
@@ -66,7 +67,28 @@ velocity = {
 
 ### 3. Run the algorithm
 
-The local-flow walk starts at one point and repeatedly steps to the unvisited
+With no further arguments, `pcf.order` runs the **default pipeline**: an MST
+backbone (the longest path of a minimum spanning tree of the nearest-neighbour
+graph, which runs from one end of the curve to the other) refined by a
+Self-Organizing Map. It needs no start point, and it orients the ordering along
+the velocity.
+
+```python
+result = pcf.order(position, velocity)
+
+print(result.ordering)
+# Array([0, 1, 2, 3, 4])
+assert result.gamma_range == (-1.0, 1.0)  # the default pipeline's, not the walk's
+```
+
+The SOM needs at least 15 tracers (its default number of prototypes) to fit; with
+fewer, as in this five-point example, `pcf.order` returns the MST ordering alone.
+See [The default pipeline](orderers.md#the-default-pipeline-mst-then-som).
+
+#### The local-flow walk
+
+To follow the velocity field step by step instead, pass a
+{class}`~phasecurvefit.orderers.LocalFlowOrderer`. The walk starts at one point and repeatedly steps to the unvisited
 point that minimizes a distance metric. With the default
 `AlignedMomentumDistanceMetric`, that distance combines closeness with a penalty
 for the direction *to* the candidate point being misaligned with the current
@@ -100,8 +122,8 @@ print(result.ordering)
 ```{note}
 Above we ran the **local-flow walk** through `pcf.order` with a
 {class}`~phasecurvefit.orderers.LocalFlowOrderer` — one of several pluggable
-orderers. Swap in the {class}`~phasecurvefit.orderers.MSTOrderer` for near-closed
-loops where the velocity reverses. See the [Orderers guide](orderers.md).
+orderers, and not the default. See the [Orderers guide](orderers.md). The rest of
+this page is about the walk's settings.
 ```
 
 ### 4. Extract ordered data
@@ -119,9 +141,9 @@ print(ordered_pos["x"])
 
 `pcf.order` returns an `OrderingResult` (a `WalkLocalFlowResult` for the walk) with:
 
-- **`ordering`**: the indices of the visited observations, in walk order
+- **`ordering`**: the indices of the visited observations, in order
 - **`indices`**: the same, padded with `-1` to the full length (a fixed shape, for JAX)
-- **`n_visited`** / **`n_skipped`**: how many observations the walk reached or left out
+- **`n_visited`** / **`n_skipped`**: how many observations the orderer reached or left out
 - **`positions`**, **`velocities`**: the input data
 - **`gamma_range`**: the range of the ordering coordinate $\gamma$
 
@@ -315,9 +337,9 @@ Integration guide.
 
 ## Next Steps
 
-- [The recommended walk-then-SOM chain](orderers.md#the-recommended-walk-then-som-chain) - `pcf.orderers.default_pipeline` refines the walk with a SOM stage, a better default than the bare walk above without changing it
+- [The default pipeline](orderers.md#the-default-pipeline-mst-then-som) - what `pcf.order(pos, vel)` runs: an MST backbone refined by a SOM, and how to tune it
 - [Tutorials](../tutorials/index.md) - Worked examples, starting with a simulated stellar stream
 - [Autoencoder](nn.md) - Order every point, including the ones the walk skipped, and fit a smooth track - or run the whole thing in one call with `pcf.fit_track`
 - [Algorithm Details](algorithm.md) - Understand the math
-- [Orderers](orderers.md) - Choose between the walk and the MST
+- [Orderers](orderers.md) - Choose between the default pipeline, the walk and the MST
 - [JAX Integration](jax-integration.md) - Advanced JAX usage

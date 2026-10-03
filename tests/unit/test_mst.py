@@ -167,6 +167,57 @@ class TestMSTDisconnected:
                 pos, vel
             )
 
+    def test_connect_orders_every_component_without_warning(self):
+        """``"connect"`` bridges the pieces: nothing is dropped, nothing warns."""
+        pos, vel = _two_clusters(n_a=80, n_b=30)
+        res = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=0.5, on_disconnected="connect"
+        ).order(pos, vel)  # `filterwarnings = error`: a warning would fail this
+        assert int(res.n_visited) == 110
+        x = np.asarray(pos["x"])[np.asarray(res.ordering)]
+        # Tip to tip across the gap: one cluster, then the other, monotonically.
+        assert np.all(np.diff(x) >= 0) or np.all(np.diff(x) <= 0)
+
+    def test_connect_handles_many_components(self):
+        """Several pieces, found and joined over more than one bridging round."""
+        centers = np.array([0.0, 50.0, 120.0, 130.0, 400.0])
+        x = np.concatenate([np.linspace(c, c + 1.0, 20) for c in centers])
+        pos = {"x": jnp.asarray(x), "y": jnp.zeros(x.size)}
+        vel = {"x": jnp.ones(x.size), "y": jnp.zeros(x.size)}
+        res = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=2.0, on_disconnected="connect"
+        ).order(pos, vel)
+        assert int(res.n_visited) == x.size
+        xs = x[np.asarray(res.ordering)]
+        assert np.all(np.diff(xs) >= 0) or np.all(np.diff(xs) <= 0)
+
+    def test_connect_is_a_no_op_on_a_connected_graph(self):
+        """With nothing to bridge, ``"connect"`` gives the ``"raise"`` answer."""
+        pos, vel, _ = _open_arc(n=100)
+        kw = {"k": 8, "jump_cap": 2.0}
+        a = pcf.orderers.MSTOrderer(**kw, on_disconnected="connect").order(pos, vel)
+        b = pcf.orderers.MSTOrderer(**kw, on_disconnected="raise").order(pos, vel)
+        assert jnp.array_equal(a.indices, b.indices)
+
+    def test_connect_ignores_jump_cap_for_the_bridge_only(self):
+        """The bridge may be longer than ``jump_cap``; ordinary edges may not."""
+        pos, vel = _two_clusters(n_a=80, n_b=30)  # the gap is ~99, jump_cap is 0.5
+        res = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=0.5, on_disconnected="connect"
+        ).order(pos, vel)
+        assert int(res.n_visited) == 110
+
+    def test_disconnected_message_does_not_blame_an_infinite_jump_cap(self):
+        """``jump_cap=inf`` cannot be "too small": the message must not say so."""
+        pos, vel = _two_clusters(n_a=80, n_b=30)
+        with pytest.raises(ValueError, match="disconnected") as exc:
+            pcf.orderers.MSTOrderer(
+                k=5, jump_cap=float("inf"), on_disconnected="raise"
+            ).order(pos, vel)
+        msg = str(exc.value)
+        assert "jump_cap=inf" not in msg
+        assert "connect" in msg  # names the way out
+
     def test_unknown_on_disconnected_raises(self):
         """An unknown policy is rejected at construction, not treated as 'largest'."""
         with pytest.raises(ValueError, match="on_disconnected"):

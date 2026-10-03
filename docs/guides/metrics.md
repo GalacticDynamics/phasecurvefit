@@ -74,7 +74,7 @@ result = pcf.order(
 ### AlignedMomentumDistanceMetric
 
 The Nearest Neighbors with Momentum (NN+p) metric from [Nibauer et al.
-(2022)](https://arxiv.org/abs/2201.12042).  This is the default metric.
+(2022)](https://arxiv.org/abs/2205.11767).  This is the default metric.
 
 **Mathematical formulation:**
 

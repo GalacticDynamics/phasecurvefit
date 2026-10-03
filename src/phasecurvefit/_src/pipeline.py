@@ -35,8 +35,8 @@ def fit_track(
 ) -> tuple[AbstractResult, AutoencoderResult, Float[Array, " n_epochs"]]:
     """Order, refine, and fit a smooth track through phase-space tracers.
 
-    Runs :func:`~phasecurvefit.orderers.default_pipeline` (the velocity-flow
-    walk refined by a SOM stage), builds a
+    Runs :func:`~phasecurvefit.orderers.default_pipeline` (the MST backbone
+    refined by a SOM stage), builds a
     :class:`~phasecurvefit.nn.PathAutoencoder` sized to match, and trains it
     with :func:`~phasecurvefit.nn.train_autoencoder` -- the same three steps
     as the quickstart and autoencoder guides, in one call.

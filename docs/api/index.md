@@ -6,7 +6,28 @@ Complete API documentation for phasecurvefit.
 .. currentmodule:: phasecurvefit
 ```
 
-## Main Function
+## Main Functions
+
+`order` is the primary entry point. With no orderer it runs `default_pipeline`, an
+MST backbone refined by a SOM; `fit_track` goes on to fit the autoencoder.
+
+```{eval-rst}
+.. autofunction:: order
+   :no-index:
+
+.. autofunction:: phasecurvefit.orderers.default_pipeline
+   :no-index:
+
+.. autofunction:: fit_track
+   :no-index:
+```
+
+### Deprecated
+
+`walk_local_flow` is deprecated in favor of `order` with a
+{class}`~phasecurvefit.orderers.LocalFlowOrderer`; see the
+migration guides ([v0.2 → v0.3](../migration/v0.2-to-v0.3.md),
+[v0.3 → v0.4](../migration/v0.3-to-v0.4.md)).
 
 ```{eval-rst}
 .. autofunction:: walk_local_flow

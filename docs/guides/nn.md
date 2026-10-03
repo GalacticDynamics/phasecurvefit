@@ -1,9 +1,9 @@
 # Autoencoder for Gap Filling
 
-The walk algorithm skips some tracers due to the momentum condition. This guide explains how to use an autoencoder to assign ordering values ($\gamma$) to these skipped tracers.
+An orderer can leave tracers unvisited — the local-flow walk skips some because of its momentum condition, and the default MST | SOM pipeline can leave out tracers an outlier-rejecting chain (`edge_clip_sigma`) has dropped. This guide explains how to use an autoencoder to assign ordering values ($\gamma$) to these skipped tracers, and to fit a smooth track through the lot.
 
 ```{note}
-The examples below start from a walk, but `train_autoencoder` accepts **any**
+The examples below start from the default pipeline, but `train_autoencoder` accepts **any**
 orderer's output — it dispatches on the unified
 {class}`~phasecurvefit.orderers.OrderingResult`. An
 {class}`~phasecurvefit.orderers.MSTOrderer` result feeds the autoencoder the same
@@ -13,7 +13,8 @@ that the decoder can be trained against.
 
 ## Problem and Solution
 
-**Problem**: the walk follows a single thread through the data, so it leaves out
+**Problem**: an ordering is not yet a smooth track, and may be incomplete. The local-flow walk
+follows a single thread through the data, so it leaves out
 many tracers: those off to the side of its path, and everything beyond a gap
 larger than `max_dist`. On the simulated stream in the
 [stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb), the walk
@@ -24,7 +25,7 @@ through the data.
 - **Encoder**: $(x, v) \rightarrow (\gamma, p)$ — predicts ordering and membership probability
 - **Decoder**: $\gamma \rightarrow x$ — reconstructs position from ordering
 
-The encoder learns from the walk-ordered tracers and generalizes to predict $\gamma$ for skipped tracers.
+The encoder learns from the ordered tracers and generalizes to predict $\gamma$ for skipped tracers.
 The decoder gives the smooth mean track $x(\gamma)$, which you can evaluate at
 any $\gamma$. If training time matters more than accuracy, a running-mean
 decoder can replace the trained one; see the
@@ -37,24 +38,22 @@ import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
 
-# Get an initial ordering from the local-flow walk
+# Get an initial ordering from the default pipeline (MST backbone + SOM)
 pos = {"x": jnp.linspace(0, 5, 50), "y": jnp.sin(jnp.linspace(0, jnp.pi, 50))}
 vel = {"x": jnp.ones(50), "y": jnp.cos(jnp.linspace(0, jnp.pi, 50))}
-walkresult = pcf.order(
-    pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
-)
+ordering = pcf.order(pos, vel)
 
 # Create normalizer and autoencoder
 key = jax.random.key(0)
 normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
 autoencoder = pcf.nn.PathAutoencoder.make(
-    normalizer, gamma_range=walkresult.gamma_range, key=key
+    normalizer, gamma_range=ordering.gamma_range, key=key
 )
 
 # Train autoencoder
 config = pcf.nn.TrainingConfig(show_pbar=False)
 result, _, losses = pcf.nn.train_autoencoder(
-    autoencoder, walkresult, config=config, key=key
+    autoencoder, ordering, config=config, key=key
 )
 
 gamma = result.gamma
@@ -78,7 +77,7 @@ a different orderer, a pre-built model, a decoder swap.
 
 ## How It Works
 
-1. **Initialization**: Walk assigns $\gamma \in [-1, 1]$ to ordered tracers
+1. **Initialization**: The orderer assigns $\gamma$ (over its `gamma_range`, $[-1, 1]$ for the default pipeline) to ordered tracers
 2. **Phase 1 (encoder)**: Encoder learns to predict $\gamma$ from phase-space
    coordinates, and a membership probability $p$ to distinguish stream from
    background
@@ -112,7 +111,7 @@ config = pcf.nn.TrainingConfig(
 )
 
 result, _, losses = pcf.nn.train_autoencoder(
-    autoencoder, walkresult, config=config, key=key
+    autoencoder, ordering, config=config, key=key
 )
 ```
 

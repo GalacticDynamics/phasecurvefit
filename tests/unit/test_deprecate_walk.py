@@ -1,8 +1,9 @@
 """Deprecation and equivalence tests for ``order()`` vs ``walk_local_flow``.
 
-Covers issue #36: ``pcf.order`` is the primary entry point (default orderer is the
-local-flow walk), and ``walk_local_flow`` is a deprecated alias that emits a
-``DeprecationWarning`` while producing identical results.
+Covers issue #36: ``pcf.order`` is the primary entry point, and ``walk_local_flow``
+is a deprecated alias that emits a ``DeprecationWarning`` while producing results
+identical to ``order(..., LocalFlowOrderer(...))``. ``order``'s own default is no
+longer the walk (it is the MST | SOM pipeline); see ``test_orderers.py``.
 """
 
 import warnings
@@ -26,18 +27,23 @@ def _walk(pos, vel, **kwargs):
         return pcf.walk_local_flow(pos, vel, **kwargs)
 
 
-class TestOrderDefault:
-    """``order()`` defaults to the local-flow walk and equals the deprecated func."""
+class TestOrderEqualsWalk:
+    """``order(..., LocalFlowOrderer(...))`` equals the deprecated function."""
 
-    def test_default_orderer_is_local_flow(self):
-        """``order(pos, vel)`` with no orderer == an explicit ``LocalFlowOrderer``."""
-        got = pcf.order(POS, VEL).indices
-        exp = pcf.order(POS, VEL, pcf.orderers.LocalFlowOrderer()).indices
-        assert jnp.array_equal(got, exp)
+    def test_local_flow_orderer_equals_deprecated_walk(self):
+        """``order(pos, vel, LocalFlowOrderer())`` reproduces ``walk_local_flow``."""
+        lfo = pcf.orderers.LocalFlowOrderer()
+        assert jnp.array_equal(
+            pcf.order(POS, VEL, lfo).indices, _walk(POS, VEL).indices
+        )
 
-    def test_default_equals_deprecated_walk(self):
-        """``order(pos, vel)`` reproduces ``walk_local_flow(pos, vel)`` exactly."""
-        assert jnp.array_equal(pcf.order(POS, VEL).indices, _walk(POS, VEL).indices)
+    def test_bare_order_is_not_the_walk(self):
+        """``order(pos, vel)`` is no longer the walk: it is the MST | SOM default.
+
+        A walk result has ``gamma_range == (0, 1)``; the default's is ``(-1, 1)``.
+        """
+        assert _walk(POS, VEL).gamma_range == (0.0, 1.0)
+        assert pcf.order(POS, VEL).gamma_range == (-1.0, 1.0)
 
     def test_nondefault_params_via_orderer(self):
         """Non-default walk params on ``LocalFlowOrderer`` match the walk kwargs."""
@@ -66,4 +72,5 @@ class TestDeprecation:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             pcf.order(POS, VEL)
+            pcf.order(POS, VEL, pcf.orderers.LocalFlowOrderer())
             pcf.orderers.LocalFlowOrderer().order(POS, VEL)

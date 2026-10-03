@@ -40,7 +40,9 @@ api/index
 :hidden:
 :caption: 🔀 Migration
 
-migration
+migration/v0.3-to-v0.4
+migration/v0.2-to-v0.3
+migration/v0.1-to-v0.2
 ```
 
 ```{toctree}
@@ -49,21 +51,29 @@ migration
 :caption: More
 
 contributing
+citation
 ```
 
 # 🚀 Get Started
 
-**phasecurvefit** is a Python library for constructing a single, ordered walk
-through phase-space data. It was originally built for stellar stream
-simulations but is general-purpose and applies to any dataset where you want to
-order observations by proximity and momentum in phase-space.
+**phasecurvefit** is a Python library for ordering phase-space data along a
+curve, and fitting a smooth track through it. It was originally built for stellar
+stream simulations but is general-purpose and applies to any dataset whose
+samples lie along a curve in phase space with the order along it unknown.
 
-The core approach combines:
+The default pipeline, `pcf.order(pos, vel)`, combines:
 
-- **Spatial proximity**: Finding nearby points in position space
-- **Velocity momentum**: Preferring points that align with the current velocity direction
+- **An MST backbone**: a minimum spanning tree of the nearest-neighbour graph,
+  whose longest path runs tip to tip along the curve with no progenitor or start
+  index needed
+- **A SOM refinement**: a Self-Organizing Map whose prototypes average over many
+  tracers, smoothing the backbone against local noise
 
-This is particularly useful for coherent trajectories in phase-space, such as stellar streams, but works well for many other ordered-walk problems.
+Velocity orients the ordering along the flow, and can also steer the MST where
+strands cross. The **local-flow walk**, which follows the velocity field
+step by step, is available as an alternative orderer.
+
+This is particularly useful for coherent trajectories in phase-space, such as stellar streams, but works well for many other ordering problems.
 
 ## Why phasecurvefit?
 
@@ -77,9 +87,10 @@ breaks down in exactly the cases that matter:
   nearest point is often on the wrong strand. phasecurvefit uses velocities as
   well as positions, so the ordering stays on the right strand
   (see the [epitrochoid tutorials](tutorials/epitrochoid_autoencoder.ipynb)).
-- **No known starting point.** The MST orderer finds the two ends of the curve
-  itself, so no progenitor position or hand-picked start index is needed ([MST tutorial](tutorials/stream_mst.ipynb)).
-- **Incomplete orderings.** A conservative walk orders a reliable subset; an
+- **No known starting point.** The default MST | SOM pipeline finds the two ends of
+  the curve itself, so no progenitor position or hand-picked start index is needed ([MST tutorial](tutorials/stream_mst.ipynb)).
+- **Incomplete orderings.** An orderer may order only a reliable subset (the
+  local-flow walk does); an
   autoencoder then assigns an ordering coordinate $\gamma$ to every sample and
   learns a smooth mean track through them ([stream autoencoder tutorial](tutorials/stream_autoencoder.ipynb)).
 - **Contamination.** A stream-plus-background mixture model gives each sample a
@@ -183,9 +194,9 @@ vel = {
     "y": jnp.array([0.5, 0.5, 0.5, 0.5, 0.5]),
 }
 
-# Order observations using pcf.order
-config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=3))
-result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
+# Order observations using pcf.order: an MST backbone refined by a SOM.
+# (With fewer than 15 points, as here, the SOM is skipped and the MST is used alone.)
+result = pcf.order(pos, vel)
 
 # Train autoencoder for gap filling
 key = jax.random.key(0)
@@ -204,8 +215,9 @@ print(result.indices)  # Array([0, 1, 2, 3, 4])
 
 ## Features
 
-- ✅ **JAX-native**: Full support for JIT compilation, vectorization, and auto-differentiation
-- ✅ **High performance**: Optimized with `jax.lax.while_loop` for speed
+- ✅ **JAX-native**: The local-flow walk, the MST orderer and the neural networks support JIT compilation, vectorization, and auto-differentiation (the default MST | SOM pipeline needs an explicit orderer under `jit`/`vmap`; see the [JAX guide](guides/jax-integration))
+- ✅ **High performance**: The walk is optimized with `jax.lax.while_loop`
+- ✅ **No start point needed**: the default MST | SOM pipeline finds both ends of the curve itself
 - ✅ **Gap filling**: Autoencoder neural network interpolates skipped tracers
 - ✅ **Flexible**: Works in any number of dimensions
 - ✅ **Type-safe**: Full type annotations with `jaxtyping`
@@ -213,18 +225,43 @@ print(result.indices)  # Array([0, 1, 2, 3, 4])
 
 ## How It Works
 
-Localflowwalk constructs a **single ordered walk** through your phase-space data by iteratively selecting the nearest next point based on:
+By default, `pcf.order` runs two stages:
+
+1. **MST backbone**: link each tracer to its nearest neighbours, keep the minimum
+   spanning tree of those links, and order the tracers along its longest path, from
+   one tip of the curve to the other.
+2. **SOM refinement**: train a one-dimensional Self-Organizing Map on that ordering
+   and order the tracers by their projection onto it. The SOM's prototypes are
+   averages over many tracers, so the result is far less sensitive to local noise
+   than the MST's individual edges.
+
+Fewer tracers than the SOM has prototypes (15 by default) cannot be refined, so the
+MST ordering is returned as it is. See the [Orderers Guide](guides/orderers) and the
+[SOM Guide](guides/som).
+
+### The local-flow walk
+
+The alternative {class}`~phasecurvefit.orderers.LocalFlowOrderer` constructs a
+**single ordered walk** through your phase-space data by iteratively selecting the
+nearest next point based on:
 
 1. **Current position**: Where you are in the walk
 2. **Candidate points**: Remaining unvisited observations
 3. **Distance metric**: A configurable function that scores proximity
 4. **Termination criteria**: Optional constraints on walk length or distance thresholds
 
-The library ships with multiple built-in metrics (e.g., momentum-weighted, spatial-only), and you can implement custom metrics for domain-specific use cases. See the [Metrics Guide](guides/metrics) for full details and examples.
+Choose it with `pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())`. It follows
+the velocity field, so it suits open streams and curves that cross where the
+velocity stays coherent; it needs a start point, and it is fully JAX-traceable.
+The library ships with multiple built-in metrics (e.g., momentum-weighted,
+spatial-only), and you can implement custom metrics for domain-specific use cases.
+See the [Metrics Guide](guides/metrics) for full details and examples.
 
-For the mathematical background on momentum-weighted ordering, refer to the [NN+p paper](https://arxiv.org/abs/2201.12042).
+For the mathematical background on momentum-weighted ordering, refer to the [NN+p paper](https://arxiv.org/abs/2205.11767).
 
-## Configuration Options
+## Local-Flow Walk Options
+
+These configure the walk, through {class}`~phasecurvefit.orderers.LocalFlowOrderer`:
 
 - **`metric`**: Distance metric to use (default: `AlignedMomentumDistanceMetric`). Determines how "closeness" is computed. See [Metrics Guide](guides/metrics).
 
@@ -284,59 +321,6 @@ This dict-based API is designed for:
 - Seamless integration with JAX transformations (`jit`, `vmap`, `grad`)
 - Minimal overhead in hot loops
 
-## Citation
-
-The core algorithm originates from Nibauer et al. (2022). If you use **momentum-weighted ordering** or reference the original work in your research, please cite:
-
-```bibtex
-@article{nibauer2022charting,
-  title={Charting Galactic Accelerations with Stellar Streams and Machine Learning},
-  author={Nibauer, Jacob and others},
-  journal={arXiv preprint arXiv:2201.12042},
-  year={2022}
-}
-```
-
-If you use **mixture-model membership** for outlier rejection (see
-{doc}`guides/outliers`), please also cite Hogg, Bovy & Lang (2010), whose §3
-("Pruning outliers") is the model implemented there:
-
-```bibtex
-@article{hogg2010data,
-  title={Data analysis recipes: Fitting a model to data},
-  author={Hogg, David W. and Bovy, Jo and Lang, Dustin},
-  journal={arXiv preprint arXiv:1008.4686},
-  year={2010},
-  eprint={1008.4686},
-  archivePrefix={arXiv},
-  primaryClass={astro-ph.IM}
-}
-```
-
-If you use the **SOM ordering stage** ({class}`~phasecurvefit.orderers.SOMOrderer`
-or the {mod}`phasecurvefit.som` module, see {doc}`guides/som`), please cite
-Starkman et al. (2023), whose §2.2 and Appendix A are the method implemented
-there:
-
-```bibtex
-@article{starkman2023fasttrack,
-  title={On the Fast Track: Rapid construction of stellar stream paths},
-  author={Starkman, Nathaniel and Bovy, Jo and Webb, Jeremy J. and
-          Calvetti, Daniela and Somersalo, Erkki},
-  journal={Monthly Notices of the Royal Astronomical Society},
-  volume={522},
-  number={4},
-  pages={5022--5036},
-  year={2023},
-  doi={10.1093/mnras/stad1166},
-  eprint={2212.00949},
-  archivePrefix={arXiv},
-  primaryClass={astro-ph.GA}
-}
-```
-
-If you use **phasecurvefit** with custom metrics or for general phase-space ordering, please cite this package directly (check the [GitHub repository](https://github.com/GalacticDynamics/phasecurvefit) for the latest citation format).
-
 ## Next Steps
 
 ::::{grid} 1 2 2 3
@@ -382,6 +366,13 @@ Optimize with JIT, vmap, and grad
 :link-type: doc
 
 Interactive tutorials with Jupyter notebooks
+:::
+
+:::{grid-item-card} {material-regular}`format_quote;2em` Citation
+:link: citation
+:link-type: doc
+
+What to cite, depending on what you use
 :::
 
 ::::

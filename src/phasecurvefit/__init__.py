@@ -1,8 +1,10 @@
 """phasecurvefit.
 
 This library implements algorithms for ordering phase-space observations in
-stellar streams. The algorithm uses both spatial proximity and velocity momentum
-to trace coherent structures through phase-space.
+stellar streams. By default, observations are ordered along an MST backbone
+refined by a Self-Organizing Map; the velocity-following local-flow walk, which
+uses both spatial proximity and velocity momentum to trace coherent structures
+through phase-space, is available as an alternative orderer.
 
 Phase-space data is represented as two dictionaries: - `position`: Maps
 component names to position arrays (e.g., {"x": array, "y": array}) -
@@ -10,8 +12,14 @@ component names to position arrays (e.g., {"x": array, "y": array}) -
 
 Main Components
 ---------------
+order : function
+    The primary entry point. With no orderer it runs the default pipeline,
+    ``MSTOrderer() | SOMOrderer()``; pass any ``pcf.orderers`` orderer to choose
+    another algorithm.
+fit_track : function
+    Order, refine and fit a smooth track in one call.
 walk_local_flow : function
-    The main algorithm for ordering phase-space observations.
+    Deprecated; use ``pcf.order`` with ``pcf.orderers.LocalFlowOrderer``.
 combine_results : function
     Combine results from forward and backward walks into a single ordering.
 WalkLocalFlowResult : NamedTuple
@@ -42,7 +50,8 @@ Create phase-space observations as dictionaries:
 >>> pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
 >>> vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 
-Order the observations:
+Order the observations (an MST backbone, refined by a SOM when there are enough
+observations):
 
 >>> result = pcf.order(pos, vel)
 >>> result.indices
@@ -56,10 +65,13 @@ Configure with custom metric and strategy:
 ... )
 >>> result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 
-References
-----------
-Nibauer et al. (2022). "Charting Galactic Accelerations with Stellar Streams and
-Machine Learning."
+Citation
+--------
+What to cite depends on the components you use: Starkman et al. (2023) for the
+SOM stage (and so the default pipeline); Nibauer et al. (2022) for momentum-
+weighted ordering (``LocalFlowOrderer``) or the autoencoder (``PathAutoencoder``);
+Hogg, Bovy & Lang (2010) for mixture-model membership. See the Citation page of
+the documentation.
 
 """
 
