@@ -136,7 +136,7 @@ def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarra
 
 
 def _backbone_on_component(
-    P: np.ndarray, tree: object, nodes: np.ndarray
+    P: np.ndarray, tree: object, nodes: np.ndarray, *, workers: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Backbone/order within one connected component.
 
@@ -164,7 +164,7 @@ def _backbone_on_component(
     seg = np.linalg.norm(np.diff(Cb, axis=0), axis=1)
     s_bb = np.concatenate([[0.0], np.cumsum(seg)])
     # project every component point onto the backbone -> along-track arc length
-    _, near = cKDTree(Cb).query(P[nodes])
+    _, near = cKDTree(Cb).query(P[nodes], workers=workers)
     order_local = np.argsort(s_bb[near], kind="stable")
     return nodes[order_local], backbone_nodes, Cb
 
@@ -199,15 +199,23 @@ def _sigma_clip_edges(
     Returns the surviving node set (a subset of ``nodes``, in ascending order).
     """
     log_floor = np.log(_EDGE_CLIP_MIN_RATIO)
-    current = nodes
+    # The edges among ``nodes`` and their lengths, once, relabelled to
+    # 0..m-1; survivors are then tracked by a mask rather than by re-slicing
+    # the tree each iteration, and every iteration costs O(m), not O(n).
+    m = nodes.size
+    local = np.full(tree.shape[0], -1)
+    local[nodes] = np.arange(m)
+    tree_edges = tree.tocoo()
+    ei, ej = local[tree_edges.row], local[tree_edges.col]
+    upper = (ei >= 0) & (ej >= 0) & (ei < ej)  # undirected edges, once each
+    ei, ej = ei[upper], ej[upper]
+    length = np.linalg.norm(P[nodes[ei]] - P[nodes[ej]], axis=1)
+    alive = np.ones(m, dtype=bool)
     for _ in range(max_iters):
-        sub = tree[current][:, current].tocoo()
-        upper = sub.row < sub.col  # undirected edges, once each
-        ei, ej = sub.row[upper], sub.col[upper]
-        length = np.linalg.norm(P[current[ei]] - P[current[ej]], axis=1)
+        live = alive[ei] & alive[ej]
         # Zero-length edges join coincident points: they have no log length,
         # carry no spacing information, and can never be too long to keep.
-        pos = length > 0.0
+        pos = live & (length > 0.0)
         if not pos.any():
             break
         loglen = np.log(length[pos])
@@ -217,21 +225,23 @@ def _sigma_clip_edges(
         cut[pos] = loglen > med + max(sigma * scale, log_floor)
         if not cut.any():
             break
-        m = current.size
-        keep = ~cut
+        keep = live & ~cut
         g = csr_matrix((np.ones(int(keep.sum())), (ei[keep], ej[keep])), shape=(m, m))
-        g = g.maximum(g.T)
+        # Dead nodes have no kept edges, so each is its own component and the
+        # live components' sizes count live nodes only.
         _, labels = connected_components(g, directed=False)
         sizes = np.bincount(labels)
-        size_min = max(2, int(np.ceil(_EDGE_CLIP_SMALL_FRAC * m)))
-        small = np.isin(labels, np.flatnonzero(sizes < size_min))
+        size_min = max(2, int(np.ceil(_EDGE_CLIP_SMALL_FRAC * int(alive.sum()))))
+        small = alive & (sizes[labels] < size_min)
         if not small.any():  # cuts split off nothing small (e.g. a sparse gap)
             break
-        current = current[~small]
-    return current
+        alive &= ~small
+    return nodes[alive]
 
 
-def _connect_components(P: np.ndarray, graph: csr_matrix) -> csr_matrix:
+def _connect_components(
+    P: np.ndarray, graph: csr_matrix, *, workers: int
+) -> csr_matrix:
     """Join a graph's connected components along their shortest links.
 
     Each round, every component adds one edge: the shortest spatial link from
@@ -253,7 +263,7 @@ def _connect_components(P: np.ndarray, graph: csr_matrix) -> csr_matrix:
         for c in range(n_comp):
             inside = np.flatnonzero(labels == c)
             outside = np.flatnonzero(labels != c)
-            dist, nearest = cKDTree(P[inside]).query(P[outside])
+            dist, nearest = cKDTree(P[inside]).query(P[outside], workers=workers)
             best = int(np.argmin(dist))
             rows.append(inside[nearest[best]])
             cols.append(outside[best])
@@ -308,6 +318,7 @@ def _mst_backbone(
     on_disconnected: OnDisconnected,
     edge_clip_sigma: float | None,
     edge_clip_max_iters: int,
+    workers: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Order points along the MST longest-path backbone.
 
@@ -322,7 +333,7 @@ def _mst_backbone(
         return np.arange(n), np.arange(n)
 
     k_eff = int(min(k, n - 1))
-    nn_d, nn_i = cKDTree(P).query(P, k=k_eff + 1)
+    nn_d, nn_i = cKDTree(P).query(P, k=k_eff + 1, workers=workers)
     nn_d = np.atleast_2d(nn_d)
     nn_i = np.atleast_2d(nn_i)
 
@@ -349,10 +360,12 @@ def _mst_backbone(
     if sever_cos_threshold is not None:  # Mechanism 2: velocity-aware severing
         keep = keep & (cos >= sever_cos_threshold)
 
+    # Left directed: csgraph treats it as undirected, taking the smaller nonzero
+    # of graph[i, j] and graph[j, i]. Distances and cosines are symmetric, so
+    # that equals the explicit symmetrised graph without building it.
     graph = csr_matrix((weights[keep], (rows[keep], cols[keep])), shape=(n, n))
-    graph = graph.maximum(graph.T)  # symmetrise
     if on_disconnected == "connect":  # bridge the pieces instead of dropping any
-        graph = _connect_components(P, graph)
+        graph = _connect_components(P, graph, workers=workers)
     tree = minimum_spanning_tree(graph)
     tree = tree + tree.T
 
@@ -373,7 +386,9 @@ def _mst_backbone(
             tree, P, nodes, sigma=edge_clip_sigma, max_iters=edge_clip_max_iters
         )
 
-    order_idx, backbone_nodes, Cb = _backbone_on_component(P, tree, nodes)
+    order_idx, backbone_nodes, Cb = _backbone_on_component(
+        P, tree, nodes, workers=workers
+    )
 
     if orient_by_velocity:  # Mechanism 3: orient gamma along mean velocity
         order_idx, backbone_nodes = _orient_along_velocity(
@@ -395,6 +410,7 @@ def _mst_backbone_padded(
     on_disconnected: OnDisconnected,
     edge_clip_sigma: float | None,
     edge_clip_max_iters: int,
+    workers: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """``_mst_backbone``, padded to a shape fixed by ``P`` (for ``pure_callback``).
 
@@ -419,6 +435,7 @@ def _mst_backbone_padded(
         on_disconnected=on_disconnected,
         edge_clip_sigma=edge_clip_sigma,
         edge_clip_max_iters=edge_clip_max_iters,
+        workers=workers,
     )
 
     idx_full = np.full(n, -1, dtype=np.int32)
@@ -474,6 +491,10 @@ class MSTOrderer(AbstractOrderer):
     edge_clip_max_iters
         Maximum sigma-clip iterations (default 5). Ignored when
         ``edge_clip_sigma`` is ``None``.
+    workers
+        Threads for the k-d tree queries, as scipy's ``cKDTree.query``
+        ``workers``: ``-1`` (default) uses every core, a positive integer caps
+        it. The result does not depend on it.
 
     Examples
     --------
@@ -551,6 +572,7 @@ class MSTOrderer(AbstractOrderer):
     on_disconnected: OnDisconnected = eqx.field(static=True, default="raise")
     edge_clip_sigma: float | None = eqx.field(static=True, default=None)
     edge_clip_max_iters: int = eqx.field(static=True, default=5)
+    workers: int = eqx.field(static=True, default=-1)
 
     def __check_init__(self) -> None:
         """Reject invalid configuration early, at construction."""
@@ -620,6 +642,7 @@ class MSTOrderer(AbstractOrderer):
                 on_disconnected=self.on_disconnected,
                 edge_clip_sigma=self.edge_clip_sigma,
                 edge_clip_max_iters=self.edge_clip_max_iters,
+                workers=self.workers,
             )
 
         # The host call only ever needs to see values, never gradients -- the

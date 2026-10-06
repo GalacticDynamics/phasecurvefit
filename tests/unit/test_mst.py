@@ -286,6 +286,74 @@ class TestMSTEdgeClip:
         rej = set(range(is_outlier.size)) - visited
         assert sum(is_outlier[i] for i in rej) >= 0.6 * int(is_outlier.sum())
 
+    @pytest.mark.parametrize("dup", [False, True], ids=["plain", "duplicates"])
+    @pytest.mark.parametrize("subset", [False, True], ids=["all", "subset"])
+    def test_matches_reference_loop(self, dup, subset):
+        """The mask-based clip keeps exactly the nodes the per-slice loop kept."""
+        from scipy.sparse import csr_matrix  # noqa: PLC0415
+        from scipy.sparse.csgraph import (  # noqa: PLC0415
+            connected_components,
+            minimum_spanning_tree,
+        )
+        from scipy.spatial import cKDTree  # noqa: PLC0415
+
+        from phasecurvefit._src.orderers import mst  # noqa: PLC0415
+
+        def reference(tree, P, nodes, *, sigma, max_iters):
+            log_floor = np.log(mst._EDGE_CLIP_MIN_RATIO)
+            current = nodes
+            for _ in range(max_iters):
+                sub = tree[current][:, current].tocoo()
+                upper = sub.row < sub.col
+                ei, ej = sub.row[upper], sub.col[upper]
+                length = np.linalg.norm(P[current[ei]] - P[current[ej]], axis=1)
+                pos = length > 0.0
+                if not pos.any():
+                    break
+                loglen = np.log(length[pos])
+                med = float(np.median(loglen))
+                scale = 1.4826 * float(np.median(np.abs(loglen - med)))
+                cut = np.zeros_like(pos)
+                cut[pos] = loglen > med + max(sigma * scale, log_floor)
+                if not cut.any():
+                    break
+                m = current.size
+                keep = ~cut
+                g = csr_matrix(
+                    (np.ones(int(keep.sum())), (ei[keep], ej[keep])), shape=(m, m)
+                )
+                _, labels = connected_components(g.maximum(g.T), directed=False)
+                sizes = np.bincount(labels)
+                size_min = max(2, int(np.ceil(mst._EDGE_CLIP_SMALL_FRAC * m)))
+                small = np.isin(labels, np.flatnonzero(sizes < size_min))
+                if not small.any():
+                    break
+                current = current[~small]
+            return current
+
+        pos, _, _ = _arc_with_interlopers(n_arc=400, n_out=30)
+        P = np.stack([np.asarray(pos[c]) for c in sorted(pos)], axis=1)
+        if dup:
+            P = np.r_[P, P[::3]]
+        d, i = cKDTree(P).query(P, k=11)
+        # Self by index, as MSTOrderer does: with duplicates cKDTree may list a
+        # coincident copy before the point itself.
+        not_self = i != np.arange(len(P))[:, None]
+        rows = np.nonzero(not_self)[0]
+        w = np.maximum(d[not_self], np.finfo(d.dtype).tiny)
+        tree = minimum_spanning_tree(
+            csr_matrix((w, (rows, i[not_self])), shape=(len(P),) * 2)
+        )
+        tree = tree + tree.T
+        nodes = np.arange(len(P))
+        if subset:
+            nodes = nodes[np.asarray(P[:, 0]) > 2.0]
+        for sigma in (1.5, 3.0):
+            got = mst._sigma_clip_edges(tree, P, nodes, sigma=sigma, max_iters=5)
+            want = reference(tree, P, nodes, sigma=sigma, max_iters=5)
+            np.testing.assert_array_equal(got, want)
+            assert got.size < nodes.size  # the comparison exercised a real clip
+
     def test_invalid_sigma_raises(self):
         """A non-positive ``edge_clip_sigma`` is rejected at construction."""
         with pytest.raises(ValueError, match="edge_clip_sigma"):
