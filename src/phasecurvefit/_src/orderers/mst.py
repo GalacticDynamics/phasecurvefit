@@ -74,6 +74,8 @@ _EDGE_CLIP_MIN_RATIO = 2.0
 # fewer than this fraction of the working points. Larger pieces are kept and
 # reconnected, so cutting a genuine sparse-region edge never discards stream.
 _EDGE_CLIP_SMALL_FRAC = 0.01
+# cKDTree queries use every core; results are identical to a single worker.
+_KDTREE_WORKERS = -1
 
 
 # A single, long-lived worker thread that runs every _run_in_thread() job.
@@ -164,7 +166,7 @@ def _backbone_on_component(
     seg = np.linalg.norm(np.diff(Cb, axis=0), axis=1)
     s_bb = np.concatenate([[0.0], np.cumsum(seg)])
     # project every component point onto the backbone -> along-track arc length
-    _, near = cKDTree(Cb).query(P[nodes])
+    _, near = cKDTree(Cb).query(P[nodes], workers=_KDTREE_WORKERS)
     order_local = np.argsort(s_bb[near], kind="stable")
     return nodes[order_local], backbone_nodes, Cb
 
@@ -199,15 +201,20 @@ def _sigma_clip_edges(
     Returns the surviving node set (a subset of ``nodes``, in ascending order).
     """
     log_floor = np.log(_EDGE_CLIP_MIN_RATIO)
-    current = nodes
+    n = tree.shape[0]
+    # The tree's edges and lengths, once; survivors are tracked by a mask
+    # rather than by re-slicing the tree each iteration.
+    tree_edges = tree.tocoo()
+    upper = tree_edges.row < tree_edges.col  # undirected edges, once each
+    ei, ej = tree_edges.row[upper], tree_edges.col[upper]
+    length = np.linalg.norm(P[ei] - P[ej], axis=1)
+    alive = np.zeros(n, dtype=bool)
+    alive[nodes] = True
     for _ in range(max_iters):
-        sub = tree[current][:, current].tocoo()
-        upper = sub.row < sub.col  # undirected edges, once each
-        ei, ej = sub.row[upper], sub.col[upper]
-        length = np.linalg.norm(P[current[ei]] - P[current[ej]], axis=1)
+        live = alive[ei] & alive[ej]
         # Zero-length edges join coincident points: they have no log length,
         # carry no spacing information, and can never be too long to keep.
-        pos = length > 0.0
+        pos = live & (length > 0.0)
         if not pos.any():
             break
         loglen = np.log(length[pos])
@@ -217,18 +224,18 @@ def _sigma_clip_edges(
         cut[pos] = loglen > med + max(sigma * scale, log_floor)
         if not cut.any():
             break
-        m = current.size
-        keep = ~cut
-        g = csr_matrix((np.ones(int(keep.sum())), (ei[keep], ej[keep])), shape=(m, m))
-        g = g.maximum(g.T)
+        keep = live & ~cut
+        g = csr_matrix((np.ones(int(keep.sum())), (ei[keep], ej[keep])), shape=(n, n))
+        # Dead nodes have no kept edges, so each is its own component and the
+        # live components' sizes count live nodes only.
         _, labels = connected_components(g, directed=False)
         sizes = np.bincount(labels)
-        size_min = max(2, int(np.ceil(_EDGE_CLIP_SMALL_FRAC * m)))
-        small = np.isin(labels, np.flatnonzero(sizes < size_min))
+        size_min = max(2, int(np.ceil(_EDGE_CLIP_SMALL_FRAC * int(alive.sum()))))
+        small = alive & (sizes[labels] < size_min)
         if not small.any():  # cuts split off nothing small (e.g. a sparse gap)
             break
-        current = current[~small]
-    return current
+        alive &= ~small
+    return np.flatnonzero(alive)
 
 
 def _connect_components(P: np.ndarray, graph: csr_matrix) -> csr_matrix:
@@ -253,7 +260,9 @@ def _connect_components(P: np.ndarray, graph: csr_matrix) -> csr_matrix:
         for c in range(n_comp):
             inside = np.flatnonzero(labels == c)
             outside = np.flatnonzero(labels != c)
-            dist, nearest = cKDTree(P[inside]).query(P[outside])
+            dist, nearest = cKDTree(P[inside]).query(
+                P[outside], workers=_KDTREE_WORKERS
+            )
             best = int(np.argmin(dist))
             rows.append(inside[nearest[best]])
             cols.append(outside[best])
@@ -322,7 +331,7 @@ def _mst_backbone(
         return np.arange(n), np.arange(n)
 
     k_eff = int(min(k, n - 1))
-    nn_d, nn_i = cKDTree(P).query(P, k=k_eff + 1)
+    nn_d, nn_i = cKDTree(P).query(P, k=k_eff + 1, workers=_KDTREE_WORKERS)
     nn_d = np.atleast_2d(nn_d)
     nn_i = np.atleast_2d(nn_i)
 
@@ -349,8 +358,10 @@ def _mst_backbone(
     if sever_cos_threshold is not None:  # Mechanism 2: velocity-aware severing
         keep = keep & (cos >= sever_cos_threshold)
 
+    # Left directed: csgraph treats it as undirected, taking the smaller nonzero
+    # of graph[i, j] and graph[j, i]. Distances and cosines are symmetric, so
+    # that equals the explicit symmetrised graph without building it.
     graph = csr_matrix((weights[keep], (rows[keep], cols[keep])), shape=(n, n))
-    graph = graph.maximum(graph.T)  # symmetrise
     if on_disconnected == "connect":  # bridge the pieces instead of dropping any
         graph = _connect_components(P, graph)
     tree = minimum_spanning_tree(graph)
