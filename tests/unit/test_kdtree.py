@@ -1,92 +1,57 @@
-"""Tests for KD-tree strategy in the local-flow walk."""
+"""Tests for the self-contained JAX kd-tree (``phasecurvefit._src.kdtree``)."""
 
+import functools
+
+import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
-import phasecurvefit as pcf
+from phasecurvefit._src.kdtree._layout import layout
+from phasecurvefit._src.kdtree._select import ksmallest, kth_smallest
 
 
-@pytest.mark.parametrize(
-    "config",
-    [
-        pcf.WalkConfig(strategy=pcf.strats.BruteForce()),
-        pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2)),
-    ],
-)
-def test_walk_local_flow_kdtree_matches_bruteforce(config):
-    pos = {
-        "x": jnp.array([0.0, 1.0, 2.0, 3.0]),
-        "y": jnp.array([0.0, 0.5, 0.8, 1.2]),
-    }
-    vel = {
-        "x": jnp.array([1.0, 1.0, 1.0, 1.0]),
-        "y": jnp.array([0.2, 0.2, 0.2, 0.2]),
-    }
+class TestLayout:
+    """Static tree layout."""
 
-    res = pcf.order(
-        pos, vel, pcf.orderers.LocalFlowOrderer(metric_scale=0.5, config=config)
-    )
-    # For this simple dataset, both strategies should visit all points in order
-    assert res.all_visited
-    assert (res.indices == jnp.array([0, 1, 2, 3])).all()
+    @pytest.mark.parametrize("n", [0, 1, 2, 15, 16, 17, 100, 1000, 100_000])
+    @pytest.mark.parametrize("leaf_size", [8, 16, 32])
+    def test_padding_under_one_row_per_leaf(self, n, leaf_size):
+        """n_pad covers n, padding is < one row per leaf, spread as 0/1 per leaf."""
+        lay = layout(n, leaf_size)
+        assert lay.n_leaves == 2**lay.depth
+        assert lay.n_pad == lay.n_leaves * lay.leaf_size >= n
+        assert lay.n_pad - n < lay.n_leaves or n == 0
+        assert int(lay.leaf_valid.sum()) == max(n, 0) or n == 0
+        assert set(np.unique(lay.leaf_size - lay.leaf_valid)) <= {0, 1}
+        assert lay.leaf_size <= max(leaf_size, 1) or lay.depth == 0
 
 
-def test_kdtree_duplicate_points_match_bruteforce():
-    """Coincident points must not cost a candidate slot or be skipped.
+class TestSelect:
+    """Exact k-smallest selection."""
 
-    The tree may return a duplicate of the current point before the point
-    itself, so self must be excluded by index, not by dropping slot 0.
-    """
-    x = jnp.array([0.0, 0.5, 1.5, 1.5, 2.0, 2.5])
-    pos = {"x": x, "y": jnp.zeros_like(x)}
-    vel = {"x": jnp.ones_like(x), "y": jnp.zeros_like(x)}
-
-    def run(strategy):
-        orderer = pcf.orderers.LocalFlowOrderer(
-            metric_scale=0.5, config=pcf.WalkConfig(strategy=strategy)
+    @pytest.mark.parametrize("width", [3, 13, 52, 208])
+    def test_matches_sort_with_ties_and_infs(self, width):
+        """Values equal np.sort; columns reproduce them, distinct, stable on ties."""
+        k = 10
+        rng = np.random.default_rng(width)
+        a = rng.random((500, width)).astype(np.float32)
+        a[:, 1 % width] = 0.5
+        a[:, 2 % width] = 0.5  # ties
+        a[:7] = np.inf
+        a[:7, 0] = 0.1  # rows with fewer than k finite entries
+        vals, cols = jax.jit(functools.partial(ksmallest, k=k))(jnp.asarray(a))
+        vals, cols = np.asarray(vals), np.asarray(cols)
+        padded = np.concatenate(
+            [a, np.full((500, max(0, k - width)), np.inf, np.float32)], 1
         )
-        return pcf.order(pos, vel, orderer)
-
-    bf = run(pcf.strats.BruteForce())
-    kd = run(pcf.strats.KDTree(k=2))
-    assert bf.all_visited
-    assert kd.all_visited
-    # Duplicates (2, 3) are tied, so their relative order is arbitrary.
-    assert kd.indices[:2].tolist() == [0, 1]
-    assert set(kd.indices[2:4].tolist()) == {2, 3}
-    assert kd.indices[4:].tolist() == [4, 5]
-
-
-def test_walk_local_flow_kdtree_k_parameter():
-    pos = {
-        "x": jnp.linspace(0.0, 9.0, 10),
-        "y": jnp.linspace(0.0, 9.0, 10) * 0.1,
-    }
-    vel = {
-        "x": jnp.ones(10),
-        "y": jnp.ones(10) * 0.1,
-    }
-
-    # Run with KD-tree using small k
-    res_small = pcf.order(
-        pos,
-        vel,
-        pcf.orderers.LocalFlowOrderer(
-            metric_scale=0.5, config=pcf.WalkConfig(strategy=pcf.strats.KDTree(k=3))
-        ),
-    )
-    # Run with KD-tree using larger k
-    res_large = pcf.order(
-        pos,
-        vel,
-        pcf.orderers.LocalFlowOrderer(
-            metric_scale=0.5, config=pcf.WalkConfig(strategy=pcf.strats.KDTree(k=8))
-        ),
-    )
-
-    # Both should produce valid ordered results
-    assert res_small.n_visited >= 1
-    assert res_large.n_visited >= 1
-
-    # Larger k should be at least as thorough as small k
-    assert res_large.n_visited >= res_small.n_visited
+        ref = np.sort(padded, 1)[:, :k]
+        np.testing.assert_array_equal(vals, ref)
+        finite = np.isfinite(vals)
+        np.testing.assert_array_equal(
+            np.take_along_axis(padded, cols, 1)[finite], ref[finite]
+        )
+        for r in range(7, 500):
+            assert len(set(cols[r].tolist())) == k
+        kth = np.asarray(kth_smallest(jnp.asarray(a), k))
+        np.testing.assert_array_equal(kth, ref[:, -1])
