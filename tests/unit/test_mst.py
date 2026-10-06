@@ -336,10 +336,13 @@ class TestMSTEdgeClip:
         if dup:
             P = np.r_[P, P[::3]]
         d, i = cKDTree(P).query(P, k=11)
-        rows = np.repeat(np.arange(len(P)), 10)
-        w = np.maximum(d[:, 1:].ravel(), np.finfo(d.dtype).tiny)
+        # Self by index, as MSTOrderer does: with duplicates cKDTree may list a
+        # coincident copy before the point itself.
+        not_self = i != np.arange(len(P))[:, None]
+        rows = np.nonzero(not_self)[0]
+        w = np.maximum(d[not_self], np.finfo(d.dtype).tiny)
         tree = minimum_spanning_tree(
-            csr_matrix((w, (rows, i[:, 1:].ravel())), shape=(len(P),) * 2)
+            csr_matrix((w, (rows, i[not_self])), shape=(len(P),) * 2)
         )
         tree = tree + tree.T
         nodes = np.arange(len(P))
