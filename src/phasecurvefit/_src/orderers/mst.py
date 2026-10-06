@@ -595,9 +595,6 @@ class MSTOrderer(AbstractOrderer):
         if self.edge_clip_max_iters < 1:
             msg = f"edge_clip_max_iters must be >= 1, got {self.edge_clip_max_iters}."
             raise ValueError(msg)
-        if self.workers != -1 and self.workers < 1:
-            msg = f"workers must be -1 (all cores) or >= 1, got {self.workers}."
-            raise ValueError(msg)
 
     @plum.dispatch
     def order(

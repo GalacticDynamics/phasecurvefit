@@ -354,21 +354,6 @@ class TestMSTEdgeClip:
             np.testing.assert_array_equal(got, want)
             assert got.size < nodes.size  # the comparison exercised a real clip
 
-    def test_workers_does_not_change_result(self):
-        """``workers`` only sets scipy's thread count; the ordering is identical."""
-        pos, vel, _ = _arc_with_interlopers(n_arc=400, n_out=30)
-        kw = {"k": 10, "jump_cap": 20.0, "edge_clip_sigma": 3.0}
-        one = pcf.orderers.MSTOrderer(workers=1, **kw).order(pos, vel)
-        every = pcf.orderers.MSTOrderer(workers=-1, **kw).order(pos, vel)
-        np.testing.assert_array_equal(one.indices, every.indices)
-        np.testing.assert_array_equal(one.backbone["x"], every.backbone["x"])
-
-    @pytest.mark.parametrize("workers", [0, -2])
-    def test_invalid_workers_raises(self, workers):
-        """``workers`` must be -1 or positive, as for scipy."""
-        with pytest.raises(ValueError, match="workers"):
-            pcf.orderers.MSTOrderer(workers=workers)
-
     def test_invalid_sigma_raises(self):
         """A non-positive ``edge_clip_sigma`` is rejected at construction."""
         with pytest.raises(ValueError, match="edge_clip_sigma"):

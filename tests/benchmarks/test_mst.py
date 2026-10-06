@@ -32,20 +32,14 @@ def _stream(n, interloper_frac=0.0, seed=0):
 
 
 @pytest.mark.parametrize("n", [1_000, 10_000], ids=["n1e3", "n1e4"])
-def test_order(benchmark, n):
-    """Benchmark ``order`` on a clean stream."""
-    pos, vel = _stream(n)
-    orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=2.0)
+@pytest.mark.parametrize(
+    ("frac", "kw"),
+    [(0.0, {"jump_cap": 2.0}), (0.01, {"jump_cap": 50.0, "edge_clip_sigma": 3.0})],
+    ids=["clean", "edge_clip"],
+)
+def test_order(benchmark, n, frac, kw):
+    """Benchmark ``order``; ``edge_clip`` adds 1% interlopers and sigma-clipping."""
+    pos, vel = _stream(n, interloper_frac=frac)
+    orderer = pcf.orderers.MSTOrderer(k=10, **kw)
     run = lambda: jax.block_until_ready(orderer.order(pos, vel).indices)
-    out = benchmark(run)
-    assert out.shape == (n,)
-
-
-@pytest.mark.parametrize("n", [1_000, 10_000], ids=["n1e3", "n1e4"])
-def test_order_edge_clip(benchmark, n):
-    """Benchmark ``order`` with sigma-clipping on a stream with 1% interlopers."""
-    pos, vel = _stream(n, interloper_frac=0.01)
-    orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=50.0, edge_clip_sigma=3.0)
-    run = lambda: jax.block_until_ready(orderer.order(pos, vel).indices)
-    out = benchmark(run)
-    assert out.shape == (n,)
+    assert benchmark(run).shape == (n,)
