@@ -17,7 +17,8 @@ Built-in orderers
 -----------------
 MSTOrderer
     MST longest-path backbone ordering for near-closed-loop / self-overlapping
-    streams. Host-side graph algorithms (NumPy/SciPy).
+    streams. kNN via a selectable backend (JAX kd-tree by default); host-side
+    graph algorithms (SciPy).
 SOMOrderer
     Self-Organizing Map refinement: trains a 1-D SOM and orders by arc-length
     projection onto its backbone. Cite Starkman et al. (2023).

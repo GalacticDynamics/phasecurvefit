@@ -234,6 +234,29 @@ Self-Organizing Map ordering, after Starkman et al. (2023). See
    :no-index:
 ```
 
+## Neighbour Backends
+
+Exact k-nearest-neighbour backends for
+{class}`~phasecurvefit.orderers.MSTOrderer` (`neighbors=`).
+
+```{eval-rst}
+.. autoclass:: phasecurvefit.neighbors.AbstractNeighborSearch
+   :no-index:
+   :members: knn
+
+.. autoclass:: phasecurvefit.neighbors.BucketKDTree
+   :no-index:
+
+.. autoclass:: phasecurvefit.neighbors.BruteForce
+   :no-index:
+
+.. autoclass:: phasecurvefit.neighbors.Jaxkd
+   :no-index:
+
+.. autoclass:: phasecurvefit.neighbors.Scipy
+   :no-index:
+```
+
 ## Index
 
 ```{eval-rst}

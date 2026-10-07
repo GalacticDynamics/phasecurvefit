@@ -37,9 +37,15 @@ def _stream(n, interloper_frac=0.0, seed=0):
     [(0.0, {"jump_cap": 2.0}), (0.01, {"jump_cap": 50.0, "edge_clip_sigma": 3.0})],
     ids=["clean", "edge_clip"],
 )
-def test_order(benchmark, n, frac, kw):
+@pytest.mark.parametrize(
+    "neighbors",
+    [pcf.neighbors.BucketKDTree(), pcf.neighbors.Scipy()],
+    ids=["bucket", "scipy"],
+)
+def test_order(benchmark, n, frac, kw, neighbors):
     """Benchmark ``order``; ``edge_clip`` adds 1% interlopers and sigma-clipping."""
     pos, vel = _stream(n, interloper_frac=frac)
-    orderer = pcf.orderers.MSTOrderer(k=10, **kw)
+    orderer = pcf.orderers.MSTOrderer(k=10, neighbors=neighbors, **kw)
     run = lambda: jax.block_until_ready(orderer.order(pos, vel).indices)
+    run()
     assert benchmark(run).shape == (n,)
