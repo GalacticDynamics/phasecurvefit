@@ -54,6 +54,16 @@ class TestContract:
                 np.asarray(dist), _ref(p, k, q), rtol=1e-5, atol=1e-6
             )
 
+    def test_far_queries(self, backend):
+        """Queries farther from the data than its diameter still find real points."""
+        p = np.random.default_rng(11).normal(size=(100, 3)).astype(np.float32)
+        q = np.array([[50, 0, 0], [0, -40, 0]], np.float32)
+        idx, dist = backend.knn(jnp.asarray(p), 3, queries=jnp.asarray(q))
+        np.testing.assert_allclose(
+            np.asarray(dist), _ref(p, 3, q), rtol=1e-5, atol=1e-6
+        )
+        assert not np.any(np.asarray(idx) == 100)
+
     def test_non_finite_raises(self, backend):
         """Review Focus 2: NaN input is an error, not a silently wrong answer."""
         p = np.random.default_rng(0).normal(size=(50, 3)).astype(np.float32)

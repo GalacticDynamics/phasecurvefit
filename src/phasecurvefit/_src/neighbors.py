@@ -70,11 +70,11 @@ def _bucket(n: int) -> int:
 
 
 def far_rows(points: Float[Array, "n d"], count: int) -> Float[Array, "count d"]:
-    """``count`` distinct rows farther from every point than the points' diameter.
+    """``count`` distinct rows farther from every row of ``points`` than its diameter.
 
-    Padding with these never changes a real query's k nearest real neighbours
-    while at least k real points exist: every real point lies within the data's
-    diameter, every far row beyond it.
+    Padding a search with these never changes the k nearest real neighbours of
+    any query that was included in the array passed here (so pass the union of
+    points and queries), while at least k real points exist.
     """
     d = points.shape[1]
     lo, hi = points.min(0), points.max(0)
@@ -152,7 +152,8 @@ class BucketKDTree(AbstractNeighborSearch):
                 jax.lax.stop_gradient(points), sq, k, self.leaf_size, self.frontier
             )
             return ii, _gathered_distance(points, queries, ii)
-        padded = jnp.concatenate([points, far_rows(points, _bucket(n) - n)])
+        extent = points if queries is None else jnp.concatenate([points, queries])
+        padded = jnp.concatenate([points, far_rows(extent, _bucket(n) - n)])
         qpad = None
         if queries is not None:
             filler = jnp.broadcast_to(queries[:1], (_bucket(m) - m, points.shape[1]))
