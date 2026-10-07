@@ -84,9 +84,12 @@ machinery, see the [Algorithm guide](algorithm.md).
 
 ## MSTOrderer
 
-The MST's graph algorithms are **host-side** (NumPy/SciPy); `order()` runs them
-through `jax.pure_callback` when traced, so it works under `jit` and `vmap`.
-Pure-spatial is the default:
+The MST's k-nearest-neighbour search runs in JAX through its `neighbors`
+backend (default {class}`~phasecurvefit.neighbors.BucketKDTree`; see
+{mod}`phasecurvefit.neighbors` for the alternatives, including the faster but
+eager-only `Scipy()`). Its graph algorithms are **host-side** (NumPy/SciPy);
+`order()` runs them through `jax.pure_callback` when traced, so it works under
+`jit` and `vmap`. Pure-spatial is the default:
 
 ```python
 import jax.numpy as jnp
@@ -140,7 +143,7 @@ system:
 result = orderer.order(qs, ps, metadata=pcf.StateMetadata(usys=usys))
 ```
 
-Because the MST is host-side, unit handling is a simple strip-in / reattach-out:
+Because the MST's graph stage is host-side, unit handling is a simple strip-in / reattach-out:
 `positions`/`velocities` keep their input units and `backbone` is returned in the
 position units. `velocity_weight` and `jump_cap` are interpreted in the `usys`
 length units.
