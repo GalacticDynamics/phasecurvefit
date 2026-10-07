@@ -30,6 +30,10 @@ from jaxtyping import Array
 
 from .custom_types import FLikeSz0, VectorComponents
 from .metrics import AbstractDistanceMetric
+from .optional_deps import OptDeps
+
+if OptDeps.JAXKD.installed:
+    import jaxkd
 
 
 class QueryResult(NamedTuple):
@@ -161,15 +165,12 @@ class KDTree(AbstractQueryStrategy):
         """
         self.k = k
 
-        try:
-            import jaxkd  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
-        except ImportError:
+        if not OptDeps.JAXKD.installed:
             msg = (
                 "KDTree requires jaxkd optional dependency. "
                 "Install with: uv add phasecurvefit[kdtree]"
             )
-            raise ImportError(msg) from None
-        self._jaxkd = jaxkd
+            raise ImportError(msg)
 
     def init(
         self,
@@ -181,7 +182,7 @@ class KDTree(AbstractQueryStrategy):
         """Build KD-tree from positions and return strategy state."""
         pos_arrays = [positions[k] for k in sorted(positions.keys())]
         pos_flat = jnp.stack(pos_arrays, axis=-1)
-        tree = self._jaxkd.build_tree(pos_flat)
+        tree = jaxkd.build_tree(pos_flat)
         return {"tree": tree, "n_points": pos_flat.shape[0]}
 
     def query(
@@ -216,7 +217,7 @@ class KDTree(AbstractQueryStrategy):
         # mask (the current point is always visited). Clamp to the point count
         # since jaxkd errors when ``k`` exceeds the tree size.
         n_query = min(self.k + 1, kd_state["n_points"])
-        indices, _ = self._jaxkd.query_neighbors(
+        indices, _ = jaxkd.query_neighbors(
             kd_state["tree"], current_pos_arr[None, :], k=n_query
         )
         indices = indices[0]
