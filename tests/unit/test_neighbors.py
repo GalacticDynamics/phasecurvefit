@@ -177,14 +177,22 @@ class TestBucketing:
         sizes = [nb_src._bucket(n) for n in [1, 2, 3, 5, 7, 100, 1000]]
         assert sizes == [1, 2, 3, 6, 8, 128, 1024]
 
-    def test_same_bucket_reuses_compilation(self):
+    def test_same_bucket_reuses_compilation(self, monkeypatch):
         """Review Focus 1: n in an already-compiled bucket does not recompile."""
-        backend = pcf.neighbors.BucketKDTree()
+        traces = []
+        all_knn = nb_src._kd.all_knn
+
+        def counting(*args, **kwargs):  # runs only while jit traces
+            traces.append(args[0].shape)
+            return all_knn(*args, **kwargs)
+
+        monkeypatch.setattr(nb_src._kd, "all_knn", counting)
+        # An unusual leaf_size, so this test's first call is a fresh trace.
+        backend = pcf.neighbors.BucketKDTree(leaf_size=13)
         rng = np.random.default_rng(3)
         backend.knn(jnp.asarray(rng.normal(size=(1000, 3)), jnp.float32), 10)
-        before = nb_src._knn_core_jit._cache_size()
         backend.knn(jnp.asarray(rng.normal(size=(990, 3)), jnp.float32), 10)
-        assert nb_src._knn_core_jit._cache_size() == before
+        assert traces == [(1024, 3)]
 
     def test_far_rows_never_win(self):
         """Padding rows are farther than the data's diameter from every point."""
