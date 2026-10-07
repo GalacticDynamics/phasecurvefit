@@ -1,6 +1,7 @@
 """Tests for the self-contained JAX kd-tree (``phasecurvefit._src.kdtree``)."""
 
 import functools
+import importlib
 
 import jax
 import jax.numpy as jnp
@@ -247,3 +248,34 @@ class TestBrute:
         _assert_exact(
             p, *kd.brute_knn(jnp.asarray(p), 10, queries=jnp.asarray(q)), 10, queries=q
         )
+
+
+class TestBruteTier:
+    """The final brute-force overflow tier, forced by tiny tier constants."""
+
+    @pytest.mark.parametrize("frontier", [1, 2])
+    def test_forced_tiers_exact(self, monkeypatch, frontier):
+        """All-points and bichromatic (incl. far) queries stay exact through brute."""
+        q_mod = importlib.import_module("phasecurvefit._src.kdtree._query")
+        monkeypatch.setattr(q_mod, "TIERS", (2, 4))
+        monkeypatch.setattr(q_mod, "TIER_CHUNK", (3, 5))
+        monkeypatch.setattr(q_mod, "BRUTE_CHUNK", 7)
+        chunks = []
+        real = q_mod._finish
+
+        def spy(*args):
+            chunks.append(args[6])  # the chunk size of each overflow stage
+            return real(*args)
+
+        monkeypatch.setattr(q_mod, "_finish", spy)
+        jax.clear_caches()  # constants are read at trace time
+        p = _stream(300, seed=3, interlopers=0.1)
+        rng = np.random.default_rng(1)
+        q = np.concatenate(
+            [p[:20] + 0.01, 100 * rng.normal(size=(10, 3)).astype(np.float32)]
+        ).astype(np.float32)
+        _assert_exact(p, *_all(p, k=8, leaf_size=4, frontier=frontier), 8)
+        _assert_exact(p, *_bi(p, q, k=8, leaf_size=4, frontier=frontier), 8, queries=q)
+        assert 7 in chunks  # brute tier was traced
+        assert 5 in chunks  # ... after an overflow tier
+        jax.clear_caches()

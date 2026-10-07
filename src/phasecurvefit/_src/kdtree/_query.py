@@ -207,6 +207,9 @@ def _query(
         over = over & qvalid
 
     pos_all = jnp.arange(tree.n_pad)
+    # ponytail: per-chunk (BRUTE_CHUNK, n_pad, d) allocation, ~0.5-1.5 GB at
+    # n~1e6 when any query reaches brute force (rare, ~0.03% on interloper
+    # data); upgrade = smaller BRUTE_CHUNK or loop over dimensions.
 
     def brute(xs: Array, ss: Array, rs: Array) -> tuple[Array, ...]:
         del rs
