@@ -82,6 +82,7 @@ __all__: tuple[str, ...] = (
     "metrics",
     "som",
     "strats",
+    "neighbors",
     "orderers",
     # Algorithm
     "combine_results",
@@ -97,7 +98,7 @@ __all__: tuple[str, ...] = (
     "order_w",
 )
 
-from . import metrics, nn, orderers, som, strats, w
+from . import metrics, neighbors, nn, orderers, som, strats, w
 from ._src.algorithm import (
     StateMetadata,
     WalkLocalFlowResult,
