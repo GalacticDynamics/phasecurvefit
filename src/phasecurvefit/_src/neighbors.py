@@ -33,6 +33,12 @@ def _traced(*xs: object) -> bool:
     return any(isinstance(x, jax.core.Tracer) for x in xs)
 
 
+def _as_float(x: object) -> Array:
+    """Promote integer / low-precision inputs to at least float32."""
+    x = jnp.asarray(x)
+    return x.astype(jnp.promote_types(x.dtype, jnp.float32))
+
+
 def _safe_sqrt(d2: Array) -> Array:
     """Euclidean distance with gradient 0 (not NaN) at coincident points."""
     pos = d2 > 0
@@ -137,10 +143,12 @@ class BucketKDTree(AbstractNeighborSearch):
             raise ValueError(msg)
 
     def knn(self, points: Array, k: int, *, queries: Array | None = None) -> KnnOut:
-        points = jnp.asarray(points)
-        queries = None if queries is None else jnp.asarray(queries)
+        points = _as_float(points)
+        queries = None if queries is None else _as_float(queries)
         n = points.shape[0]
         m = n if queries is None else queries.shape[0]
+        if m == 0:
+            return jnp.zeros((0, k), jnp.int32), jnp.zeros((0, k), points.dtype)
         if n == 0:
             return jnp.full((m, k), 0, jnp.int32), jnp.full(
                 (m, k), jnp.inf, points.dtype
@@ -148,7 +156,7 @@ class BucketKDTree(AbstractNeighborSearch):
         points = _check_finite(points, queries)
         if _traced(points, queries):
             sq = None if queries is None else jax.lax.stop_gradient(queries)
-            ii, _ = _knn_core(
+            ii, _ = _knn_core_jit(
                 jax.lax.stop_gradient(points), sq, k, self.leaf_size, self.frontier
             )
             return ii, _gathered_distance(points, queries, ii)
@@ -170,8 +178,8 @@ class BruteForce(AbstractNeighborSearch):
     chunk: int = eqx.field(static=True, default=1024)
 
     def knn(self, points: Array, k: int, *, queries: Array | None = None) -> KnnOut:
-        points = _check_finite(jnp.asarray(points), queries)
-        q = None if queries is None else jnp.asarray(queries)
+        q = None if queries is None else _as_float(queries)
+        points = _check_finite(_as_float(points), q)
         ii, d2 = _kd.brute_knn(points, k, queries=q, chunk=self.chunk)
         return ii, _safe_sqrt(d2)
 
@@ -207,9 +215,9 @@ class Jaxkd(AbstractNeighborSearch):
     def knn(self, points: Array, k: int, *, queries: Array | None = None) -> KnnOut:
         import jaxkd  # noqa: PLC0415
 
-        points = _check_finite(jnp.asarray(points), queries)
+        q = None if queries is None else _as_float(queries)
+        points = _check_finite(_as_float(points), q)
         n = points.shape[0]
-        q = None if queries is None else jnp.asarray(queries)
         ps = jax.lax.stop_gradient(points)  # jaxkd's traversal is a while_loop
         tree = jaxkd.build_tree(ps)
         if q is not None:
@@ -242,8 +250,8 @@ class Scipy(AbstractNeighborSearch):
             raise TypeError(msg)
         from scipy.spatial import cKDTree  # noqa: PLC0415
 
-        p = np.asarray(points)
-        q = None if queries is None else np.asarray(queries)
+        p = np.asarray(_as_float(points))
+        q = None if queries is None else np.asarray(_as_float(queries))
         if not np.all(np.isfinite(p)) or (q is not None and not np.all(np.isfinite(q))):
             msg = "kNN inputs must be finite (no NaN or inf)."
             raise ValueError(msg)

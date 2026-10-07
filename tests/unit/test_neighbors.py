@@ -1,5 +1,7 @@
 """Tests for the kNN backends (``phasecurvefit.neighbors``)."""
 
+import importlib.util
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -8,13 +10,32 @@ import pytest
 import phasecurvefit as pcf
 from phasecurvefit._src import neighbors as nb_src
 
-BACKENDS = [
-    pcf.neighbors.BucketKDTree(),
-    pcf.neighbors.BruteForce(),
-    pcf.neighbors.Jaxkd(),
-    pcf.neighbors.Scipy(),
+_NO_JAXKD = pytest.mark.skipif(
+    importlib.util.find_spec("jaxkd") is None, reason="jaxkd not installed"
+)
+# Lazy factories: Jaxkd() raises at construction when jaxkd is missing.
+_FACTORIES = {
+    "bucket": pcf.neighbors.BucketKDTree,
+    "brute": pcf.neighbors.BruteForce,
+    "jaxkd": pcf.neighbors.Jaxkd,
+    "scipy": pcf.neighbors.Scipy,
+}
+PARAMS = [
+    pytest.param(f, id=i, marks=[_NO_JAXKD] if i == "jaxkd" else [])
+    for i, f in _FACTORIES.items()
 ]
-IDS = ["bucket", "brute", "jaxkd", "scipy"]
+
+
+@pytest.fixture(params=PARAMS)
+def backend(request):
+    """Each backend, constructed lazily."""
+    return request.param()
+
+
+@pytest.fixture(params=PARAMS[:3])
+def jax_backend(request):
+    """Yield each backend that traces under jit."""
+    return request.param()
 
 
 def _ref(points, k, queries=None):
@@ -27,7 +48,6 @@ def _ref(points, k, queries=None):
     return np.sqrt(np.sort(d2, 1)[:, :k])
 
 
-@pytest.mark.parametrize("backend", BACKENDS, ids=IDS)
 class TestContract:
     """Every backend honours the same contract."""
 
@@ -64,6 +84,27 @@ class TestContract:
         )
         assert not np.any(np.asarray(idx) == 100)
 
+    @pytest.mark.parametrize("dtype", [jnp.int32, jnp.bfloat16], ids=["int32", "bf16"])
+    def test_integer_and_low_precision_inputs(self, backend, dtype):
+        """Integers / bfloat16 behave as their float32 values (no inf rows)."""
+        rng = np.random.default_rng(5)
+        p = jnp.asarray(rng.integers(-50, 50, size=(120, 3))).astype(dtype)
+        q = jnp.asarray(rng.integers(-60, 60, size=(15, 3))).astype(dtype)
+        p32, q32 = p.astype(jnp.float32), q.astype(jnp.float32)
+        for qq, qq32 in ((None, None), (q, q32)):
+            got_i, got_d = backend.knn(p, 4, queries=qq)
+            _, want_d = backend.knn(p32, 4, queries=qq32)
+            assert jnp.issubdtype(got_d.dtype, jnp.floating)
+            assert np.all(np.isfinite(np.asarray(got_d)))
+            np.testing.assert_allclose(np.asarray(got_d), np.asarray(want_d), rtol=1e-5)
+            assert np.all(np.asarray(got_i) < 120)
+
+    def test_empty_queries(self, backend):
+        """Zero queries give (0, k) outputs."""
+        p = jnp.asarray(np.random.default_rng(0).normal(size=(30, 3)), jnp.float32)
+        idx, dist = backend.knn(p, 4, queries=jnp.zeros((0, 3), jnp.float32))
+        assert idx.shape == dist.shape == (0, 4)
+
     def test_non_finite_raises(self, backend):
         """Review Focus 2: NaN input is an error, not a silently wrong answer."""
         p = np.random.default_rng(0).normal(size=(50, 3)).astype(np.float32)
@@ -75,12 +116,13 @@ class TestContract:
 class TestTracing:
     """Which backends trace."""
 
-    @pytest.mark.parametrize("backend", BACKENDS[:3], ids=IDS[:3])
-    def test_jax_backends_trace(self, backend):
+    def test_jax_backends_trace(self, jax_backend):
         """BucketKDTree, BruteForce and Jaxkd run under jit."""
         p = jnp.asarray(np.random.default_rng(1).normal(size=(200, 3)), jnp.float32)
-        idx, _ = jax.jit(lambda x: backend.knn(x, 5))(p)
-        np.testing.assert_array_equal(np.asarray(idx), np.asarray(backend.knn(p, 5)[0]))
+        idx, _ = jax.jit(lambda x: jax_backend.knn(x, 5))(p)
+        np.testing.assert_array_equal(
+            np.asarray(idx), np.asarray(jax_backend.knn(p, 5)[0])
+        )
 
     def test_scipy_raises_when_traced(self):
         """The scipy backend is eager-only."""

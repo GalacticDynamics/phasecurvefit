@@ -68,6 +68,7 @@ from phasecurvefit._src.neighbors import (
     AbstractNeighborSearch,
     BucketKDTree,
     Scipy,
+    _as_float,
     _traced,
     far_rows,
 )
@@ -591,8 +592,8 @@ class MSTOrderer(AbstractOrderer):
         _check_component_keys(positions, velocities)
 
         comps = sorted(positions)
-        P = jnp.stack([jnp.asarray(positions[c]) for c in comps], axis=1)
-        V = jnp.stack([jnp.asarray(velocities[c]) for c in comps], axis=1)
+        P = _as_float(jnp.stack([jnp.asarray(positions[c]) for c in comps], axis=1))
+        V = _as_float(jnp.stack([jnp.asarray(velocities[c]) for c in comps], axis=1))
         n = P.shape[0]
         cfg = {
             "k": self.k,

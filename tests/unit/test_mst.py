@@ -1,5 +1,7 @@
 """Tests for the MST-backbone orderer (``pcf.orderers.MSTOrderer``)."""
 
+import importlib.util
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -596,18 +598,35 @@ def _distinct_backbone(result):
 class TestMSTBackends:
     """``MSTOrderer(neighbors=...)``: every backend gives the scipy result."""
 
+    def test_integer_positions(self):
+        """Integer positions work with the default backend and match scipy."""
+        pos = {"x": jnp.arange(40), "y": jnp.arange(40) // 3}
+        vel = {"x": jnp.ones(40), "y": jnp.ones(40)}
+        want = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=3, neighbors=pcf.neighbors.Scipy()
+        ).order(pos, vel)
+        got = pcf.orderers.MSTOrderer(k=5, jump_cap=3).order(pos, vel)
+        np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
+
     @pytest.mark.parametrize(
-        "backend",
+        "make",
         [
-            pcf.neighbors.BucketKDTree(),
-            pcf.neighbors.BruteForce(),
-            pcf.neighbors.Jaxkd(),
+            pytest.param(pcf.neighbors.BucketKDTree, id="bucket"),
+            pytest.param(pcf.neighbors.BruteForce, id="brute"),
+            pytest.param(
+                pcf.neighbors.Jaxkd,
+                id="jaxkd",
+                marks=pytest.mark.skipif(
+                    importlib.util.find_spec("jaxkd") is None,
+                    reason="jaxkd not installed",
+                ),
+            ),
         ],
-        ids=["bucket", "brute", "jaxkd"],
     )
     @pytest.mark.parametrize("case", _cases(), ids=lambda c: c[0])
-    def test_matches_scipy(self, case, backend):
+    def test_matches_scipy(self, case, make):
         """Same ordering and backbone as the scipy backend on reference configs."""
+        backend = make()
         _, p, v, kw = case
         pos, vel = _as_dicts(p, v)
         want = pcf.orderers.MSTOrderer(
