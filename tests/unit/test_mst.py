@@ -615,10 +615,18 @@ class TestMSTBackends:
         ).order(pos, vel)
         got = pcf.orderers.MSTOrderer(k=10, neighbors=backend, **kw).order(pos, vel)
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
-        # Coincident points tie in distance, so backends may thread the MST
-        # through a clump in a different order; compare the backbone with
-        # consecutive repeats collapsed.
-        np.testing.assert_array_equal(_distinct_backbone(got), _distinct_backbone(want))
+        if case[0] == "dup":
+            # Coincident points tie in distance, so backends may thread the MST
+            # through a clump in a different order; compare the backbone with
+            # consecutive repeats collapsed.
+            np.testing.assert_array_equal(
+                _distinct_backbone(got), _distinct_backbone(want)
+            )
+            return
+        assert int(got.backbone_size) == int(want.backbone_size)
+        np.testing.assert_array_equal(
+            np.asarray(got.backbone["x"]), np.asarray(want.backbone["x"])
+        )
 
     def test_default_is_bucket_kdtree(self):
         """The kd-tree is the default backend."""
