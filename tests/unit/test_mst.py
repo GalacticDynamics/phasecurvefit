@@ -526,3 +526,166 @@ class TestMSTDuplicates:
         vel = {"x": jnp.ones(12), "y": jnp.zeros(12)}
         res = pcf.orderers.MSTOrderer(k=4, edge_clip_sigma=3.0).order(pos, vel)
         assert int(res.n_skipped) == 0
+
+
+def _cases():
+    """Return reference configs: (name, positions, velocities, MSTOrderer kwargs)."""
+    rng = np.random.default_rng(11)
+
+    def stream(n, interlopers=0.0, dup=0):
+        t = np.linspace(0, 1, n)
+        p = np.c_[10 * t, np.sin(3 * t), 0.3 * np.cos(2 * t)] + rng.normal(
+            0, 0.02, (n, 3)
+        )
+        v = np.c_[np.ones(n), 3 * np.cos(3 * t), -0.6 * np.sin(2 * t)]
+        m = int(interlopers * n)
+        if m:
+            i = rng.choice(n, m, replace=False)
+            pad = np.array([0.0, 3.0, 3.0])
+            p[i] = rng.uniform(p.min(0) - pad, p.max(0) + pad, (m, 3))
+            v[i] = rng.normal(size=(m, 3))
+        if dup:
+            src = rng.choice(n, dup // 25, replace=False)
+            p = np.r_[p, np.repeat(p[src], 25, axis=0)]
+            v = np.r_[v, np.repeat(v[src], 25, axis=0)]
+        perm = rng.permutation(len(p))
+        return p[perm].astype(np.float32), v[perm].astype(np.float32)
+
+    def loop(n):
+        a = np.linspace(0, 2 * np.pi * 0.95, n)
+        p = np.c_[np.cos(a), np.sin(a), 0 * a] + rng.normal(0, 0.01, (n, 3))
+        v = np.c_[-np.sin(a), np.cos(a), 0 * a]
+        perm = rng.permutation(n)
+        return p[perm].astype(np.float32), v[perm].astype(np.float32)
+
+    two = stream(1500)
+    two[0][:500, 0] += 50.0
+    return [
+        ("stream", *stream(1500), {"jump_cap": 2.0}),
+        ("clip", *stream(1500, 0.01), {"jump_cap": 50.0, "edge_clip_sigma": 3.0}),
+        ("dup", *stream(1500, dup=250), {"jump_cap": 2.0}),
+        (
+            "loop_vw",
+            *loop(1000),
+            {"jump_cap": 0.5, "velocity_weight": 1.0, "orient_by_velocity": True},
+        ),
+        (
+            "loop_sever",
+            *loop(1000),
+            {"jump_cap": 0.5, "sever_cos_threshold": 0.0, "on_disconnected": "largest"},
+        ),
+        ("connect", *two, {"jump_cap": 2.0, "on_disconnected": "connect"}),
+    ]
+
+
+def _as_dicts(p, v):
+    comps = "xyz"[: p.shape[1]]
+    return (
+        {c: jnp.asarray(p[:, i]) for i, c in enumerate(comps)},
+        {c: jnp.asarray(v[:, i]) for i, c in enumerate(comps)},
+    )
+
+
+def _distinct_backbone(result):
+    """Backbone coordinates (valid prefix) with consecutive repeats collapsed."""
+    n = int(result.backbone_size)
+    bb = np.stack([np.asarray(c)[:n] for c in result.backbone.values()], axis=1)
+    return bb[np.r_[True, np.any(np.diff(bb, axis=0) != 0, axis=1)]]
+
+
+class TestMSTBackends:
+    """``MSTOrderer(neighbors=...)``: every backend gives the scipy result."""
+
+    @pytest.mark.parametrize(
+        "backend",
+        [
+            pcf.neighbors.BucketKDTree(),
+            pcf.neighbors.BruteForce(),
+            pcf.neighbors.Jaxkd(),
+        ],
+        ids=["bucket", "brute", "jaxkd"],
+    )
+    @pytest.mark.parametrize("case", _cases(), ids=lambda c: c[0])
+    def test_matches_scipy(self, case, backend):
+        """Same ordering and backbone as the scipy backend on reference configs."""
+        _, p, v, kw = case
+        pos, vel = _as_dicts(p, v)
+        want = pcf.orderers.MSTOrderer(
+            k=10, neighbors=pcf.neighbors.Scipy(), **kw
+        ).order(pos, vel)
+        got = pcf.orderers.MSTOrderer(k=10, neighbors=backend, **kw).order(pos, vel)
+        np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
+        # Coincident points tie in distance, so backends may thread the MST
+        # through a clump in a different order; compare the backbone with
+        # consecutive repeats collapsed.
+        np.testing.assert_array_equal(_distinct_backbone(got), _distinct_backbone(want))
+
+    def test_default_is_bucket_kdtree(self):
+        """The kd-tree is the default backend."""
+        assert isinstance(
+            pcf.orderers.MSTOrderer().neighbors, pcf.neighbors.BucketKDTree
+        )
+
+    def test_scipy_raises_under_jit(self):
+        """The scipy backend is eager-only, with a pointer to BucketKDTree."""
+        pos, vel, _ = _open_arc(n=60)
+        orderer = pcf.orderers.MSTOrderer(
+            k=8, jump_cap=2.0, neighbors=pcf.neighbors.Scipy()
+        )
+        with pytest.raises(TypeError, match="BucketKDTree"):
+            jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
+
+    def test_default_jit_matches_eager(self):
+        """The default backend traces, and jit equals eager."""
+        pos, vel, _ = _open_arc(n=200)
+        orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=2.0)
+        eager = orderer.order(pos, vel).indices
+        jitted = jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
+        np.testing.assert_array_equal(np.asarray(jitted), np.asarray(eager))
+
+    @pytest.mark.parametrize("n", [0, 1, 2, 3, 9])
+    def test_tiny_inputs_match_scipy(self, n):
+        """Review Focus 3: tiny n (and n <= k) match the scipy backend."""
+        rng = np.random.default_rng(n)
+        pos, vel = _as_dicts(
+            rng.normal(size=(n, 3)).astype(np.float32),
+            rng.normal(size=(n, 3)).astype(np.float32),
+        )
+        kw = {"k": 10, "jump_cap": 100.0}
+        want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.Scipy(), **kw).order(
+            pos, vel
+        )
+        got = pcf.orderers.MSTOrderer(**kw).order(pos, vel)
+        np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
+
+    def test_one_dimensional_matches_scipy(self):
+        """Review Focus 5: a single position component."""
+        rng = np.random.default_rng(5)
+        x = rng.permutation(np.linspace(0, 10, 400)).astype(np.float32)
+        pos, vel = {"x": jnp.asarray(x)}, {"x": jnp.ones(400)}
+        want = pcf.orderers.MSTOrderer(
+            k=8, jump_cap=1.0, neighbors=pcf.neighbors.Scipy()
+        ).order(pos, vel)
+        got = pcf.orderers.MSTOrderer(k=8, jump_cap=1.0).order(pos, vel)
+        np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
+
+    def test_non_finite_positions_raise(self):
+        """Review Focus 2: NaN positions raise instead of mis-ordering."""
+        pos, vel, _ = _open_arc(n=60)
+        pos = {**pos, "x": pos["x"].at[5].set(jnp.nan)}
+        with pytest.raises(Exception, match="finite"):
+            jax.block_until_ready(
+                pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(pos, vel).indices
+            )
+
+    def test_vmap_default_backend(self):
+        """Vmap over two clouds equals two separate eager calls."""
+        a, b = _open_arc(n=120, seed=0), _open_arc(n=120, seed=1)
+        orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0)
+        batch_p = {c: jnp.stack([a[0][c], b[0][c]]) for c in a[0]}
+        batch_v = {c: jnp.stack([a[1][c], b[1][c]]) for c in a[1]}
+        got = jax.vmap(lambda p, v: orderer.order(p, v).indices)(batch_p, batch_v)
+        for i, (p, v, _) in enumerate((a, b)):
+            np.testing.assert_array_equal(
+                np.asarray(got[i]), np.asarray(orderer.order(p, v).indices)
+            )
