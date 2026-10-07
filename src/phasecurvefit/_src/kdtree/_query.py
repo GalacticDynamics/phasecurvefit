@@ -131,7 +131,11 @@ def _finish(
     nq = xq.shape[0]
     n_over = over.sum()
     tgt = jnp.where(over, jnp.cumsum(over) - 1, nq + chunk)
-    buf = jnp.full(nq + chunk, nq, jnp.int32).at[tgt].set(jnp.arange(nq), mode="drop")
+    buf = (
+        jnp.full(nq + chunk, nq, jnp.int32)
+        .at[tgt]
+        .set(jnp.arange(nq, dtype=jnp.int32), mode="drop")
+    )
     still = jnp.zeros(nq, bool)
 
     def body(state: tuple) -> tuple:

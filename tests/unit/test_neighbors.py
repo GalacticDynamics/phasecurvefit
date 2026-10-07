@@ -99,6 +99,17 @@ class TestContract:
             np.testing.assert_allclose(np.asarray(got_d), np.asarray(want_d), rtol=1e-5)
             assert np.all(np.asarray(got_i) < 120)
 
+    def test_float64(self, backend):
+        """Under x64, float64 stays float64 and nothing scatters int64 into int32."""
+        p = np.random.default_rng(9).normal(size=(200, 3))
+        q = p[:20] * 3
+        with jax.enable_x64(new_val=True):
+            for qq in (None, jnp.asarray(q)):
+                _, dist = backend.knn(jnp.asarray(p), 4, queries=qq)
+                assert dist.dtype == jnp.float64
+                ref = _ref(p, 4, None if qq is None else q)
+                np.testing.assert_allclose(np.asarray(dist), ref, rtol=1e-12)
+
     def test_empty_queries(self, backend):
         """Zero queries give (0, k) outputs."""
         p = jnp.asarray(np.random.default_rng(0).normal(size=(30, 3)), jnp.float32)
