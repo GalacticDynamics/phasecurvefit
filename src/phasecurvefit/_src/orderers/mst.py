@@ -67,7 +67,7 @@ from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.neighbors import (
     AbstractNeighborSearch,
     BucketKDTree,
-    Scipy,
+    SciPy,
     _as_float,
     _traced,
     far_rows,
@@ -391,7 +391,7 @@ def _finish_numpy(P, full, blen, in_comp, flip, workers, /):  # noqa: ANN001, AN
     n = P.shape[0]
     cb = P[full[:blen]]
     seg = np.linalg.norm(np.diff(cb, axis=0), axis=1)
-    s_bb = np.concatenate([[0.0], np.cumsum(seg)])
+    s_bb = np.concat([[0.0], np.cumsum(seg)])
     _, near = cKDTree(cb).query(P, workers=workers)
     primary, secondary = _order_keys(s_bb[near], in_comp, flip, n, np)
     order = np.lexsort((secondary, primary)).astype(np.int32)
@@ -408,7 +408,7 @@ def _finish_jax(P, full, blen, in_comp, flip, neighbors, /):  # noqa: ANN001, AN
     n = P.shape[0]
     cb = P[full]
     seg = jnp.linalg.norm(jnp.diff(cb, axis=0), axis=1)  # 0 across the padded tail
-    s_bb = jnp.concatenate([jnp.zeros(1, P.dtype), jnp.cumsum(seg)])
+    s_bb = jnp.concat([jnp.zeros(1, P.dtype), jnp.cumsum(seg)])
     ref = jnp.where((jnp.arange(n) < blen)[:, None], cb, far_rows(P, n))
     near = neighbors.knn(ref, 1, queries=P)[0][:, 0]
     primary, secondary = _order_keys(s_bb[near], in_comp, flip, n, jnp)
@@ -461,8 +461,8 @@ class MSTOrderer(AbstractOrderer):
         ``edge_clip_sigma`` is ``None``.
     neighbors
         The exact kNN backend (``phasecurvefit.neighbors``): ``BucketKDTree()``
-        (default; JAX-native, traceable), ``BruteForce()``, ``Jaxkd()``
-        (optional dependency), or ``Scipy(workers=-1)`` (fastest on CPU, but
+        (default; JAX-native, traceable), ``BruteForce()``, ``JaxKD()``
+        (optional dependency), or ``SciPy(workers=-1)`` (fastest on CPU, but
         eager-only: it raises under jit/vmap/grad).
 
     Examples
@@ -522,8 +522,8 @@ class MSTOrderer(AbstractOrderer):
     Reject an interloper by MST edge length with ``edge_clip_sigma``. Here a lone
     point sits far off an otherwise clean line; clipping leaves it unvisited:
 
-    >>> xs = jnp.concatenate([jnp.linspace(0.0, 9.0, 40), jnp.array([30.0])])
-    >>> ys = jnp.concatenate([jnp.zeros(40), jnp.array([30.0])])
+    >>> xs = jnp.concat([jnp.linspace(0.0, 9.0, 40), jnp.array([30.0])])
+    >>> ys = jnp.concat([jnp.zeros(40), jnp.array([30.0])])
     >>> pos = {"x": xs, "y": ys}
     >>> vel = {"x": jnp.ones(41), "y": jnp.zeros(41)}
     >>> clipper = pcf.orderers.MSTOrderer(k=10, jump_cap=50.0, edge_clip_sigma=3.0)
@@ -577,11 +577,11 @@ class MSTOrderer(AbstractOrderer):
         """Order tracers along the MST backbone.
 
         Three stages. (a) The kNN runs in the ``neighbors`` backend: in JAX for
-        ``BucketKDTree``, ``BruteForce`` and ``Jaxkd``, so it traces under
+        ``BucketKDTree``, ``BruteForce`` and ``JaxKD``, so it traces under
         ``jax.jit``/``vmap``/``grad``. (b) The graph algorithms (MST,
         components, diameter, edge-clip) run on the host: directly when eager,
         through ``jax.pure_callback`` when traced. (c) The arc-length projection
-        and ordering run in JAX. With ``Scipy`` every stage runs in NumPy, and a
+        and ordering run in JAX. With ``SciPy`` every stage runs in NumPy, and a
         traced call raises ``TypeError``.
 
         A caveat of the traced path: ``on_disconnected="raise"`` raises
@@ -611,7 +611,7 @@ class MSTOrderer(AbstractOrderer):
             idx_full = jnp.arange(n, dtype=jnp.int32)
             backbone_idx = jnp.arange(n, dtype=jnp.int32)
             backbone_len = jnp.asarray(n, jnp.int32)
-        elif isinstance(self.neighbors, Scipy):
+        elif isinstance(self.neighbors, SciPy):
             # Eager-only: knn raises TypeError first if the inputs are traced.
             nbr = np.asarray(self.neighbors.knn(P, min(self.k, n - 1))[0])
             Pn, Vn = np.asarray(P), np.asarray(V)

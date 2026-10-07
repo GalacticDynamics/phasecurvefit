@@ -1,7 +1,5 @@
 """Tests for the MST-backbone orderer (``pcf.orderers.MSTOrderer``)."""
 
-import importlib.util
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -9,6 +7,7 @@ import pytest
 
 import phasecurvefit as pcf
 from phasecurvefit._src.abstract_result import AbstractResult
+from phasecurvefit._src.optional_deps import OptDeps
 
 
 def _open_arc(n=200, seed=0):
@@ -603,7 +602,7 @@ class TestMSTBackends:
         pos = {"x": jnp.arange(40), "y": jnp.arange(40) // 3}
         vel = {"x": jnp.ones(40), "y": jnp.ones(40)}
         want = pcf.orderers.MSTOrderer(
-            k=5, jump_cap=3, neighbors=pcf.neighbors.Scipy()
+            k=5, jump_cap=3, neighbors=pcf.neighbors.SciPy()
         ).order(pos, vel)
         got = pcf.orderers.MSTOrderer(k=5, jump_cap=3).order(pos, vel)
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
@@ -614,10 +613,10 @@ class TestMSTBackends:
             pytest.param(pcf.neighbors.BucketKDTree, id="bucket"),
             pytest.param(pcf.neighbors.BruteForce, id="brute"),
             pytest.param(
-                pcf.neighbors.Jaxkd,
+                pcf.neighbors.JaxKD,
                 id="jaxkd",
                 marks=pytest.mark.skipif(
-                    importlib.util.find_spec("jaxkd") is None,
+                    not OptDeps.JAXKD.installed,
                     reason="jaxkd not installed",
                 ),
             ),
@@ -630,7 +629,7 @@ class TestMSTBackends:
         _, p, v, kw = case
         pos, vel = _as_dicts(p, v)
         want = pcf.orderers.MSTOrderer(
-            k=10, neighbors=pcf.neighbors.Scipy(), **kw
+            k=10, neighbors=pcf.neighbors.SciPy(), **kw
         ).order(pos, vel)
         got = pcf.orderers.MSTOrderer(k=10, neighbors=backend, **kw).order(pos, vel)
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
@@ -657,7 +656,7 @@ class TestMSTBackends:
         """The scipy backend is eager-only, with a pointer to BucketKDTree."""
         pos, vel, _ = _open_arc(n=60)
         orderer = pcf.orderers.MSTOrderer(
-            k=8, jump_cap=2.0, neighbors=pcf.neighbors.Scipy()
+            k=8, jump_cap=2.0, neighbors=pcf.neighbors.SciPy()
         )
         with pytest.raises(TypeError, match="BucketKDTree"):
             jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
@@ -679,7 +678,7 @@ class TestMSTBackends:
             rng.normal(size=(n, 3)).astype(np.float32),
         )
         kw = {"k": 10, "jump_cap": 100.0}
-        want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.Scipy(), **kw).order(
+        want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw).order(
             pos, vel
         )
         got = pcf.orderers.MSTOrderer(**kw).order(pos, vel)
@@ -691,7 +690,7 @@ class TestMSTBackends:
         x = rng.permutation(np.linspace(0, 10, 400)).astype(np.float32)
         pos, vel = {"x": jnp.asarray(x)}, {"x": jnp.ones(400)}
         want = pcf.orderers.MSTOrderer(
-            k=8, jump_cap=1.0, neighbors=pcf.neighbors.Scipy()
+            k=8, jump_cap=1.0, neighbors=pcf.neighbors.SciPy()
         ).order(pos, vel)
         got = pcf.orderers.MSTOrderer(k=8, jump_cap=1.0).order(pos, vel)
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))

@@ -250,10 +250,10 @@ Exact k-nearest-neighbour backends for
 .. autoclass:: phasecurvefit.neighbors.BruteForce
    :no-index:
 
-.. autoclass:: phasecurvefit.neighbors.Jaxkd
+.. autoclass:: phasecurvefit.neighbors.JaxKD
    :no-index:
 
-.. autoclass:: phasecurvefit.neighbors.Scipy
+.. autoclass:: phasecurvefit.neighbors.SciPy
    :no-index:
 ```
 

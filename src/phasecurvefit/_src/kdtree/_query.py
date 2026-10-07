@@ -51,7 +51,7 @@ def _descend(tree: Tree, xq: Array, r2: Array, cap: int, /) -> tuple[Array, Arra
     rows = jnp.arange(nq)[:, None]
     l0 = min(tree.depth, math.floor(math.log2(cap)))
     n0 = 2**l0
-    seed = jnp.concatenate([jnp.arange(n0), jnp.full(cap - n0, n0)]).astype(jnp.int32)
+    seed = jnp.concat([jnp.arange(n0), jnp.full(cap - n0, n0)]).astype(jnp.int32)
     front = jnp.broadcast_to(seed, (nq, cap))
     over = jnp.zeros(nq, bool)
 
@@ -86,9 +86,9 @@ def _merge(
     diff = xq[:, None] - xc
     d2 = jnp.where(ok & (pos != qself[:, None]), jnp.sum(diff * diff, -1), jnp.inf)
     if m * b < k:
-        d2 = jnp.concatenate([d2, jnp.full((nq, k - m * b), jnp.inf, d2.dtype)], 1)
-        pos = jnp.concatenate(
-            [pos, jnp.full((nq, k - m * b), tree.n_pad, jnp.int32)], 1
+        d2 = jnp.concat([d2, jnp.full((nq, k - m * b), jnp.inf, d2.dtype)], axis=1)
+        pos = jnp.concat(
+            [pos, jnp.full((nq, k - m * b), tree.n_pad, jnp.int32)], axis=1
         )
     if top_k:
         neg, col = jax.lax.top_k(-d2, k)
@@ -179,7 +179,7 @@ def _query(
     padn = n_chunks * qc - nq
 
     def pad(a: Array, fill: float) -> Array:
-        return jnp.concatenate([a, jnp.full((padn, *a.shape[1:]), fill, a.dtype)])
+        return jnp.concat([a, jnp.full((padn, *a.shape[1:]), fill, a.dtype)])
 
     def chunk(args: tuple[Array, Array, Array]) -> tuple[Array, ...]:
         x, s, lf = args
@@ -224,7 +224,7 @@ def _query(
         d2 = jnp.where(tree.valid[None] & (pos_all[None] != ss[:, None]), d2, jnp.inf)
         if tree.n_pad < k:
             extra = jnp.full((d2.shape[0], k - tree.n_pad), jnp.inf, d2.dtype)
-            d2 = jnp.concatenate([d2, extra], 1)
+            d2 = jnp.concat([d2, extra], axis=1)
         neg, col = jax.lax.top_k(-d2, k)
         d_new = -neg
         i_new = jnp.where(jnp.isinf(d_new), tree.n_pad, col.astype(jnp.int32))

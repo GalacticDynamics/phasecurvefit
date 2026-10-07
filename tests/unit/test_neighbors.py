@@ -1,7 +1,5 @@
 """Tests for the kNN backends (``phasecurvefit.neighbors``)."""
 
-import importlib.util
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -9,16 +7,17 @@ import pytest
 
 import phasecurvefit as pcf
 from phasecurvefit._src import neighbors as nb_src
+from phasecurvefit._src.optional_deps import OptDeps
 
 _NO_JAXKD = pytest.mark.skipif(
-    importlib.util.find_spec("jaxkd") is None, reason="jaxkd not installed"
+    not OptDeps.JAXKD.installed, reason="jaxkd not installed"
 )
-# Lazy factories: Jaxkd() raises at construction when jaxkd is missing.
+# Lazy factories: JaxKD() raises at construction when jaxkd is missing.
 _FACTORIES = {
     "bucket": pcf.neighbors.BucketKDTree,
     "brute": pcf.neighbors.BruteForce,
-    "jaxkd": pcf.neighbors.Jaxkd,
-    "scipy": pcf.neighbors.Scipy,
+    "jaxkd": pcf.neighbors.JaxKD,
+    "scipy": pcf.neighbors.SciPy,
 }
 PARAMS = [
     pytest.param(f, id=i, marks=[_NO_JAXKD] if i == "jaxkd" else [])
@@ -44,14 +43,14 @@ def _ref(points, k, queries=None):
     if queries is None:
         np.fill_diagonal(d2, np.inf)
     if points.shape[0] < k:
-        d2 = np.concatenate([d2, np.full((len(q), k - points.shape[0]), np.inf)], 1)
+        d2 = np.concat([d2, np.full((len(q), k - points.shape[0]), np.inf)], axis=1)
     return np.sqrt(np.sort(d2, 1)[:, :k])
 
 
 class TestContract:
     """Every backend honours the same contract."""
 
-    @pytest.mark.parametrize("n", [1, 2, 11, 300])
+    @pytest.mark.parametrize("n", [0, 1, 2, 11, 300])
     def test_all_points(self, backend, n):
         """Euclidean distances, sorted, self excluded, sentinel n when short."""
         p = np.random.default_rng(n).normal(size=(n, 3)).astype(np.float32)
@@ -124,6 +123,14 @@ class TestContract:
         idx, dist = backend.knn(p, 4, queries=jnp.zeros((0, 3), jnp.float32))
         assert idx.shape == dist.shape == (0, 4)
 
+    def test_empty_points(self, backend):
+        """Zero points: every query gets sentinel index 0 (= n) at distance inf."""
+        q = jnp.asarray(np.random.default_rng(0).normal(size=(5, 3)), jnp.float32)
+        idx, dist = backend.knn(jnp.zeros((0, 3), jnp.float32), 4, queries=q)
+        assert idx.shape == dist.shape == (5, 4)
+        assert np.all(np.asarray(idx) == 0)
+        assert np.all(np.isinf(np.asarray(dist)))
+
     def test_non_finite_raises(self, backend):
         """Review Focus 2: NaN input is an error, not a silently wrong answer."""
         p = np.random.default_rng(0).normal(size=(50, 3)).astype(np.float32)
@@ -136,7 +143,7 @@ class TestTracing:
     """Which backends trace."""
 
     def test_jax_backends_trace(self, jax_backend):
-        """BucketKDTree, BruteForce and Jaxkd run under jit."""
+        """BucketKDTree, BruteForce and JaxKD run under jit."""
         p = jnp.asarray(np.random.default_rng(1).normal(size=(200, 3)), jnp.float32)
         idx, _ = jax.jit(lambda x: jax_backend.knn(x, 5))(p)
         np.testing.assert_array_equal(
@@ -147,7 +154,7 @@ class TestTracing:
         """The scipy backend is eager-only."""
         p = jnp.ones((10, 3))
         with pytest.raises(TypeError, match="BucketKDTree"):
-            jax.jit(lambda x: pcf.neighbors.Scipy().knn(x, 3))(p)
+            jax.jit(lambda x: pcf.neighbors.SciPy().knn(x, 3))(p)
 
     def test_gradient_finite_at_coincident_points(self):
         """Distances differentiate with neighbour selection fixed; no NaN at d=0."""

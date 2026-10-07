@@ -39,7 +39,7 @@ def _stream(n, interloper_frac=0.0, seed=0):
 )
 @pytest.mark.parametrize(
     "neighbors",
-    [pcf.neighbors.BucketKDTree(), pcf.neighbors.Scipy()],
+    [pcf.neighbors.BucketKDTree(), pcf.neighbors.SciPy()],
     ids=["bucket", "scipy"],
 )
 def test_order(benchmark, n, frac, kw, neighbors):

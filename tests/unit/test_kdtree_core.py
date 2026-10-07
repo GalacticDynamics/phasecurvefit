@@ -45,8 +45,8 @@ class TestSelect:
         a[:7, 0] = 0.1  # rows with fewer than k finite entries
         vals, cols = jax.jit(functools.partial(ksmallest, k=k))(jnp.asarray(a))
         vals, cols = np.asarray(vals), np.asarray(cols)
-        padded = np.concatenate(
-            [a, np.full((500, max(0, k - width)), np.inf, np.float32)], 1
+        padded = np.concat(
+            [a, np.full((500, max(0, k - width)), np.inf, np.float32)], axis=1
         )
         ref = np.sort(padded, 1)[:, :k]
         np.testing.assert_array_equal(vals, ref)
@@ -115,7 +115,7 @@ def _ref_sq(points, k, queries=None):
     if queries is None:
         np.fill_diagonal(d2, np.inf)
     if points.shape[0] < k:
-        d2 = np.concatenate([d2, np.full((len(q), k - points.shape[0]), np.inf)], 1)
+        d2 = np.concat([d2, np.full((len(q), k - points.shape[0]), np.inf)], axis=1)
     return np.sort(d2, 1)[:, :k]
 
 
@@ -271,7 +271,7 @@ class TestBruteTier:
         jax.clear_caches()  # constants are read at trace time
         p = _stream(300, seed=3, interlopers=0.1)
         rng = np.random.default_rng(1)
-        q = np.concatenate(
+        q = np.concat(
             [p[:20] + 0.01, 100 * rng.normal(size=(10, 3)).astype(np.float32)]
         ).astype(np.float32)
         _assert_exact(p, *_all(p, k=8, leaf_size=4, frontier=frontier), 8)

@@ -42,7 +42,7 @@ def _pad_width(d2: Array, k: int, /) -> Array:
     if w >= k:
         return d2
     pad = jnp.full((*d2.shape[:-1], k - w), jnp.inf, d2.dtype)
-    return jnp.concatenate([d2, pad], -1)
+    return jnp.concat([d2, pad], axis=-1)
 
 
 def kth_smallest(d2: Float[Array, "Q W"], /, k: int) -> Float[Array, " Q"]:

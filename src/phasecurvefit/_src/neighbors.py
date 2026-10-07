@@ -1,7 +1,7 @@
 """Selectable exact k-nearest-neighbour backends.
 
 ``BucketKDTree`` (default) and ``BruteForce`` are JAX-native and trace under
-jit/vmap/grad; ``Jaxkd`` wraps the optional jaxkd package; ``Scipy`` is scipy's
+jit/vmap/grad; ``JaxKD`` wraps the optional jaxkd package; ``SciPy`` is scipy's
 ``cKDTree`` -- fastest on CPU but eager-only.
 """
 
@@ -9,8 +9,8 @@ __all__: tuple[str, ...] = (
     "AbstractNeighborSearch",
     "BruteForce",
     "BucketKDTree",
-    "Jaxkd",
-    "Scipy",
+    "JaxKD",
+    "SciPy",
     "far_rows",
 )
 
@@ -24,6 +24,10 @@ import numpy as np
 from jaxtyping import Array, Float, Int
 
 from phasecurvefit._src import kdtree as _kd
+from phasecurvefit._src.optional_deps import OptDeps
+
+if OptDeps.JAXKD.installed:
+    import jaxkd
 
 KnnOut = tuple[Int[Array, "m k"], Float[Array, "m k"]]
 
@@ -161,12 +165,12 @@ class BucketKDTree(AbstractNeighborSearch):
                 jax.lax.stop_gradient(points), sq, k, self.leaf_size, self.frontier
             )
             return ii, _gathered_distance(points, queries, ii)
-        extent = points if queries is None else jnp.concatenate([points, queries])
-        padded = jnp.concatenate([points, far_rows(extent, _bucket(n) - n)])
+        extent = points if queries is None else jnp.concat([points, queries])
+        padded = jnp.concat([points, far_rows(extent, _bucket(n) - n)])
         qpad = None
         if queries is not None:
             filler = jnp.broadcast_to(queries[:1], (_bucket(m) - m, points.shape[1]))
-            qpad = jnp.concatenate([queries, filler])
+            qpad = jnp.concat([queries, filler])
         ii, d2 = _knn_core_jit(padded, qpad, k, self.leaf_size, self.frontier)
         ii, d2 = ii[:m], d2[:m]
         fake = ii >= n  # only when fewer than k real candidates exist
@@ -190,12 +194,12 @@ def _pad_k(ii: Array, dd: Array, k: int, n: int, /) -> KnnOut:
         return ii[:, :k], dd[:, :k]
     extra = k - ii.shape[1]
     return (
-        jnp.concatenate([ii, jnp.full((ii.shape[0], extra), n, jnp.int32)], 1),
-        jnp.concatenate([dd, jnp.full((dd.shape[0], extra), jnp.inf, dd.dtype)], 1),
+        jnp.concat([ii, jnp.full((ii.shape[0], extra), n, jnp.int32)], axis=1),
+        jnp.concat([dd, jnp.full((dd.shape[0], extra), jnp.inf, dd.dtype)], axis=1),
     )
 
 
-class Jaxkd(AbstractNeighborSearch):
+class JaxKD(AbstractNeighborSearch):
     """The optional ``jaxkd`` package.
 
     Traceable, but pathological on data with scattered interlopers (minutes at
@@ -204,21 +208,20 @@ class Jaxkd(AbstractNeighborSearch):
 
     def __check_init__(self) -> None:
         """Fail at construction if jaxkd is missing."""
-        try:
-            import jaxkd  # noqa: F401, PLC0415
-        except ImportError:
+        if not OptDeps.JAXKD.installed:
             msg = (
-                "Jaxkd requires the jaxkd optional dependency. "
+                "JaxKD requires the jaxkd optional dependency. "
                 "Install with: uv add phasecurvefit[kdtree]"
             )
-            raise ImportError(msg) from None
+            raise ImportError(msg)
 
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
-        import jaxkd  # noqa: PLC0415
-
         q = None if queries is None else _as_float(queries)
         points = _check_finite(_as_float(points), q)
         n = points.shape[0]
+        if n == 0:  # jaxkd cannot build an empty tree
+            m = 0 if q is None else q.shape[0]
+            return jnp.zeros((m, k), jnp.int32), jnp.full((m, k), jnp.inf, points.dtype)
         ps = jax.lax.stop_gradient(points)  # jaxkd's traversal is a while_loop
         tree = jaxkd.build_tree(ps)
         if q is not None:
@@ -234,7 +237,7 @@ class Jaxkd(AbstractNeighborSearch):
         return ii, _gathered_distance(points, None, ii)
 
 
-class Scipy(AbstractNeighborSearch):
+class SciPy(AbstractNeighborSearch):
     """scipy's ``cKDTree``: fastest on CPU, but eager-only (raises when traced).
 
     ``workers`` is scipy's thread count: -1 (default) uses every core.
@@ -245,7 +248,7 @@ class Scipy(AbstractNeighborSearch):
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
         if _traced(points, queries):
             msg = (
-                "neighbors.Scipy cannot run under jax.jit/vmap/grad (it is host "
+                "neighbors.SciPy cannot run under jax.jit/vmap/grad (it is host "
                 "code). Use neighbors.BucketKDTree() to trace."
             )
             raise TypeError(msg)

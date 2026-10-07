@@ -48,7 +48,7 @@ def build_tree(points: Float[Array, "n d"], /, *, leaf_size: int = 16) -> Tree:
     n, d = points.shape
     lay = layout(n, leaf_size)
     n_pad, inf = lay.n_pad, jnp.inf
-    pp = jnp.concatenate([points, jnp.full((n_pad - n, d), inf, points.dtype)])
+    pp = jnp.concat([points, jnp.full((n_pad - n, d), inf, points.dtype)])
     ords = [jnp.argsort(pp[:, j], stable=True).astype(jnp.int32) for j in range(d)]
     lo = jnp.full((1, d), -inf, points.dtype)
     hi = jnp.full((1, d), inf, points.dtype)

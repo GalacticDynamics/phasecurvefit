@@ -87,7 +87,7 @@ machinery, see the [Algorithm guide](algorithm.md).
 The MST's k-nearest-neighbour search runs in JAX through its `neighbors`
 backend (default {class}`~phasecurvefit.neighbors.BucketKDTree`; see
 {mod}`phasecurvefit.neighbors` for the alternatives, including the faster but
-eager-only `Scipy()`). Its graph algorithms are **host-side** (NumPy/SciPy);
+eager-only `SciPy()`). Its graph algorithms are **host-side** (NumPy/SciPy);
 `order()` runs them through `jax.pure_callback` when traced, so it works under
 `jit` and `vmap`. Pure-spatial is the default:
 

@@ -63,7 +63,7 @@ def test_knn_equals_brute(n, m, d, k, frontier, seed, far):
     idx, d2 = map(np.asarray, f(jnp.asarray(p), jnp.asarray(q)))
     ref = ((q[:, None].astype(np.float64) - p[None]) ** 2).sum(-1)
     ref = np.sort(ref, 1)
-    ref = np.concatenate([ref, np.full((m, max(0, k - n)), np.inf)], 1)[:, :k]
+    ref = np.concat([ref, np.full((m, max(0, k - n)), np.inf)], axis=1)[:, :k]
     fin = np.isfinite(ref)
     np.testing.assert_array_equal(np.isfinite(d2), fin)
     np.testing.assert_allclose(d2[fin], ref[fin], rtol=1e-5, atol=1e-12)

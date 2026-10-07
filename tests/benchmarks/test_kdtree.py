@@ -52,7 +52,7 @@ def test_ours(benchmark, name, n):
 @pytest.mark.parametrize("n", SIZES)
 @pytest.mark.parametrize("name", ["stream", "blob"])
 def test_jaxkd(benchmark, name, n):
-    """Jaxkd build + query, compiled (the gate's reference)."""
+    """JaxKD build + query, compiled (the gate's reference)."""
     jaxkd = pytest.importorskip("jaxkd")
     p = jnp.asarray(_data(name, n))
     f = jax.jit(lambda x: jaxkd.query_neighbors(jaxkd.build_tree(x), x, k=K + 1))
@@ -64,6 +64,6 @@ def test_jaxkd(benchmark, name, n):
 @pytest.mark.parametrize("n", SIZES)
 @pytest.mark.parametrize("name", NAMES)
 def test_scipy(benchmark, name, n):
-    """Scipy cKDTree with every core, for reference."""
+    """SciPy cKDTree with every core, for reference."""
     p = _data(name, n)
     benchmark(lambda: cKDTree(p).query(p, k=K + 1, workers=-1))

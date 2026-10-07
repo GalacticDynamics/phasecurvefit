@@ -29,7 +29,7 @@ def brute_knn(
         return jnp.zeros((0, k), jnp.int32), jnp.zeros((0, k), points.dtype)
     qc = min(chunk, m)
     nc = -(-m // qc)
-    qp = jnp.concatenate([q, jnp.zeros((nc * qc - m, q.shape[1]), q.dtype)])
+    qp = jnp.concat([q, jnp.zeros((nc * qc - m, q.shape[1]), q.dtype)])
     ids = jnp.arange(nc * qc, dtype=jnp.int32)
 
     def one(args: tuple[Array, Array]) -> tuple[Array, Array]:
@@ -39,7 +39,7 @@ def brute_knn(
         if self_mode:
             d2 = jnp.where(jnp.arange(n)[None] == iq[:, None], jnp.inf, d2)
         if n < k:
-            d2 = jnp.concatenate([d2, jnp.full((qc, k - n), jnp.inf, d2.dtype)], 1)
+            d2 = jnp.concat([d2, jnp.full((qc, k - n), jnp.inf, d2.dtype)], axis=1)
         neg, col = jax.lax.top_k(-d2, k)
         dd = -neg
         return jnp.where(jnp.isinf(dd), n, col).astype(jnp.int32), dd
