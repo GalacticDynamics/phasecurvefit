@@ -18,7 +18,7 @@ class Layout(NamedTuple):
     leaf_valid: np.ndarray  # (n_leaves,) real points per leaf: B_eff or B_eff - 1
 
 
-def layout(n: int, leaf_size: int) -> Layout:
+def layout(n: int, leaf_size: int, /) -> Layout:
     """Spread fewer than one padding row per leaf evenly across ``2**depth`` leaves.
 
     >>> layout(100, 16)[:4]

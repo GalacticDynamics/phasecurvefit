@@ -99,6 +99,14 @@ class TestContract:
             np.testing.assert_allclose(np.asarray(got_d), np.asarray(want_d), rtol=1e-5)
             assert np.all(np.asarray(got_i) < 120)
 
+    def test_signature(self, backend):
+        """``points`` is positional-only; ``k`` may be bound by keyword (for jit)."""
+        p = jnp.asarray(np.random.default_rng(1).normal(size=(20, 2)), jnp.float32)
+        idx, _ = backend.knn(p, k=3)
+        assert idx.shape == (20, 3)
+        with pytest.raises(TypeError, match="positional"):
+            backend.knn(points=p, k=3)
+
     def test_float64(self, backend):
         """Under x64, float64 stays float64 and nothing scatters int64 into int32."""
         p = np.random.default_rng(9).normal(size=(200, 3))

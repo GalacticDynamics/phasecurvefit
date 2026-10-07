@@ -13,7 +13,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
 
 
-def _network(at: Float[Array, "W Q"], k: int) -> Float[Array, "k Q"]:
+def _network(at: Float[Array, "W Q"], k: int, /) -> Float[Array, "k Q"]:
     """Sorted k smallest of each column of ``at`` by insertion.
 
     ``t_i' = min(t_i, max(t_{i-1}, c))`` on k separate ``(Q,)`` carries, scanned
@@ -37,7 +37,7 @@ def _network(at: Float[Array, "W Q"], k: int) -> Float[Array, "k Q"]:
     return jnp.stack(t, 0)
 
 
-def _pad_width(d2: Array, k: int) -> Array:
+def _pad_width(d2: Array, k: int, /) -> Array:
     w = d2.shape[-1]
     if w >= k:
         return d2
@@ -45,13 +45,13 @@ def _pad_width(d2: Array, k: int) -> Array:
     return jnp.concatenate([d2, pad], -1)
 
 
-def kth_smallest(d2: Float[Array, "Q W"], k: int) -> Float[Array, " Q"]:
+def kth_smallest(d2: Float[Array, "Q W"], /, k: int) -> Float[Array, " Q"]:
     """Return the k-th smallest value of each row (``inf`` if a row has fewer)."""
     return _network(_pad_width(d2, k).T, k)[-1]
 
 
 def ksmallest(
-    d2: Float[Array, "Q W"], k: int
+    d2: Float[Array, "Q W"], /, k: int
 ) -> tuple[Float[Array, "Q k"], Int[Array, "Q k"]]:
     """Sorted k smallest values per row and their column indices.
 

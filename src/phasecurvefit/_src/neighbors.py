@@ -33,19 +33,19 @@ def _traced(*xs: object) -> bool:
     return any(isinstance(x, jax.core.Tracer) for x in xs)
 
 
-def _as_float(x: object) -> Array:
+def _as_float(x: object, /) -> Array:
     """Promote integer / low-precision inputs to at least float32."""
     x = jnp.asarray(x)
     return x.astype(jnp.promote_types(x.dtype, jnp.float32))
 
 
-def _safe_sqrt(d2: Array) -> Array:
+def _safe_sqrt(d2: Array, /) -> Array:
     """Euclidean distance with gradient 0 (not NaN) at coincident points."""
     pos = d2 > 0
     return jnp.where(pos, jnp.sqrt(jnp.where(pos, d2, 1.0)), 0.0)
 
 
-def _gathered_distance(points: Array, queries: Array | None, ii: Array) -> Array:
+def _gathered_distance(points: Array, queries: Array | None, ii: Array, /) -> Array:
     """Euclidean distance to each selected neighbour, recomputed from coordinates.
 
     The tree selects indices on stop-gradiented inputs (its overflow tiers use
@@ -60,14 +60,14 @@ def _gathered_distance(points: Array, queries: Array | None, ii: Array) -> Array
     return jnp.where(ii >= n, jnp.inf, _safe_sqrt(jnp.sum(diff * diff, -1)))
 
 
-def _check_finite(points: Array, queries: Array | None) -> Array:
+def _check_finite(points: Array, queries: Array | None, /) -> Array:
     bad = ~jnp.all(jnp.isfinite(points))
     if queries is not None:
         bad = bad | ~jnp.all(jnp.isfinite(queries))
     return eqx.error_if(points, bad, "kNN inputs must be finite (no NaN or inf).")
 
 
-def _bucket(n: int) -> int:
+def _bucket(n: int, /) -> int:
     """Smallest value in {2**j, 3 * 2**(j-1)} that is >= n (and >= 1)."""
     if n <= 1:
         return 1
@@ -75,7 +75,7 @@ def _bucket(n: int) -> int:
     return p * 3 // 4 if p >= 4 and p * 3 // 4 >= n else p
 
 
-def far_rows(points: Float[Array, "n d"], count: int) -> Float[Array, "count d"]:
+def far_rows(points: Float[Array, "n d"], count: int, /) -> Float[Array, "count d"]:
     """``count`` distinct rows farther from every row of ``points`` than its diameter.
 
     Padding a search with these never changes the k nearest real neighbours of
@@ -103,6 +103,7 @@ class AbstractNeighborSearch(eqx.Module):
     def knn(
         self,
         points: Float[Array, "n d"],
+        /,
         k: int,
         *,
         queries: Float[Array, "m d"] | None = None,
@@ -111,7 +112,7 @@ class AbstractNeighborSearch(eqx.Module):
 
 
 def _knn_core(
-    points: Array, queries: Array | None, k: int, leaf_size: int, frontier: int
+    points: Array, queries: Array | None, k: int, leaf_size: int, frontier: int, /
 ) -> KnnOut:
     if queries is None:
         return _kd.all_knn(points, k, leaf_size=leaf_size, frontier=frontier)
@@ -142,7 +143,7 @@ class BucketKDTree(AbstractNeighborSearch):
             )
             raise ValueError(msg)
 
-    def knn(self, points: Array, k: int, *, queries: Array | None = None) -> KnnOut:
+    def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
         points = _as_float(points)
         queries = None if queries is None else _as_float(queries)
         n = points.shape[0]
@@ -177,14 +178,14 @@ class BruteForce(AbstractNeighborSearch):
 
     chunk: int = eqx.field(static=True, default=1024)
 
-    def knn(self, points: Array, k: int, *, queries: Array | None = None) -> KnnOut:
+    def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
         q = None if queries is None else _as_float(queries)
         points = _check_finite(_as_float(points), q)
         ii, d2 = _kd.brute_knn(points, k, queries=q, chunk=self.chunk)
         return ii, _safe_sqrt(d2)
 
 
-def _pad_k(ii: Array, dd: Array, k: int, n: int) -> KnnOut:
+def _pad_k(ii: Array, dd: Array, k: int, n: int, /) -> KnnOut:
     if ii.shape[1] >= k:
         return ii[:, :k], dd[:, :k]
     extra = k - ii.shape[1]
@@ -212,7 +213,7 @@ class Jaxkd(AbstractNeighborSearch):
             )
             raise ImportError(msg) from None
 
-    def knn(self, points: Array, k: int, *, queries: Array | None = None) -> KnnOut:
+    def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
         import jaxkd  # noqa: PLC0415
 
         q = None if queries is None else _as_float(queries)
@@ -241,7 +242,7 @@ class Scipy(AbstractNeighborSearch):
 
     workers: int = eqx.field(static=True, default=-1)
 
-    def knn(self, points: Array, k: int, *, queries: Array | None = None) -> KnnOut:
+    def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
         if _traced(points, queries):
             msg = (
                 "neighbors.Scipy cannot run under jax.jit/vmap/grad (it is host "

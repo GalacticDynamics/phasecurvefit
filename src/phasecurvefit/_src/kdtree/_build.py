@@ -43,7 +43,7 @@ class Tree(eqx.Module):
         return 2**self.depth
 
 
-def build_tree(points: Float[Array, "n d"], *, leaf_size: int = 16) -> Tree:
+def build_tree(points: Float[Array, "n d"], /, *, leaf_size: int = 16) -> Tree:
     """Build a tree over ``points`` (``n >= 0`` rows, any dimension ``d >= 1``)."""
     n, d = points.shape
     lay = layout(n, leaf_size)

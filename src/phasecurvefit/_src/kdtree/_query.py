@@ -37,12 +37,12 @@ BRUTE_CHUNK = 128
 QUERY_CHUNK = 16384
 
 
-def _box_d2(q: Array, lo: Array, hi: Array) -> Array:
+def _box_d2(q: Array, lo: Array, hi: Array, /) -> Array:
     gap = jnp.maximum(0.0, jnp.maximum(lo - q, q - hi))
     return jnp.sum(gap * gap, -1)
 
 
-def _descend(tree: Tree, xq: Array, r2: Array, cap: int) -> tuple[Array, Array]:
+def _descend(tree: Tree, xq: Array, r2: Array, cap: int, /) -> tuple[Array, Array]:
     """Leaves whose cell is within ``r2`` of each query, at most ``cap`` of them.
 
     Returns ``(front (Q, cap) leaf ids with sentinel n_leaves, overflow (Q,))``.
@@ -73,7 +73,7 @@ def _descend(tree: Tree, xq: Array, r2: Array, cap: int) -> tuple[Array, Array]:
 
 
 def _merge(
-    tree: Tree, xq: Array, qself: Array, cand: Array, k: int, *, top_k: bool
+    tree: Tree, xq: Array, qself: Array, cand: Array, k: int, /, *, top_k: bool
 ) -> tuple[Array, Array]:
     """K nearest valid points among the candidate leaves -> (sq_dist, tree position)."""
     nq, m = cand.shape
@@ -99,7 +99,7 @@ def _merge(
     return dd, ii
 
 
-def _bound(tree: Tree, xq: Array, qself: Array, qleaf: Array, k: int) -> Array:
+def _bound(tree: Tree, xq: Array, qself: Array, qleaf: Array, k: int, /) -> Array:
     """k-th squared distance to the valid points of each query's leaf block."""
     bb = min(BLOCK_LEAVES, tree.n_leaves)
     while bb < tree.n_leaves and bb * max(tree.leaf_size - 1, 0) < k + 1:
@@ -126,6 +126,7 @@ def _finish(
     r2: Array,
     chunk: int,
     handler: Handler,
+    /,
 ) -> tuple[Array, Array, Array, Array]:
     """Rerun ``handler`` on the queries flagged in ``over`` (compacted, chunked)."""
     nq = xq.shape[0]
@@ -169,6 +170,7 @@ def _query(
     qleaf: Array,
     k: int,
     frontier: int,
+    /,
 ) -> tuple[Array, Array]:
     """Exact kNN for queries ``xq`` -> ``(sq_dist (Q, k), tree position (Q, k))``."""
     nq, d = xq.shape
@@ -232,7 +234,7 @@ def _query(
     return dd, ii
 
 
-def locate_leaves(tree: Tree, queries: Float[Array, "m d"]) -> Int[Array, " m"]:
+def locate_leaves(tree: Tree, queries: Float[Array, "m d"], /) -> Int[Array, " m"]:
     """Return the leaf each query falls in, by descending the split planes."""
     node = jnp.zeros(queries.shape[0], jnp.int32)
     rows = jnp.arange(queries.shape[0])
@@ -243,12 +245,12 @@ def locate_leaves(tree: Tree, queries: Float[Array, "m d"]) -> Int[Array, " m"]:
     return node
 
 
-def _to_original(tree: Tree, ii: Array) -> Array:
+def _to_original(tree: Tree, ii: Array, /) -> Array:
     return tree.perm.at[ii].get(mode="fill", fill_value=tree.n)
 
 
 def all_knn(
-    points: Float[Array, "n d"], k: int, *, leaf_size: int = 16, frontier: int = 16
+    points: Float[Array, "n d"], /, k: int, *, leaf_size: int = 16, frontier: int = 16
 ) -> tuple[Int[Array, "n k"], Float[Array, "n k"]]:
     """Exact k nearest neighbours of every point among the others.
 
@@ -274,7 +276,7 @@ def all_knn(
 
 
 def knn(
-    tree: Tree, queries: Float[Array, "m d"], k: int, *, frontier: int = 16
+    tree: Tree, queries: Float[Array, "m d"], /, k: int, *, frontier: int = 16
 ) -> tuple[Int[Array, "m k"], Float[Array, "m k"]]:
     """Exact k nearest tree points to each query (no self-exclusion).
 

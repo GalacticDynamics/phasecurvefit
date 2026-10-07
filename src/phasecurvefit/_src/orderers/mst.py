@@ -268,7 +268,7 @@ def _disconnected_message(
     )
 
 
-def _diameter_path(tree: csr_matrix, nodes: np.ndarray) -> np.ndarray:
+def _diameter_path(tree: csr_matrix, nodes: np.ndarray, /) -> np.ndarray:
     """Tip-to-tip backbone (original indices) of the tree restricted to ``nodes``."""
     sub = tree[nodes][:, nodes]
     # graph diameter via double shortest-path: farthest node a, then farthest b
@@ -289,6 +289,7 @@ def _host_graph(
     P: np.ndarray,
     V: np.ndarray,
     nbr: np.ndarray,
+    /,
     *,
     k: int,
     jump_cap: float,
@@ -366,7 +367,7 @@ def _host_graph(
     return full, np.int32(bb.size), in_comp, np.bool_(flip)
 
 
-def _order_keys(s, in_comp, flip, n, xp):  # noqa: ANN001, ANN202
+def _order_keys(s, in_comp, flip, n, xp, /):  # noqa: ANN001, ANN202
     """Sort keys (primary, secondary): (s, idx), or (-s, -idx) when flipped.
 
     Unvisited points sort last. This reproduces the original arc-length argsort
@@ -378,14 +379,14 @@ def _order_keys(s, in_comp, flip, n, xp):  # noqa: ANN001, ANN202
     return primary, secondary
 
 
-def _orient_backbone(full, blen, flip, xp):  # noqa: ANN001, ANN202
+def _orient_backbone(full, blen, flip, xp, /):  # noqa: ANN001, ANN202
     """Reverse the valid prefix of the padded backbone when ``flip``."""
     i = xp.arange(full.shape[0])
     rev = xp.where(i < blen, blen - 1 - i, 0)
     return xp.where(flip, full[rev], full)
 
 
-def _finish_numpy(P, full, blen, in_comp, flip, workers):  # noqa: ANN001, ANN202
+def _finish_numpy(P, full, blen, in_comp, flip, workers, /):  # noqa: ANN001, ANN202
     """Stage (c) in NumPy (the eager scipy path): projection and ordering."""
     n = P.shape[0]
     cb = P[full[:blen]]
@@ -398,7 +399,7 @@ def _finish_numpy(P, full, blen, in_comp, flip, workers):  # noqa: ANN001, ANN20
     return idx, _orient_backbone(full, blen, flip, np).astype(np.int32)
 
 
-def _finish_jax(P, full, blen, in_comp, flip, neighbors):  # noqa: ANN001, ANN202
+def _finish_jax(P, full, blen, in_comp, flip, neighbors, /):  # noqa: ANN001, ANN202
     """Stage (c) in JAX: arc-length projection onto the backbone, then ordering.
 
     The padded backbone tail is replaced by far rows, which can never be any

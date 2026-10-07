@@ -9,6 +9,7 @@ from jaxtyping import Array, Float, Int
 
 def brute_knn(
     points: Float[Array, "n d"],
+    /,
     k: int,
     *,
     queries: Float[Array, "m d"] | None = None,
