@@ -31,7 +31,11 @@ def _data(name, n):
 
 
 NAMES = ["stream", "blob", "interlopers"]
-SIZES = [pytest.param(10_000, id="n1e4"), pytest.param(100_000, id="n1e5")]
+SIZES = [
+    pytest.param(1_000, id="n1e3"),
+    pytest.param(10_000, id="n1e4"),
+    pytest.param(100_000, id="n1e5"),
+]
 
 
 @pytest.mark.parametrize("n", SIZES)
