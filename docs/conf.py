@@ -58,7 +58,7 @@ python_use_unqualified_type_names = True
 
 # Locally, execute everything. On ReadTheDocs, execute the MyST markdown guides
 # (cheap, and their figures are not stored) but not the tutorial notebooks.
-_ON_RTD = bool(os.environ.get("READTHEDOCS"))
+_ON_RTD = os.environ.get("READTHEDOCS") == "True"  # the value RTD sets
 nb_execution_mode = "auto" if _ON_RTD else "force"
 nb_execution_excludepatterns = ["tutorials/*"] if _ON_RTD else []
 nb_execution_timeout = -1  # tutorials train models; no per-cell timeout

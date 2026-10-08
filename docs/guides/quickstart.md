@@ -334,17 +334,21 @@ The algorithm is fully compatible with JAX transformations:
 ### JIT Compilation
 
 ```{code-cell} python
+from functools import partial
+
 from jax import jit
 
 
-@jit
-def order_stream(pos, vel):
+# start_idx is a static field of the orderer, so it is a static argument here
+# (each new value recompiles).
+@partial(jit, static_argnames="start_idx")
+def order_stream(pos, vel, start_idx):
     return pcf.order(
-        pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=1.0)
+        pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=start_idx, metric_scale=1.0)
     )
 
 
-result = order_stream(position, velocity)
+result = order_stream(position, velocity, start_idx=start)
 ```
 
 ### Vectorization
