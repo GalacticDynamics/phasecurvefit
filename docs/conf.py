@@ -40,8 +40,7 @@ language = "en"
 # -- General configuration ---------------------------------------------------
 
 extensions = [
-    "myst_parser",  # General MyST markdown support
-    "nbsphinx",  # Jupyter notebook support
+    "myst_nb",  # MyST markdown + Jupyter notebook support
     "sphinx_design",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
@@ -57,11 +56,13 @@ extensions = [
 
 python_use_unqualified_type_names = True
 
-# Use a known lexer for notebook code cells to avoid Pygments warnings.
-nbsphinx_codecell_lexer = "python"
-# On ReadTheDocs, don't execute notebooks (no kernel available)
-# Locally, execute them to update outputs
-nbsphinx_execute = "never" if os.environ.get("READTHEDOCS") else "always"
+# Locally, execute everything. On ReadTheDocs, execute the MyST markdown guides
+# (cheap, and their figures are not stored) but not the tutorial notebooks.
+_ON_RTD = os.environ.get("READTHEDOCS") == "True"  # the value RTD sets
+nb_execution_mode = "auto" if _ON_RTD else "force"
+nb_execution_excludepatterns = ["tutorials/*"] if _ON_RTD else []
+nb_execution_timeout = -1  # tutorials train models; no per-cell timeout
+nb_execution_raise_on_error = True
 pygments_lexers = {"ipython3": PythonLexer()}
 
 exclude_patterns = [
@@ -74,7 +75,8 @@ exclude_patterns = [
 ]
 
 source_suffix = {
-    ".md": "markdown",
+    ".md": "myst-nb",
+    ".ipynb": "myst-nb",
     ".rst": "restructuredtext",
 }
 
