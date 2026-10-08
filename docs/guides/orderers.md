@@ -69,7 +69,8 @@ The hyperparameters (carried by the orderer object) are:
   the default {class}`~phasecurvefit.metrics.AlignedMomentumDistanceMetric`).
 - **`config`** — a {class}`~phasecurvefit.WalkConfig` composing the distance
   **metric** with the neighbor-query **strategy** (brute force, or
-  {class}`~phasecurvefit.strats.KDTree` for large datasets). See the
+  {class}`~phasecurvefit.strats.KDTree` to restrict candidates to spatial
+  neighbors). See the
   [Metrics guide](metrics.md).
 - **`start_idx`** — index of the starting tracer.
 - **`direction`** — `"forward"` follows the velocity field, `"backward"` traces
