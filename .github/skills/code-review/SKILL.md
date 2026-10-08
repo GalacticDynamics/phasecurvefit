@@ -92,7 +92,7 @@ ones. Every comment should name the concrete input that breaks and what happens.
 ## Project rules the linters don't catch
 
 - `__all__` is a **tuple** and is defined **before** imports (only
-  `from __future__` may precede it — and that import is banned, see next).
+  `from __future__` imports may precede it).
 - Never `from __future__ import annotations` (breaks plum and runtime type
   checking).
 - Type hints everywhere (`jaxtyping` for arrays). Tests run with beartype
