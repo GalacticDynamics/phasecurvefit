@@ -18,8 +18,9 @@ ones. Every comment should name the concrete input that breaks and what happens.
 ## How to review
 
 1. Read the whole changed function, not just the diff hunk. Trace the change to
-   its callers (`order()`, the orderers in `_src/orderers/`, `walk_local_flow`,
-   the `nn` trainers) and to any `_interop/interop_unxt.py` dispatch for it.
+   its callers (`order()`, the orderers in `_src/orderers/`, `ChainOrderer`,
+   `default_pipeline`, `fit_track`, the `nn` trainers) and to any
+   `_interop/interop_unxt.py` dispatch for it.
 2. **A defect is a sample of a class.** When you find a bug, search the same
    module (and siblings) for the same shape — the same risky call, the same
    index arithmetic — and flag every instance, not just the first. In this repo
@@ -61,10 +62,17 @@ ones. Every comment should name the concrete input that breaks and what happens.
 
 ### API and dispatch
 
-- Ordering goes through `pcf.order(pos, vel, orderer)`; `walk_local_flow` is
-  deprecated (removal in v0.4). New features should target `order()` / orderers,
-  not extend the deprecated path. Deprecated paths must still emit their
-  `DeprecationWarning` and keep working.
+- Ordering goes through `pcf.order(pos, vel, orderer)`; `walk_local_flow` was
+  removed in v0.4 — flag any reintroduction. With no orderer, `order()` runs
+  `default_pipeline` (`MSTOrderer() | SOMOrderer()`); changes to either stage
+  change the default for every user.
+- Orderers composed with `|` (`ChainOrderer`) receive the previous stage's
+  result as `init`. A new orderer must accept `init` to sit after another stage,
+  and must not silently discard it. `ChainOrderer.order` stays a plain method,
+  not a plum dispatch.
+- Never use a `StateMetadata()` (or other mutable object) as a parameter default
+  — it is shared across calls. Use `None` and construct in the body;
+  `tests/static/` sweeps the source for this.
 - New options must default to an exact no-op so existing behaviour is unchanged
   (e.g. `edge_clip_sigma=None`).
 - plum dispatch: adding a method — is there already one for those types? Do
@@ -91,13 +99,14 @@ ones. Every comment should name the concrete input that breaks and what happens.
   enabled, so wrong annotations become runtime failures.
 - Phase-space naming: `q` position, `p` velocity/momentum, `w` full point.
 - Tests: one condition per `assert` (no `assert a and b`); test `jit`/`vmap`
-  /`grad` where applicable; Quantity paths covered in `tests/*unxt*` /
-  `tests/test_quantity_support.py`. Warnings are errors in pytest, so new
-  warnings need handling.
+  /`grad` where applicable; Quantity paths covered in `tests/unit/*unxt*` /
+  `tests/unit/test_quantity_support.py`. New tests go in the matching
+  `tests/unit/`, `integration/`, `smoke/` or `static/` folder. Warnings are
+  errors in pytest, so new warnings need handling.
 - Docstring and `docs/` examples are executed by Sybil — check they would run
   and that their printed output matches.
 - New user-facing behaviour needs a docs update in `docs/guides/`; API breaks
-  need an entry in `docs/migration.md`.
+  need an entry in the matching `docs/migration/vX-to-vY.md`.
 
 ## Don't comment on
 

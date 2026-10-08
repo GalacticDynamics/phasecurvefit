@@ -8,6 +8,7 @@ import pytest
 from jaxtyping import PRNGKeyArray
 
 import phasecurvefit as pcf
+from phasecurvefit._src.nn.autoencoder import compute_decoder_loss
 
 
 class TestOrderingNet:
@@ -282,7 +283,7 @@ class TestTrainAutoencoder:
         pos = {"x": t, "y": 0.5 * t}
         vel = {"x": jnp.ones(n_points), "y": 0.5 * jnp.ones(n_points)}
 
-        return pcf.order(pos, vel)
+        return pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
 
     def test_loss_finite_when_encoder_claims_no_members(self, rng_key: PRNGKeyArray):
         """The joint loss stays finite when no star clears `member_threshold`.
@@ -293,8 +294,6 @@ class TestTrainAutoencoder:
         every star in the batch. `masked_mean` returns NaN on an empty mask, so
         without a guard the epoch loss goes NaN. Regression test for that.
         """
-        from phasecurvefit._src.nn.autoencoder import compute_decoder_loss
-
         key1, key2 = jr.split(rng_key)
         n, d = 8, 2
 
@@ -680,7 +679,7 @@ class TestEdgeCases:
         pos = {"x": jnp.array([0.0, 1.0]), "y": jnp.array([0.0, 1.0])}
         vel = {"x": jnp.array([1.0, 1.0]), "y": jnp.array([1.0, 1.0])}
 
-        walkresult = pcf.order(pos, vel)
+        walkresult = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
 
         normalizer = pcf.nn.StandardScalerNormalizer(
             walkresult.positions, walkresult.velocities
@@ -708,7 +707,7 @@ class TestEdgeCases:
         pos = {"x": t, "y": jnp.zeros(n_points)}
         vel = {"x": jnp.ones(n_points), "y": jnp.zeros(n_points)}
 
-        walkresult = pcf.order(pos, vel)
+        walkresult = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
 
         # All points should be ordered
         assert len(walkresult.indices) == n_points

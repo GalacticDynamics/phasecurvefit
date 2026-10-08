@@ -9,7 +9,7 @@ from .strategies import AbstractQueryStrategy, BruteForce
 
 
 class WalkConfig(eqx.Module):
-    """Configuration for neighbor queries in walk_local_flow.
+    """Configuration for neighbor queries in the local-flow walk.
 
     Composes a distance metric with a query strategy. This is the primary
     way to configure how the algorithm selects the next point.
@@ -28,7 +28,7 @@ class WalkConfig(eqx.Module):
     >>> import jax.numpy as jnp
     >>> import phasecurvefit as pcf
 
-    Default configuration (brute-force with full phase-space metric):
+    Default configuration (brute-force with aligned-momentum metric):
 
     >>> config = pcf.WalkConfig()
     >>> pos = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}

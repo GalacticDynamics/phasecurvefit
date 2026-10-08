@@ -27,7 +27,7 @@ class TestAutoencoderTrainingBenchmarks:
         )
 
         assert result is not None
-        # Losses from: encoder (10) + decoder (100 default) + both (10) = 120
+        # Expect 120 loss entries for this training configuration.
         assert len(losses) == 120
 
     def test_full_autoencoder_training_medium(
@@ -35,7 +35,7 @@ class TestAutoencoderTrainingBenchmarks:
     ):
         """Benchmark full autoencoder training on 100-point stream."""
         config = pcf.nn.TrainingConfig(
-            n_epochs_encoder=20, n_epochs_both=20, show_pbar=False
+            n_epochs_encoder=20, n_epochs_decoder=100, n_epochs_both=20, show_pbar=False
         )
         result, _, losses = benchmark(
             pcf.nn.train_autoencoder,
@@ -46,7 +46,7 @@ class TestAutoencoderTrainingBenchmarks:
         )
 
         assert result is not None
-        # Losses from: encoder (20) + decoder (100 default) + both (20) = 140
+        # Losses from: encoder (20) + decoder (100) + both (20) = 140
         assert len(losses) == 140
 
     def test_full_autoencoder_training_high_epochs(
@@ -65,7 +65,7 @@ class TestAutoencoderTrainingBenchmarks:
         )
 
         assert result is not None
-        # Losses from: encoder (50) + decoder (100 default) + both (50) = 200
+        # Expected losses: encoder (50) + decoder (100, default) + both (50) = 200
         assert len(losses) == 200
 
     def test_encoder_only_training_simple(
@@ -138,5 +138,5 @@ class TestAutoencoderTrainingBenchmarks:
         model = result.model
         if isinstance(model, pcf.nn.PathAutoencoder):
             assert getattr(model, "decoder", None) is not None
-        # encoder (5) + decoder (100 default) + both (5) = 110 total loss values
+        # encoder (5) + decoder (default epochs) + both (5) = 110 total loss values
         assert len(losses) == 110

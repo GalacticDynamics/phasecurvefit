@@ -52,7 +52,7 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
-        result = pcf.order(q, p)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer())
 
         # Should follow the line in order
         assert jnp.array_equal(result.indices, jnp.array([0, 1, 2, 3, 4]))
@@ -76,7 +76,7 @@ class TestNearestNeighborsWithMomentum:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Forward walk from leftmost point should go toward higher indices
-        result_forward = pcf.order(q, p)
+        result_forward = pcf.order(q, p, pcf.orderers.LocalFlowOrderer())
         # First step should be to index 1
         assert result_forward.indices[1] == 1
 
@@ -232,7 +232,7 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([0.0, 1.0, 2.0, 3.0]), "y": jnp.array([0.0, 1.0, 2.0, 3.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0]), "y": jnp.array([1.0, 1.0, 1.0, 1.0])}
 
-        result = pcf.order(q, p)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer())
 
         assert jnp.array_equal(result.indices, jnp.array([0, 1, 2, 3]))
 
@@ -350,7 +350,7 @@ class TestNearestNeighborsWithMomentum:
         q = {"x": jnp.array([1.0])}
         p = {"x": jnp.array([1.0])}
 
-        result = pcf.order(q, p)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer())
 
         assert jnp.array_equal(result.indices, jnp.array([0]))
 
@@ -361,7 +361,7 @@ class TestNearestNeighborsWithMomentum:
         # Tangent velocity
         p = {"x": -jnp.sin(t), "y": jnp.cos(t), "z": jnp.ones_like(t) / (4 * jnp.pi)}
 
-        result = pcf.order(q, p)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer())
 
         # Should roughly follow the helix order
         # Check that we visit all points
@@ -410,7 +410,7 @@ class TestAlgorithmIntegration:
         q = {"x": base_x + noise_x, "y": base_y + noise_y}
         p = {"x": jnp.ones(n_points), "y": jnp.zeros(n_points)}
 
-        result = pcf.order(q, p)
+        result = pcf.order(q, p, pcf.orderers.LocalFlowOrderer())
 
         # Should visit all points
         assert result.all_visited
@@ -458,7 +458,7 @@ class TestAlgorithmIntegration:
             "z": jnp.array([1.0, 1.0, 1.0]),
         }
 
-        result = pcf.order(pos, vel)
+        result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
 
         assert result.all_visited
         assert jnp.array_equal(result.indices, jnp.array([0, 1, 2]))
@@ -529,7 +529,7 @@ class TestCombineFlowWalks:
         q = {"x": jnp.array([0.0, 1.0, 2.0]), "y": jnp.array([0.0, 0.5, 1.0])}
         p = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.1, 0.1, 0.1])}
 
-        res_fwd = pcf.order(q, p)
+        res_fwd = pcf.order(q, p, pcf.orderers.LocalFlowOrderer())
         res_bwd = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(direction="backward"))
         res = pcf.combine_results(res_fwd, res_bwd)
 
@@ -591,7 +591,7 @@ class TestCombineFlowWalks:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         # Combine from index 0
-        res_fwd_0 = pcf.order(q, p)
+        res_fwd_0 = pcf.order(q, p, pcf.orderers.LocalFlowOrderer())
         res_bwd_0 = pcf.order(q, p, pcf.orderers.LocalFlowOrderer(direction="backward"))
         res_0 = pcf.combine_results(res_fwd_0, res_bwd_0)
 
@@ -665,9 +665,37 @@ class TestCombineFlowWalks:
         p2 = {"x": jnp.array([1.0, 1.0, 1.0])}
 
         # Create results with different positions
-        res1 = pcf.order(q1, p1)
+        res1 = pcf.order(q1, p1, pcf.orderers.LocalFlowOrderer())
         res2 = pcf.order(q2, p2, pcf.orderers.LocalFlowOrderer(direction="backward"))
 
         # Should raise an error when combining
         with pytest.raises((eqx.EquinoxRuntimeError, ValueError)):
             pcf.combine_results(res1, res2)
+
+
+class TestStateMetadataIsADict:
+    """``StateMetadata`` offers dict-like access, so it must convert like one.
+
+    It has ``__getitem__``, ``__contains__``, ``get`` and ``__iter__`` but had
+    no ``keys()``, so ``dict()`` silently took the iterable-of-pairs path over
+    the *keys* instead of the mapping path.
+    """
+
+    def test_dict_round_trips(self):
+        """``dict(metadata)`` returns the keys and values it was built with."""
+        md = pcf.StateMetadata(usys="SI", note="hello")
+        assert dict(md) == {"usys": "SI", "note": "hello"}
+
+    def test_double_star_unpacking_round_trips(self):
+        """``StateMetadata(**md)`` is how the interop dispatch carries keys."""
+        md = pcf.StateMetadata(usys="SI", note="hello")
+        assert dict(pcf.StateMetadata(**md)) == {"usys": "SI", "note": "hello"}
+
+    def test_a_two_character_key_is_not_silently_shredded(self):
+        """The quiet case, and the reason a crash test alone is not enough.
+
+        Keys of length != 2 raised a confusing ValueError, but a two-character
+        key unpacked into its own characters: ``StateMetadata(ab=1)`` became
+        ``{"a": "b"}`` -- wrong data, no error, value discarded entirely.
+        """
+        assert dict(pcf.StateMetadata(ab=1)) == {"ab": 1}

@@ -6,10 +6,19 @@ Complete API documentation for phasecurvefit.
 .. currentmodule:: phasecurvefit
 ```
 
-## Main Function
+## Main Functions
+
+`order` is the primary entry point. With no orderer it runs `default_pipeline`, an
+MST backbone refined by a SOM; `fit_track` goes on to fit the autoencoder.
 
 ```{eval-rst}
-.. autofunction:: walk_local_flow
+.. autofunction:: order
+   :no-index:
+
+.. autofunction:: phasecurvefit.orderers.default_pipeline
+   :no-index:
+
+.. autofunction:: fit_track
    :no-index:
 ```
 
@@ -119,7 +128,7 @@ Low-level functions for phase-space operations. Available in the `phasecurvefit.
 
 ## Autoencoder Module
 
-Neural network for interpolating skipped tracers. See [Autoencoder Guide](../guides/autoencoder.md) for details.
+Neural network for interpolating skipped tracers. See [Autoencoder Guide](../guides/nn.md) for details.
 
 ### Classes
 
@@ -185,6 +194,43 @@ Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
    :no-index:
 
 .. autofunction:: phasecurvefit.nn.uniform_background_density
+   :no-index:
+```
+
+## SOM Module
+
+Self-Organizing Map ordering, after Starkman et al. (2023). See
+{doc}`/guides/som`.
+
+```{eval-rst}
+.. autoclass:: phasecurvefit.orderers.SOMOrderer
+   :no-index:
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.orderers.ChainOrderer
+   :no-index:
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.som.SOM1D
+   :no-index:
+   :members: make, fit, backbone, chord, n_prototypes
+   :show-inheritance:
+
+.. autofunction:: phasecurvefit.som.init_prototypes
+   :no-index:
+
+.. autofunction:: phasecurvefit.som.fit
+   :no-index:
+
+.. autofunction:: phasecurvefit.som.densify
+   :no-index:
+
+.. autofunction:: phasecurvefit.som.chord
+   :no-index:
+
+.. autofunction:: phasecurvefit.som.bootstrap_weights
    :no-index:
 ```
 

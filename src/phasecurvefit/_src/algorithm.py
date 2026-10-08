@@ -24,12 +24,10 @@ Array([0, 1, 2, 3], dtype=int32)
 __all__: tuple[str, ...] = (
     "WalkLocalFlowResult",
     "StateMetadata",
-    "walk_local_flow",
     "combine_results",
 )
 
-import warnings
-from collections.abc import Iterator, Set
+from collections.abc import Iterator, KeysView, Set
 from typing import Literal, TypeAlias
 
 import equinox as eqx
@@ -52,7 +50,7 @@ vec_euclidean_distance = jax.jit(jax.vmap(euclidean_distance, in_axes=(None, 0))
 
 
 class StateMetadata(quax.Value):
-    """Metadata container for walk_local_flow state.
+    """Metadata container for the local-flow walk's state.
 
     This holds optional context like unit systems that need to be passed
     through the algorithm state without participating in computation.
@@ -102,8 +100,20 @@ class StateMetadata(quax.Value):
     def __iter__(self) -> Iterator:
         return iter(self._data)
 
-    @staticmethod
-    def aval() -> jax.core.ShapedArray:
+    def keys(self) -> KeysView[str]:
+        """Return the metadata keys.
+
+        Required for ``dict(metadata)`` and ``**metadata`` to work. Without
+        it neither raises a missing-method error: ``dict`` falls back to the
+        iterable-of-pairs protocol, iterates the *keys*, and tries to unpack
+        each one as a 2-element pair. A key of any length but two raises an
+        opaque "dictionary update sequence element #0 has length 4", and a
+        two-character key silently unpacks into its own characters --
+        ``StateMetadata(ab=1)`` became ``{"a": "b"}``.
+        """
+        return self._data.keys()  # pylint: disable=no-member
+
+    def aval(self) -> jax.core.ShapedArray:
         """Return a placeholder abstract value so JAX tracing is satisfied."""
         return jax.core.ShapedArray((), jnp.dtype(bool))
 
@@ -176,7 +186,7 @@ class WalkLocalFlowResult(OrderingResult):
     ...     "y": jnp.sin(jnp.linspace(0, 2 * 3.14159, 20)),
     ... }
     >>> vel = {"x": jnp.ones(20), "y": jnp.cos(jnp.linspace(0, 2 * 3.14159, 20))}
-    >>> result = pcf.order(pos, vel)
+    >>> result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
     >>> result.indices
     Array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16,
            17, 18, 19], dtype=int32)
@@ -279,13 +289,13 @@ def _local_flow_walk(
     terminate_indices: Set[int] | None = None,
     n_max: int | None = None,
     config: WalkConfig = WalkConfig(),  # noqa: B008
-    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    metadata: StateMetadata | None = None,
     direction: Direction = "forward",
 ) -> WalkLocalFlowResult:
     r"""Find an ordered path through phase-space using the local flow.
 
-    The implementation behind `LocalFlowOrderer` and the (deprecated) public
-    `walk_local_flow`. Prefer ``pcf.order(positions, velocities)`` at call sites.
+    The implementation behind `LocalFlowOrderer`. Call sites should use
+    ``pcf.order(positions, velocities, pcf.orderers.LocalFlowOrderer())``.
 
     Parameters
     ----------
@@ -370,6 +380,13 @@ def _local_flow_walk(
     Array([4, 3, 2, 1, 0], dtype=int32)
 
     """
+    # ``None`` rather than a shared ``StateMetadata()``: the default would be
+    # a single instance created at definition time. Its *attributes* are
+    # frozen -- the declared base is ``quax.Value``, which subclasses
+    # ``equinox.Module`` -- but ``_data`` is an ordinary dict, so a mutation
+    # reaching through that attribute would leak into every later call.
+    metadata = StateMetadata() if metadata is None else metadata
+
     if direction == "both":
         kwargs = {
             "start_idx": start_idx,
@@ -390,10 +407,16 @@ def _local_flow_walk(
     key0 = zeroth(xs)
     n_obs = jnp.shape(xs[key0])[0]
 
-    # Validate start_idx - use plain Python check if not traced
-    if start_idx < 0 or start_idx >= n_obs:
-        msg = f"start_idx {start_idx} out of bounds for data with {n_obs} observations."
-        raise ValueError(msg)
+    # Validate start_idx. A concrete index is checked in Python so the error
+    # arrives immediately; a traced one -- which is what a chained orderer
+    # supplies under `jit` -- is checked on device instead, since `if` on a
+    # tracer raises before it can report anything useful.
+    msg = f"start_idx {start_idx} out of bounds for data with {n_obs} observations."
+    if isinstance(start_idx, int):
+        if start_idx < 0 or start_idx >= n_obs:
+            raise ValueError(msg)
+    else:
+        start_idx = eqx.error_if(start_idx, (start_idx < 0) | (start_idx >= n_obs), msg)
 
     # Set n_max to n_obs if not provided
     n_max = n_obs if n_max is None else n_max
@@ -444,7 +467,7 @@ def _local_flow_walk(
             jnp.logical_and(step < n_max, jnp.logical_not(stop)), should_not_terminate
         )
 
-    # NOTE: body_fn stays un-jitted; when walk_local_flow is wrapped in jax.jit,
+    # NOTE: body_fn stays un-jitted; when the walk is wrapped in jax.jit,
     # equinox.internal.while_loop traces this body once per iteration, so a
     # local jit would be redundant. The bounded while_loop is scan-based and
     # more efficient.
@@ -502,7 +525,7 @@ def _local_flow_walk(
         return (new_path, new_unvisited, new_cur_idx, new_step, new_stop, metadata)
 
     # Use custom bounded_while_loop for efficient scan-based implementation that
-    # skips iterations once condition is met.  The parent walk_local_flow
+    # skips iterations once condition is met.  The parent walk
     # wrapper handles quaxification, so we don't quaxify here.
     final_state = bounded_while_loop(cond_fn, body_fn, state, max_steps=n_max)
 
@@ -514,37 +537,17 @@ def _local_flow_walk(
 
     # Package results into WalkLocalFlowResult. This is a NamedTuple, so can be
     # unpacked easily.
+    # Velocity-awareness is a property of the metric, not of ``metric_scale``: a
+    # zero scale makes a phase-space metric numerically position-only, but the
+    # walk is still configured to follow the flow. Set here rather than in
+    # `LocalFlowOrderer.order` so direct callers report it too.
     return WalkLocalFlowResult(
         positions=dict(xs),
         velocities=dict(vs_original),
         indices=final_ordered,
         gamma_range=gamma_range,
+        velocity_aware=config.metric.uses_velocity,
     )
-
-
-def walk_local_flow(*args: object, **kwargs: object) -> WalkLocalFlowResult:
-    """Order tracers with the local-flow walk (deprecated; use `order`).
-
-    .. deprecated:: 0.3
-        ``walk_local_flow`` will be removed in v0.4. Use
-        ``pcf.order(positions, velocities)`` -- or
-        ``pcf.orderers.LocalFlowOrderer(...).order(...)`` for non-default walk
-        parameters -- which routes through the same implementation without a
-        warning.
-
-    Thin wrapper that emits a `DeprecationWarning` and forwards to the private
-    implementation (plain and Quantity dispatch), returning an unchanged
-    `WalkLocalFlowResult`.
-    """
-    warnings.warn(
-        "`walk_local_flow` is deprecated and will be removed in v0.4; use "
-        "`pcf.order(positions, velocities)` (or "
-        "`pcf.orderers.LocalFlowOrderer(...).order(...)` for non-default walk "
-        "parameters) instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return _local_flow_walk(*args, **kwargs)
 
 
 def order_w(res: WalkLocalFlowResult, /) -> tuple[VectorComponents, VectorComponents]:
@@ -556,7 +559,7 @@ def order_w(res: WalkLocalFlowResult, /) -> tuple[VectorComponents, VectorCompon
     Parameters
     ----------
     res
-        The result from walk_local_flow.
+        The result from the local-flow walk.
 
     Returns
     -------
@@ -635,7 +638,7 @@ def combine_results(
 ) -> WalkLocalFlowResult:
     r"""Combine forward and reverse flow walk results into a single result.
 
-    Takes the results from two separate walk_local_flow calls (one forward, one
+    Takes the results from two separate local-flow walks (one forward, one
     reverse) and combines them into a single coherent ordering. This is useful
     for tracing complete stellar streams that extend in both directions from a
     starting point.
@@ -763,4 +766,8 @@ def combine_results(
         velocities=result_fwd.velocities,
         indices=indices,
         gamma_range=combined_gamma_range,
+        # Either walk having used velocity makes the combined ordering
+        # velocity-informed; taking only the forward result's flag would report
+        # a false negative on results built with different configs.
+        velocity_aware=result_fwd.velocity_aware or result_bwd.velocity_aware,
     )

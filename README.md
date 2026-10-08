@@ -2,9 +2,51 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
 [![Python versions](https://img.shields.io/pypi/pyversions/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
+[![CI](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/ci.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/GalacticDynamics/phasecurvefit/branch/main/graph/badge.svg)](https://codecov.io/gh/GalacticDynamics/phasecurvefit)
+[![Documentation Status](https://readthedocs.org/projects/phasecurvefit/badge/?version=latest)](https://phasecurvefit.readthedocs.io/en/latest/?badge=latest)
+[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
+[![CITATION.cff](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml)
 
 Construct paths through phase-Space points, supporting many different
 algorithms.
+
+## Why phasecurvefit?
+
+Many datasets are samples along a curve in phase space whose order along the
+curve is unknown. Before fitting a model to such a curve you need two things: an
+ordering coordinate for every sample, and a smooth track through them. Doing
+this by hand, or with a position-only nearest-neighbor or clustering method,
+breaks down in exactly the cases that matter:
+
+- **Curves that cross or fold back on themselves.** Where two strands meet, the
+  nearest point is often on the wrong strand. phasecurvefit uses velocities as
+  well as positions, so the ordering stays on the right strand (see the
+  [epitrochoid tutorials](https://phasecurvefit.readthedocs.io/en/latest/tutorials/epitrochoid_autoencoder.html)).
+- **No known starting point.** The default MST | SOM pipeline finds the two ends
+  of the curve itself, so no progenitor position or hand-picked start index is
+  needed
+  ([MST tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_mst.html)).
+- **Incomplete orderings.** An orderer may order only a reliable subset (the
+  local-flow walk does); an autoencoder then assigns an ordering coordinate γ to
+  every sample and learns a smooth mean track through them
+  ([stream autoencoder tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_autoencoder.html)).
+- **Contamination.** A stream-plus-background mixture model gives each sample a
+  calibrated membership probability, so interlopers can be down-weighted or
+  removed
+  ([outlier-rejection tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/outlier_rejection.html)).
+- **Use inside larger models.** phasecurvefit is built on JAX: the walk, the
+  distance metrics and the neural networks work with `jit`, `vmap` and `grad`
+  and run on CPU or GPU. A training-free running-mean track is available when
+  speed matters more than accuracy, for example inside a likelihood evaluated at
+  every step of an MCMC
+  ([running-mean tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_runningmean.html)).
+
+phasecurvefit is a reusable, tested library for ordering samples along a curve
+in phase space, by default with an MST backbone refined by a Self-Organizing
+Map, with alternative orderers (including momentum-weighted ordering), gap
+filling, outlier rejection and optional physical units (via `unxt`). It was
+built for stellar streams but applies to any ordered phase-space data.
 
 ## Features
 
@@ -17,8 +59,9 @@ algorithms.
   interpretations
 - **Pluggable query strategies**: Flexible neighbor search strategies (e.g.,
   brute-force, KD-tree) to optimize performance
-- **Pluggable orderers**: One interface over multiple ordering algorithms — the
-  velocity-following walk and an MST backbone for near-closed loops
+- **Pluggable orderers**: One interface over multiple ordering algorithms — by
+  default an MST backbone refined by a SOM, with the velocity-following walk as
+  an alternative
 - **Highly customizable ML setup and training**: Well-chosen defaults with
   highly flexible customization for specific use-cases.
 - **Physical units**: Optional support via `unxt` for unit-aware calculations
@@ -82,6 +125,63 @@ uv add phasecurvefit --extra interop
 uv add phasecurvefit --extra kdtree
 ```
 
+### Running the Tutorials
+
+The
+[tutorial notebooks](https://phasecurvefit.readthedocs.io/en/latest/tutorials/index.html)
+need packages beyond the runtime `[all]` extra — `matplotlib` for plotting and
+`galax` for the mock-stream examples. Install them with the `tutorials` extra:
+
+```bash
+pip install phasecurvefit[tutorials]
+```
+
+```bash
+uv add phasecurvefit --extra tutorials
+```
+
+Note `[all]` intentionally does not include `tutorials`: `all` covers optional
+_runtime_ functionality, while `tutorials` covers packages only needed to run
+the example notebooks.
+
+### GPU Support (NVIDIA CUDA)
+
+phasecurvefit runs on GPU through JAX, but a plain `pip install jax` (what
+phasecurvefit depends on) only ships a CPU-only `jaxlib`. If you have an NVIDIA
+GPU and see:
+
+```text
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is
+not installed. Falling back to cpu.
+```
+
+Install JAX's CUDA-enabled build alongside phasecurvefit:
+
+```bash
+pip install --upgrade "phasecurvefit[all]" "jax[cuda12]"
+```
+
+Or with uv:
+
+```bash
+uv add phasecurvefit --extra all
+uv add "jax[cuda12]"
+```
+
+This pulls in self-contained NVIDIA CUDA/cuDNN wheels — you don't need the CUDA
+toolkit installed system-wide — but you do still need a
+[compatible NVIDIA driver](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for your GPU. `--upgrade` ensures pip actually swaps in the CUDA-enabled
+`jaxlib` even if a CPU-only one is already installed. See the
+[JAX GPU installation guide](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for other CUDA versions or platforms (TPU, ROCm), and verify the install with:
+
+```python
+import jax
+
+print(jax.devices())  # should list a CudaDevice, not just CpuDevice
+```
+
 ## Quick Start
 
 ```python
@@ -99,9 +199,9 @@ vel = {
     "y": jnp.array([0.5, 0.5, 0.5, 0.5, 0.5]),
 }
 
-# Step 1: Order the observations (use KD-tree for spatial neighbor prefiltering)
-config = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=3))  # k=3 for this small dataset
-result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
+# Step 1: Order the observations: an MST backbone refined by a SOM. (With fewer
+# than 15 points, as here, the SOM is skipped and the MST is used alone.)
+result = pcf.order(pos, vel)
 print(result.indices)  # Initial ordering
 
 # Step 2: Create normalizer and autoencoder
@@ -171,14 +271,20 @@ result, _, losses = pcf.nn.train_autoencoder(
 
 The ordering step is pluggable. Every orderer implements the same interface —
 `order(positions, velocities)` — and returns an `OrderingResult` that feeds the
-autoencoder unchanged, so orderers are interchangeable:
+autoencoder unchanged, so orderers are interchangeable. With no orderer,
+`pcf.order(pos, vel)` runs the **default pipeline**, an MST backbone refined by
+a SOM (`MSTOrderer() | SOMOrderer()`). The built-in orderers it is made from,
+and the alternative to them, are:
 
-- **`LocalFlowOrderer`** — the velocity-following walk (wraps
-  `walk_local_flow`). Follows a coherent flow from a start point.
 - **`MSTOrderer`** — a minimum-spanning-tree backbone. It needs no start point
   (the graph diameter finds the two tips itself), which makes it ideal for
   **near-closed loops** where the velocity field reverses and a single walk
-  covers only one arm. Requires the `mst` extra.
+  covers only one arm.
+- **`SOMOrderer`** — a Self-Organizing Map refinement. Its prototypes average
+  over many tracers, so the backbone it produces is far less sensitive to local
+  noise than a single walk's or MST's individual decisions.
+- **`LocalFlowOrderer`** — the velocity-following walk. Follows a coherent flow
+  from a start point, and is fully JAX-traceable.
 
 ```python
 import jax.numpy as jnp
@@ -189,16 +295,19 @@ t = jnp.linspace(0.0, 1.0, 60)
 pos = {"x": 10.0 * t, "y": jnp.sin(3.0 * t)}
 vel = {"x": jnp.ones(60), "y": 3.0 * jnp.cos(3.0 * t)}
 
+# The default: MST backbone refined by a SOM (no start point needed)
+result = pcf.order(pos, vel)
+
 # The velocity-following walk, via the orderer interface
 walk_orderer = pcf.orderers.LocalFlowOrderer(metric_scale=1.0, start_idx=0)
 walk_result = walk_orderer.order(pos, vel)
 
-# The MST backbone (no start point needed)
-mst_orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0)
-mst_result = pcf.order(pos, vel, mst_orderer)  # or mst_orderer.order(pos, vel)
+# A custom chain: tune the MST, then refine with a SOM
+chain = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0) | pcf.orderers.SOMOrderer()
+chain_result = pcf.order(pos, vel, chain)
 
 # Either result feeds the autoencoder unchanged
-print(mst_result.gamma_range)  # (-1.0, 1.0)
+print(result.gamma_range)  # (-1.0, 1.0)
 ```
 
 `MSTOrderer` also has opt-in velocity mechanisms (`velocity_weight`,
@@ -206,7 +315,8 @@ print(mst_result.gamma_range)  # (-1.0, 1.0)
 the
 [Orderers Guide](https://phasecurvefit.readthedocs.io/en/latest/guides/orderers.html)
 and the
-[Migration Guide](https://phasecurvefit.readthedocs.io/en/latest/migration.html).
+[v0.3 → v0.4 Migration Guide](https://phasecurvefit.readthedocs.io/en/latest/migration/v0.3-to-v0.4.html),
+which covers the change of default from the walk to MST | SOM.
 
 ## Distance Metrics
 
@@ -374,6 +484,32 @@ class SmallestIndexStrategy(pcf.strats.AbstractQueryStrategy):
 config = pcf.WalkConfig(strategy=SmallestIndexStrategy())
 result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
+
+## Citation
+
+If you use `phasecurvefit` in published work, please cite the package via its
+DOI, together with the paper behind whichever component you used.
+
+[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
+
+<details>
+  <summary>component papers</summary>
+
+- **default pipeline / SOM ordering** (`pcf.order(pos, vel)`, `SOMOrderer`,
+  `phasecurvefit.som`) — Starkman et al. (2023), MNRAS 522, 5022,
+  [arXiv:2212.00949](https://arxiv.org/abs/2212.00949)
+- **momentum-weighted ordering** (`LocalFlowOrderer`) **or the autoencoder**
+  (`PathAutoencoder`, `fit_track`) — Nibauer et al. (2022),
+  [arXiv:2205.11767](https://arxiv.org/abs/2205.11767)
+- **mixture-model membership / outlier rejection** — Hogg, Bovy & Lang (2010),
+  [arXiv:1008.4686](https://arxiv.org/abs/1008.4686)
+
+Machine-readable metadata for all of these is in
+[`CITATION.cff`](https://github.com/GalacticDynamics/phasecurvefit/blob/main/CITATION.cff);
+what to cite for which component, with BibTeX entries, is on the
+[Citation page](https://phasecurvefit.readthedocs.io/en/latest/citation.html).
+
+</details>
 
 ## AI Usage Disclosure
 

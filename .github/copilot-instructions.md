@@ -14,15 +14,22 @@ using a variety of tools.
 ### Ordering (`phasecurvefit.order`, `phasecurvefit.orderers`)
 
 - `order(positions, velocities, orderer=None)`: Main entry point. Returns an
-  `OrderingResult`. `orderer` defaults to `LocalFlowOrderer()`.
+  `OrderingResult`. With no `orderer` it runs `default_pipeline`: an MST
+  backbone refined by a SOM (`MSTOrderer() | SOMOrderer()`), falling back to the
+  MST alone when there are too few tracers for the SOM.
 - Orderers (`phasecurvefit.orderers`), all subclasses of `AbstractOrderer`:
   - `LocalFlowOrderer`: the local-flow walk (Nibauer et al. 2022); takes a
     `WalkConfig`, `metric_scale`, `start_idx`, `direction`, `max_dist`, etc.
-  - `MSTOrderer`: velocity-aware minimum-spanning-tree backbone, with optional
-    edge-length sigma-clipping (`edge_clip_sigma`) for outlier rejection.
-- `walk_local_flow(...)` is **deprecated** (removal in v0.4) and emits a
-  `DeprecationWarning`. New code should use `order()` / an orderer; do not
-  extend the deprecated path.
+    - `MSTOrderer`: velocity-aware minimum-spanning-tree backbone, with optional
+      edge-length sigma-clipping (`edge_clip_sigma`) for outlier rejection.
+  - `SOMOrderer`: 1-D Self-Organizing Map (Starkman et al. 2023); see also the
+    `phasecurvefit.som` module.
+  - `ChainOrderer`: runs stages in sequence, threading each result into the next
+    as `init`. Built with `|`, e.g. `MSTOrderer(k=10) | LocalFlowOrderer()`.
+- `fit_track(positions, velocities, key=...)`: end to end — runs the default
+  pipeline, then builds and trains a `PathAutoencoder`.
+- `walk_local_flow` was **removed** in v0.4; use `order()` with
+  `LocalFlowOrderer`.
 - `WalkConfig(metric=..., strategy=...)` composes a distance metric and a query
   strategy.
 - Phase-space data: Two dicts with matching keys, e.g.,
@@ -82,18 +89,20 @@ without it the orderers raise.
 ## Folder Structure
 
 - `/src/phasecurvefit/`: Public API
-  - `__init__.py`: Main exports (`order`, `WalkConfig`, result types, and the
-    deprecated `walk_local_flow`)
-  - `orderers.py`: Orderer classes and `OrderingResult`
+  - `__init__.py`: Main exports (`order`, `fit_track`, `WalkConfig`, result
+    types)
+  - `orderers.py`: Orderer classes, `default_pipeline`, and `OrderingResult`
+  - `som.py`: Self-Organizing Map
   - `metrics.py`: Distance metric classes
   - `strats.py`: Query strategy classes
   - `nn.py`: Neural network module
   - `w.py`: Phase-space utilities (distances, directions, similarities)
 - `/src/phasecurvefit/_src/`: Private implementation
-  - `orderers/`: `order()`, `AbstractOrderer`, `LocalFlowOrderer`, `MSTOrderer`,
+  - `orderers/`: `order()`, `AbstractOrderer`, the orderers, `default_pipeline`,
     `OrderingResult`
-  - `algorithm.py`: Local-flow walk implementation (and deprecated
-    `walk_local_flow`)
+  - `algorithm.py`: Local-flow walk implementation, `StateMetadata`
+  - `som.py`: SOM implementation
+  - `pipeline.py`: `fit_track`
   - `nn/`: Neural networks, training, and membership (Equinox)
   - `metrics.py`: Metric base classes and implementations
   - `strategies.py`: Query strategy classes
@@ -101,9 +110,10 @@ without it the orderers raise.
   - `phasespace.py`: Phase-space operations
 - `/src/phasecurvefit/_interop/`: Optional dependency integrations
   - `interop_unxt.py`: `unxt` Quantity support via Quax dispatch
-- `/docs/guides/`: User guides (quickstart, orderers, metrics, outliers, JAX
-  integration, etc.); `/docs/migration.md` records API changes
-- `/tests/`: Test suite organized by component
+- `/docs/guides/`: User guides (quickstart, orderers, SOM, metrics, outliers,
+  JAX integration, etc.); `/docs/migration/` records API changes per version
+- `/tests/`: `unit/`, `integration/`, `smoke/`, `static/` (source-sweep checks),
+  `benchmarks/`, and `usage/`
 
 ## Coding Style
 
@@ -174,8 +184,8 @@ uv run pre-commit run -a # Run all pre-commit hooks
 - Use `pytest` for all test suites
 - Add unit tests for every new function or class
 - Test JAX compatibility (`jit`, `vmap`, `grad`) where applicable
-- Tests for Quantity support in `tests/test_quantity_support.py`,
-  `tests/test_interop_unxt.py`, and `tests/test_orderers_unxt.py`
+- Tests for Quantity support in `tests/unit/test_quantity_support.py`,
+  `tests/unit/test_interop_unxt.py`, and `tests/unit/test_orderers_unxt.py`
 - Tests run with beartype runtime type checking and warnings as errors
 - Assertions should be atomic (no `assert a and b`, use separate asserts)
 
@@ -193,7 +203,7 @@ uv run pre-commit run -a # Run all pre-commit hooks
 - `backbone`: Optional ordered polyline (e.g. from `MSTOrderer`); `__call__`
   interpolates along it, or along the visited observations if `None`
 
-`WalkLocalFlowResult` is a thin subclass kept for backwards compatibility.
+`WalkLocalFlowResult` (from `LocalFlowOrderer`) is a thin subclass.
 
 ## Final Notes
 

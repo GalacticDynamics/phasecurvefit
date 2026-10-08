@@ -4,11 +4,14 @@ This guide shows how to use `phasecurvefit` with JAX for faster computation, bat
 
 ```{note}
 This guide covers the **local-flow walk**
-({class}`~phasecurvefit.orderers.LocalFlowOrderer`), which is fully JAX-traceable.
-The {class}`~phasecurvefit.orderers.MSTOrderer` is **host-side** (NumPy/SciPy):
-its `order()` is a one-shot preprocessing step and is *not* jit/vmap/grad-able.
-Its *result*, however, is an ordinary `OrderingResult` whose `__call__`
-interpolation is JAX-traceable like any other.
+({class}`~phasecurvefit.orderers.LocalFlowOrderer`), which is fully JAX-traceable,
+so every example here names it explicitly. `pcf.order(pos, vel)` with **no**
+orderer runs the default MST | SOM pipeline, which is *not* traceable under `jit`
+or `vmap` (it raises a `TypeError` saying so): whether the SOM stage runs depends
+on the visited count, and a SOM stage chained after another cannot be traced. The
+{class}`~phasecurvefit.orderers.MSTOrderer` alone does trace: its graph
+algorithms run host-side (NumPy/SciPy) through `jax.pure_callback`. A result's
+`__call__` interpolation is JAX-traceable whichever orderer produced it.
 ```
 
 ## Basic Usage
@@ -114,7 +117,12 @@ results = jax.tree.map(
 
 ## Differentiation
 
-Compute gradients with respect to parameters:
+The ordering itself is discrete: it is a list of integer indices, so its
+gradient with respect to anything (the data, `metric_scale`, …) is zero. What is
+differentiable is everything computed *from* the ordering with real numbers,
+such as positions interpolated along it (`result(gamma)`) or the autoencoder's
+outputs. Here the loss depends on the interpolated track, and the gradient flows
+back to the input positions with the ordering held fixed:
 
 ```python
 import jax
@@ -123,24 +131,19 @@ import phasecurvefit as pcf
 
 position = {"x": jnp.array([0.0, 1.0, 2.0, 3.0])}
 velocity = {"x": jnp.array([1.0, 1.1, 1.2, 1.3])}
+orderer = pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
 
 
-# Define a scalar loss
-def loss_fn(metric_scale):
-    result = pcf.order(
-        position,
-        velocity,
-        pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=metric_scale),
-    )
-    return jnp.sum(result.indices.astype(jnp.float32))
+# A scalar loss on the track interpolated along the ordering
+def loss_fn(pos):
+    result = pcf.order(pos, velocity, orderer)
+    track = result(jnp.linspace(0.0, 1.0, 5))
+    return jnp.sum(track["x"] ** 2)
 
 
-# Compute gradient
-grads = jax.grad(loss_fn)(jnp.array(1.5))
-
-# Or get both value and gradient
-value, grads = jax.value_and_grad(loss_fn)(jnp.array(1.5))
-print(f"Loss: {value}, Gradient: {grads}")
+# Gradient with respect to the input positions
+value, grads = jax.value_and_grad(loss_fn)(position)
+print(f"Loss: {value}, d(loss)/dx: {grads['x']}")
 ```
 
 ## Performance Tips
@@ -178,11 +181,53 @@ def batch_order(stacked_pos, stacked_vel):
 
 ## Hardware Acceleration
 
-The library works on GPU/TPU with no code changes:
+The library works on GPU/TPU with no code changes — but only once JAX itself
+can see the accelerator.
+
+### Installing for GPU (NVIDIA CUDA)
+
+A plain `pip install phasecurvefit` (or `jax`) installs a **CPU-only**
+`jaxlib`. If you have an NVIDIA GPU, you'll see JAX print:
+
+```text
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is
+not installed. Falling back to cpu.
+```
+
+Install JAX's CUDA-enabled build alongside phasecurvefit to fix this:
+
+::::{tab-set}
+
+:::{tab-item} pip
+```bash
+pip install --upgrade "phasecurvefit[all]" "jax[cuda12]"
+```
+`--upgrade` ensures pip actually swaps in the CUDA-enabled `jaxlib` even if a
+CPU-only one is already installed.
+:::
+
+:::{tab-item} uv
+```bash
+uv add phasecurvefit --extra all
+uv add "jax[cuda12]"
+```
+:::
+
+::::
+
+This pulls in self-contained NVIDIA CUDA/cuDNN wheels — you don't need the
+CUDA toolkit installed system-wide — but you do still need a
+[compatible NVIDIA driver](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for your GPU. See the
+[JAX GPU installation guide](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
+for other CUDA versions or platforms (TPU, ROCm).
+
+Once installed, no code changes are needed:
 
 ```python
 import jax
 import jax.numpy as jnp
+import phasecurvefit as pcf
 
 position = {"x": jnp.array([0.0, 1.0, 2.0, 3.0])}
 velocity = {"x": jnp.array([1.0, 1.0, 1.0, 1.0])}

@@ -19,16 +19,33 @@ mechanisms, all reusing the phase-space notion of velocity alignment
 3. *tip orientation* (``orient_by_velocity``): flip the ordering so ``gamma``
    increases along the mean velocity.
 
-The computation is **host-side** (NumPy/SciPy) and deterministic; ``order()`` is
-not jit/vmap-traceable (per the ``AbstractOrderer`` contract).
+The graph algorithms themselves (kNN, MST, shortest-path) remain **host-side**
+(NumPy/SciPy) and deterministic -- the *selection* they make (which edges,
+which nodes, in what order) is combinatorial and has no meaningful gradient,
+since it changes in discrete jumps rather than smoothly as points move.
+``order()`` runs them through ``jax.pure_callback`` with their inputs
+stop-gradiented, so it is jit/vmap-traceable (``vmap_method="sequential"``: one
+host call per batch element) and can sit inside a larger autodiffed pipeline.
+The callback itself returns only indices (``indices``, the backbone's node
+indices, ``backbone_size``) -- correctly gradient-free. The backbone
+*coordinates* are then gathered from ``positions``/``velocities`` in ordinary
+JAX (``P[backbone_idx]``), so -- away from the measure-zero set of points where
+the selection itself changes -- gradient flows through them exactly as it would
+through any other data-dependent gather (e.g. ``x[jnp.argmax(x)]``): real
+w.r.t. the gathered values, zero w.r.t. the (integer, non-differentiable)
+index that picked them.
 """
 
 __all__: tuple[str, ...] = ("MSTOrderer",)
 
+import queue
+import threading
 import warnings
+from collections.abc import Callable
 from typing import Literal
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import plum
@@ -40,12 +57,13 @@ from scipy.sparse.csgraph import (
 )
 from scipy.spatial import cKDTree
 
-from .base import AbstractOrderer
+from .base import AbstractOrderer, _check_component_keys, chord_along_ordering
 from .result import OrderingResult
+from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
 
-OnDisconnected = Literal["raise", "warn", "largest"]
+OnDisconnected = Literal["raise", "warn", "largest", "connect"]
 _TINY = 1e-12
 # An edge must be at least this multiple of the median length to be a clip
 # candidate. Floors the (multiplicative) threshold so a uniformly-sampled
@@ -58,6 +76,57 @@ _EDGE_CLIP_MIN_RATIO = 2.0
 _EDGE_CLIP_SMALL_FRAC = 0.01
 
 
+# A single, long-lived worker thread that runs every _run_in_thread() job.
+#
+# The original workaround (spawn a fresh threading.Thread per call, from
+# wherever _run_in_thread happened to be called) fixed a segfault reliably on
+# macOS, but the identical input still segfaulted identically on Linux CI --
+# even with an explicit, generous stack size on that fresh thread. That points
+# away from "the new thread's stack was too small" and toward "creating a
+# *new* thread from inside jax.pure_callback's own native dispatch thread is
+# itself unsafe on some platforms" -- plausible, since that dispatch thread is
+# a foreign thread CPython has attached a PyThreadState to (not one CPython
+# created itself), and further threading operations from such a thread are
+# less well-trodden than from an ordinary one.
+#
+# A single worker thread sidesteps that concern entirely: it is created once,
+# here, at import time -- on whatever thread imports this module, which is
+# always an ordinary Python thread, never jax's callback-dispatch thread.
+# _run_in_thread() then only ever *hands work to* that already-running thread
+# via a queue; it never creates a thread from within pure_callback's dispatch
+# thread. Confirmed on Linux CI to fix the segfault.
+_job_queue: "queue.Queue[tuple[Callable[[], object], queue.Queue]]" = queue.Queue()
+
+
+def _worker() -> None:
+    while True:
+        fn, out = _job_queue.get()
+        try:
+            out.put(("ok", fn()))
+        except BaseException as exc:  # noqa: BLE001 -- forwarded to the caller
+            out.put(("err", exc))
+
+
+threading.Thread(target=_worker, daemon=True, name="phasecurvefit-mst-host").start()
+
+
+def _run_in_thread[T](fn: Callable[[], T]) -> T:
+    """Run ``fn`` on this module's persistent worker thread; re-raise there.
+
+    Works around a segfault observed when scipy's ``cKDTree``/sparse-graph C
+    extensions run directly on the native thread ``jax.pure_callback``
+    dispatches the host call onto. See the module-level worker thread's
+    comment for why this hands work to an already-running thread rather than
+    spawning a new one on demand.
+    """
+    out: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=1)
+    _job_queue.put((fn, out))
+    kind, payload = out.get()
+    if kind == "err":
+        raise payload  # type: ignore[misc]
+    return payload  # type: ignore[return-value]
+
+
 def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
     """Cosine similarity of velocities across each candidate edge (i, j)."""
     vi, vj = V[rows], V[cols]
@@ -67,7 +136,7 @@ def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarra
 
 
 def _backbone_on_component(
-    P: np.ndarray, tree: object, nodes: np.ndarray
+    P: np.ndarray, tree: object, nodes: np.ndarray, *, workers: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Backbone/order within one connected component.
 
@@ -95,7 +164,7 @@ def _backbone_on_component(
     seg = np.linalg.norm(np.diff(Cb, axis=0), axis=1)
     s_bb = np.concatenate([[0.0], np.cumsum(seg)])
     # project every component point onto the backbone -> along-track arc length
-    _, near = cKDTree(Cb).query(P[nodes])
+    _, near = cKDTree(Cb).query(P[nodes], workers=workers)
     order_local = np.argsort(s_bb[near], kind="stable")
     return nodes[order_local], backbone_nodes, Cb
 
@@ -130,31 +199,111 @@ def _sigma_clip_edges(
     Returns the surviving node set (a subset of ``nodes``, in ascending order).
     """
     log_floor = np.log(_EDGE_CLIP_MIN_RATIO)
-    current = nodes
+    # The edges among ``nodes`` and their lengths, once, relabelled to
+    # 0..m-1; survivors are then tracked by a mask rather than by re-slicing
+    # the tree each iteration, and every iteration costs O(m), not O(n).
+    m = nodes.size
+    local = np.full(tree.shape[0], -1)
+    local[nodes] = np.arange(m)
+    tree_edges = tree.tocoo()
+    ei, ej = local[tree_edges.row], local[tree_edges.col]
+    upper = (ei >= 0) & (ej >= 0) & (ei < ej)  # undirected edges, once each
+    ei, ej = ei[upper], ej[upper]
+    length = np.linalg.norm(P[nodes[ei]] - P[nodes[ej]], axis=1)
+    alive = np.ones(m, dtype=bool)
     for _ in range(max_iters):
-        sub = tree[current][:, current].tocoo()
-        upper = sub.row < sub.col  # undirected edges, once each
-        ei, ej = sub.row[upper], sub.col[upper]
-        if ei.size == 0:
+        live = alive[ei] & alive[ej]
+        # Zero-length edges join coincident points: they have no log length,
+        # carry no spacing information, and can never be too long to keep.
+        pos = live & (length > 0.0)
+        if not pos.any():
             break
-        loglen = np.log(np.linalg.norm(P[current[ei]] - P[current[ej]], axis=1))
+        loglen = np.log(length[pos])
         med = float(np.median(loglen))
         scale = 1.4826 * float(np.median(np.abs(loglen - med)))
-        cut = loglen > med + max(sigma * scale, log_floor)
+        cut = np.zeros_like(pos)
+        cut[pos] = loglen > med + max(sigma * scale, log_floor)
         if not cut.any():
             break
-        m = current.size
-        keep = ~cut
+        keep = live & ~cut
         g = csr_matrix((np.ones(int(keep.sum())), (ei[keep], ej[keep])), shape=(m, m))
-        g = g.maximum(g.T)
+        # Dead nodes have no kept edges, so each is its own component and the
+        # live components' sizes count live nodes only.
         _, labels = connected_components(g, directed=False)
         sizes = np.bincount(labels)
-        size_min = max(2, int(np.ceil(_EDGE_CLIP_SMALL_FRAC * m)))
-        small = np.isin(labels, np.flatnonzero(sizes < size_min))
+        size_min = max(2, int(np.ceil(_EDGE_CLIP_SMALL_FRAC * int(alive.sum()))))
+        small = alive & (sizes[labels] < size_min)
         if not small.any():  # cuts split off nothing small (e.g. a sparse gap)
             break
-        current = current[~small]
-    return current
+        alive &= ~small
+    return nodes[alive]
+
+
+def _connect_components(
+    P: np.ndarray, graph: csr_matrix, *, workers: int
+) -> csr_matrix:
+    """Join a graph's connected components along their shortest links.
+
+    Each round, every component adds one edge: the shortest spatial link from
+    one of its points to any point outside it. Components that pick each other
+    merge, so the count at least halves and the loop ends in ``O(log m)``
+    rounds. The bridge edges are spatial lengths only -- they deliberately
+    ignore ``jump_cap`` and velocity severing, which are what split the graph.
+
+    Performance: one k-d tree per component per round, ``O(m n log n)``. Fine for
+    the few pieces a gap or a clump produces; a ``jump_cap`` far below the
+    spacing shatters the graph into ~``n`` pieces and makes this slow. Switch to
+    a single k-d tree with a growing ``k`` if that case ever matters.
+    """
+    n = P.shape[0]
+    tiny = np.finfo(graph.dtype).tiny  # scipy treats zero weights as missing
+    n_comp, labels = connected_components(graph, directed=False)
+    while n_comp > 1:
+        rows, cols, lengths = [], [], []
+        for c in range(n_comp):
+            inside = np.flatnonzero(labels == c)
+            outside = np.flatnonzero(labels != c)
+            dist, nearest = cKDTree(P[inside]).query(P[outside], workers=workers)
+            best = int(np.argmin(dist))
+            rows.append(inside[nearest[best]])
+            cols.append(outside[best])
+            lengths.append(dist[best])
+        bridges = csr_matrix((np.maximum(lengths, tiny), (rows, cols)), shape=(n, n))
+        graph = graph.maximum(bridges.maximum(bridges.T))
+        n_comp, labels = connected_components(graph, directed=False)
+    return graph
+
+
+def _disconnected_message(
+    n_comp: int, k: int, jump_cap: float, sever_cos_threshold: float | None
+) -> str:
+    """Explain a disconnected kNN graph, blaming only what could be the cause."""
+    causes = [f"k={k} too low"]
+    if np.isfinite(jump_cap):  # an infinite cap cannot be "too small"
+        causes.insert(0, f"jump_cap={jump_cap} too small")
+    if sever_cos_threshold is not None:
+        causes.append("severing too aggressive")
+    return (
+        f"kNN graph is disconnected into {n_comp} components "
+        f"({', '.join(causes)}). Set on_disconnected='connect' to bridge the "
+        "pieces along their shortest links, or increase k (and jump_cap, relax "
+        "sever_cos_threshold) to connect them; 'warn'/'largest' order only the "
+        "largest piece and leave the rest unvisited."
+    )
+
+
+def _orient_along_velocity(
+    order_idx: np.ndarray, backbone_nodes: np.ndarray, Cb: np.ndarray, V: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Reverse the ordering if it runs against the mean velocity."""
+    tang = np.diff(Cb, axis=0)
+    vseg = V[backbone_nodes]
+    vmid = 0.5 * (vseg[:-1] + vseg[1:])
+    # nansum: one NaN velocity must not turn this test into a coin flip
+    # (``nan < 0`` is False, so the flip would silently never happen).
+    if np.nansum(tang * vmid) < 0.0:
+        return order_idx[::-1], backbone_nodes[::-1]
+    return order_idx, backbone_nodes
 
 
 def _mst_backbone(
@@ -169,24 +318,31 @@ def _mst_backbone(
     on_disconnected: OnDisconnected,
     edge_clip_sigma: float | None,
     edge_clip_max_iters: int,
+    workers: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Order points along the MST longest-path backbone.
 
-    Returns ``(order_idx, backbone)``: the arc-length ordering (original point
-    indices) and the tip-to-tip backbone polyline coordinates.
+    Returns ``(order_idx, backbone_nodes)``: the arc-length ordering (original
+    point indices) and the original indices of the tip-to-tip backbone
+    vertices, in order. Indices rather than coordinates -- the caller gathers
+    ``P[backbone_nodes]`` in JAX so gradient flows through the gather (see the
+    module docstring).
     """
     n = len(P)
     if n < 2:
-        return np.arange(n), P.copy()
+        return np.arange(n), np.arange(n)
 
     k_eff = int(min(k, n - 1))
-    nn_d, nn_i = cKDTree(P).query(P, k=k_eff + 1)
+    nn_d, nn_i = cKDTree(P).query(P, k=k_eff + 1, workers=workers)
     nn_d = np.atleast_2d(nn_d)
     nn_i = np.atleast_2d(nn_i)
 
-    rows = np.repeat(np.arange(n), k_eff)
-    cols = nn_i[:, 1:].ravel()
-    d_edges = nn_d[:, 1:].ravel()  # spatial edge length
+    # Exclude self by index, not by dropping column 0: with coincident points
+    # cKDTree may list a duplicate before the point itself.
+    not_self = nn_i != np.arange(n)[:, None]
+    rows = np.nonzero(not_self)[0]
+    cols = nn_i[not_self]
+    d_edges = nn_d[not_self]  # spatial edge length
 
     # velocity alignment (only computed when a mechanism needs it)
     need_cos = velocity_weight > 0.0 or sever_cos_threshold is not None
@@ -195,24 +351,27 @@ def _mst_backbone(
     weights = d_edges.copy()
     if velocity_weight > 0.0:  # Mechanism 1: phase-space edge weights
         weights = d_edges + velocity_weight * (1.0 - cos)
+    # scipy's csgraph treats zero weights as missing edges, which would cut
+    # coincident points (repeat observations) out of the graph. Floor to the
+    # smallest positive float: still "free", but a real edge.
+    weights = np.maximum(weights, np.finfo(weights.dtype).tiny)
 
     keep = d_edges <= jump_cap  # sever long cross-loop edges (spatial)
     if sever_cos_threshold is not None:  # Mechanism 2: velocity-aware severing
         keep = keep & (cos >= sever_cos_threshold)
 
+    # Left directed: csgraph treats it as undirected, taking the smaller nonzero
+    # of graph[i, j] and graph[j, i]. Distances and cosines are symmetric, so
+    # that equals the explicit symmetrised graph without building it.
     graph = csr_matrix((weights[keep], (rows[keep], cols[keep])), shape=(n, n))
-    graph = graph.maximum(graph.T)  # symmetrise
+    if on_disconnected == "connect":  # bridge the pieces instead of dropping any
+        graph = _connect_components(P, graph, workers=workers)
     tree = minimum_spanning_tree(graph)
     tree = tree + tree.T
 
     n_comp, labels = connected_components(tree, directed=False)
     if n_comp != 1:
-        msg = (
-            f"kNN graph is disconnected into {n_comp} components "
-            f"(jump_cap={jump_cap} too small, k={k} too low, or severing too "
-            "aggressive). Increase jump_cap/k, relax sever_cos_threshold, or set "
-            "on_disconnected='warn'/'largest'."
-        )
+        msg = _disconnected_message(n_comp, k, jump_cap, sever_cos_threshold)
         if on_disconnected == "raise":
             raise ValueError(msg)
         if on_disconnected == "warn":
@@ -227,17 +386,67 @@ def _mst_backbone(
             tree, P, nodes, sigma=edge_clip_sigma, max_iters=edge_clip_max_iters
         )
 
-    order_idx, backbone_nodes, Cb = _backbone_on_component(P, tree, nodes)
+    order_idx, backbone_nodes, Cb = _backbone_on_component(
+        P, tree, nodes, workers=workers
+    )
 
     if orient_by_velocity:  # Mechanism 3: orient gamma along mean velocity
-        tang = np.diff(Cb, axis=0)
-        vseg = V[backbone_nodes]
-        vmid = 0.5 * (vseg[:-1] + vseg[1:])
-        if np.sum(tang * vmid) < 0.0:
-            order_idx = order_idx[::-1]
-            Cb = Cb[::-1]
+        order_idx, backbone_nodes = _orient_along_velocity(
+            order_idx, backbone_nodes, Cb, V
+        )
 
-    return order_idx, Cb
+    return order_idx, backbone_nodes
+
+
+def _mst_backbone_padded(
+    P: np.ndarray,
+    V: np.ndarray,
+    *,
+    k: int,
+    jump_cap: float,
+    velocity_weight: float,
+    sever_cos_threshold: float | None,
+    orient_by_velocity: bool,
+    on_disconnected: OnDisconnected,
+    edge_clip_sigma: float | None,
+    edge_clip_max_iters: int,
+    workers: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``_mst_backbone``, padded to a shape fixed by ``P`` (for ``pure_callback``).
+
+    The backbone's true vertex count is data-dependent (a shortest-path length),
+    so it can't be a ``jax.pure_callback`` output shape on its own. Returns
+    ``(idx_full, backbone_idx_full, backbone_len)``: ``idx_full`` is
+    ``order_idx`` padded to ``len(P)`` with ``-1`` (as in
+    ``OrderingResult.indices``); ``backbone_idx_full`` is ``backbone_nodes``
+    padded to ``len(P)`` by repeating its last index; ``backbone_len`` is the
+    true vertex count. Indices, not coordinates -- the caller gathers
+    ``P[backbone_idx_full]`` in JAX (see the module docstring).
+    """
+    n = P.shape[0]
+    order_idx, backbone_nodes = _mst_backbone(
+        P,
+        V,
+        k=k,
+        jump_cap=jump_cap,
+        velocity_weight=velocity_weight,
+        sever_cos_threshold=sever_cos_threshold,
+        orient_by_velocity=orient_by_velocity,
+        on_disconnected=on_disconnected,
+        edge_clip_sigma=edge_clip_sigma,
+        edge_clip_max_iters=edge_clip_max_iters,
+        workers=workers,
+    )
+
+    idx_full = np.full(n, -1, dtype=np.int32)
+    idx_full[: order_idx.size] = order_idx
+
+    b = backbone_nodes.shape[0]
+    backbone_idx_full = np.empty(n, dtype=np.int32)
+    backbone_idx_full[:b] = backbone_nodes
+    if b > 0:
+        backbone_idx_full[b:] = backbone_nodes[-1]  # pad by repeating last index
+    return idx_full, backbone_idx_full, np.asarray(b, dtype=np.int32)
 
 
 class MSTOrderer(AbstractOrderer):
@@ -262,9 +471,13 @@ class MSTOrderer(AbstractOrderer):
         Mechanism 3. If ``True``, flip the ordering so ``gamma`` increases along
         the mean velocity.
     on_disconnected
-        Policy when the graph splits into multiple components: ``"raise"``
-        (default), ``"warn"`` (order the largest component, warn, leave the rest
-        unvisited), or ``"largest"`` (same, silently).
+        Policy when the graph splits into multiple components (a gap in the
+        stream, or a ``jump_cap``/``sever_cos_threshold`` that is too tight):
+        ``"raise"`` (default), ``"warn"`` (order the largest component, warn,
+        leave the rest unvisited), ``"largest"`` (same, silently), or
+        ``"connect"`` (join the pieces along their shortest links and order
+        everything; the bridge links ignore ``jump_cap`` and velocity severing,
+        which is what split the graph).
     edge_clip_sigma
         Optional outlier rejection by MST edge length. If not ``None``, robustly
         sigma-clip the backbone's *spatial* edge lengths in log space: cut edges
@@ -278,6 +491,10 @@ class MSTOrderer(AbstractOrderer):
     edge_clip_max_iters
         Maximum sigma-clip iterations (default 5). Ignored when
         ``edge_clip_sigma`` is ``None``.
+    workers
+        Threads for the k-d tree queries, as scipy's ``cKDTree.query``
+        ``workers``: ``-1`` (default) uses every core, a positive integer caps
+        it. The result does not depend on it.
 
     Examples
     --------
@@ -355,15 +572,22 @@ class MSTOrderer(AbstractOrderer):
     on_disconnected: OnDisconnected = eqx.field(static=True, default="raise")
     edge_clip_sigma: float | None = eqx.field(static=True, default=None)
     edge_clip_max_iters: int = eqx.field(static=True, default=5)
+    workers: int = eqx.field(static=True, default=-1)
 
     def __check_init__(self) -> None:
         """Reject invalid configuration early, at construction."""
-        allowed = ("raise", "warn", "largest")
+        allowed = ("raise", "warn", "largest", "connect")
         if self.on_disconnected not in allowed:
             msg = (
                 f"on_disconnected must be one of {allowed}; "
                 f"got {self.on_disconnected!r}."
             )
+            raise ValueError(msg)
+        if self.velocity_weight < 0.0:
+            # Only ``> 0.0`` engages the phase-space edge weights, so a negative
+            # value would do nothing at all -- and would make ``velocity_aware``
+            # read False on an orderer the caller thought used velocity.
+            msg = f"velocity_weight must be >= 0, got {self.velocity_weight}."
             raise ValueError(msg)
         if self.edge_clip_sigma is not None and self.edge_clip_sigma <= 0:
             msg = f"edge_clip_sigma must be positive, got {self.edge_clip_sigma}."
@@ -379,42 +603,107 @@ class MSTOrderer(AbstractOrderer):
         velocities: VectorComponents,
         *,
         metadata: StateMetadata | None = None,  # noqa: ARG002
+        init: AbstractResult | None = None,  # noqa: ARG002
     ) -> OrderingResult:
-        """Order tracers along the MST backbone (host-side)."""
-        if set(positions) != set(velocities):
-            missing = sorted(set(positions) - set(velocities))
-            extra = sorted(set(velocities) - set(positions))
-            msg = (
-                "positions and velocities must have the same component keys; "
-                f"missing={missing}, extra={extra}."
-            )
-            raise ValueError(msg)
+        """Order tracers along the MST backbone.
+
+        Runs directly (no JAX overhead) when called eagerly -- the common case,
+        per the ``AbstractOrderer`` contract. When called under ``jax.jit``,
+        ``jax.vmap``, or ``jax.grad`` (i.e. ``positions``/``velocities`` are
+        traced), the host graph algorithms instead run through
+        ``jax.pure_callback`` (inputs stop-gradiented) so tracing doesn't
+        break, returning only indices; the backbone coordinates are then
+        gathered from ``positions``/``velocities`` in ordinary JAX, so
+        gradient flows through them like any other data-dependent gather (see
+        the module docstring).
+
+        A caveat of the traced path: ``on_disconnected="raise"`` raises
+        ``ValueError`` eagerly, but surfaces as ``jax.errors.JaxRuntimeError``
+        (wrapping the same message) under jit/vmap/grad, since the host call
+        actually runs at execution time, after ``order()`` has already
+        returned traced outputs.
+        """
+        _check_component_keys(positions, velocities)
 
         comps = sorted(positions)
-        P = np.stack([np.asarray(positions[c]) for c in comps], axis=1)
-        V = np.stack([np.asarray(velocities[c]) for c in comps], axis=1)
-        order_idx, backbone_P = _mst_backbone(
-            P,
-            V,
-            k=self.k,
-            jump_cap=self.jump_cap,
-            velocity_weight=self.velocity_weight,
-            sever_cos_threshold=self.sever_cos_threshold,
-            orient_by_velocity=self.orient_by_velocity,
-            on_disconnected=self.on_disconnected,
-            edge_clip_sigma=self.edge_clip_sigma,
-            edge_clip_max_iters=self.edge_clip_max_iters,
-        )
+        P = jnp.stack([jnp.asarray(positions[c]) for c in comps], axis=1)
+        V = jnp.stack([jnp.asarray(velocities[c]) for c in comps], axis=1)
+        n, _d = P.shape
 
-        n = P.shape[0]
-        idx_full = np.full(n, -1, dtype=np.int32)
-        idx_full[: order_idx.size] = order_idx
+        def _host(p: np.ndarray, v: np.ndarray) -> tuple:
+            return _mst_backbone_padded(
+                np.asarray(p),
+                np.asarray(v),
+                k=self.k,
+                jump_cap=self.jump_cap,
+                velocity_weight=self.velocity_weight,
+                sever_cos_threshold=self.sever_cos_threshold,
+                orient_by_velocity=self.orient_by_velocity,
+                on_disconnected=self.on_disconnected,
+                edge_clip_sigma=self.edge_clip_sigma,
+                edge_clip_max_iters=self.edge_clip_max_iters,
+                workers=self.workers,
+            )
 
-        backbone = {c: jnp.asarray(backbone_P[:, i]) for i, c in enumerate(comps)}
+        # The host call only ever needs to see values, never gradients -- the
+        # selection it makes is discrete either way -- so its inputs are
+        # stop-gradiented up front. That leaves pure_callback with nothing to
+        # differentiate (no custom_jvp needed): the real gradient path is the
+        # P[backbone_idx_full] gather below, using the original (not
+        # stop-gradiented) P.
+        P_static = jax.lax.stop_gradient(P)
+        V_static = jax.lax.stop_gradient(V)
+
+        if not (isinstance(P, jax.core.Tracer) or isinstance(V, jax.core.Tracer)):
+            # Eager call (the common case): run directly on this thread, no
+            # JAX overhead -- confirmed safe without _run_in_thread's fix (see
+            # below), since it's only pure_callback's own dispatch thread that
+            # triggers the crash.
+            idx_full, backbone_idx_full, backbone_len = _host(P_static, V_static)
+            idx_full = jnp.asarray(idx_full)
+            backbone_idx_full = jnp.asarray(backbone_idx_full)
+            backbone_len = jnp.asarray(backbone_len)
+        else:
+            result_shapes = (
+                jax.ShapeDtypeStruct((n,), jnp.int32),
+                jax.ShapeDtypeStruct((n,), jnp.int32),
+                jax.ShapeDtypeStruct((), jnp.int32),
+            )
+
+            def _host_threaded(p: np.ndarray, v: np.ndarray) -> tuple:
+                # _run_in_thread works around a segfault observed when the
+                # host computation runs directly on the native thread
+                # jax.pure_callback dispatches onto. See its docstring.
+                return _run_in_thread(lambda: _host(p, v))
+
+            # Note: under an outer jax.jit/vmap, pure_callback only *records*
+            # this call during tracing -- ``_host`` (and any
+            # ``on_disconnected="raise"`` ValueError it raises) actually runs
+            # later, at execution, after this function has already returned.
+            # So a disconnected-graph failure here surfaces to the caller as
+            # ``jax.errors.JaxRuntimeError`` (wrapping the original message),
+            # not ``ValueError`` as it does eagerly.
+            idx_full, backbone_idx_full, backbone_len = jax.pure_callback(
+                _host_threaded,
+                result_shapes,
+                P_static,
+                V_static,
+                vmap_method="sequential",
+            )
+
+        backbone_full = P[backbone_idx_full]  # JAX gather: gradient flows via P
+        backbone = {c: backbone_full[:, i] for i, c in enumerate(comps)}
+        qs = {key: jnp.asarray(val) for key, val in positions.items()}
         return OrderingResult(
-            positions={key: jnp.asarray(val) for key, val in positions.items()},
+            positions=qs,
             velocities={key: jnp.asarray(val) for key, val in velocities.items()},
-            indices=jnp.asarray(idx_full),
+            indices=idx_full,
             gamma_range=(-1.0, 1.0),
             backbone=backbone,
+            backbone_size=backbone_len,
+            chord=chord_along_ordering(qs, idx_full),
+            # ``orient_by_velocity`` only picks a direction; it does not make
+            # the ordering itself velocity-aware.
+            velocity_aware=self.velocity_weight > 0.0
+            or self.sever_cos_threshold is not None,
         )

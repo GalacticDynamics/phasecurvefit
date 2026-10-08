@@ -1,4 +1,4 @@
-r"""Distance metrics for the ``walk_local_flow`` algorithm.
+r"""Distance metrics for the local-flow walk.
 
 The metric system provides pluggable distance calculations that determine how
 the algorithm selects the next point in a phase-space trajectory. Different
@@ -48,8 +48,9 @@ See the Metrics Guide in the documentation for more details and examples.
 
 References
 ----------
-Nibauer, J., et al. (2022). Charting Galactic Accelerations with Stellar
-Streams and Machine Learning. arXiv:2209.XXXXX
+Nibauer, J., Belokurov, V., Cranmer, M., Goodman, J., & Ho, S. (2022).
+Charting Galactic Accelerations with Stellar Streams and Machine Learning.
+ApJ 940, 22. arXiv:2205.11767, doi:10.3847/1538-4357/ac93ee
 
 """
 

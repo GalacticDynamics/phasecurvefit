@@ -1,3 +1,9 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+---
+
 # Algorithm Details
 
 This page explains the mathematical foundations and implementation details of
@@ -7,10 +13,11 @@ the phase flow walking algorithm.
 The walk described here is one of the pluggable **orderers**. The examples below
 run it via `pcf.order` with a
 {class}`~phasecurvefit.orderers.LocalFlowOrderer`. The walk *follows* the
-velocity field, so it covers only one arm of a **near-closed loop** whose
-velocity reverses at a progenitor. For that case the
+velocity field from a start point; on a **near-closed loop** whose velocity
+reverses at a progenitor it must start at the progenitor and walk both ways
+(`direction="both"`, below). When no start point is known, the
 {class}`~phasecurvefit.orderers.MSTOrderer` backbone orders the loop tip-to-tip
-without a start point — see the [Orderers guide](orderers.md).
+without one — see the [Orderers guide](orderers.md).
 ```
 
 ## Mathematical Foundation
@@ -84,8 +91,14 @@ The momentum weight $\lambda$ controls the balance between spatial and momentum 
   $$d \approx \lambda \cdot (1 - \cos\theta)$$
   Strongly favors points in the velocity direction, even if far away.
 
-- **$\lambda \approx 1$**: Balanced
-  Both spatial proximity and momentum alignment matter equally.
+- **$\lambda$ comparable to the spacing between neighbouring points**: balanced.
+  $\lambda$ is a length, so "balanced" is relative to the data: at $\lambda$ equal
+  to the typical spacing $s$, a neighbour at $90°$ and distance $s$ costs $2s$,
+  the same as a point straight ahead at distance $2s$.
+
+Larger $\lambda$ makes the walk take longer strides along the flow and skip points
+off to the side; that is often what you want for a thin stream, since the skipped
+points can be ordered later by the [autoencoder](nn.md).
 
 ### Physical Interpretation (Default Metric)
 
@@ -134,12 +147,14 @@ Procedure:
         # Mask visited points with infinity
         distances_masked[i] ← visited_mask[i] > 0.5 ? distances[i] : infinity
 
-        # Find nearest unvisited neighbor
-        min_dist ← min(distances_masked)
+        # Best unvisited candidate under the metric
         best_idx ← argmin(distances_masked)
 
-        # Check early termination
-        if min_dist > max_dist:
+        # Check early termination: max_dist is a *spatial* distance
+        spatial[i] ← ||position[i] - current_pos||  (unvisited only)
+        if distances_masked[best_idx] is infinity:
+            Break  # No unvisited candidates remain
+        if min(spatial) > max_dist OR spatial[best_idx] > max_dist:
             Break  # Gap detected, stop algorithm
 
         # Update state
@@ -160,11 +175,12 @@ Due to the momentum condition, the walk algorithm inevitably skips some tracers.
 To assign $\gamma$ values to these skipped particles, an **autoencoder neural
 network** can interpolate based on phase-space location:
 
-1. **Interpolation Network**: Learns $(x, v) \rightarrow (\gamma, p)$ from ordered tracers
-2. **Param-Net**: Reconstructs positions from $\gamma$ values
-3. **Momentum condition**: Ensures alignment with velocity field
+1. **Encoder**: learns $(x, v) \rightarrow (\gamma, p)$ from the ordered tracers
+2. **Decoder**: learns the mean track $\gamma \rightarrow x$
+3. **Joint training**: refines both, with a velocity-alignment term that keeps the
+   track's direction consistent with the stars' velocities
 
-See [Autoencoder for Gap Filling](autoencoder.md) for details.
+See [Autoencoder for Gap Filling](nn.md) for details.
 
 ## Extensions and Variants
 
@@ -175,7 +191,7 @@ The current implementation supports:
 - **Conditional termination**: `terminate_indices` parameter
 - **Limited search**: `n_max` parameter
 - **Gap filling**: Autoencoder neural network for skipped tracers
-- **Reverse walks**: `direction="backward"` parameter to trace streams backwards by negating velocities
+- **Reverse walks**: `direction="backward"` parameter to trace phase curves backwards by negating velocities
 - **Bidirectional walks**: `combine_results()` to trace streams in both directions simultaneously
 
 ### Reverse Walks
@@ -189,7 +205,7 @@ direction by negating the velocity vectors. This is useful for:
 
 To use backward walks:
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 import phasecurvefit as pcf
 
@@ -226,7 +242,7 @@ For stellar streams that extend in both directions from a starting point (e.g.,
 from a progenitor or disruption point), the `combine_results()` function
 combines the results of two separate walks into a single coherent ordering:
 
-```python
+```{code-cell} python
 # Run forward and reverse walks separately
 result_forward = pcf.order(
     pos,
@@ -247,7 +263,7 @@ result = pcf.combine_results(result_forward, result_reverse)
 
 This can be simplified to:
 
-```python
+```{code-cell} python
 result = pcf.order(
     pos,
     vel,
@@ -273,7 +289,7 @@ The `WalkLocalFlowResult` object provides a `__call__` method that enables
 efficient linear interpolation of spatial positions along the walk ordering
 from an ordering parameter $\gamma \in [0, 1]$:
 
-```python
+```{code-cell} python
 import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
@@ -301,10 +317,24 @@ print("Interpolated x:", interpolated_pos["x"])  # Shape (5,)
 print("Interpolated y:", interpolated_pos["y"])  # Shape (5,)
 ```
 
+The interpolated track runs through the ordered observations:
+
+```{code-cell} python
+import matplotlib.pyplot as plt
+
+track = result(jnp.linspace(0.0, 1.0, 200))
+
+fig, ax = plt.subplots(figsize=(7, 3))
+ax.plot(pos["x"], pos["y"], ".", c="0.6", label="observations")
+ax.plot(track["x"], track["y"], lw=1, label=r"result($\gamma$)")
+ax.plot(interpolated_pos["x"], interpolated_pos["y"], "o", label="gamma_values")
+ax.legend();
+```
+
 The interpolator is **JAX-compatible** and works with all JAX transformations:
 
 **JIT Compilation:**
-```python
+```{code-cell} python
 @jax.jit
 def interpolate_position(gamma):
     return result(gamma)
@@ -315,7 +345,7 @@ pos_jitted = interpolate_position(0.5)
 ```
 
 **Vectorization (vmap):**
-```python
+```{code-cell} python
 # Interpolate batch of gamma values
 @jax.jit
 def interpolate_batch(gamma_array):
@@ -328,7 +358,7 @@ print("Shape:", pos_batch["x"].shape)  # (100,)
 ```
 
 **Automatic Differentiation (grad):**
-```python
+```{code-cell} python
 # Compute gradients with respect to gamma
 def loss_fn(gamma):
     pos = result(gamma)
@@ -340,7 +370,7 @@ gradient = grad_fn(0.5)
 ```
 
 **Composition of Transformations:**
-```python
+```{code-cell} python
 # JIT + vmap + grad combination
 @jax.jit
 def compute_gradients(gamma_array):
@@ -368,4 +398,4 @@ Potential future extensions:
 
 ## References
 
-Nibauer, J., et al. (2022). "Charting Galactic Accelerations with Stellar Streams and Machine Learning." arXiv:2201.12042.
+Nibauer, J., Belokurov, V., Cranmer, M., Goodman, J., & Ho, S. (2022). "Charting Galactic Accelerations with Stellar Streams and Machine Learning." ApJ 940, 22. [arXiv:2205.11767](https://arxiv.org/abs/2205.11767), doi:[10.3847/1538-4357/ac93ee](https://doi.org/10.3847/1538-4357/ac93ee).

@@ -1,6 +1,20 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+---
+
 # Quickstart Guide
 
 Get started with phasecurvefit in 5 minutes!
+
+phasecurvefit takes points in phase space (positions *and* velocities) whose
+order along a curve is unknown, and works out that order. This guide covers the
+first step, **ordering** the points: first with the default pipeline, an MST
+backbone refined by a SOM, then with the local-flow walk and the settings that
+control it. The [Autoencoder guide](nn.md) covers the next step: giving
+every point an ordering coordinate and fitting a smooth track. For worked
+examples on realistic data, see the [tutorials](../tutorials/index.md).
 
 ## Installation
 
@@ -22,11 +36,18 @@ uv add phasecurvefit
 
 ::::
 
+```{note}
+The plain pip/uv install above ships a **CPU-only** `jaxlib`. If you have an
+NVIDIA GPU and see phasecurvefit or JAX fall back to CPU, see
+[Installing for GPU](jax-integration.md#installing-for-gpu-nvidia-cuda) in
+the JAX Integration guide.
+```
+
 ## Basic Usage
 
 ### 1. Import the library
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 import phasecurvefit as pcf
 ```
@@ -37,151 +58,14 @@ Phase-space data is represented as two dictionaries:
 - **position**: Maps coordinate names to position arrays
 - **velocity**: Maps coordinate names to velocity arrays
 
-```python
-# Example: 2D stream
-position = {
-    "x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0]),
-    "y": jnp.array([0.0, 0.5, 1.0, 1.5, 2.0]),
-}
+Any number of dimensions works. As an example, take 100 points on a 3D helix,
+shuffled so the order is unknown:
 
-velocity = {
-    "x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0]),
-    "y": jnp.array([0.5, 0.5, 0.5, 0.5, 0.5]),
-}
-```
+```{code-cell} python
+import jax
 
-### 3. Run the algorithm
+t = jax.random.permutation(jax.random.key(0), jnp.linspace(0, 4 * jnp.pi, 100))
 
-```python
-result = pcf.order(
-    position,
-    velocity,
-    pcf.orderers.LocalFlowOrderer(
-        start_idx=0,  # Start from first point
-        metric_scale=1.0,  # Metric-dependent scale parameter
-    ),
-)
-
-print(result.ordering)
-# Array([0, 1, 2, 3, 4])
-```
-
-```{note}
-Above we ran the **local-flow walk** through `pcf.order` with a
-{class}`~phasecurvefit.orderers.LocalFlowOrderer` — one of several pluggable
-orderers. Swap in the {class}`~phasecurvefit.orderers.MSTOrderer` for near-closed
-loops where the velocity reverses. See the [Orderers guide](orderers.md).
-```
-
-### 4. Extract ordered data
-
-Use the convenience function to get reordered arrays:
-
-```python
-ordered_pos, ordered_vel = pcf.order_w(result)
-
-print(ordered_pos["x"])
-# Array([0., 1., 2., 3., 4.])
-```
-
-## Understanding the Result
-
-`pcf.order` returns an `OrderingResult` (a `WalkLocalFlowResult` for the walk) with:
-
-- **`ordering`**: Array of indices of the discovered order
-- **`position`**: Original position dictionary
-- **`velocity`**: Original velocity dictionary
-
-
-## Adjusting the Metric Scale
-
-The `metric_scale` parameter controls how the algorithm weighs different aspects of the data. Its interpretation depends on which distance metric you're using:
-
-```python
-# Pure nearest neighbor (spatial only) - metric_scale ignored
-result_spatial = pcf.order(
-    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=0.0)
-)
-
-# Balanced (default)
-result_balanced = pcf.order(
-    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
-)
-
-# Higher metric_scale value (interpretation metric-dependent)
-result_momentum = pcf.order(
-    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=5.0)
-)
-```
-
-## Walking in Reverse
-
-Use the `direction` parameter to trace streams backwards by negating the velocity vectors:
-
-```python
-# Default: forward walk following the velocity direction
-result_forward = pcf.order(
-    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
-)
-
-# Reverse: walk against the velocity direction
-result_reverse = pcf.order(
-    position,
-    velocity,
-    pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0, direction="backward"),
-)
-```
-
-This is useful for tracing stellar streams from the tidal tail back towards the progenitor.
-
-## Configuring the Query
-
-Use `WalkConfig` to configure the distance metric and query strategy:
-
-```python
-from phasecurvefit.metrics import AlignedMomentumDistanceMetric
-
-# Configure with aligned momentum metric and KD-tree strategy
-config = pcf.WalkConfig(
-    metric=AlignedMomentumDistanceMetric(),
-    strategy=pcf.strats.KDTree(k=5),  # Only 5 points in the fake dataset
-)
-
-result = pcf.order(
-    position,
-    velocity,
-    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
-)
-```
-
-## Handling Gaps with max_dist
-
-Use `max_dist` to stop when there's a gap in the data:
-
-```python
-# Stop if next nearest point is more than 2 units away
-result = pcf.order(
-    position,
-    velocity,
-    pcf.orderers.LocalFlowOrderer(
-        start_idx=0,
-        metric_scale=1.0,
-        max_dist=2.0,
-    ),
-)
-
-# Check if any points were skipped
-if result.n_skipped > 0:
-    print(f"Skipped {result.n_skipped} points")
-```
-
-## Working in 3D
-
-The algorithm works in any number of dimensions:
-
-```python
-# 3D helix
-t = jnp.linspace(0, 4 * jnp.pi, 100)
 position = {
     "x": jnp.cos(t),
     "y": jnp.sin(t),
@@ -193,18 +77,234 @@ velocity = {
     "y": jnp.cos(t),
     "z": jnp.ones_like(t) / (2 * jnp.pi),
 }
+```
+
+Connecting the points in their stored order shows they are scrambled:
+
+```{code-cell} python
+import matplotlib.pyplot as plt
+
+fig = plt.figure()
+ax = fig.add_subplot(projection="3d")
+ax.set_box_aspect(None, zoom=0.85)
+ax.plot(position["x"], position["y"], position["z"], "-o", ms=3, lw=0.5)
+ax.set(xlabel="x", ylabel="y", zlabel="z", title="Input order");
+```
+
+### 3. Run the algorithm
+
+With no further arguments, `pcf.order` runs the **default pipeline**: an MST
+backbone (the longest path of a minimum spanning tree of the nearest-neighbour
+graph, which runs from one end of the curve to the other) refined by a
+Self-Organizing Map. It needs no start point, and it orients the ordering along
+the velocity.
+
+```{code-cell} python
+result = pcf.order(position, velocity)
+
+print(result.ordering[:5])
+assert result.gamma_range == (-1.0, 1.0)  # the default pipeline's, not the walk's
+```
+
+Connecting the points in the recovered order traces the helix:
+
+```{code-cell} python
+ordered_pos, ordered_vel = pcf.order_w(result)
+
+fig = plt.figure()
+ax = fig.add_subplot(projection="3d")
+ax.set_box_aspect(None, zoom=0.85)
+ax.plot(ordered_pos["x"], ordered_pos["y"], ordered_pos["z"], "-o", ms=3, lw=1)
+ax.set(xlabel="x", ylabel="y", zlabel="z", title="Recovered order");
+```
+
+The SOM needs at least 15 tracers (its default number of prototypes) to fit; with
+fewer, `pcf.order` returns the MST ordering alone.
+See [The default pipeline](orderers.md#the-default-pipeline-mst-then-som).
+
+#### The local-flow walk
+
+To follow the velocity field step by step instead, pass a
+{class}`~phasecurvefit.orderers.LocalFlowOrderer`. The walk starts at one point and repeatedly steps to the unvisited
+point that minimizes a distance metric. With the default
+`AlignedMomentumDistanceMetric`, that distance combines closeness with a penalty
+for the direction *to* the candidate point being misaligned with the current
+point's velocity — so the walk favors candidates that are close and roughly
+**ahead of it**, but a sufficiently closer point off to the side can still win.
+(Other metrics have no such directional penalty; see the
+[Metrics guide](metrics.md).) It needs two choices from you:
+
+- **Where to start** (`start_idx`). Start at one end of the curve. For a stream
+  that flows *away* from a central point, such as a tidal stream from its
+  progenitor, start at that point and walk both ways (`direction="both"`, below).
+  If you don't know either, an `MSTOrderer` can find an end for you; see
+  [Letting the MST find the walk's start point](orderers.md#letting-the-mst-find-the-walks-start-point).
+- **How strongly to prefer "ahead"** (`metric_scale`), explained in
+  [Adjusting the Metric Scale](#adjusting-the-metric-scale).
+
+Here we start at the bottom of the helix; the walk examples below reuse `start`:
+
+```{code-cell} python
+start = int(jnp.argmin(position["z"]))
 
 result = pcf.order(
-    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=2.0)
+    position,
+    velocity,
+    pcf.orderers.LocalFlowOrderer(
+        start_idx=start,  # Start from one end of the curve
+        metric_scale=1.0,  # Metric-dependent scale parameter
+    ),
 )
+
+print(result.ordering[:5])
+```
+
+```{note}
+Above we ran the **local-flow walk** through `pcf.order` with a
+{class}`~phasecurvefit.orderers.LocalFlowOrderer` — one of several pluggable
+orderers, and not the default. See the [Orderers guide](orderers.md). The rest of
+this page is about the walk's settings.
+```
+
+### 4. Extract ordered data
+
+Use the convenience function to get reordered arrays:
+
+```{code-cell} python
+ordered_pos, ordered_vel = pcf.order_w(result)
+
+# The helix climbs monotonically in z once ordered
+climbs = jnp.all(jnp.diff(ordered_pos["z"]) > 0)
+print(climbs)
+assert climbs
+```
+
+## Understanding the Result
+
+`pcf.order` returns an `OrderingResult` (a `WalkLocalFlowResult` for the walk) with:
+
+- **`ordering`**: the indices of the visited observations, in order
+- **`indices`**: the same, padded with `-1` to the full length (a fixed shape, for JAX)
+- **`n_visited`** / **`n_skipped`**: how many observations the orderer reached or left out
+- **`positions`**, **`velocities`**: the input data
+- **`gamma_range`**: the range of the ordering coordinate $\gamma$
+
+Calling the result, `result(gamma)`, interpolates positions along the ordering.
+
+
+## Adjusting the Metric Scale
+
+The `metric_scale` parameter controls how the algorithm weighs different aspects
+of the data. Its meaning depends on the distance metric. With the default
+`AlignedMomentumDistanceMetric` it is a **length**, $\lambda$: a candidate point
+at angle $\theta$ from the current velocity costs an extra
+$\lambda\,(1 - \cos\theta)$ on top of its distance. So compare it with the
+typical spacing between neighbouring points:
+
+- $\lambda$ much smaller than the spacing: essentially nearest-neighbour; the walk
+  goes wherever the closest point is.
+- $\lambda$ about the spacing: a neighbour at 90° costs as much as a point twice as
+  far away straight ahead.
+- $\lambda$ much larger than the spacing: strongly directional; the walk keeps
+  going the way it is moving, taking longer strides and skipping points off to
+  the side. (The [stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb)
+  uses 100 kpc against steps of a few kpc at most.)
+
+Raise `metric_scale` if the walk jumps between neighbouring strands; lower it if
+it skips too much. See the [Metrics guide](metrics.md#choosing-metric_scale) for
+the other metrics.
+
+```{code-cell} python
+# With the default metric, metric_scale=0 switches off the momentum penalty:
+# pure nearest neighbor
+result_spatial = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=0.0)
+)
+
+# Balanced (default)
+result_balanced = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=1.0)
+)
+
+# Higher metric_scale value (interpretation metric-dependent)
+result_momentum = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=5.0)
+)
+```
+
+## Walking in Reverse
+
+Use the `direction` parameter to trace phase curves backwards by negating the velocity vectors:
+
+```{code-cell} python
+# Default: forward walk following the velocity direction
+result_forward = pcf.order(
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=1.0)
+)
+
+# Reverse: walk against the velocity direction
+result_reverse = pcf.order(
+    position,
+    velocity,
+    pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=1.0, direction="backward"),
+)
+```
+
+This is useful for tracing stellar streams from the tidal tail back towards the progenitor.
+
+## Configuring the Query
+
+Use `WalkConfig` to configure the distance metric and query strategy:
+
+```{code-cell} python
+from phasecurvefit.metrics import AlignedMomentumDistanceMetric
+
+# Configure with aligned momentum metric and KD-tree strategy
+config = pcf.WalkConfig(
+    metric=AlignedMomentumDistanceMetric(),
+    strategy=pcf.strats.KDTree(k=5),
+)
+
+result = pcf.order(
+    position,
+    velocity,
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=start, metric_scale=1.0),
+)
+```
+
+## Handling Gaps with max_dist
+
+Use `max_dist` to stop when there's a gap in the data. It is a plain spatial
+distance: the walk stops if the step it would take next is longer than
+`max_dist`, so it does not leap across a gap onto an unrelated part of the data.
+Set it to several times the typical spacing between neighbouring points. The
+points the walk never reaches are reported as skipped; the
+[autoencoder](nn.md) can assign them an ordering afterwards.
+
+```{code-cell} python
+# Stop if next nearest point is more than 2 units away
+result = pcf.order(
+    position,
+    velocity,
+    pcf.orderers.LocalFlowOrderer(
+        start_idx=start,
+        metric_scale=1.0,
+        max_dist=2.0,
+    ),
+)
+
+# Check if any points were skipped
+if result.n_skipped > 0:
+    print(f"Skipped {result.n_skipped} points")
 ```
 
 ## Bidirectional Walks (Forward and Reverse)
 
-For streams that extend in both directions from a starting point, run forward and reverse walks separately, then combine them:
+For streams that extend in both directions from a starting point, walk both ways
+from it with `direction="both"`:
 
-```python
-# Run forward walk from starting point
+```{code-cell} python
+# Walk forward and backward from index 2, stitched into one ordering
 result = pcf.order(
     position,
     velocity,
@@ -222,8 +322,10 @@ This is particularly useful for:
 
 - Tracing complete stellar streams from a central progenitor
 - Exploring both tidal tails simultaneously
-- Verifying stream connectivity in both directions
-- Having different parameters for forward vs reverse walks
+
+To use different parameters in each direction (e.g. different `max_dist`), run the
+two walks separately and join them with `pcf.combine_results`; see the
+[Algorithm guide](algorithm.md#combining-forward-and-reverse-walks).
 
 ## JAX Integration
 
@@ -231,41 +333,35 @@ The algorithm is fully compatible with JAX transformations:
 
 ### JIT Compilation
 
-```python
+```{code-cell} python
+from functools import partial
+
 from jax import jit
 
 
-@jit
-def order_stream(pos, vel):
+# start_idx is a static field of the orderer, so it is a static argument here
+# (each new value recompiles).
+@partial(jit, static_argnames="start_idx")
+def order_stream(pos, vel, start_idx):
     return pcf.order(
-        pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+        pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=start_idx, metric_scale=1.0)
     )
 
 
-result = order_stream(position, velocity)
+result = order_stream(position, velocity, start_idx=start)
 ```
 
 ### Vectorization
 
-```python
-from jax import vmap
-
-# Position and velocity for a single stream
-position = {
-    "x": jnp.array([0.0, 1.0, 2.0, 3.0]),
-    "y": jnp.array([0.0, 0.5, 1.0, 1.5]),
-}
-velocity = {
-    "x": jnp.array([1.0, 1.0, 1.0, 1.0]),
-    "y": jnp.array([0.5, 0.5, 0.5, 0.5]),
-}
-
-# To process multiple streams, use vmap with careful handling of dictionaries
-# See the JAX integration guide for detailed examples
-```
+To order many streams at once, stack them along a leading axis and `vmap` over
+it; see [Vectorization](jax-integration.md#vectorization-vmap) in the JAX
+Integration guide.
 
 ## Next Steps
 
+- [The default pipeline](orderers.md#the-default-pipeline-mst-then-som) - what `pcf.order(pos, vel)` runs: an MST backbone refined by a SOM, and how to tune it
+- [Tutorials](../tutorials/index.md) - Worked examples, starting with a simulated stellar stream
+- [Autoencoder](nn.md) - Order every point, including the ones the walk skipped, and fit a smooth track - or run the whole thing in one call with `pcf.fit_track`
 - [Algorithm Details](algorithm.md) - Understand the math
-- [API Design](api-design.md) - Learn about the dict-based API
+- [Orderers](orderers.md) - Choose between the default pipeline, the walk and the MST
 - [JAX Integration](jax-integration.md) - Advanced JAX usage

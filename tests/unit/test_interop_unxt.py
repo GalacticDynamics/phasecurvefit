@@ -1,5 +1,9 @@
 """Tests for unxt interoperability with phasespace functions."""
 
+import re
+
+import pytest
+
 import quaxed.numpy as jnp
 import unxt as u
 
@@ -175,3 +179,35 @@ class TestCosineSimilarityQuantity:
 
         # Dot product of unit vectors is dimensionless
         assert result.unit == u.unit("")
+
+
+class TestUsysGuidance:
+    """The missing-``usys`` error must name a way in that the caller has.
+
+    The orderer dispatches accept ``metadata`` only, so the example in the error
+    must be the ``metadata`` route, not a ``usys`` kwarg that does not exist.
+    """
+
+    @staticmethod
+    def _quantity_data():
+        return (
+            {"x": u.Q(jnp.array([0.0, 1.0, 2.0]), "m")},
+            {"x": u.Q(jnp.array([1.0, 1.0, 1.0]), "m/s")},
+        )
+
+    def test_order_names_the_metadata_route_it_actually_accepts(self):
+        """``order`` has no ``usys`` kwarg, so suggesting one would misdirect."""
+        q, p = self._quantity_data()
+        with pytest.raises(TypeError, match=re.escape("order(q, p, metadata=")):
+            pcf.order(q, p, pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(1.0, "m")))
+
+    def test_metadata_and_usys_together_merge(self):
+        """The path that ``dict(metadata)`` used to break outright."""
+        q, p = self._quantity_data()
+        result = pcf.order(
+            q,
+            p,
+            pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=u.Q(1.0, "m")),
+            metadata=pcf.StateMetadata(note="carried", usys=u.unitsystems.si),
+        )
+        assert result.indices.shape == (3,)

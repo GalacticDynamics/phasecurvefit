@@ -20,7 +20,7 @@ import jax.random as jr
 import jax.tree as jtu
 import optax
 import plum
-from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray, PyTree
+from jaxtyping import Array, Bool, Float, Int, Key, PRNGKeyArray, PyTree
 
 from jaxmore.nn import masked_mean
 
@@ -1065,20 +1065,30 @@ def train_autoencoder(
     /,
     *,
     config: TrainingConfig | None = None,
+    chord: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[AutoencoderResult, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
-    r"""Train the PathAutoencoder in two phases.
+    r"""Train the PathAutoencoder in three phases.
 
-    This function orchestrates the complete two-phase training procedure:
+    This function orchestrates the complete three-phase training procedure:
 
     **Phase 1 (OrderingNet/Encoder)**: Trains the encoder to predict $\gamma$
     (ordering parameter) and $p$ (membership probability) from phase-space
     coordinates. Uses the ordering from the walk algorithm as supervision.
 
-    **Phase 2 (TrackNet/Decoder)**: Trains the decoder to reconstruct spatial
-    positions from $\gamma$ while aligning with velocity directions. Uses the
-    trained encoder to filter stream members based on membership probability
-    threshold.
+    **Phase 2 (TrackNet/Decoder)**: Trains the decoder, with the encoder
+    frozen, to reproduce a running mean of member positions as a function of
+    $\gamma$. Uses the trained encoder to filter stream members based on the
+    membership probability threshold.
+
+    **Phase 3 (joint)**: Trains encoder and decoder together on spatial
+    reconstruction plus velocity alignment, with the velocity weight ramped
+    over ``config.lambda_p``. Skipped when ``config.n_epochs_both == 0``.
+
+    Each phase optimizes a different objective, so the concatenated ``losses``
+    are not comparable across phase boundaries. The returned model holds the
+    weights from the final epoch of the last phase that ran; no best-epoch
+    checkpoint is kept.
 
     Parameters
     ----------
@@ -1089,8 +1099,12 @@ def train_autoencoder(
     ordering_indices : Int[Array, " N"]
         Ordering indices from walk algorithm. Valid indices (>= 0) indicate
         ordered tracers; -1 indicates skipped/unordered tracers.
+    chord : Array, shape (N,) | None, keyword-only
+        The orderer's arc-length parameter (``OrderingResult.chord``), passed
+        through to the encoder's arclength target. The ``OrderingResult``
+        overload supplies this automatically.
     config : TrainingConfig | None, optional
-        Complete training configuration for both phases.
+        Complete training configuration for all three phases.
         If `None` (default), uses default configuration.
     key : PRNGKeyArray
         Random key for training (split internally for each phase).
@@ -1101,8 +1115,8 @@ def train_autoencoder(
         Result containing the fully trained autoencoder and ordering data.
     opt_states : dict[str, optax.OptState]
         Dictionary with 'encoder', 'decoder' and 'both' optimizer states.
-    losses : Array, shape (n_epochs_encoder + n_epochs_both,)
-        Concatenated training losses from both phases.
+    losses : Array, shape (n_epochs_encoder + n_epochs_decoder + n_epochs_both,)
+        Per-epoch training losses of the three phases, concatenated in order.
 
     """
     # Build default config if none provided
@@ -1110,8 +1124,7 @@ def train_autoencoder(
         config = TrainingConfig()
 
     # Split the keys
-    keys: tuple[PRNGKeyArray, ...]
-    key, *keys = jr.split(key, 6)
+    keys: Key[Array, " 5"] = jr.split(key, 5)
 
     # ===========================================
     # Train Encoder
@@ -1121,7 +1134,12 @@ def train_autoencoder(
 
     # Train the encoder
     encoder, encoder_opt_state, encoder_losses = train_ordering_net(
-        model.encoder, all_ws, ordering_indices, config=config_encoder, key=keys[0]
+        model.encoder,
+        all_ws,
+        ordering_indices,
+        config=config_encoder,
+        chord=chord,
+        key=keys[0],
     )
 
     # Model surgery: put the updated encoder back into the model
@@ -1163,6 +1181,9 @@ def train_autoencoder(
         member_train=decoder_mask,
     )
     mean_qs = jax.vmap(mean_fn, (0, None))(gamma_ord, keys[2])
+    # Masked-out points can have empty windows (NaN targets). They don't enter
+    # the loss, but NaN * 0 is still NaN, so zero them explicitly.
+    mean_qs = jnp.where(decoder_mask[:, None], mean_qs, 0.0)
 
     # Train the decoder to reconstruct the running-mean positions from gamma.
     config_decoder = config.decoderonly_config()
@@ -1172,7 +1193,7 @@ def train_autoencoder(
         qs_mean=mean_qs,
         mask=decoder_mask,
         config=config_decoder,
-        key=keys[2],
+        key=keys[3],
     )
 
     # Model surgery: put the updated decoder back into the model
@@ -1186,7 +1207,7 @@ def train_autoencoder(
 
     # Train the decoder.
     model, autoencoder_opt_state, autoencoder_losses = train_ordering_and_track_net(
-        model, all_ws, mask=is_member, config=config_autoencoder, key=keys[3]
+        model, all_ws, mask=is_member, config=config_autoencoder, key=keys[4]
     )
 
     # ===========================================
@@ -1241,7 +1262,12 @@ def train_autoencoder(
 
     # Train the model
     result, opt_states, losses = train_autoencoder(
-        model, ws, walk_results.indices, config=config, key=key
+        model,
+        ws,
+        walk_results.indices,
+        config=config,
+        chord=walk_results.chord,
+        key=key,
     )
 
     return result, opt_states, losses

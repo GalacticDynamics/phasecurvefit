@@ -26,7 +26,7 @@ from jaxtyping import Array, Bool, Int, PRNGKeyArray
 from zeroth import zeroth
 
 from phasecurvefit._src.abstract_result import AbstractResult
-from phasecurvefit._src.custom_types import BSzN, ISz0, ISzN, VectorComponents
+from phasecurvefit._src.custom_types import BSzN, FSzN, ISz0, ISzN, VectorComponents
 
 
 class OrderingResult(AbstractResult):
@@ -47,6 +47,29 @@ class OrderingResult(AbstractResult):
         Optional ordered polyline (tip-to-tip) that ``__call__`` interpolates
         along. ``None`` for walk-style results, which interpolate along the
         ordered visited observations instead.
+    backbone_size : Int[Array, ""] | None
+        Number of valid leading vertices in ``backbone`` when it has been
+        padded to a static shape (e.g. by ``MSTOrderer`` under
+        ``jax.pure_callback``, where the true backbone length is data-dependent
+        and unknown at trace time). ``None`` (default) means every vertex in
+        ``backbone`` is valid.
+    chord : Float[Array, " n_obs"] | None
+        Arc length along the curve this result represents, per observation, in
+        **input order** -- not reordered. Unvisited observations carry ``nan``.
+
+        This is the physical along-track coordinate: the distance travelled from
+        the curve's start, in position units. Unlike the ordering, it is
+        continuous and it reflects how the observations are actually spaced, so
+        it is the natural affine parameter for a downstream fit. ``None`` when
+        the orderer does not provide one, in which case consumers fall back to
+        index-uniform spacing.
+    velocity_aware : bool
+        Inherited from :class:`~phasecurvefit._src.abstract_result.AbstractResult`.
+        For an orderer, it reflects the *metric* it was configured with -- see
+        ``AbstractDistanceMetric.uses_velocity`` -- not any scale parameter: a
+        zero scale makes a phase-space metric numerically position-only, but
+        the orderer is still configured to use velocity. Orderers that order on
+        position alone leave it ``False``.
 
     Examples
     --------
@@ -120,6 +143,8 @@ class OrderingResult(AbstractResult):
     _: KW_ONLY
     gamma_range: tuple[float, float] = eqx.field(static=True, default=(0.0, 1.0))
     backbone: VectorComponents | None = None
+    backbone_size: ISz0 | None = None
+    chord: FSzN | None = None
 
     def __check_init__(self) -> None:
         """Reject a degenerate ``gamma_range`` (its width divides in ``__call__``)."""
@@ -209,11 +234,18 @@ class OrderingResult(AbstractResult):
         return idx_lower, idx_upper, indices_float - floor
 
     def _interp_backbone(self, gamma_normalized: Array) -> VectorComponents:
-        """Interpolate along the static backbone polyline vertices."""
-        n_control = len(zeroth(self.backbone.values()))
-        if n_control == 0:
-            msg = "Cannot interpolate: the backbone has no vertices."
-            raise ValueError(msg)
+        """Interpolate along the backbone polyline vertices.
+
+        Uses ``backbone_size`` as the valid vertex count when set (the backbone
+        arrays may be padded to a static shape beyond that point).
+        """
+        if self.backbone_size is None:
+            n_control = len(zeroth(self.backbone.values()))
+            if n_control == 0:
+                msg = "Cannot interpolate: the backbone has no vertices."
+                raise ValueError(msg)
+        else:
+            n_control = self.backbone_size
         lo, hi, w = self._lerp_bracket(gamma_normalized, n_control)
 
         def interpolate_component(vals: Array) -> Array:

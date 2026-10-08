@@ -113,14 +113,14 @@ def simple_3d_stream(rng_key: PRNGKeyArray) -> tuple[dict, dict]:
 def simple_wlf_result(simple_2d_stream):
     """Create a phase-flow walk result."""
     pos, vel = simple_2d_stream
-    return pcf.order(pos, vel)
+    return pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
 
 
 @pytest.fixture
 def medium_wlf_result(medium_2d_stream):
     """Create a phase-flow walk result for 100 points."""
     pos, vel = medium_2d_stream
-    return pcf.order(pos, vel)
+    return pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
 
 
 @pytest.fixture
@@ -145,7 +145,7 @@ def medium_autoencoder(medium_wlf_result, rng_key):
 def trained_autoencoder(simple_2d_stream, rng_key):
     """Create and train an autoencoder."""
     pos, vel = simple_2d_stream
-    walkresult = pcf.order(pos, vel)
+    walkresult = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
 
     normalizer = pcf.nn.StandardScalerNormalizer(
         walkresult.positions, walkresult.velocities
