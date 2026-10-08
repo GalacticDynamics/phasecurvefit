@@ -174,7 +174,9 @@ Use the convenience function to get reordered arrays:
 ordered_pos, ordered_vel = pcf.order_w(result)
 
 # The helix climbs monotonically in z once ordered
-print(jnp.all(jnp.diff(ordered_pos["z"]) > 0))
+climbs = jnp.all(jnp.diff(ordered_pos["z"]) > 0)
+print(climbs)
+assert climbs
 ```
 
 ## Understanding the Result
