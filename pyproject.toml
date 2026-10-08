@@ -18,6 +18,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
+  "dataclassish>=0.8.0",
   "equinox>=0.13.5",
   "jax>=0.7.2",
   "jaxmore>=0.4.0",
