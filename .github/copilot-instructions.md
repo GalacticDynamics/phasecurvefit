@@ -20,8 +20,8 @@ using a variety of tools.
 - Orderers (`phasecurvefit.orderers`), all subclasses of `AbstractOrderer`:
   - `LocalFlowOrderer`: the local-flow walk (Nibauer et al. 2022); takes a
     `WalkConfig`, `metric_scale`, `start_idx`, `direction`, `max_dist`, etc.
-    - `MSTOrderer`: velocity-aware minimum-spanning-tree backbone, with optional
-      edge-length sigma-clipping (`edge_clip_sigma`) for outlier rejection.
+  - `MSTOrderer`: velocity-aware minimum-spanning-tree backbone, with optional
+    edge-length sigma-clipping (`edge_clip_sigma`) for outlier rejection.
   - `SOMOrderer`: 1-D Self-Organizing Map (Starkman et al. 2023); see also the
     `phasecurvefit.som` module.
   - `ChainOrderer`: runs stages in sequence, threading each result into the next
@@ -74,6 +74,7 @@ modelling the track. Training is built on `jaxmore.nn`.
 When `unxt` is installed, `order` accepts `Quantity` values:
 
 ```python
+import phasecurvefit as pcf
 import unxt as u
 
 pos = {"x": u.Q([0, 1, 2], "kpc"), "y": u.Q([0, 0.5, 1], "kpc")}
