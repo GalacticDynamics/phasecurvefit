@@ -277,6 +277,20 @@ class TestMSTEdgeClip:
         )
         assert int(res.n_skipped) == 0
 
+    def test_all_pieces_small_keeps_everything(self):
+        """Cuts that leave only small pieces stop clipping instead of emptying it.
+
+        Gaps alternate 1 and 10, so a tight clip cuts every long edge and leaves
+        300 pairs, each under 1% of the points: there is no main body.
+        """
+        x = np.concatenate([[0.0], np.cumsum(np.tile([1.0, 10.0], 300))])
+        pos = {"x": jnp.asarray(x), "y": jnp.zeros(x.size)}
+        vel = {"x": jnp.ones(x.size), "y": jnp.zeros(x.size)}
+        res = pcf.orderers.MSTOrderer(k=4, jump_cap=1e9, edge_clip_sigma=0.1).order(
+            pos, vel
+        )
+        assert int(res.n_visited) == x.size
+
     def test_composes_with_velocity_weight(self):
         """Clipping uses spatial length, so it still works with velocity weights."""
         pos, vel, is_outlier = _arc_with_interlopers(n_arc=200, n_out=15)

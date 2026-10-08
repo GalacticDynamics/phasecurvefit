@@ -212,6 +212,8 @@ def _sigma_clip_edges(
         small = alive & (sizes[labels] < size_min)
         if not small.any():  # cuts split off nothing small (e.g. a sparse gap)
             break
+        if small.sum() == alive.sum():  # every piece is small: no main body
+            break
         alive &= ~small
     return nodes[alive]
 
