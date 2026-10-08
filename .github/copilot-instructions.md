@@ -23,8 +23,8 @@ using a variety of tools.
 
 Pluggable metrics determine how the algorithm selects the next point:
 
-- `FullPhaseSpaceDistanceMetric` (default): True 6D Euclidean distance
-- `AlignedMomentumDistanceMetric`: NN+p metric with velocity alignment
+- `AlignedMomentumDistanceMetric` (default): NN+p metric with velocity alignment
+- `FullPhaseSpaceDistanceMetric`: True 6D Euclidean distance
 - `SpatialDistanceMetric`: Position-only (standard nearest-neighbor)
 - `AbstractDistanceMetric`: Base class for custom metrics
 
