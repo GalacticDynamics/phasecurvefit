@@ -139,8 +139,10 @@ class KDTree(AbstractQueryStrategy):
     """KD-tree strategy: spatial query followed by metric-based selection.
 
     This strategy uses a KD-tree to find the k nearest neighbors spatially,
-    then applies the metric to select the best one. Much more efficient for
-    large datasets, especially when most points have been visited.
+    and the walk then picks whichever of them is nearest under the metric.
+    This changes *which* point can be chosen (only spatial neighbors), not the
+    cost of a step: the metric and the spatial distance are still evaluated
+    for every point at each step, so this is not faster than `BruteForce`.
 
     The KD-tree is built once at the start of the walk.
 
@@ -154,9 +156,10 @@ class KDTree(AbstractQueryStrategy):
         ----------
         k : int, optional
             Number of candidate spatial neighbors to consider at each step,
-            *excluding* the current point itself. Default: 50. Increase for
-            more thorough searches; decrease for speed. Values larger than the
-            number of points are clamped to consider every other point.
+            *excluding* the current point itself. Default: 50. Larger values
+            allow longer jumps; smaller values keep the walk spatially local.
+            Values larger than the number of points are clamped to consider
+            every other point.
 
         """
         self.k = k
