@@ -1,3 +1,9 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+---
+
 # Self-Organizing Maps
 
 A **Self-Organizing Map** learns a 1-D lattice of *prototype* vectors in phase
@@ -22,7 +28,7 @@ orderer runs an {class}`~phasecurvefit.orderers.MSTOrderer` chained into a
 [The default pipeline](orderers.md#the-default-pipeline-mst-then-som)). Chaining
 it explicitly gives you control over both stages:
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 
 import phasecurvefit as pcf
@@ -38,10 +44,33 @@ result = pcf.order(pos, vel, chain)
 assert int(result.n_visited) == 120
 ```
 
+The smoothing shows on noisy data: the MST's backbone follows individual
+tracers, while the SOM's follows their average.
+
+```{code-cell} python
+import jax
+import matplotlib.pyplot as plt
+
+k1, k2 = jax.random.split(jax.random.key(1))
+noisy = {
+    "x": pos["x"] + 0.2 * jax.random.normal(k1, (120,)),
+    "y": pos["y"] + 0.2 * jax.random.normal(k2, (120,)),
+}
+mst = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0)
+
+fig, ax = plt.subplots(figsize=(6, 3.4))
+ax.plot(noisy["x"], noisy["y"], ".", c="0.7", ms=4, label="tracers")
+for name, orderer in {"MST": mst, "MST | SOM": chain}.items():
+    backbone = pcf.order(noisy, vel, orderer).backbone
+    ax.plot(backbone["x"], backbone["y"], lw=1.5, label=f"{name} backbone")
+ax.set(aspect="equal")
+ax.legend();
+```
+
 It also runs standalone, initializing itself by binning along the first
 principal axis of the positions:
 
-```python
+```{code-cell} python
 result = pcf.order(pos, vel, pcf.orderers.SOMOrderer(n_prototypes=12))
 assert int(result.n_visited) == 120
 ```
@@ -61,7 +90,7 @@ If you are ordering a near-closed loop or a phase-wrapped curve — exactly the
 case {class}`~phasecurvefit.orderers.MSTOrderer` exists for — chain after it
 instead of running the SOM standalone:
 
-```python
+```{code-cell} python
 chain = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0) | pcf.orderers.SOMOrderer()
 ```
 
@@ -97,7 +126,7 @@ Unlike the other orderers, the SOM produces a *continuous* along-track
 coordinate, not merely a permutation. `result.chord` is the arc length of each
 observation's projection onto the backbone, in input order:
 
-```python
+```{code-cell} python
 assert result.chord.shape == (120,)
 ```
 
@@ -227,7 +256,7 @@ simply in the wrong place, with nothing in the ordering quality to reveal it.
 Set `outlier_clip_sigma` to enable robust, iterated rejection by quantization
 error — each datum's distance to its own best-matching prototype:
 
-```python
+```{code-cell} python
 pcf.orderers.SOMOrderer(n_prototypes=25, outlier_clip_sigma=3.0)
 ```
 
@@ -270,7 +299,7 @@ the curve's tightest turn.
 Standalone, `SOMOrderer.order()` is traceable — `jit` it, or build the orderer
 inside one:
 
-```python
+```{code-cell} python
 import jax
 import jax.numpy as jnp
 
@@ -313,7 +342,7 @@ warning.
 
 The diversity has to come from the data, which is what `weights` is for:
 
-```python
+```{code-cell} python
 import jax
 import jax.numpy as jnp
 

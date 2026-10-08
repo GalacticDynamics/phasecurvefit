@@ -1,3 +1,9 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+---
+
 # Algorithm Details
 
 This page explains the mathematical foundations and implementation details of
@@ -199,7 +205,7 @@ direction by negating the velocity vectors. This is useful for:
 
 To use backward walks:
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 import phasecurvefit as pcf
 
@@ -236,7 +242,7 @@ For stellar streams that extend in both directions from a starting point (e.g.,
 from a progenitor or disruption point), the `combine_results()` function
 combines the results of two separate walks into a single coherent ordering:
 
-```python
+```{code-cell} python
 # Run forward and reverse walks separately
 result_forward = pcf.order(
     pos,
@@ -257,7 +263,7 @@ result = pcf.combine_results(result_forward, result_reverse)
 
 This can be simplified to:
 
-```python
+```{code-cell} python
 result = pcf.order(
     pos,
     vel,
@@ -283,7 +289,7 @@ The `WalkLocalFlowResult` object provides a `__call__` method that enables
 efficient linear interpolation of spatial positions along the walk ordering
 from an ordering parameter $\gamma \in [0, 1]$:
 
-```python
+```{code-cell} python
 import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
@@ -311,10 +317,24 @@ print("Interpolated x:", interpolated_pos["x"])  # Shape (5,)
 print("Interpolated y:", interpolated_pos["y"])  # Shape (5,)
 ```
 
+The interpolated track runs through the ordered observations:
+
+```{code-cell} python
+import matplotlib.pyplot as plt
+
+track = result(jnp.linspace(0.0, 1.0, 200))
+
+fig, ax = plt.subplots(figsize=(7, 3))
+ax.plot(pos["x"], pos["y"], ".", c="0.6", label="observations")
+ax.plot(track["x"], track["y"], lw=1, label=r"result($\gamma$)")
+ax.plot(interpolated_pos["x"], interpolated_pos["y"], "o", label="gamma_values")
+ax.legend();
+```
+
 The interpolator is **JAX-compatible** and works with all JAX transformations:
 
 **JIT Compilation:**
-```python
+```{code-cell} python
 @jax.jit
 def interpolate_position(gamma):
     return result(gamma)
@@ -325,7 +345,7 @@ pos_jitted = interpolate_position(0.5)
 ```
 
 **Vectorization (vmap):**
-```python
+```{code-cell} python
 # Interpolate batch of gamma values
 @jax.jit
 def interpolate_batch(gamma_array):
@@ -338,7 +358,7 @@ print("Shape:", pos_batch["x"].shape)  # (100,)
 ```
 
 **Automatic Differentiation (grad):**
-```python
+```{code-cell} python
 # Compute gradients with respect to gamma
 def loss_fn(gamma):
     pos = result(gamma)
@@ -350,7 +370,7 @@ gradient = grad_fn(0.5)
 ```
 
 **Composition of Transformations:**
-```python
+```{code-cell} python
 # JIT + vmap + grad combination
 @jax.jit
 def compute_gradients(gamma_array):
