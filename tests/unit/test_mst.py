@@ -277,13 +277,19 @@ class TestMSTEdgeClip:
         )
         assert int(res.n_skipped) == 0
 
-    def test_all_pieces_small_keeps_everything(self):
-        """Cuts that leave only small pieces stop clipping instead of emptying it.
+    @pytest.mark.parametrize("extra", [0, 7], ids=["pairs", "pairs+7"])
+    def test_fragmenting_cuts_keep_everything(self, extra):
+        """Cuts that shatter the stream stop clipping instead of emptying it.
 
         Gaps alternate 1 and 10, so a tight clip cuts every long edge and leaves
-        300 pairs, each under 1% of the points: there is no main body.
+        300 pairs, each under 1% of the points: there is no main body. With
+        ``extra`` points in one more run, that run is not "small", but rejecting
+        everything else would still discard most of the stream.
         """
-        x = np.concatenate([[0.0], np.cumsum(np.tile([1.0, 10.0], 300))])
+        gaps = np.tile([1.0, 10.0], 300)
+        if extra:
+            gaps = np.r_[gaps, np.ones(extra - 1), 10.0]
+        x = np.concatenate([[0.0], np.cumsum(gaps)])
         pos = {"x": jnp.asarray(x), "y": jnp.zeros(x.size)}
         vel = {"x": jnp.ones(x.size), "y": jnp.zeros(x.size)}
         res = pcf.orderers.MSTOrderer(k=4, jump_cap=1e9, edge_clip_sigma=0.1).order(
@@ -608,6 +614,19 @@ def _distinct_backbone(result):
     return bb[np.r_[True, np.any(np.diff(bb, axis=0) != 0, axis=1)]]
 
 
+_JAX_BACKENDS = [
+    pytest.param(pcf.neighbors.BucketKDTree, id="bucket"),
+    pytest.param(pcf.neighbors.BruteForce, id="brute"),
+    pytest.param(
+        pcf.neighbors.JaxKD,
+        id="jaxkd",
+        marks=pytest.mark.skipif(
+            not OptDeps.JAXKD.installed, reason="jaxkd not installed"
+        ),
+    ),
+]
+
+
 class TestMSTBackends:
     """``MSTOrderer(neighbors=...)``: every backend gives the scipy result."""
 
@@ -710,10 +729,18 @@ class TestMSTBackends:
         result = pcf.orderers.MSTOrderer(k=50, jump_cap=2.0).order(pos, vel)
         assert int(result.n_visited) == 200
 
-    def test_default_jit_matches_eager(self):
-        """The default backend traces, and jit equals eager."""
+    def test_workers_moved_to_scipy_backend(self):
+        """``MSTOrderer(workers=...)`` is gone; the thread count is on SciPy."""
+        with pytest.raises(TypeError, match="workers"):
+            pcf.orderers.MSTOrderer(workers=4)
+        orderer = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(workers=2))
+        assert orderer.neighbors.workers == 2
+
+    @pytest.mark.parametrize("make", _JAX_BACKENDS)
+    def test_jit_matches_eager(self, make):
+        """Every JAX backend traces, and jit equals eager."""
         pos, vel, _ = _open_arc(n=200)
-        orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=2.0)
+        orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=2.0, neighbors=make())
         eager = orderer.order(pos, vel).indices
         jitted = jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
         np.testing.assert_array_equal(np.asarray(jitted), np.asarray(eager))
@@ -753,10 +780,11 @@ class TestMSTBackends:
                 pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(pos, vel).indices
             )
 
-    def test_vmap_default_backend(self):
+    @pytest.mark.parametrize("make", _JAX_BACKENDS)
+    def test_vmap_matches_loop(self, make):
         """Vmap over two clouds equals two separate eager calls."""
         a, b = _open_arc(n=120, seed=0), _open_arc(n=120, seed=1)
-        orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0)
+        orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0, neighbors=make())
         batch_p = {c: jnp.stack([a[0][c], b[0][c]]) for c in a[0]}
         batch_v = {c: jnp.stack([a[1][c], b[1][c]]) for c in a[1]}
         got = jax.vmap(lambda p, v: orderer.order(p, v).indices)(batch_p, batch_v)
@@ -764,3 +792,23 @@ class TestMSTBackends:
             np.testing.assert_array_equal(
                 np.asarray(got[i]), np.asarray(orderer.order(p, v).indices)
             )
+
+    def test_float64_matches_scipy(self):
+        """Under x64 the default backend (eager and jit) matches SciPy."""
+        rng = np.random.default_rng(12)
+        t = np.sort(rng.uniform(0, 1, 300))
+        p = np.c_[10 * t, np.sin(3 * t), 0.1 * t] + rng.normal(0, 0.01, (300, 3))
+        p = p[rng.permutation(300)]
+        with jax.enable_x64(new_val=True):
+            pos, vel = _as_dicts(p, np.ones_like(p))
+            want = pcf.orderers.MSTOrderer(
+                k=10, jump_cap=2.0, neighbors=pcf.neighbors.SciPy()
+            ).order(pos, vel)
+            orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=2.0)
+            eager = orderer.order(pos, vel)
+            jitted = jax.jit(lambda q, v: orderer.order(q, v).indices)(pos, vel)
+            assert eager.backbone["x"].dtype == jnp.float64
+        np.testing.assert_array_equal(
+            np.asarray(eager.indices), np.asarray(want.indices)
+        )
+        np.testing.assert_array_equal(np.asarray(jitted), np.asarray(want.indices))

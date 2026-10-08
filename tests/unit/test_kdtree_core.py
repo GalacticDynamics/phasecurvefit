@@ -70,6 +70,33 @@ class TestSelect:
         np.testing.assert_array_equal(np.asarray(vals), [[0.0, 1.0, 1.0]])
         np.testing.assert_array_equal(np.asarray(out), [[2, 4, 7]])
 
+    def test_top_k_path_exact_beyond_float32_columns(self):
+        """Rows wider than 2**24: a strictly nearer point is never dropped.
+
+        A float32 key over column numbers stops being exact there and used to
+        let a point tied at the k-th value displace the nearest one.
+        """
+        w = 2**24 + 4
+        a = jnp.full((1, w), 2.0, jnp.float32).at[0, w - 1].set(0.0)
+        a = a.at[0, :2].set(1.0)
+        vals, ids = ksmallest(a, jnp.arange(w, dtype=jnp.int32)[None], 2, top_k=True)
+        np.testing.assert_array_equal(np.asarray(vals), [[0.0, 1.0]])
+        np.testing.assert_array_equal(np.asarray(ids), [[w - 1, 0]])
+
+    def test_trace_size_flat_in_k(self):
+        """k=64 traces to a small program (an unrolled O(k**2) sort was ~19k ops).
+
+        Counting jaxpr equations bounds compile time deterministically; a timed
+        compile could hang the run instead of failing it.
+        """
+        a = jnp.zeros((8, 256), jnp.float32)
+        ids = jnp.zeros((8, 256), jnp.int32)
+        for top_k in (False, True):
+            jx = jax.make_jaxpr(lambda x, i, t=top_k: ksmallest(x, i, 64, top_k=t))(
+                a, ids
+            )
+            assert len(jx.jaxpr.eqns) < 1000
+
     def test_large_k_compiles(self):
         """Trace size does not grow as k**2 (k=64 compiled for minutes before)."""
         a = jnp.asarray(np.random.default_rng(0).random((50, 256)), jnp.float32)
@@ -181,6 +208,15 @@ class TestAllKnn:
         """Every n, including n <= k (sentinel rows), matches brute force."""
         p = np.random.default_rng(n).normal(size=(n, 3)).astype(np.float32)
         _assert_exact(p, *_all(p, **kw), 10)
+
+    @pytest.mark.parametrize("n", [17, 100, 300])
+    def test_float64(self, n):
+        """Under x64, float64 points stay float64 and stay exact."""
+        p = np.random.default_rng(n).normal(size=(n, 3))
+        with jax.enable_x64(new_val=True):
+            idx, d2 = kd.all_knn(jnp.asarray(p), 10, frontier=2)
+            assert d2.dtype == jnp.float64
+            _assert_exact(p, idx, d2, 10)
 
     @pytest.mark.parametrize("frontier", [16, 2])
     def test_duplicates(self, frontier):
