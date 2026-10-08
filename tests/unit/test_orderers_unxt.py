@@ -4,13 +4,13 @@ Mirrors the local-flow walk's Quantity-in / Quantity-out UX. Because MST is
 host-side, unit handling is a simple strip-in / reattach-out.
 """
 
+import dataclasses
+
 import equinox as eqx
 import jax.numpy as jnp
 import jax.tree as jt
 import numpy as np
 import pytest
-
-import dataclassish
 
 import phasecurvefit as pcf
 from phasecurvefit._src.algorithm import StateMetadata
@@ -193,7 +193,7 @@ def test_localflow_quantity_agrees_with_plain_field_by_field():
     # Strip result_q's Quantity-valued fields back to plain arrays so both
     # results share one pytree structure -- only then can eqx.tree_equal walk
     # them leaf-by-leaf together.
-    result_q_stripped = dataclassish.replace(
+    result_q_stripped = dataclasses.replace(
         result_q,
         positions={k: u.ustrip(usys, v) for k, v in result_q.positions.items()},
         velocities={k: u.ustrip(usys, v) for k, v in result_q.velocities.items()},

@@ -28,6 +28,7 @@ With Quantity-valued components:
 
 __all__: tuple[str, ...] = ()
 
+import dataclasses
 from collections.abc import Mapping
 from typing import Any, TypeAlias
 
@@ -37,7 +38,6 @@ import quax
 from jax import lax
 from jaxtyping import Array, ArrayLike, Float, Real
 
-import dataclassish
 import quaxed.numpy as qnp
 import unxt as u
 from unxt import AbstractQuantity as AbcQ
@@ -737,7 +737,7 @@ def _local_flow_walk(
         metadata=metadata,
         direction=direction,
     )
-    return dataclassish.replace(result, positions=positions, velocities=velocities)
+    return dataclasses.replace(result, positions=positions, velocities=velocities)
 
 
 @StandardScalerNormalizer.__init__.dispatch
@@ -837,7 +837,7 @@ def _order_with_backbone_and_chord(
         k: u.uconvert(positions[k].unit, u.Q(v, length_unit))
         for k, v in result.backbone.items()
     }
-    return dataclassish.replace(
+    return dataclasses.replace(
         result,
         positions=dict(positions),
         velocities=dict(velocities),
@@ -893,7 +893,7 @@ def order(
         # number, there is nothing to guess: whatever unit the caller
         # attached is stripped into ``usys``'s unit of that same dimension.
         stripped = u.ustrip(usys, self.metric_scale)
-        self = dataclassish.replace(self, metric_scale=stripped)
+        self = dataclasses.replace(self, metric_scale=stripped)
     return _order_with_backbone_and_chord(
         self, positions, velocities, metadata=metadata, init=init
     )
@@ -952,7 +952,7 @@ def order(
     chord_unit = _chord_unit(positions, usys)
     # ``velocity_aware`` is not set here: ``_local_flow_walk`` already derives
     # it from the same ``config``, so overriding would only restate it.
-    return dataclassish.replace(
+    return dataclasses.replace(
         result,
         chord=u.uconvert(chord_unit, u.Q(result.chord, usys["length"])),
     )
