@@ -314,7 +314,7 @@ def _local_flow_walk(
         Configuration for neighbor queries, containing both the distance metric
         and the query strategy. Use ``WalkConfig(metric=..., strategy=...)`` to
         customize. Defaults to ``WalkConfig()`` which uses
-        ``FullPhaseSpaceDistanceMetric`` with ``BruteForce``.
+        ``AlignedMomentumDistanceMetric`` with ``BruteForce``.
 
     metadata
         Optional metadata to pass through the algorithm state without
