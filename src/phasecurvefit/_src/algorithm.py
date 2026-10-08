@@ -171,8 +171,9 @@ class WalkLocalFlowResult(OrderingResult):
     - :attr:`ordered`: Positions/velocities reordered by walk
     - :attr:`skipped_indices`: Indices of unvisited observations
 
-    The interpolation method (:meth:`__call__`) enables smooth spatial
-    interpolation along the discovered path using a continuous ordering
+    The interpolation method
+    (:meth:`~phasecurvefit.orderers.OrderingResult.__call__`) enables smooth
+    spatial interpolation along the discovered path using a continuous ordering
     parameter $\gamma \in [0, 1]$.
 
     Examples

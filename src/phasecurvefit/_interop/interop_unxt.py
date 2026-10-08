@@ -857,7 +857,7 @@ def order(
 ) -> OrderingResult:
     """Order Quantity-valued tracers with the MST backbone.
 
-    See :func:`_order_with_backbone_and_chord` for the strip/run/reattach body
+    See ``_order_with_backbone_and_chord`` for the strip/run/reattach body
     shared with :class:`SOMOrderer`'s dispatch below.
     """
     return _order_with_backbone_and_chord(
@@ -876,7 +876,7 @@ def order(
 ) -> OrderingResult:
     """Order Quantity-valued tracers with the SOM.
 
-    See :func:`_order_with_backbone_and_chord` for the strip/run/reattach body
+    See ``_order_with_backbone_and_chord`` for the strip/run/reattach body
     shared with :class:`MSTOrderer`'s dispatch above.
 
     ``metric_scale``, unlike ``positions``/``velocities``, is not stripped by
