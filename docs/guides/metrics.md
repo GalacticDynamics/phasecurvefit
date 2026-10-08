@@ -2,6 +2,8 @@
 file_format: mystnb
 kernelspec:
   name: python3
+  display_name: Python 3
+  language: python
 ---
 
 # Distance Metrics Guide
