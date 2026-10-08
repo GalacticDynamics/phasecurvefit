@@ -413,8 +413,10 @@ in the walk.
    select the nearest one.
 2. **KDTree**: Restrict each step's candidates to the `k` spatially nearest
    points, then select by the metric (requires optional `jaxkd` dependency).
-   This is a candidate filter, not a speedup: each step still computes distances
-   to every point, so it is not faster than `BruteForce`.
+   Each step costs O(k) instead of O(n), after a one-off batched KD-tree query
+   that builds every point's neighbor list. On CPU that setup dominates, so it
+   beats `BruteForce` only on large datasets (tens of thousands of points and
+   up).
 
 ### Using Built-in Strategies
 
