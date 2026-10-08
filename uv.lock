@@ -1785,6 +1785,7 @@ wheels = [
 name = "phasecurvefit"
 source = { editable = "." }
 dependencies = [
+    { name = "dataclassish" },
     { name = "equinox" },
     { name = "jax" },
     { name = "jax-tqdm" },
@@ -1906,6 +1907,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "dataclassish", specifier = ">=0.8.0" },
     { name = "equinox", specifier = ">=0.13.5" },
     { name = "galax", marker = "extra == 'tutorials'", git = "https://github.com/GalacticDynamics/galax" },
     { name = "jax", specifier = ">=0.7.2" },
