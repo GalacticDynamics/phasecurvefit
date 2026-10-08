@@ -57,8 +57,8 @@ built for stellar streams but applies to any ordered phase-space data.
   `jaxtyping`
 - **Pluggable metrics**: Customizable distance metrics for different physical
   interpretations
-- **Pluggable query strategies**: Flexible neighbor search strategies (e.g.,
-  brute-force, KD-tree) to optimize performance
+- **Pluggable query strategies**: Choose which neighbors each step may move to
+  (e.g., all points, or only the k spatially nearest via a KD-tree)
 - **Pluggable orderers**: One interface over multiple ordering algorithms — by
   default an MST backbone refined by a SOM, with the velocity-following walk as
   an alternative
