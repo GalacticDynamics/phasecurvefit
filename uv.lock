@@ -1930,7 +1930,10 @@ dev = [
 ]
 docs = [
     { name = "galax" },
+    { name = "ipykernel" },
+    { name = "ipywidgets" },
     { name = "jaxkd" },
+    { name = "matplotlib" },
     { name = "myst-parser" },
     { name = "nbsphinx" },
     { name = "pytz" },
@@ -2042,7 +2045,10 @@ dev = [
 ]
 docs = [
     { name = "galax", git = "https://github.com/GalacticDynamics/galax" },
+    { name = "ipykernel", specifier = ">=7.1.0" },
+    { name = "ipywidgets", specifier = ">=8.1.8" },
     { name = "jaxkd", specifier = ">=0.0.5" },
+    { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "myst-parser", specifier = ">=4.0.0" },
     { name = "nbsphinx", specifier = ">=0.9.3" },
     { name = "pytz", specifier = ">=2024.2" },

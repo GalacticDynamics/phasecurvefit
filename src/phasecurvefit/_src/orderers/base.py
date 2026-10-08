@@ -57,8 +57,8 @@ def order(
     ``orderer`` defaults to :class:`~phasecurvefit.orderers.LocalFlowOrderer`, so
     ``order(positions, velocities)`` runs the velocity-following local-flow walk
     (equivalent to the deprecated ``walk_local_flow(positions, velocities)``).
-    Pass any :class:`AbstractOrderer` (e.g. ``MSTOrderer``) to select a different
-    algorithm.
+    Pass any :class:`~phasecurvefit.orderers.AbstractOrderer` (e.g.
+    ``MSTOrderer``) to select a different algorithm.
 
     Examples
     --------

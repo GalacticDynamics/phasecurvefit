@@ -15,7 +15,7 @@ phase-space bounding box. Two things go wrong.
    spot.
 
 2. **The reconstruction residual is never used.** The quantity that actually
-   *defines* an outlier -- the distance $r_n = \lVert q_n - x_\theta(\gamma_n)
+   *defines* an outlier -- the distance $r_n = \lVert q_n - x_{\theta}(\gamma_n)
    \rVert$ from the fitted track -- is computed by the decoder and then
    discarded as far as $p$ is concerned. No gradient flows from "this star is
    far from the track" to "lower its membership probability".
@@ -32,7 +32,7 @@ either from the stream or from a smooth background:
 
 .. math::
 
-    \mathcal{L}_n = \pi_n \, \mathcal{N}\!\left(q_n \,;\, x_\theta(\gamma_n),\,
+    \mathcal{L}_n = \pi_n \, \mathcal{N}\!\left(q_n \,;\, x_{\theta}(\gamma_n),\,
                      \sigma^2(\gamma_n) \mathbb{I}\right)
                   + (1 - \pi_n) \, \rho_{\mathrm{bg}}
 
@@ -548,7 +548,7 @@ def membership_responsibility(
     prob : Array, shape (N,)
         Encoder membership output $\pi_n$, in [0, 1].
     r2 : Array, shape (N,)
-        Squared residual $\lVert q_n - x_\theta(\gamma_n) \rVert^2$.
+        Squared residual $\lVert q_n - x_{\theta}(\gamma_n) \rVert^2$.
     sigma : Array, shape (N,)
         Stream half-width at each star's $\gamma$.
     log_bg_density : float
@@ -607,12 +607,12 @@ def mixture_membership_loss(
     .. math::
 
         -\log \mathcal{L} = -\frac{1}{N} \sum_n \log\!\left[
-            \pi_n \, \mathcal{N}\!\left(q_n; x_\theta(\gamma_n),
+            \pi_n \, \mathcal{N}\!\left(q_n; x_{\theta}(\gamma_n),
                                         \sigma_n^2 \mathbb{I}\right)
             + (1 - \pi_n) \, \rho_{\mathrm{bg}}
         \right]
 
-    Minimising this simultaneously fits the track ($x_\theta$), the width
+    Minimising this simultaneously fits the track ($x_{\theta}$), the width
     ($\sigma$), and the membership ($\pi$) -- and the last of these is now driven
     by the residual, which is the entire point.
 
@@ -625,7 +625,7 @@ def mixture_membership_loss(
     qs_meas : Array, shape (N, D)
         Observed positions.
     qs_pred : Array, shape (N, D)
-        Decoded track positions, $x_\theta(\gamma_n)$.
+        Decoded track positions, $x_{\theta}(\gamma_n)$.
     prob : Array, shape (N,)
         Encoder membership output $\pi_n$, in [0, 1].
     sigma : Array, shape (N,)
