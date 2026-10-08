@@ -161,8 +161,9 @@ def order(
     alone when there are too few tracers for the SOM, and bridging any gap in the
     stream rather than dropping a side of it. It takes no ``init`` (a
     ``ValueError`` says so). Pass any
-    :class:`AbstractOrderer` -- e.g. ``LocalFlowOrderer()`` for the
-    velocity-following walk -- to select a different algorithm.
+    :class:`~phasecurvefit.orderers.AbstractOrderer` -- e.g.
+    ``LocalFlowOrderer()`` for the velocity-following walk -- to select a
+    different algorithm.
 
     Examples
     --------

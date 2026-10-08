@@ -226,11 +226,11 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         -----
         The running mean is computed using a uniform (rectangular) kernel:
 
-        $$
-        \hat{x}(\gamma)
-            = \frac{\sum_i x_i \cdot \mathbb{1}_{|\gamma_i - \gamma| < w/2}}
-                    {\sum_i \mathbb{1}_{|\gamma_i - \gamma| < w/2}}
-        $$
+        .. math::
+
+            \hat{x}(\gamma)
+                = \frac{\sum_i x_i \cdot \mathbb{1}_{|\gamma_i - \gamma| < w/2}}
+                        {\sum_i \mathbb{1}_{|\gamma_i - \gamma| < w/2}}
 
         where $w$ is the window size and the sums run over member samples.
         When the denominator is zero (an empty window), see ``empty_window``.
