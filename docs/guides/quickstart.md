@@ -1,3 +1,9 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+---
+
 # Quickstart Guide
 
 Get started with phasecurvefit in 5 minutes!
@@ -41,7 +47,7 @@ the JAX Integration guide.
 
 ### 1. Import the library
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 import phasecurvefit as pcf
 ```
@@ -52,17 +58,37 @@ Phase-space data is represented as two dictionaries:
 - **position**: Maps coordinate names to position arrays
 - **velocity**: Maps coordinate names to velocity arrays
 
-```python
-# Example: 2D stream
+Any number of dimensions works. As an example, take 100 points on a 3D helix,
+shuffled so the order is unknown:
+
+```{code-cell} python
+import jax
+
+t = jax.random.permutation(jax.random.key(0), jnp.linspace(0, 4 * jnp.pi, 100))
+
 position = {
-    "x": jnp.array([0.0, 1.0, 2.0, 3.0, 4.0]),
-    "y": jnp.array([0.0, 0.5, 1.0, 1.5, 2.0]),
+    "x": jnp.cos(t),
+    "y": jnp.sin(t),
+    "z": t / (2 * jnp.pi),
 }
 
 velocity = {
-    "x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0]),
-    "y": jnp.array([0.5, 0.5, 0.5, 0.5, 0.5]),
+    "x": -jnp.sin(t),
+    "y": jnp.cos(t),
+    "z": jnp.ones_like(t) / (2 * jnp.pi),
 }
+```
+
+Connecting the points in their stored order shows they are scrambled:
+
+```{code-cell} python
+import matplotlib.pyplot as plt
+
+fig = plt.figure()
+ax = fig.add_subplot(projection="3d")
+ax.set_box_aspect(None, zoom=0.85)
+ax.plot(position["x"], position["y"], position["z"], "-o", ms=3, lw=0.5)
+ax.set(xlabel="x", ylabel="y", zlabel="z", title="Input order");
 ```
 
 ### 3. Run the algorithm
@@ -73,16 +99,27 @@ graph, which runs from one end of the curve to the other) refined by a
 Self-Organizing Map. It needs no start point, and it orients the ordering along
 the velocity.
 
-```python
+```{code-cell} python
 result = pcf.order(position, velocity)
 
-print(result.ordering)
-# Array([0, 1, 2, 3, 4])
+print(result.ordering[:5])
 assert result.gamma_range == (-1.0, 1.0)  # the default pipeline's, not the walk's
 ```
 
+Connecting the points in the recovered order traces the helix:
+
+```{code-cell} python
+ordered_pos, ordered_vel = pcf.order_w(result)
+
+fig = plt.figure()
+ax = fig.add_subplot(projection="3d")
+ax.set_box_aspect(None, zoom=0.85)
+ax.plot(ordered_pos["x"], ordered_pos["y"], ordered_pos["z"], "-o", ms=3, lw=1)
+ax.set(xlabel="x", ylabel="y", zlabel="z", title="Recovered order");
+```
+
 The SOM needs at least 15 tracers (its default number of prototypes) to fit; with
-fewer, as in this five-point example, `pcf.order` returns the MST ordering alone.
+fewer, `pcf.order` returns the MST ordering alone.
 See [The default pipeline](orderers.md#the-default-pipeline-mst-then-som).
 
 #### The local-flow walk
@@ -105,18 +142,21 @@ point's velocity — so the walk favors candidates that are close and roughly
 - **How strongly to prefer "ahead"** (`metric_scale`), explained in
   [Adjusting the Metric Scale](#adjusting-the-metric-scale).
 
-```python
+Here we start at the bottom of the helix; the walk examples below reuse `start`:
+
+```{code-cell} python
+start = int(jnp.argmin(position["z"]))
+
 result = pcf.order(
     position,
     velocity,
     pcf.orderers.LocalFlowOrderer(
-        start_idx=0,  # Start from first point
+        start_idx=start,  # Start from one end of the curve
         metric_scale=1.0,  # Metric-dependent scale parameter
     ),
 )
 
-print(result.ordering)
-# Array([0, 1, 2, 3, 4])
+print(result.ordering[:5])
 ```
 
 ```{note}
@@ -130,11 +170,11 @@ this page is about the walk's settings.
 
 Use the convenience function to get reordered arrays:
 
-```python
+```{code-cell} python
 ordered_pos, ordered_vel = pcf.order_w(result)
 
-print(ordered_pos["x"])
-# Array([0., 1., 2., 3., 4.])
+# The helix climbs monotonically in z once ordered
+print(jnp.all(jnp.diff(ordered_pos["z"]) > 0))
 ```
 
 ## Understanding the Result
@@ -172,39 +212,39 @@ Raise `metric_scale` if the walk jumps between neighbouring strands; lower it if
 it skips too much. See the [Metrics guide](metrics.md#choosing-metric_scale) for
 the other metrics.
 
-```python
+```{code-cell} python
 # With the default metric, metric_scale=0 switches off the momentum penalty:
 # pure nearest neighbor
 result_spatial = pcf.order(
-    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=0.0)
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=0.0)
 )
 
 # Balanced (default)
 result_balanced = pcf.order(
-    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=1.0)
 )
 
 # Higher metric_scale value (interpretation metric-dependent)
 result_momentum = pcf.order(
-    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=5.0)
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=5.0)
 )
 ```
 
 ## Walking in Reverse
 
-Use the `direction` parameter to trace streams backwards by negating the velocity vectors:
+Use the `direction` parameter to trace phase curves backwards by negating the velocity vectors:
 
-```python
+```{code-cell} python
 # Default: forward walk following the velocity direction
 result_forward = pcf.order(
-    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=1.0)
 )
 
 # Reverse: walk against the velocity direction
 result_reverse = pcf.order(
     position,
     velocity,
-    pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0, direction="backward"),
+    pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=1.0, direction="backward"),
 )
 ```
 
@@ -214,19 +254,19 @@ This is useful for tracing stellar streams from the tidal tail back towards the 
 
 Use `WalkConfig` to configure the distance metric and query strategy:
 
-```python
+```{code-cell} python
 from phasecurvefit.metrics import AlignedMomentumDistanceMetric
 
 # Configure with aligned momentum metric and KD-tree strategy
 config = pcf.WalkConfig(
     metric=AlignedMomentumDistanceMetric(),
-    strategy=pcf.strats.KDTree(k=5),  # Only 5 points in the fake dataset
+    strategy=pcf.strats.KDTree(k=5),
 )
 
 result = pcf.order(
     position,
     velocity,
-    pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+    pcf.orderers.LocalFlowOrderer(config=config, start_idx=start, metric_scale=1.0),
 )
 ```
 
@@ -239,13 +279,13 @@ Set it to several times the typical spacing between neighbouring points. The
 points the walk never reaches are reported as skipped; the
 [autoencoder](nn.md) can assign them an ordering afterwards.
 
-```python
+```{code-cell} python
 # Stop if next nearest point is more than 2 units away
 result = pcf.order(
     position,
     velocity,
     pcf.orderers.LocalFlowOrderer(
-        start_idx=0,
+        start_idx=start,
         metric_scale=1.0,
         max_dist=2.0,
     ),
@@ -256,36 +296,12 @@ if result.n_skipped > 0:
     print(f"Skipped {result.n_skipped} points")
 ```
 
-## Working in 3D
-
-The algorithm works in any number of dimensions:
-
-```python
-# 3D helix
-t = jnp.linspace(0, 4 * jnp.pi, 100)
-position = {
-    "x": jnp.cos(t),
-    "y": jnp.sin(t),
-    "z": t / (2 * jnp.pi),
-}
-
-velocity = {
-    "x": -jnp.sin(t),
-    "y": jnp.cos(t),
-    "z": jnp.ones_like(t) / (2 * jnp.pi),
-}
-
-result = pcf.order(
-    position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=2.0)
-)
-```
-
 ## Bidirectional Walks (Forward and Reverse)
 
 For streams that extend in both directions from a starting point, walk both ways
 from it with `direction="both"`:
 
-```python
+```{code-cell} python
 # Walk forward and backward from index 2, stitched into one ordering
 result = pcf.order(
     position,
@@ -315,14 +331,14 @@ The algorithm is fully compatible with JAX transformations:
 
 ### JIT Compilation
 
-```python
+```{code-cell} python
 from jax import jit
 
 
 @jit
 def order_stream(pos, vel):
     return pcf.order(
-        pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
+        pos, vel, pcf.orderers.LocalFlowOrderer(start_idx=start, metric_scale=1.0)
     )
 
 

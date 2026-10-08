@@ -185,7 +185,7 @@ The current implementation supports:
 - **Conditional termination**: `terminate_indices` parameter
 - **Limited search**: `n_max` parameter
 - **Gap filling**: Autoencoder neural network for skipped tracers
-- **Reverse walks**: `direction="backward"` parameter to trace streams backwards by negating velocities
+- **Reverse walks**: `direction="backward"` parameter to trace phase curves backwards by negating velocities
 - **Bidirectional walks**: `combine_results()` to trace streams in both directions simultaneously
 
 ### Reverse Walks
