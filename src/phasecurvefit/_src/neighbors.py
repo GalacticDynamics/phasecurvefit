@@ -304,6 +304,9 @@ class SciPy(AbstractNeighborSearch):
         if not np.all(np.isfinite(p)) or (q is not None and not np.all(np.isfinite(q))):
             raise ValueError(_NOT_FINITE)
         n = p.shape[0]
+        if n == 0:  # don't rely on cKDTree's behaviour for an empty tree
+            m = 0 if q is None else q.shape[0]
+            return jnp.zeros((m, k), jnp.int32), jnp.full((m, k), jnp.inf, p.dtype)
         tree = cKDTree(p)
         if q is not None:
             dd, ii = tree.query(q, k=k, workers=self.workers)
