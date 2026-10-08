@@ -661,6 +661,41 @@ class TestMSTBackends:
         with pytest.raises(TypeError, match="BucketKDTree"):
             jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
 
+    def test_scipy_raises_under_grad_wrt_velocities(self):
+        """Grad w.r.t. velocities alone (positions concrete) also raises TypeError."""
+        pos, vel, _ = _open_arc(n=60)
+        orderer = pcf.orderers.MSTOrderer(
+            k=8, jump_cap=2.0, neighbors=pcf.neighbors.SciPy()
+        )
+
+        def loss(vx):
+            return orderer.order(pos, {**vel, "x": vx}).backbone["x"].sum()
+
+        with pytest.raises(TypeError, match="BucketKDTree"):
+            jax.grad(loss)(vel["x"])
+
+    @pytest.mark.parametrize("bad", ["scipy", None, pcf.neighbors.SciPy])
+    def test_bad_neighbors_rejected_at_construction(self, bad):
+        """A string, None or a class (not an instance) fails at construction."""
+        with pytest.raises(TypeError, match="neighbors must be"):
+            pcf.orderers.MSTOrderer(neighbors=bad)
+
+    def test_grid_ties_jit_matches_eager(self):
+        """Equidistant neighbours (a grid) give the same ordering eager and jit."""
+        g = np.stack(np.meshgrid(np.arange(7.0), np.arange(5.0)), -1).reshape(-1, 2)
+        pos = {"x": jnp.asarray(g[:, 0], jnp.float32), "y": jnp.asarray(g[:, 1])}
+        vel = {"x": jnp.ones(35), "y": jnp.zeros(35)}
+        orderer = pcf.orderers.MSTOrderer(k=3, jump_cap=1e9, on_disconnected="largest")
+        eager = orderer.order(pos, vel).indices
+        jitted = jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
+        np.testing.assert_array_equal(np.asarray(jitted), np.asarray(eager))
+
+    def test_large_k_default_backend(self):
+        """k=50 on the default backend compiles in reasonable time (was a hang)."""
+        pos, vel, _ = _open_arc(n=200)
+        result = pcf.orderers.MSTOrderer(k=50, jump_cap=2.0).order(pos, vel)
+        assert int(result.n_visited) == 200
+
     def test_default_jit_matches_eager(self):
         """The default backend traces, and jit equals eager."""
         pos, vel, _ = _open_arc(n=200)

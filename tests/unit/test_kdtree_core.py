@@ -43,7 +43,8 @@ class TestSelect:
         a[:, 2 % width] = 0.5  # ties
         a[:7] = np.inf
         a[:7, 0] = 0.1  # rows with fewer than k finite entries
-        vals, cols = jax.jit(functools.partial(ksmallest, k=k))(jnp.asarray(a))
+        ids = jnp.broadcast_to(jnp.arange(width), a.shape)
+        vals, cols = jax.jit(functools.partial(ksmallest, k=k))(jnp.asarray(a), ids)
         vals, cols = np.asarray(vals), np.asarray(cols)
         padded = np.concat(
             [a, np.full((500, max(0, k - width)), np.inf, np.float32)], axis=1
@@ -52,12 +53,30 @@ class TestSelect:
         np.testing.assert_array_equal(vals, ref)
         finite = np.isfinite(vals)
         np.testing.assert_array_equal(
-            np.take_along_axis(padded, cols, 1)[finite], ref[finite]
+            np.take_along_axis(padded, np.where(finite, cols, 0), 1)[finite],
+            ref[finite],
         )
         for r in range(7, 500):
-            assert len(set(cols[r].tolist())) == k
+            assert len(set(cols[r][finite[r]].tolist())) == finite[r].sum()
         kth = np.asarray(kth_smallest(jnp.asarray(a), k))
         np.testing.assert_array_equal(kth, ref[:, -1])
+
+    @pytest.mark.parametrize("top_k", [False, True])
+    def test_ties_go_to_lower_id_not_column(self, top_k):
+        """At the k-th value, the lower *id* wins whatever the column order."""
+        a = jnp.asarray([[3.0, 1.0, 1.0, 1.0, 0.0]])
+        ids = jnp.asarray([[0, 9, 4, 7, 2]])
+        vals, out = ksmallest(a, ids, 3, top_k=top_k)
+        np.testing.assert_array_equal(np.asarray(vals), [[0.0, 1.0, 1.0]])
+        np.testing.assert_array_equal(np.asarray(out), [[2, 4, 7]])
+
+    def test_large_k_compiles(self):
+        """Trace size does not grow as k**2 (k=64 compiled for minutes before)."""
+        a = jnp.asarray(np.random.default_rng(0).random((50, 256)), jnp.float32)
+        vals, _ = jax.jit(functools.partial(ksmallest, k=64))(
+            a, jnp.broadcast_to(jnp.arange(256), a.shape)
+        )
+        np.testing.assert_array_equal(np.asarray(vals), np.sort(a, 1)[:, :64])
 
 
 def _stream(n, seed=0, interlopers=0.0):

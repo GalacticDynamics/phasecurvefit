@@ -64,11 +64,36 @@ def _gathered_distance(points: Array, queries: Array | None, ii: Array, /) -> Ar
     return jnp.where(ii >= n, jnp.inf, _safe_sqrt(jnp.sum(diff * diff, -1)))
 
 
+_NOT_FINITE = "kNN inputs must be finite (no NaN or inf)."
+
+
+def _check_args(points: Array, k: int, queries: Array | None, /) -> None:
+    """Check ``k >= 1`` and (n, d) shapes; shared by every backend."""
+    if isinstance(k, bool) or not isinstance(k, int | np.integer) or k < 1:
+        msg = f"k must be an integer >= 1, got {k!r}."
+        raise ValueError(msg)
+    if jnp.ndim(points) != 2:
+        msg = f"points must have shape (n, d), got {jnp.shape(points)}."
+        raise ValueError(msg)
+    if queries is not None and (
+        jnp.ndim(queries) != 2 or jnp.shape(queries)[1] != jnp.shape(points)[1]
+    ):
+        msg = (
+            f"queries must have shape (m, {jnp.shape(points)[1]}) to match "
+            f"points, got {jnp.shape(queries)}."
+        )
+        raise ValueError(msg)
+
+
 def _check_finite(points: Array, queries: Array | None, /) -> Array:
     bad = ~jnp.all(jnp.isfinite(points))
     if queries is not None:
         bad = bad | ~jnp.all(jnp.isfinite(queries))
-    return eqx.error_if(points, bad, "kNN inputs must be finite (no NaN or inf).")
+    if not _traced(points, queries, bad):  # same error type as the SciPy backend
+        if bad:
+            raise ValueError(_NOT_FINITE)
+        return points
+    return eqx.error_if(points, bad, _NOT_FINITE)
 
 
 def _bucket(n: int, /) -> int:
@@ -88,7 +113,9 @@ def far_rows(points: Float[Array, "n d"], count: int, /) -> Float[Array, "count 
     """
     d = points.shape[1]
     lo, hi = points.min(0), points.max(0)
-    span = jnp.max(hi - lo) + 1.0
+    # Cover the magnitude too: in float32, hi + c * spread rounds back to hi
+    # once |hi| / spread >~ 1e7, which would put "far" rows on real points.
+    span = jnp.maximum(jnp.max(hi - lo), jnp.max(jnp.abs(jnp.stack([lo, hi])))) + 1.0
     offset = (2.0 * math.sqrt(d) + 1.0 + jnp.arange(count, dtype=points.dtype)) * span
     return jnp.broadcast_to(lo, (count, d)).at[:, 0].set(hi[0] + offset)
 
@@ -100,7 +127,10 @@ class AbstractNeighborSearch(eqx.Module):
     (self excluded by index). ``knn(points, k, queries=q)`` returns the k
     nearest points to each query. Both give ``(indices, distances)``: Euclidean
     distances, rows sorted ascending; a missing neighbour (fewer than k
-    candidates) is index ``len(points)`` with distance ``inf``.
+    candidates) is index ``len(points)`` with distance ``inf``. Equidistant
+    neighbours: ``BucketKDTree`` and ``BruteForce`` take the lower index
+    (identically eager and under jit); ``JaxKD`` and ``SciPy`` follow their
+    library's order.
     """
 
     @abc.abstractmethod
@@ -148,6 +178,7 @@ class BucketKDTree(AbstractNeighborSearch):
             raise ValueError(msg)
 
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
+        _check_args(points, k, queries)
         points = _as_float(points)
         queries = None if queries is None else _as_float(queries)
         n = points.shape[0]
@@ -182,7 +213,14 @@ class BruteForce(AbstractNeighborSearch):
 
     chunk: int = eqx.field(static=True, default=1024)
 
+    def __check_init__(self) -> None:
+        """Reject an invalid chunk size at construction."""
+        if self.chunk < 1:
+            msg = f"chunk must be >= 1, got {self.chunk}."
+            raise ValueError(msg)
+
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
+        _check_args(points, k, queries)
         q = None if queries is None else _as_float(queries)
         points = _check_finite(_as_float(points), q)
         ii, d2 = _kd.brute_knn(points, k, queries=q, chunk=self.chunk)
@@ -216,8 +254,12 @@ class JaxKD(AbstractNeighborSearch):
             raise ImportError(msg)
 
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
-        q = None if queries is None else _as_float(queries)
-        points = _check_finite(_as_float(points), q)
+        _check_args(points, k, queries)
+        # jaxkd fails on float32 under x64 ("cond branches must have equal
+        # output types"), so use the default float dtype.
+        fdt = jnp.promote_types(jnp.float32, jnp.result_type(float))
+        q = None if queries is None else jnp.asarray(queries).astype(fdt)
+        points = _check_finite(jnp.asarray(points).astype(fdt), q)
         n = points.shape[0]
         if n == 0:  # jaxkd cannot build an empty tree
             m = 0 if q is None else q.shape[0]
@@ -237,6 +279,12 @@ class JaxKD(AbstractNeighborSearch):
         return ii, _gathered_distance(points, None, ii)
 
 
+SCIPY_TRACED = (
+    "neighbors.SciPy cannot run under jax.jit/vmap/grad (it is host "
+    "code). Use neighbors.BucketKDTree() to trace."
+)
+
+
 class SciPy(AbstractNeighborSearch):
     """scipy's ``cKDTree``: fastest on CPU, but eager-only (raises when traced).
 
@@ -246,19 +294,15 @@ class SciPy(AbstractNeighborSearch):
     workers: int = eqx.field(static=True, default=-1)
 
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
+        _check_args(points, k, queries)
         if _traced(points, queries):
-            msg = (
-                "neighbors.SciPy cannot run under jax.jit/vmap/grad (it is host "
-                "code). Use neighbors.BucketKDTree() to trace."
-            )
-            raise TypeError(msg)
+            raise TypeError(SCIPY_TRACED)
         from scipy.spatial import cKDTree  # noqa: PLC0415
 
         p = np.asarray(_as_float(points))
         q = None if queries is None else np.asarray(_as_float(queries))
         if not np.all(np.isfinite(p)) or (q is not None and not np.all(np.isfinite(q))):
-            msg = "kNN inputs must be finite (no NaN or inf)."
-            raise ValueError(msg)
+            raise ValueError(_NOT_FINITE)
         n = p.shape[0]
         tree = cKDTree(p)
         if q is not None:

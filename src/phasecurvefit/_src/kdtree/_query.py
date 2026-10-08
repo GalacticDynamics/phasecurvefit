@@ -15,6 +15,8 @@ For each query:
    ``lax.cond`` is used: under ``vmap``/batched ``lax.map`` it becomes ``select``
    and runs both branches.
 
+Results carry original indices (``tree.perm``), and ties go to the lower one,
+so the answer depends only on the input, not on the tree layout or padding.
 Sentinels: tree positions use ``tree.n_pad``; original indices use ``tree.n``.
 """
 
@@ -75,7 +77,7 @@ def _descend(tree: Tree, xq: Array, r2: Array, cap: int, /) -> tuple[Array, Arra
 def _merge(
     tree: Tree, xq: Array, qself: Array, cand: Array, k: int, /, *, top_k: bool
 ) -> tuple[Array, Array]:
-    """K nearest valid points among the candidate leaves -> (sq_dist, tree position)."""
+    """K nearest valid points among the candidate leaves -> (sq_dist, original idx)."""
     nq, m = cand.shape
     b = tree.leaf_size
     pts = tree.points.reshape(tree.n_leaves, b, -1)
@@ -83,20 +85,15 @@ def _merge(
     xc = pts.at[cand].get(mode="fill", fill_value=0).reshape(nq, m * b, -1)
     ok = val.at[cand].get(mode="fill", fill_value=False).reshape(nq, m * b)
     pos = (cand[..., None] * b + jnp.arange(b)).reshape(nq, m * b)
+    if top_k:
+        orig = tree.perm.at[pos].get(mode="fill", fill_value=tree.n)
+    else:  # gathered in (m*b, nq) layout: the networks want ids transposed
+        pos_t = (cand.T[:, None] * b + jnp.arange(b)[:, None]).reshape(m * b, nq)
+        orig = tree.perm.at[pos_t].get(mode="fill", fill_value=tree.n).T
     diff = xq[:, None] - xc
     d2 = jnp.where(ok & (pos != qself[:, None]), jnp.sum(diff * diff, -1), jnp.inf)
-    if m * b < k:
-        d2 = jnp.concat([d2, jnp.full((nq, k - m * b), jnp.inf, d2.dtype)], axis=1)
-        pos = jnp.concat(
-            [pos, jnp.full((nq, k - m * b), tree.n_pad, jnp.int32)], axis=1
-        )
-    if top_k:
-        neg, col = jax.lax.top_k(-d2, k)
-        dd = -neg
-    else:
-        dd, col = ksmallest(d2, k)
-    ii = jnp.where(jnp.isinf(dd), tree.n_pad, jnp.take_along_axis(pos, col, 1))
-    return dd, ii
+    dd, ii = ksmallest(d2, orig, k, top_k=top_k)  # pads width < k itself
+    return dd, jnp.where(jnp.isinf(dd), tree.n, ii)
 
 
 def _bound(tree: Tree, xq: Array, qself: Array, qleaf: Array, k: int, /) -> Array:
@@ -172,7 +169,7 @@ def _query(
     frontier: int,
     /,
 ) -> tuple[Array, Array]:
-    """Exact kNN for queries ``xq`` -> ``(sq_dist (Q, k), tree position (Q, k))``."""
+    """Exact kNN for queries ``xq`` -> ``(sq_dist (Q, k), original idx (Q, k))``."""
     nq, d = xq.shape
     qc = min(QUERY_CHUNK, nq)
     n_chunks = -(-nq // qc)
@@ -222,12 +219,9 @@ def _query(
         diff = xs[:, None] - tree.points[None]
         d2 = jnp.sum(diff * diff, -1)
         d2 = jnp.where(tree.valid[None] & (pos_all[None] != ss[:, None]), d2, jnp.inf)
-        if tree.n_pad < k:
-            extra = jnp.full((d2.shape[0], k - tree.n_pad), jnp.inf, d2.dtype)
-            d2 = jnp.concat([d2, extra], axis=1)
-        neg, col = jax.lax.top_k(-d2, k)
-        d_new = -neg
-        i_new = jnp.where(jnp.isinf(d_new), tree.n_pad, col.astype(jnp.int32))
+        perm = jnp.broadcast_to(tree.perm, d2.shape)
+        d_new, i_new = ksmallest(d2, perm, k, top_k=True)
+        i_new = jnp.where(jnp.isinf(d_new), tree.n, i_new)
         return d_new, i_new, jnp.zeros(xs.shape[0], bool)
 
     dd, ii, _, _ = _finish(xq, qself, over, dd, ii, r2, BRUTE_CHUNK, brute)
@@ -243,10 +237,6 @@ def locate_leaves(tree: Tree, queries: Float[Array, "m d"], /) -> Int[Array, " m
         right = queries[rows, dim] >= tree.split_val[lvl][node]
         node = 2 * node + right.astype(jnp.int32)
     return node
-
-
-def _to_original(tree: Tree, ii: Array, /) -> Array:
-    return tree.perm.at[ii].get(mode="fill", fill_value=tree.n)
 
 
 def all_knn(
@@ -266,11 +256,7 @@ def all_knn(
     dd, ii = _query(
         tree, tree.points, pos, tree.valid, pos // tree.leaf_size, k, frontier
     )
-    out_i = (
-        jnp.full((n, k), n, jnp.int32)
-        .at[tree.perm]
-        .set(_to_original(tree, ii), mode="drop")
-    )
+    out_i = jnp.full((n, k), n, jnp.int32).at[tree.perm].set(ii, mode="drop")
     out_d = jnp.full((n, k), jnp.inf, points.dtype).at[tree.perm].set(dd, mode="drop")
     return out_i, out_d
 
@@ -300,6 +286,6 @@ def knn(
         k,
         frontier,
     )
-    out_i = jnp.zeros((m, k), jnp.int32).at[order].set(_to_original(tree, ii))
+    out_i = jnp.zeros((m, k), jnp.int32).at[order].set(ii)
     out_d = jnp.zeros((m, k), queries.dtype).at[order].set(dd)
     return out_i, out_d

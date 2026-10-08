@@ -65,6 +65,7 @@ from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.neighbors import (
+    SCIPY_TRACED,
     AbstractNeighborSearch,
     BucketKDTree,
     SciPy,
@@ -305,7 +306,10 @@ def _host_graph(
 
     ``nbr`` (n, k_eff) holds each point's self-excluded neighbour indices from
     any backend. Edge lengths, cosines and weights are computed here in float64,
-    exactly as before the backends existed, so every backend shares one graph.
+    exactly as before the backends existed, so backends that return the same
+    neighbours give the same graph. (With equidistant neighbours, only
+    ``BucketKDTree`` and ``BruteForce`` are guaranteed to agree: both take the
+    lower index.)
 
     Returns ``(backbone (n,) int32 padded by repeating its last index,
     backbone_len int32, in_component (n,) bool, flip bool)``; ``flip`` says the
@@ -564,6 +568,12 @@ class MSTOrderer(AbstractOrderer):
         if self.edge_clip_max_iters < 1:
             msg = f"edge_clip_max_iters must be >= 1, got {self.edge_clip_max_iters}."
             raise ValueError(msg)
+        if not isinstance(self.neighbors, AbstractNeighborSearch):
+            msg = (
+                "neighbors must be a phasecurvefit.neighbors backend instance, "
+                f"e.g. pcf.neighbors.SciPy(); got {self.neighbors!r}."
+            )
+            raise TypeError(msg)
 
     @plum.dispatch
     def order(
@@ -612,7 +622,10 @@ class MSTOrderer(AbstractOrderer):
             backbone_idx = jnp.arange(n, dtype=jnp.int32)
             backbone_len = jnp.asarray(n, jnp.int32)
         elif isinstance(self.neighbors, SciPy):
-            # Eager-only: knn raises TypeError first if the inputs are traced.
+            # Eager-only. Check V too: under grad w.r.t. velocities alone, P is
+            # concrete and knn would not notice.
+            if _traced(P, V):
+                raise TypeError(SCIPY_TRACED)
             nbr = np.asarray(self.neighbors.knn(P, min(self.k, n - 1))[0])
             Pn, Vn = np.asarray(P), np.asarray(V)
             workers = self.neighbors.workers

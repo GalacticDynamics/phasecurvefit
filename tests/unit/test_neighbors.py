@@ -1,5 +1,7 @@
 """Tests for the kNN backends (``phasecurvefit.neighbors``)."""
 
+from types import SimpleNamespace
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -47,6 +49,15 @@ def _ref(points, k, queries=None):
     return np.sqrt(np.sort(d2, 1)[:, :k])
 
 
+def _assert_indices_give_distances(points, queries, idx, dist):
+    """Each finite neighbour index reproduces its reported distance."""
+    q = points if queries is None else queries
+    fin = np.isfinite(dist)
+    rows = np.nonzero(fin)[0]
+    got = np.linalg.norm(q[rows].astype(np.float64) - points[idx[fin]], axis=1)
+    np.testing.assert_allclose(got, dist[fin], rtol=1e-5, atol=1e-6)
+
+
 class TestContract:
     """Every backend honours the same contract."""
 
@@ -61,6 +72,17 @@ class TestContract:
         np.testing.assert_allclose(dist[fin], ref[fin], rtol=1e-5, atol=1e-6)
         assert np.all(idx[~fin] == n)
         assert not np.any(idx == np.arange(n)[:, None])
+        _assert_indices_give_distances(p, None, idx, dist)
+
+    @pytest.mark.parametrize("k", [5, 40])
+    def test_duplicates_excluded_by_index(self, backend, k):
+        """Coincident points are neighbours at distance 0; self never is."""
+        p = np.random.default_rng(3).normal(size=(80, 3)).astype(np.float32)
+        p[10:40] = p[0]
+        idx, dist = map(np.asarray, backend.knn(jnp.asarray(p), k))
+        assert not np.any(idx == np.arange(80)[:, None])
+        assert np.sum(dist[0] == 0) == min(k, 30)
+        _assert_indices_give_distances(p, None, idx, dist)
 
     def test_queries(self, backend):
         """Bichromatic queries, k=1 and k=10."""
@@ -68,10 +90,11 @@ class TestContract:
         p = rng.normal(size=(300, 3)).astype(np.float32)
         q = rng.normal(size=(40, 3)).astype(np.float32)
         for k in (1, 10):
-            _, dist = backend.knn(jnp.asarray(p), k, queries=jnp.asarray(q))
+            idx, dist = backend.knn(jnp.asarray(p), k, queries=jnp.asarray(q))
             np.testing.assert_allclose(
                 np.asarray(dist), _ref(p, k, q), rtol=1e-5, atol=1e-6
             )
+            _assert_indices_give_distances(p, q, np.asarray(idx), np.asarray(dist))
 
     def test_far_queries(self, backend):
         """Queries farther from the data than its diameter still find real points."""
@@ -131,6 +154,30 @@ class TestContract:
         assert np.all(np.asarray(idx) == 0)
         assert np.all(np.isinf(np.asarray(dist)))
 
+    @pytest.mark.parametrize(
+        ("args", "kwargs"),
+        [
+            ((np.ones((5, 2)), 0), {}),
+            ((np.ones((5, 2)), -1), {}),
+            ((np.ones((5, 2)), 2.0), {}),
+            ((np.ones(5), 2), {}),
+            ((np.ones((5, 2)), 2), {"queries": np.ones((3, 3))}),
+        ],
+        ids=["k0", "k-1", "kfloat", "1d", "query-dim"],
+    )
+    def test_invalid_args_raise(self, backend, args, kwargs):
+        """Bad k or shapes raise the same ValueError from every backend."""
+        with pytest.raises(ValueError, match="must"):
+            backend.knn(*args, **kwargs)
+
+    def test_non_finite_queries_raise(self, backend):
+        """NaN in queries is caught too, as ValueError when eager."""
+        p = np.random.default_rng(0).normal(size=(50, 3)).astype(np.float32)
+        q = p[:4].copy()
+        q[2, 0] = np.nan
+        with pytest.raises(ValueError, match="finite"):
+            backend.knn(jnp.asarray(p), 3, queries=jnp.asarray(q))
+
     def test_non_finite_raises(self, backend):
         """Review Focus 2: NaN input is an error, not a silently wrong answer."""
         p = np.random.default_rng(0).normal(size=(50, 3)).astype(np.float32)
@@ -148,6 +195,31 @@ class TestTracing:
         idx, _ = jax.jit(lambda x: jax_backend.knn(x, 5))(p)
         np.testing.assert_array_equal(
             np.asarray(idx), np.asarray(jax_backend.knn(p, 5)[0])
+        )
+
+    @pytest.mark.parametrize("k", [3, 8])
+    def test_ties_independent_of_jit_and_padding(self, k):
+        """On a grid (many equidistant neighbours) eager, jit and brute agree."""
+        g = np.stack(np.meshgrid(np.arange(7.0), np.arange(5.0)), -1).reshape(-1, 2)
+        g = jnp.asarray(g, jnp.float32)
+        eager = pcf.neighbors.BucketKDTree().knn(g, k)[0]
+        jitted = jax.jit(lambda x: pcf.neighbors.BucketKDTree().knn(x, k))(g)[0]
+        brute = pcf.neighbors.BruteForce().knn(g, k)[0]
+        np.testing.assert_array_equal(np.asarray(eager), np.asarray(jitted))
+        np.testing.assert_array_equal(np.asarray(eager), np.asarray(brute))
+
+    def test_gradient_matches_brute_force(self):
+        """The kd-tree's distance gradient equals brute force's (tie-free data)."""
+        p = jnp.asarray(np.random.default_rng(6).normal(size=(64, 3)), jnp.float32)
+
+        def loss(backend):
+            return jax.grad(lambda x: jnp.sum(backend.knn(x, 4)[1] ** 1.5))(p)
+
+        np.testing.assert_allclose(
+            np.asarray(loss(pcf.neighbors.BucketKDTree())),
+            np.asarray(loss(pcf.neighbors.BruteForce())),
+            rtol=1e-5,
+            atol=1e-6,
         )
 
     def test_scipy_raises_when_traced(self):
@@ -204,3 +276,43 @@ class TestBucketing:
         dmin = np.min(np.linalg.norm(np.asarray(p)[:, None] - far[None], axis=-1))
         assert dmin > diam
         assert len({tuple(r) for r in far.tolist()}) == 7
+
+    def test_far_rows_large_magnitude_float32(self):
+        """|x| >> spread in float32: far rows must not round onto real points."""
+        p = np.c_[np.full(41, 1e9), np.linspace(0, 0.5, 41)].astype(np.float32)
+        idx, dist = pcf.neighbors.BucketKDTree().knn(jnp.asarray(p), 3)
+        assert np.all(np.asarray(idx) < 41)
+        np.testing.assert_allclose(np.asarray(dist), _ref(p, 3), rtol=1e-5)
+
+
+class TestConstruction:
+    """Invalid backend settings fail at construction."""
+
+    @pytest.mark.parametrize(
+        "make",
+        [
+            lambda: pcf.neighbors.BucketKDTree(leaf_size=0),
+            lambda: pcf.neighbors.BucketKDTree(frontier=0),
+            lambda: pcf.neighbors.BruteForce(chunk=0),
+        ],
+        ids=["leaf_size", "frontier", "chunk"],
+    )
+    def test_bad_sizes(self, make):
+        """Sizes below 1 raise ValueError."""
+        with pytest.raises(ValueError, match=">= 1"):
+            make()
+
+    def test_jaxkd_missing(self, monkeypatch):
+        """JaxKD() without jaxkd installed raises ImportError with a hint."""
+        missing = SimpleNamespace(JAXKD=SimpleNamespace(installed=False))
+        monkeypatch.setattr(nb_src, "OptDeps", missing)
+        with pytest.raises(ImportError, match="kdtree"):
+            pcf.neighbors.JaxKD()
+
+    @_NO_JAXKD
+    def test_jaxkd_float32_under_x64(self):
+        """Jaxkd itself fails on float32 under x64; the wrapper upcasts."""
+        p = np.random.default_rng(0).normal(size=(20, 2)).astype(np.float32)
+        with jax.enable_x64(new_val=True):
+            _, dist = pcf.neighbors.JaxKD().knn(jnp.asarray(p), 3)
+        np.testing.assert_allclose(np.asarray(dist), _ref(p, 3), rtol=1e-5)
