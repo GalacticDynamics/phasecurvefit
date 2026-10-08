@@ -85,6 +85,8 @@ _EDGE_CLIP_MIN_RATIO = 2.0
 # fewer than this fraction of the working points. Larger pieces are kept and
 # reconnected, so cutting a genuine sparse-region edge never discards stream.
 _EDGE_CLIP_SMALL_FRAC = 0.01
+# Never reject more than this fraction of the working points in one iteration.
+_EDGE_CLIP_MAX_REJECT_FRAC = 0.5
 
 
 # A single, long-lived worker thread that runs every _run_in_thread() job.
@@ -171,7 +173,10 @@ def _sigma_clip_edges(
        ``tree``, so cutting a genuine sparse-region edge cannot discard half the
        stream;
     3. recompute the statistic on the survivors and repeat, until nothing small
-       is split off (or ``max_iters``).
+       is split off (or ``max_iters``). If the small pieces would hold more than
+       ``_EDGE_CLIP_MAX_REJECT_FRAC`` of the working points, the cuts have
+       fragmented the stream rather than isolated interlopers, so clipping
+       stops and keeps them.
 
     Returns the surviving node set (a subset of ``nodes``, in ascending order).
     """
@@ -212,8 +217,8 @@ def _sigma_clip_edges(
         small = alive & (sizes[labels] < size_min)
         if not small.any():  # cuts split off nothing small (e.g. a sparse gap)
             break
-        if small.sum() == alive.sum():  # every piece is small: no main body
-            break
+        if small.sum() > _EDGE_CLIP_MAX_REJECT_FRAC * alive.sum():
+            break  # no main body: this is fragmentation, not outlier rejection
         alive &= ~small
     return nodes[alive]
 

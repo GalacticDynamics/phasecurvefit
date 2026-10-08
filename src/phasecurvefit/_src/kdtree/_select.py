@@ -95,17 +95,23 @@ def ksmallest(
     a, ids = _pad_width(d2, k), _pad_width(ids.astype(jnp.int32), k, 0)
     w = a.shape[-1]
     if top_k:
-        # Float key: XLA's CPU top_k is ~70x slower on int32. The columns come
-        # from top_k itself, so rounding never returns a wrong point.
-        # ponytail: ids >= 2**24 - W (float32) round, so their ties may not
-        # follow id order; still exact neighbours. Upgrade = a two-pass key.
+        # Strictly-nearer entries come straight from the first top_k (its
+        # values are exact); a second top_k only picks which entries tied at
+        # tau fill the remaining slots. Float keys: XLA's CPU top_k is ~70x
+        # slower on int32. ponytail: ids >= 2**24 round in float32, so ties
+        # among them may not follow id order (the distances stay exact).
+        v1, c1 = jax.lax.top_k(-a, k)
+        v1 = -v1
         # max, not [:, -1:]: slicing top_k's output made XLA CPU ~60x slower.
-        tau = jnp.max(-jax.lax.top_k(-a, k)[0], axis=1, keepdims=True)
+        tau = jnp.max(v1, axis=1, keepdims=True)
+        n_lt = jnp.sum(v1 < tau, axis=1, keepdims=True)  # all of them are in v1
         kdt = jnp.promote_types(a.dtype, jnp.float32)
-        j = jnp.arange(w, dtype=kdt)
-        key = jnp.where(a < tau, j, jnp.where(a == tau, w + ids.astype(kdt), jnp.inf))
-        col = jax.lax.top_k(-key, k)[1]
-        vals = jnp.take_along_axis(a, col, 1)
+        tie_key = jnp.where(a == tau, ids.astype(kdt), jnp.inf)
+        c2 = jax.lax.top_k(-tie_key, k)[1]
+        slot = jnp.arange(k)[None]
+        c2 = jnp.take_along_axis(c2, jnp.clip(slot - n_lt, 0, k - 1), 1)
+        col = jnp.where(slot < n_lt, c1, c2)
+        vals = jnp.where(slot < n_lt, v1, tau)
         out = jnp.take_along_axis(ids, col, 1)
         return _sort_pairs(vals, out, k)
     # (W, Q) layout for the networks; pass ``ids`` as ``x.T`` to skip a copy.
