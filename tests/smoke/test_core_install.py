@@ -4,9 +4,13 @@ CI runs this file in an isolated environment with only the package's core
 dependencies plus pytest, so it catches imports that are satisfied only
 transitively (e.g. via ``unxt`` in the ``interop`` extra). Keep it
 self-contained: no fixtures from ``conftest.py`` and no optional dependencies.
+
+Skipped unless ``PHASECURVEFIT_SMOKE_TESTS=1`` (set by the CI smoke job), so the
+full test matrix doesn't repeat them.
 """
 
 import importlib
+import os
 
 import jax
 import jax.numpy as jnp
@@ -14,6 +18,11 @@ import numpy as np
 import pytest
 
 import phasecurvefit as pcf
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("PHASECURVEFIT_SMOKE_TESTS") != "1",
+    reason="core-only smoke tests; set PHASECURVEFIT_SMOKE_TESTS=1 to run",
+)
 
 
 @pytest.mark.parametrize("name", ["metrics", "nn", "orderers", "strats", "w"])
@@ -47,7 +56,9 @@ def test_order_recovers_a_line(make_orderer):
     start = int(jnp.argmin(pos["x"]))
     result = pcf.order(pos, vel, make_orderer(start))
 
-    xs = np.asarray(pos["x"])[np.asarray(result.indices)]
+    indices = np.asarray(result.indices)
+    assert np.all(indices >= 0), "an orderer skipped points (-1 sentinel)"
+    xs = np.asarray(pos["x"])[indices]
     diffs = np.diff(xs)
     assert len(xs) == len(pos["x"])
     assert np.all(diffs > 0) or np.all(diffs < 0)

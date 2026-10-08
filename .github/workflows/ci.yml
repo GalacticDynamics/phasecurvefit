@@ -55,6 +55,8 @@ jobs:
       # the shared conftests need test-group packages; `-o addopts=` drops
       # options that need test-group pytest plugins.
       - name: Run smoke tests
+        env:
+          PHASECURVEFIT_SMOKE_TESTS: "1"
         run: |
           uv run --isolated --no-project --with . --with pytest --with pytest-env \
             pytest tests/smoke --noconftest -o addopts= -p no:cacheprovider
