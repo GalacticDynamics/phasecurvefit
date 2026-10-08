@@ -36,10 +36,29 @@ jobs:
       - name: Run pre-commit
         run: uv run --frozen nox -s precommit
 
+  import_core:
+    name: Import with core dependencies only
+    runs-on: ubuntu-latest
+    needs: [pre-commit]
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5.5.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+
+      # No extras or dependency groups: catches imports that are only
+      # satisfied transitively (e.g. via unxt in the interop extra).
+      - name: Import package
+        run: |
+          uv run --isolated --no-project --with . python -c "import phasecurvefit"
+
   tests:
     name: Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
     runs-on: ${{ matrix.runs-on }}
-    needs: [pre-commit]
+    needs: [pre-commit, import_core]
     strategy:
       fail-fast: false
       matrix:
