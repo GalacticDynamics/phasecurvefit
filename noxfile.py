@@ -129,7 +129,8 @@ def docs(s: nox.Session, /) -> None:
     if args.serve:
         s.run("sphinx-autobuild", *shared_args)
     else:
-        s.run("sphinx-build", "--keep-going", *shared_args)
+        # -W: fail on warnings (reported in full, thanks to --keep-going)
+        s.run("sphinx-build", "-W", "--keep-going", *shared_args)
 
 
 # =============================================================================
