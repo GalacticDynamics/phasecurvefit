@@ -181,13 +181,6 @@ ignore = [
   "PYI025", # Set from collections.abc is clear in context
   "RUF059", # Unpacked tuple elements required for JAX while loop state
 ]
-"src/phasecurvefit/_src/autoencoder.py" = [
-  "ANN001", # Missing type annotations for nested loss functions
-  "ANN202", # Missing return type for nested loss functions
-  "C901",   # train_autoencoder is complex but well-structured
-  "RUF003", # Greek letters are intentional in math code
-  "RUF059", # Unpacked variable 'keys' used for structure
-]
 "src/phasecurvefit/_src/orderers/mst.py" = [
   "N803", # P, V are conventional names for the point / velocity matrices
   "N806", # Cb is the conventional name for the backbone coordinate matrix
