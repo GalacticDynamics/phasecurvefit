@@ -100,77 +100,163 @@ class TestTipOrientation:
         assert xo_pos[0] < xo_pos[-1]
 
 
+_MECHANISMS = {
+    "velocity_weight": {"velocity_weight": 5.0},
+    "sever_cos_threshold": {"sever_cos_threshold": 0.0},
+    "orient_by_velocity": {"orient_by_velocity": True},
+}
+
+
+def _line(n=60):
+    """Build a straight line moving in +x, which every mechanism must order."""
+    x = np.linspace(0.0, 10.0, n)
+    pos = {"x": jnp.asarray(x), "y": jnp.zeros(n)}
+    vel = {"x": jnp.ones(n), "y": jnp.zeros(n)}
+    return x, pos, vel
+
+
 class TestMissingVelocities:
-    """Mechanisms 1 and 2 refuse tracers without a velocity direction."""
+    """NaN velocities are missing data, policed by ``nan_policy``; inf is an error.
 
-    @pytest.mark.parametrize("bad", [np.nan, np.inf, 0.0], ids=["nan", "inf", "zero"])
-    @pytest.mark.parametrize(
-        "kw",
-        [{"velocity_weight": 5.0}, {"sever_cos_threshold": 0.0}],
-        ids=["velocity_weight", "sever"],
-    )
-    def test_raises(self, kw, bad):
-        """One directionless velocity raises instead of bridging the arms.
+    Every silent stand-in for a missing velocity (cos = 0, cos = 1, neighbour
+    imputation) lets one tracer reconnect the anti-parallel arms of the
+    hairpin, so skipping them has to be asked for.
+    """
 
-        Every silent stand-in (cos = 0, cos = 1, neighbour imputation) lets
-        that one tracer reconnect the anti-parallel arms of the hairpin.
-        """
+    @pytest.mark.parametrize("mechanism", sorted(_MECHANISMS))
+    def test_nan_raises_by_default(self, mechanism):
+        """Skipping a missing velocity has to be asked for."""
+        pos, vel = _hairpin()
+        vel = {"x": vel["x"].at[20].set(jnp.nan), "y": vel["y"]}
+        orderer = pcf.orderers.MSTOrderer(
+            k=6, jump_cap=1.0, on_disconnected="largest", **_MECHANISMS[mechanism]
+        )
+        with pytest.raises(ValueError, match="nan_policy='omit'") as err:
+            orderer.order(pos, vel)
+        assert mechanism in str(err.value)
+        for other in set(_MECHANISMS) - {mechanism}:  # names only what is on
+            assert other not in str(err.value)
+
+    @pytest.mark.parametrize("policy", ["raise", "omit"])
+    @pytest.mark.parametrize("bad", [np.inf, -np.inf], ids=["+inf", "-inf"])
+    @pytest.mark.parametrize("mechanism", sorted(_MECHANISMS))
+    def test_inf_raises_under_either_policy(self, mechanism, bad, policy):
+        """Infinity is not a missing measurement, so ``omit`` does not cover it."""
         pos, vel = _hairpin()
         vel = {"x": vel["x"].at[20].set(bad), "y": vel["y"]}
-        if bad == 0.0:
-            vel["y"] = vel["y"].at[20].set(0.0)
         orderer = pcf.orderers.MSTOrderer(
-            k=6, jump_cap=1.0, on_disconnected="largest", **kw
+            k=6,
+            jump_cap=1.0,
+            on_disconnected="largest",
+            nan_policy=policy,
+            **_MECHANISMS[mechanism],
         )
-        with pytest.raises(ValueError, match="velocity direction") as err:
+        with pytest.raises(ValueError, match="infinite"):
             orderer.order(pos, vel)
-        (enabled,) = kw  # the message names only the enabled mechanism
-        other = {"velocity_weight", "sever_cos_threshold"} - {enabled}
-        assert enabled in str(err.value)
-        assert other.pop() not in str(err.value)
 
     def test_raises_under_jit(self):
         """Traced, the same error surfaces from the host stage at run time."""
         pos, vel = _hairpin()
         vel = {"x": vel["x"].at[20].set(jnp.nan), "y": vel["y"]}
         orderer = pcf.orderers.MSTOrderer(k=6, jump_cap=1.0, velocity_weight=5.0)
-        with pytest.raises(jax.errors.JaxRuntimeError, match="velocity direction"):
+        with pytest.raises(jax.errors.JaxRuntimeError, match="nan_policy='omit'"):
             jax.block_until_ready(
                 jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
             )
 
-    @pytest.mark.parametrize(
-        "kw", [{}, {"orient_by_velocity": True}], ids=["spatial", "orient"]
-    )
-    def test_unused_or_tolerant_mechanisms_accept_nan(self, kw):
-        """Velocities the graph never compares may be missing."""
-        x = np.linspace(0.0, 10.0, 60)
-        pos = {"x": jnp.asarray(x), "y": jnp.zeros(60)}
-        vel = {"x": jnp.ones(60).at[10:15].set(jnp.nan), "y": jnp.zeros(60)}
-        res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, **kw).order(pos, vel)
-        steps = np.diff(np.asarray(res.ordering))
-        assert len(steps) == 59
-        assert np.all(np.abs(steps) == 1)  # neighbours along the line...
-        assert np.all(steps == steps[0])  # ...all in one direction
+    def test_rejects_an_unknown_nan_policy(self):
+        """A typo fails at construction, not at the first NaN."""
+        with pytest.raises(ValueError, match="nan_policy"):
+            pcf.orderers.MSTOrderer(nan_policy="propagate")
 
-    @pytest.mark.parametrize("bad", [np.nan, -np.inf], ids=["nan", "-inf"])
-    def test_orientation_skips_non_finite_velocities(self, bad):
-        """One non-finite velocity cannot decide the orientation.
+    @pytest.mark.parametrize("mechanism", [None, *sorted(_MECHANISMS)])
+    def test_omit_accepts_nan(self, mechanism):
+        """Under ``omit`` (or with no mechanism on) a NaN velocity is tolerated.
 
-        59 tracers move in +x; a single -inf would otherwise dominate the
-        tangent-velocity sum and flip the ordering against all of them.
+        The tracers with a velocity stay in exact order. A run of missing ones
+        joins as leaves, each ordered at a backbone vertex beside the run
+        (projection is to the nearest vertex), so within the run the order is
+        only as good as the gap it fills.
         """
-        x = np.linspace(0.0, 10.0, 60)
-        pos = {"x": jnp.asarray(x), "y": jnp.zeros(60)}
-        vel = {"x": jnp.ones(60).at[30].set(bad), "y": jnp.zeros(60)}
-        res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, orient_by_velocity=True).order(
+        _, pos, vel = _line()
+        vel = {"x": vel["x"].at[10:15].set(jnp.nan), "y": vel["y"]}
+        kw = {} if mechanism is None else _MECHANISMS[mechanism]
+        res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, nan_policy="omit", **kw).order(
             pos, vel
         )
+        order = np.asarray(res.ordering)
+        assert len(order) == 60
+        run = (order >= 10) & (order < 15)
+        steps = np.diff(order[~run])
+        assert np.all(np.sign(steps) == np.sign(steps[0]))  # monotone along x
+        ranks = np.flatnonzero(run)
+        rank_9, rank_15 = (int(np.flatnonzero(order == i)[0]) for i in (9, 15))
+        # In the gap between 9 and 15, give or take one: a leaf ties with the
+        # vertex it projects to and may sort just past it.
+        assert np.all(np.abs(ranks - (rank_9 + rank_15) / 2) <= 4)
+
+    def test_spatial_default_never_reads_velocities(self):
+        """No mechanism on: even the default ``raise`` accepts NaN."""
+        _, pos, vel = _line()
+        vel = {"x": vel["x"].at[10:15].set(jnp.nan), "y": vel["y"]}
+        res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0).order(pos, vel)
+        assert int(res.n_visited) == 60
+
+    def test_a_stationary_tracer_is_not_severed(self):
+        """A zero velocity is data: it joins as a leaf rather than being cut off.
+
+        Read as perpendicular (cos = 0), any threshold above 0 cut it off and
+        ``on_disconnected="raise"`` raised.
+        """
+        _, pos, vel = _line()
+        vel = {"x": vel["x"].at[30].set(0.0), "y": vel["y"]}
+        res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, sever_cos_threshold=0.5).order(
+            pos, vel
+        )
+        assert int(res.n_visited) == 60
+
+    @pytest.mark.parametrize("where", [20, 70], ids=["arm-A", "arm-B"])
+    @pytest.mark.parametrize("bad", [0.0, jnp.nan], ids=["stationary", "omitted-nan"])
+    def test_a_directionless_tracer_does_not_bridge_the_arms(self, bad, where):
+        """It joins as a leaf, so severing still separates the arms.
+
+        Given any cosine (0 or 1), one such tracer merged the hairpin's arms:
+        all 90 tracers kept instead of arm A's 50.
+        """
+        pos, vel = _hairpin()
+        vel = {"x": vel["x"].at[where].set(bad), "y": vel["y"]}
+        res = pcf.orderers.MSTOrderer(
+            k=6,
+            jump_cap=1.0,
+            sever_cos_threshold=0.0,
+            on_disconnected="largest",
+            nan_policy="omit",
+        ).order(pos, vel)
+        assert int(res.n_visited) <= 51  # arm A, plus at most that one leaf
+
+    @pytest.mark.parametrize("mechanism", ["velocity_weight", "sever_cos_threshold"])
+    def test_a_stationary_tracer_does_not_raise(self, mechanism):
+        """Under the default ``raise``, a zero velocity is accepted as data."""
+        pos, vel = _hairpin()
+        vel = {"x": vel["x"].at[20].set(0.0), "y": vel["y"]}
+        res = pcf.orderers.MSTOrderer(
+            k=6, jump_cap=1.0, on_disconnected="largest", **_MECHANISMS[mechanism]
+        ).order(pos, vel)
+        assert int(res.n_visited) > 0
+
+    @pytest.mark.parametrize("bad", [jnp.nan, 0.0], ids=["omitted-nan", "stationary"])
+    def test_orientation_skips_tracers_without_a_direction(self, bad):
+        """One missing or stationary velocity cannot decide the orientation."""
+        x, pos, vel = _line()
+        vel = {"x": vel["x"].at[30].set(bad), "y": vel["y"]}
+        res = pcf.orderers.MSTOrderer(
+            k=6, jump_cap=2.0, orient_by_velocity=True, nan_policy="omit"
+        ).order(pos, vel)
         steps = np.diff(x[np.asarray(res.ordering)])
         assert np.all(steps > 0)
 
     def test_orientation_skips_partly_non_finite_velocities(self):
-        """A velocity with any non-finite component is skipped whole.
+        """A velocity with any NaN component is skipped whole.
 
         On a diagonal, (NaN, -1e6) used to keep its finite y component, whose
         huge term against the flow flipped the ordering.
@@ -181,11 +267,17 @@ class TestMissingVelocities:
             "x": jnp.ones(60).at[30].set(jnp.nan),
             "y": jnp.ones(60).at[30].set(-1e6),
         }
-        res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, orient_by_velocity=True).order(
-            pos, vel
-        )
+        res = pcf.orderers.MSTOrderer(
+            k=6, jump_cap=2.0, orient_by_velocity=True, nan_policy="omit"
+        ).order(pos, vel)
         steps = np.diff(t[np.asarray(res.ordering)])
         assert np.all(steps > 0)
+
+    def test_default_pipeline_omits_missing_velocities(self):
+        """``pcf.order`` with no orderer must not reject a catalogue with gaps."""
+        _, pos, vel = _line()
+        vel = {"x": vel["x"].at[10:15].set(jnp.nan), "y": vel["y"]}
+        assert int(pcf.order(pos, vel).n_visited) == 60
 
     def test_small_unit_velocities_keep_their_direction(self):
         """|v| ~ 1e-7 still separates the arms (an absolute floor ignored them)."""

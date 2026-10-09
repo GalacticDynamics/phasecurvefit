@@ -126,60 +126,116 @@ def _run_in_thread[T](fn: Callable[[], T]) -> T:
     return payload  # type: ignore[return-value]
 
 
-def _check_velocity_directions(V: np.ndarray, /, *, used: str) -> None:
-    """Raise unless every velocity has a direction (finite and nonzero).
-
-    ``used`` names the enabled mechanism(s), for the message.
-
-    ``velocity_weight`` and ``sever_cos_threshold`` compare velocity directions
-    across edges. A tracer without one leaves them nothing to compare, and every
-    stand-in fails silently where those mechanisms matter (two close,
-    anti-parallel arms): treating it as perpendicular (``cos = 0``) or as
-    aligned (``cos = 1``) lets it bridge the arms, and imputing it from spatial
-    neighbours averages the two arms to nothing. So refuse, and say what to do.
-    """
-    norm = np.linalg.norm(V, axis=1)
-    bad = ~(np.isfinite(norm) & (norm > 0.0))
-    if bad.any():
-        first = int(np.flatnonzero(bad)[0])
-        msg = (
-            f"Enabling {used} requires a velocity direction for every tracer, but "
-            f"{int(bad.sum())} of {len(V)} velocities are non-finite or zero "
-            f"(first at index {first}). Drop or impute those tracers, or "
-            f"disable {used} (orient_by_velocity skips non-finite velocities)."
-        )
-        raise ValueError(msg)
-
-
-def _edge_cosine(
+def _check_velocities(
     V: np.ndarray,
-    rows: np.ndarray,
-    cols: np.ndarray,
     /,
     *,
+    nan_policy: str,
     velocity_weight: float,
     sever_cos_threshold: float | None,
-) -> np.ndarray:
-    """Cosine similarity of velocities across each candidate edge (i, j).
+    orient_by_velocity: bool,
+) -> None:
+    """Raise on an infinite velocity, and on NaN unless ``nan_policy="omit"``.
 
-    Scale-free: an absolute floor on ``|v_i| |v_j|`` would read every
-    small-unit velocity (``|v| <~ 1e-6``) as directionless. Raises unless
-    every velocity has a direction (``_check_velocity_directions``), naming
-    whichever of the two mechanisms is enabled.
+    Only when an enabled mechanism reads velocities; the message names those
+    mechanisms. A zero velocity is a stationary tracer -- data, not missing --
+    so it never raises.
+
+    NaN raises by default because every silent stand-in fails somewhere on
+    two close, anti-parallel arms (the case these mechanisms exist for):
+    treating it as perpendicular or aligned lets one tracer bridge the arms,
+    and imputing it from spatial neighbours averages the arms to nothing.
+    ``"omit"`` opts into attaching it as a leaf anyway
+    (``_directionless_as_leaves``).
     """
     on = [
         name
         for name, enabled in (
             ("velocity_weight", velocity_weight > 0.0),
             ("sever_cos_threshold", sever_cos_threshold is not None),
+            ("orient_by_velocity", orient_by_velocity),
         )
         if enabled
     ]
-    _check_velocity_directions(V, used=" and ".join(on))
+    if not on:
+        return
+    used = " and ".join(on)
+    inf = np.isinf(V).any(axis=1)
+    if inf.any():
+        msg = (
+            f"{int(inf.sum())} of {len(V)} velocities are infinite (first at "
+            f"index {int(np.flatnonzero(inf)[0])}). inf is not a measurement -- "
+            f"it comes from an overflow or a bug upstream -- so {used} raises "
+            f"under either nan_policy. Fix or drop those tracers."
+        )
+        raise ValueError(msg)
+    nan = np.isnan(V).any(axis=1)
+    if nan_policy == "raise" and nan.any():
+        msg = (
+            f"{used} reads velocities, but {int(nan.sum())} of {len(V)} are NaN "
+            f"(first at index {int(np.flatnonzero(nan)[0])}). To treat NaN as a "
+            f"missing velocity pass nan_policy='omit'; or drop or impute those "
+            f"tracers; or disable {used}."
+        )
+        raise ValueError(msg)
+
+
+def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
+    """Cosine similarity of velocities across each candidate edge (i, j).
+
+    An edge with an end that has no direction -- a stationary tracer, or a
+    missing (NaN) velocity under ``nan_policy="omit"`` -- gets ``cos = 1``
+    (no ``velocity_weight`` penalty, not severed) -- only ever its single
+    leaf edge, from ``_directionless_as_leaves``.
+    Scale-free otherwise: an absolute floor on ``|v_i| |v_j|`` would read
+    every small-unit velocity (``|v| <~ 1e-6``) as directionless.
+    """
     vi, vj = V[rows], V[cols]
     num = np.sum(vi * vj, axis=1)
     den = np.linalg.norm(vi, axis=1) * np.linalg.norm(vj, axis=1)
-    return np.divide(num, den, out=np.zeros_like(num), where=den > 0.0)
+    return np.divide(num, den, out=np.ones_like(num), where=den > 0.0)
+
+
+def _knn_edges(
+    P: np.ndarray, k: int, /, *, workers: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Directed kNN edges ``(rows, cols, length)``, self excluded."""
+    nn_d, nn_i = cKDTree(P).query(P, k=int(min(k, len(P) - 1)) + 1, workers=workers)
+    nn_d = np.atleast_2d(nn_d)
+    nn_i = np.atleast_2d(nn_i)
+    # Exclude self by index, not by dropping column 0: with coincident points
+    # cKDTree may list a duplicate before the point itself.
+    not_self = nn_i != np.arange(len(P))[:, None]
+    return np.nonzero(not_self)[0], nn_i[not_self], nn_d[not_self]
+
+
+def _directionless_as_leaves(
+    P: np.ndarray, V: np.ndarray, /, *, k: int, workers: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """Build kNN edges among tracers with a direction, plus a leaf for each other.
+
+    A stationary tracer (or a missing velocity under ``nan_policy="omit"``)
+    gives mechanisms 1 and 2 nothing to compare, and any cosine it is given
+    -- 0, 1 -- lets it bridge two close, anti-parallel arms: one merged the
+    hairpin's arms under severing. So split: build the kNN graph among the
+    tracers that have a direction (a run of directionless ones then leaves
+    no hole: their neighbours do not spend kNN slots on them), and recombine
+    by attaching each directionless tracer to its nearest directed one. A
+    leaf has one edge, so it cannot join two components. A leaf longer than
+    ``jump_cap`` is cut like any edge, leaving that tracer to
+    ``on_disconnected``. ``None`` when there is nothing to split.
+    """
+    dirless = ~(np.linalg.norm(V, axis=1) > 0.0)  # zero or NaN
+    directed = np.flatnonzero(~dirless)
+    if not dirless.any() or len(directed) < 2:
+        return None
+    r, c, d = _knn_edges(P[directed], k, workers=workers)
+    d_leaf, near = cKDTree(P[directed]).query(P[dirless], workers=workers)
+    return (
+        np.concatenate([directed[r], np.flatnonzero(dirless)]),
+        np.concatenate([directed[c], directed[near]]),
+        np.concatenate([d, d_leaf]),
+    )
 
 
 def _backbone_on_component(
@@ -346,10 +402,10 @@ def _orient_along_velocity(
     tang = np.diff(Cb, axis=0)
     vseg = V[backbone_nodes]
     vmid = 0.5 * (vseg[:-1] + vseg[1:])
-    # Skip segments whose velocity is not wholly finite: one NaN velocity
-    # must not turn this test into a coin flip (``nan < 0`` is False, so the
-    # flip would silently never happen), one inf velocity must not outvote
-    # every other tracer, and a partly NaN one must not count half a dot.
+    # Skip segments whose velocity is not wholly finite (NaN, under
+    # ``nan_policy="omit"``): one NaN velocity must not turn this test into a
+    # coin flip (``nan < 0`` is False, so the flip would silently never
+    # happen), and a partly NaN one must not count half a dot.
     dots = tang * vmid
     if np.sum(dots[np.isfinite(dots).all(axis=1)]) < 0.0:
         return order_idx[::-1], backbone_nodes[::-1]
@@ -365,6 +421,7 @@ def _mst_backbone(
     velocity_weight: float,
     sever_cos_threshold: float | None,
     orient_by_velocity: bool,
+    nan_policy: str,
     on_disconnected: OnDisconnected,
     edge_clip_sigma: float | None,
     edge_clip_max_iters: int,
@@ -382,31 +439,19 @@ def _mst_backbone(
     if n < 2:
         return np.arange(n), np.arange(n)
 
-    k_eff = int(min(k, n - 1))
-    nn_d, nn_i = cKDTree(P).query(P, k=k_eff + 1, workers=workers)
-    nn_d = np.atleast_2d(nn_d)
-    nn_i = np.atleast_2d(nn_i)
-
-    # Exclude self by index, not by dropping column 0: with coincident points
-    # cKDTree may list a duplicate before the point itself.
-    not_self = nn_i != np.arange(n)[:, None]
-    rows = np.nonzero(not_self)[0]
-    cols = nn_i[not_self]
-    d_edges = nn_d[not_self]  # spatial edge length
+    _check_velocities(
+        V,
+        nan_policy=nan_policy,
+        velocity_weight=velocity_weight,
+        sever_cos_threshold=sever_cos_threshold,
+        orient_by_velocity=orient_by_velocity,
+    )
 
     # velocity alignment (only computed when a mechanism needs it)
     need_cos = velocity_weight > 0.0 or sever_cos_threshold is not None
-    cos = (
-        _edge_cosine(
-            V,
-            rows,
-            cols,
-            velocity_weight=velocity_weight,
-            sever_cos_threshold=sever_cos_threshold,
-        )
-        if need_cos
-        else None
-    )
+    split = _directionless_as_leaves(P, V, k=k, workers=workers) if need_cos else None
+    rows, cols, d_edges = split or _knn_edges(P, k, workers=workers)  # d: spatial
+    cos = _edge_cosine(V, rows, cols) if need_cos else None
 
     weights = d_edges.copy()
     if velocity_weight > 0.0:  # Mechanism 1: phase-space edge weights
@@ -467,6 +512,7 @@ def _mst_backbone_padded(
     velocity_weight: float,
     sever_cos_threshold: float | None,
     orient_by_velocity: bool,
+    nan_policy: str,
     on_disconnected: OnDisconnected,
     edge_clip_sigma: float | None,
     edge_clip_max_iters: int,
@@ -492,6 +538,7 @@ def _mst_backbone_padded(
         velocity_weight=velocity_weight,
         sever_cos_threshold=sever_cos_threshold,
         orient_by_velocity=orient_by_velocity,
+        nan_policy=nan_policy,
         on_disconnected=on_disconnected,
         edge_clip_sigma=edge_clip_sigma,
         edge_clip_max_iters=edge_clip_max_iters,
@@ -523,18 +570,22 @@ class MSTOrderer(AbstractOrderer):
     velocity_weight
         Mechanism 1. If ``> 0``, edge weights become
         ``||dq|| + velocity_weight * (1 - cos(v_i, v_j))``. ``0`` (default) is
-        pure spatial and accepts any velocities. If ``> 0``, every velocity must
-        be finite and nonzero; a missing one raises ``ValueError`` (drop or
-        impute those tracers first).
+        pure spatial and never reads velocities. See ``nan_policy`` for
+        missing velocities.
     sever_cos_threshold
         Mechanism 2. If not ``None``, edges with ``cos(v_i, v_j)`` below this are
-        severed (e.g. ``0.0`` cuts anti-parallel arms). If set, every velocity
-        must be finite and nonzero; a missing one raises ``ValueError`` (drop or
-        impute those tracers first).
+        severed (e.g. ``0.0`` cuts anti-parallel arms).
+
+        For mechanisms 1 and 2, a stationary (zero-velocity) tracer has no
+        direction to compare, and any cosine it is given lets it bridge two
+        close, anti-parallel arms. So it joins the graph only as a leaf, by
+        its shortest kNN edge (within ``jump_cap``) to a tracer that has a
+        direction: a leaf cannot join two components. Many of them close
+        together (~10% of a tight hairpin at ``k=6``) still remove the edges
+        that ran through them and can fragment an arm; raise ``k`` then.
     orient_by_velocity
         Mechanism 3. If ``True``, flip the ordering so ``gamma`` increases along
-        the mean velocity. Tracers with a non-finite velocity are skipped in
-        that vote.
+        the mean velocity.
     on_disconnected
         Policy when the graph splits into multiple components (a gap in the
         stream, or a ``jump_cap``/``sever_cos_threshold`` that is too tight):
@@ -560,6 +611,22 @@ class MSTOrderer(AbstractOrderer):
         Threads for the k-d tree queries, as scipy's ``cKDTree.query``
         ``workers``: ``-1`` (default) uses every core, a positive integer caps
         it. The result does not depend on it.
+    nan_policy
+        What to do with a NaN velocity when a mechanism reads velocities
+        (``velocity_weight > 0``, ``sever_cos_threshold`` or
+        ``orient_by_velocity``). The pure-spatial default never reads them, so
+        never raises.
+
+        ``"raise"`` (default) raises ``ValueError`` (under ``jit``,
+        ``jax.errors.JaxRuntimeError`` carrying the same message). ``"omit"``
+        treats NaN as a missing measurement (catalogues often lack radial
+        velocities): for mechanisms 1 and 2 it joins the graph as a leaf, like
+        a stationary tracer, and mechanism 3 skips it. That is an opt-in, not a
+        safe default: the leaf goes to the spatially nearest tracer with a
+        direction, which on two close arms can be the other arm.
+
+        A zero velocity is data (a stationary tracer), not missing. An
+        infinite one is neither, so it raises under either policy.
 
     Examples
     --------
@@ -638,6 +705,7 @@ class MSTOrderer(AbstractOrderer):
     edge_clip_sigma: float | None = eqx.field(static=True, default=None)
     edge_clip_max_iters: int = eqx.field(static=True, default=5)
     workers: int = eqx.field(static=True, default=-1)
+    nan_policy: Literal["raise", "omit"] = eqx.field(static=True, default="raise")
 
     def __check_init__(self) -> None:
         """Reject invalid configuration early, at construction."""
@@ -647,6 +715,9 @@ class MSTOrderer(AbstractOrderer):
                 f"on_disconnected must be one of {allowed}; "
                 f"got {self.on_disconnected!r}."
             )
+            raise ValueError(msg)
+        if self.nan_policy not in ("raise", "omit"):
+            msg = f"nan_policy must be 'raise' or 'omit', got {self.nan_policy!r}."
             raise ValueError(msg)
         if self.velocity_weight < 0.0:
             # Only ``> 0.0`` engages the phase-space edge weights, so a negative
@@ -704,6 +775,7 @@ class MSTOrderer(AbstractOrderer):
                 velocity_weight=self.velocity_weight,
                 sever_cos_threshold=self.sever_cos_threshold,
                 orient_by_velocity=self.orient_by_velocity,
+                nan_policy=self.nan_policy,
                 on_disconnected=self.on_disconnected,
                 edge_clip_sigma=self.edge_clip_sigma,
                 edge_clip_max_iters=self.edge_clip_max_iters,
