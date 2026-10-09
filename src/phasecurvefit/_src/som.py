@@ -264,7 +264,20 @@ def init_prototypes(
         total = jax.ops.segment_sum(ordered, segment, num_segments=n_prototypes)
         return total / counts
 
-    return jt.map(bin_mean, positions), jt.map(bin_mean, velocities)
+    def finite_bin_mean(values: Array) -> Array:
+        # Velocities only: skip non-finite entries, as `fit` does. A NaN
+        # prototype would otherwise win every velocity-aware `argmin` (which
+        # returns the first NaN) on the first epoch. A bin with no finite entry
+        # takes the mean of all finite entries (0 if there are none).
+        ordered = jnp.asarray(values)[ordering]
+        ok = jnp.isfinite(ordered)
+        clean = jnp.where(ok, ordered, 0.0)
+        total = jax.ops.segment_sum(clean, segment, num_segments=n_prototypes)
+        n_ok = jax.ops.segment_sum(ok.astype(clean.dtype), segment, n_prototypes)
+        fallback = jnp.sum(clean) / jnp.maximum(jnp.sum(ok), 1)
+        return jnp.where(n_ok > 0, total / jnp.maximum(n_ok, 1), fallback)
+
+    return jt.map(bin_mean, positions), jt.map(finite_bin_mean, velocities)
 
 
 def _distance_matrix(
@@ -276,10 +289,24 @@ def _distance_matrix(
     proto_velocities: VectorComponents,
     /,
 ) -> Float[Array, "N K"]:
-    """Phase-space distance from every datum to every prototype."""
+    """Phase-space distance from every datum to every prototype.
+
+    A datum whose distances are not all finite -- under a velocity-aware
+    metric, one with a non-finite velocity -- falls back to position distance.
+    Left non-finite, ``argmin`` sends it to prototype 0 (it returns the first
+    NaN), dragging that prototype across the curve: on two close,
+    anti-parallel arms one NaN velocity took the arm switches from 1 to ~25,
+    where the fallback keeps 1. Raising, as ``MSTOrderer`` does, would reject
+    the default ``LocalFlowOrderer | SOMOrderer`` chain for any catalogue
+    with a missing velocity.
+    """
 
     def one(pos_n: VectorComponents, vel_n: VectorComponents) -> Array:
-        return metric(pos_n, vel_n, proto_positions, proto_velocities, metric_scale)
+        d = metric(pos_n, vel_n, proto_positions, proto_velocities, metric_scale)
+        spatial = SpatialDistanceMetric()(
+            pos_n, vel_n, proto_positions, proto_velocities, 0.0
+        )
+        return jnp.where(jnp.all(jnp.isfinite(d)), d, spatial)
 
     return jax.vmap(one)(positions, velocities)
 
@@ -383,7 +410,15 @@ def _fit_core(
         if weights is None
         else jnp.asarray(weights, dtype=stacked.dtype)
     )
-    weighted_stacked = stacked * omega[:, None]
+    # A non-finite velocity (common in catalogues: no radial velocity) is left
+    # out of that component's averages rather than summed in: one NaN would
+    # otherwise reach every prototype through the neighbourhood and make every
+    # prototype velocity NaN. Per column, so the datum still pulls on positions
+    # and its finite velocity components. Positions are not masked: a datum
+    # without a position has nowhere to be placed.
+    present = jnp.isfinite(stacked).at[:, :n_pos].set(True)
+    contrib = omega[:, None] * present
+    weighted_stacked = jnp.where(present, stacked, 0.0) * omega[:, None]
 
     def epoch(
         carry: tuple[VectorComponents, VectorComponents], step: Array
@@ -400,17 +435,18 @@ def _fit_core(
         # consumers -- a column sum and a matmul -- which blocked XLA from
         # fusing the whole (N, K) chain, so it materialized: `fit` peaked at
         # 416 MB for N=1e6, K=100 against 16 MB this way.
-        counts = jax.ops.segment_sum(omega, bmu, num_segments=n_prototypes)
+        counts = jax.ops.segment_sum(contrib, bmu, num_segments=n_prototypes)
         totals = jax.ops.segment_sum(weighted_stacked, bmu, num_segments=n_prototypes)
         neighbourhood = jnp.exp(-lattice_sq / (2.0 * sigma**2))
-        weight = counts @ neighbourhood
+        weight = neighbourhood.T @ counts
         # A lattice unit no datum reaches has zero weight *and* zero numerator
         # (the Gaussian underflows in float32 ~11 units from the nearest
-        # best-matching unit). Leave it where it is rather than dividing 0/0.
+        # best-matching unit); likewise a velocity component every nearby datum
+        # lacks. Leave it where it is rather than dividing 0/0.
         live = weight > jnp.finfo(stacked.dtype).tiny
-        means = (neighbourhood.T @ totals) / jnp.where(live, weight, 1.0)[:, None]
+        means = (neighbourhood.T @ totals) / jnp.where(live, weight, 1.0)
         current = jnp.stack([pq[k] for k in keys] + [pp[k] for k in vel_keys], axis=-1)
-        means = jnp.where(live[:, None], means, current)
+        means = jnp.where(live, means, current)
         return (
             {k: means[:, i] for i, k in enumerate(keys)},
             {k: means[:, n_pos + i] for i, k in enumerate(vel_keys)},
@@ -503,7 +539,9 @@ def fit(
     (:doc:`/guides/som` notes how that differs from (A9) as printed). ``omega_n``
     is ``weights``, defaulting to ``1`` for every datum -- the paper has no such
     term, so this is an addition, not a further deviation from (A9)/(A10): with
-    the default, the sum above is exactly the un-weighted one.
+    the default, the sum above is exactly the un-weighted one. A non-finite
+    velocity component is left out of both sums for that component, so a
+    missing velocity cannot poison every prototype through the neighbourhood.
 
     ``sigma`` anneals geometrically from ``sigma_start`` to ``sigma_end``, so the
     global ordering forms first and local detail is refined afterwards.
