@@ -317,21 +317,18 @@ Exact k-nearest-neighbour backends for
 {class}`~phasecurvefit.orderers.MSTOrderer` (`neighbors=`).
 
 ```{eval-rst}
+.. py:module:: phasecurvefit.neighbors
+
 .. autoclass:: phasecurvefit.neighbors.AbstractNeighborSearch
-   :no-index:
    :members: knn
 
 .. autoclass:: phasecurvefit.neighbors.BucketKDTree
-   :no-index:
 
 .. autoclass:: phasecurvefit.neighbors.BruteForce
-   :no-index:
 
 .. autoclass:: phasecurvefit.neighbors.JaxKD
-   :no-index:
 
 .. autoclass:: phasecurvefit.neighbors.SciPy
-   :no-index:
 ```
 
 ## Index
