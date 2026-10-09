@@ -130,7 +130,7 @@ class TestMissingVelocities:
         pos, vel = _hairpin()
         vel = {"x": vel["x"].at[20].set(jnp.nan), "y": vel["y"]}
         orderer = pcf.orderers.MSTOrderer(k=6, jump_cap=1.0, velocity_weight=5.0)
-        with pytest.raises(Exception, match="velocity direction"):
+        with pytest.raises(jax.errors.JaxRuntimeError, match="velocity direction"):
             jax.block_until_ready(
                 jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
             )

@@ -145,7 +145,7 @@ def _check_velocity_directions(V: np.ndarray, /) -> None:
             f"for every tracer, but {int(bad.sum())} of {len(V)} velocities are "
             f"non-finite or zero (first at index {first}). Drop or impute those "
             "tracers, or disable velocity_weight and sever_cos_threshold "
-            "(orient_by_velocity ignores missing velocities)."
+            "(orient_by_velocity skips NaN velocities)."
         )
         raise ValueError(msg)
 
@@ -499,8 +499,8 @@ class MSTOrderer(AbstractOrderer):
 
         Mechanisms 1 and 2 need every velocity to be finite and nonzero; a
         missing velocity raises ``ValueError`` (drop or impute those tracers
-        first). The pure-spatial default and ``orient_by_velocity`` accept
-        missing velocities.
+        first). The pure-spatial default accepts any velocities, and
+        ``orient_by_velocity`` skips NaN ones.
     orient_by_velocity
         Mechanism 3. If ``True``, flip the ordering so ``gamma`` increases along
         the mean velocity.
