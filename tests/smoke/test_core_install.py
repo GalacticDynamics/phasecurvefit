@@ -25,7 +25,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.mark.parametrize("name", ["metrics", "nn", "orderers", "strats", "w"])
+@pytest.mark.parametrize(
+    "name", ["metrics", "neighbors", "nn", "orderers", "strats", "w"]
+)
 def test_public_submodules_import(name):
     """Each public submodule imports with core dependencies only."""
     importlib.import_module(f"phasecurvefit.{name}")
