@@ -149,6 +149,22 @@ class TestMissingVelocities:
         assert np.all(np.abs(steps) == 1)  # neighbours along the line...
         assert np.all(steps == steps[0])  # ...all in one direction
 
+    @pytest.mark.parametrize("bad", [np.nan, -np.inf], ids=["nan", "-inf"])
+    def test_orientation_skips_non_finite_velocities(self, bad):
+        """One non-finite velocity cannot decide the orientation.
+
+        59 tracers move in +x; a single -inf would otherwise dominate the
+        tangent-velocity sum and flip the ordering against all of them.
+        """
+        x = np.linspace(0.0, 10.0, 60)
+        pos = {"x": jnp.asarray(x), "y": jnp.zeros(60)}
+        vel = {"x": jnp.ones(60).at[30].set(bad), "y": jnp.zeros(60)}
+        res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, orient_by_velocity=True).order(
+            pos, vel
+        )
+        steps = np.diff(x[np.asarray(res.ordering)])
+        assert np.all(steps > 0)
+
     def test_small_unit_velocities_keep_their_direction(self):
         """|v| ~ 1e-7 still separates the arms (an absolute floor ignored them)."""
         pos, vel = _hairpin(n_a=50, n_b=40)

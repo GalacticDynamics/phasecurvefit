@@ -145,7 +145,7 @@ def _check_velocity_directions(V: np.ndarray, /) -> None:
             f"for every tracer, but {int(bad.sum())} of {len(V)} velocities are "
             f"non-finite or zero (first at index {first}). Drop or impute those "
             "tracers, or disable velocity_weight and sever_cos_threshold "
-            "(orient_by_velocity skips NaN velocities)."
+            "(orient_by_velocity skips non-finite velocities)."
         )
         raise ValueError(msg)
 
@@ -328,9 +328,11 @@ def _orient_along_velocity(
     tang = np.diff(Cb, axis=0)
     vseg = V[backbone_nodes]
     vmid = 0.5 * (vseg[:-1] + vseg[1:])
-    # nansum: one NaN velocity must not turn this test into a coin flip
-    # (``nan < 0`` is False, so the flip would silently never happen).
-    if np.nansum(tang * vmid) < 0.0:
+    # Sum finite terms only: one NaN velocity must not turn this test into a
+    # coin flip (``nan < 0`` is False, so the flip would silently never
+    # happen), and one inf velocity must not outvote every other tracer.
+    dots = tang * vmid
+    if np.sum(dots[np.isfinite(dots)]) < 0.0:
         return order_idx[::-1], backbone_nodes[::-1]
     return order_idx, backbone_nodes
 
@@ -500,7 +502,7 @@ class MSTOrderer(AbstractOrderer):
         Mechanisms 1 and 2 need every velocity to be finite and nonzero; a
         missing velocity raises ``ValueError`` (drop or impute those tracers
         first). The pure-spatial default accepts any velocities, and
-        ``orient_by_velocity`` skips NaN ones.
+        ``orient_by_velocity`` skips non-finite ones.
     orient_by_velocity
         Mechanism 3. If ``True``, flip the ordering so ``gamma`` increases along
         the mean velocity.
