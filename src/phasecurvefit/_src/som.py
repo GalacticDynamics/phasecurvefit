@@ -296,13 +296,19 @@ def _distance_matrix(
     Left non-finite, ``argmin`` sends it to prototype 0 (it returns the first
     NaN), dragging that prototype across the curve: on two close,
     anti-parallel arms one NaN velocity took the arm switches from 1 to ~25,
-    where the fallback keeps 1. Raising, as ``MSTOrderer`` does, would reject
-    the default ``LocalFlowOrderer | SOMOrderer`` chain for any catalogue
-    with a missing velocity.
+    where the fallback keeps 1. Whether missing velocities may reach this point
+    at all is ``SOMOrderer.nan_policy``'s decision.
+
+    The fallback costs ~10% of a velocity-aware ``fit`` on clean data (XLA
+    shares the position term), and nothing for a position-only metric, which
+    skips it. ``lax.cond`` per row would not save it: under ``vmap`` it lowers
+    to a ``select`` that evaluates both branches.
     """
 
     def one(pos_n: VectorComponents, vel_n: VectorComponents) -> Array:
         d = metric(pos_n, vel_n, proto_positions, proto_velocities, metric_scale)
+        if not metric.uses_velocity:
+            return d
         spatial = SpatialDistanceMetric()(
             pos_n, vel_n, proto_positions, proto_velocities, 0.0
         )

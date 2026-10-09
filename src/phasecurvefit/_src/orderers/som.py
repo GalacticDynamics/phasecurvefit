@@ -105,10 +105,13 @@ def _check_velocities(
     Called only when the stage reads velocities. ``eqx.error_if`` so the
     check survives ``jit`` and ``vmap``.
     """
-    flat = jnp.concatenate([jnp.ravel(jnp.asarray(v)) for v in velocities.values()])
+    # Per component, then reduced: no (N * D) copy just to validate.
+    comps = [jnp.asarray(v) for v in velocities.values()]
+    has_inf = jnp.any(jnp.stack([jnp.any(jnp.isinf(v)) for v in comps]))
+    has_nan = jnp.any(jnp.stack([jnp.any(jnp.isnan(v)) for v in comps]))
     velocities = eqx.error_if(
         velocities,
-        jnp.any(jnp.isinf(flat)),
+        has_inf,
         "SOMOrderer found an infinite velocity. inf is not a measurement -- it "
         "comes from an overflow or a bug upstream -- so it raises under either "
         "nan_policy. Fix or drop those tracers.",
@@ -117,7 +120,7 @@ def _check_velocities(
         return velocities
     return eqx.error_if(
         velocities,
-        jnp.any(jnp.isnan(flat)),
+        has_nan,
         "SOMOrderer reads velocities here (a velocity-aware metric or "
         "orient_by_velocity) and found a NaN. To treat NaN as a missing "
         "velocity pass nan_policy='omit'; or drop those tracers; or order on "
