@@ -28,8 +28,9 @@ from typing import Any, NamedTuple
 import jax.numpy as jnp
 from jaxtyping import Array
 
-from .custom_types import FLikeSz0, VectorComponents
+from .custom_types import FLikeSz0, ISz0, VectorComponents
 from .metrics import AbstractDistanceMetric
+from .phasespace import get_w_at
 
 
 class QueryResult(NamedTuple):
@@ -38,10 +39,13 @@ class QueryResult(NamedTuple):
     Attributes
     ----------
     distances : Array
-        Array of distances to all points (shape (n,))
-    indices : Array
-        Candidate indices (for kdtree, indices of k nearest neighbors) For
-        brute-force, this is None or full index range.
+        Metric distances. If ``indices`` is None, to every point (shape
+        ``(n,)``); otherwise to each candidate, aligned with ``indices``
+        (``distances[i]`` is the distance to point ``indices[i]``).
+    indices : Array or None
+        Candidate indices, or None if every point is a candidate. For `KDTree`
+        these are the ``k + 1`` nearest spatial points, which include the
+        current point itself; the walk excludes it as already visited.
 
     """
 
@@ -53,8 +57,11 @@ class AbstractQueryStrategy(ABC):
     """Abstract base class for neighbor query strategies.
 
     Strategies are minimally stateful. Configure via `__init__` (e.g., KD-tree
-    `k`). Call `init(positions)` once to build and return a strategy state
-    object. Then call `query(state, ...)` for each step.
+    `k`). The walk calls `init(positions)` once to build a strategy state, then
+    `query_at(state, idx, ...)` at each step. Subclasses must implement `query`,
+    which answers for an arbitrary position; the default `query_at` looks up
+    the data point at ``idx`` and delegates to it. Override `query_at` only to
+    use precomputed per-point state, as `KDTree` does.
     """
 
     @abstractmethod
@@ -104,6 +111,34 @@ class AbstractQueryStrategy(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
+    def query_at(
+        self,
+        state: object,
+        current_idx: ISz0,
+        /,
+        positions: VectorComponents,
+        velocities: VectorComponents,
+        metric_fn: AbstractDistanceMetric,
+        metric_scale: FLikeSz0,
+    ) -> QueryResult:
+        """Query for neighbors of the data point at ``current_idx``.
+
+        The walk only ever queries at data points, so it calls this rather
+        than `query`. The default looks the point up and delegates to `query`;
+        a strategy can override it to use precomputed per-point state (as
+        `KDTree` does with its neighbor table).
+        """
+        current_pos, current_vel = get_w_at(positions, velocities, current_idx)
+        return self.query(
+            state,
+            current_pos,
+            current_vel,
+            positions,
+            velocities,
+            metric_fn,
+            metric_scale,
+        )
+
 
 class BruteForce(AbstractQueryStrategy):
     """Brute-force strategy: compute distance to all points.
@@ -136,15 +171,19 @@ class BruteForce(AbstractQueryStrategy):
 
 
 class KDTree(AbstractQueryStrategy):
-    """KD-tree strategy: spatial query followed by metric-based selection.
+    """KD-tree strategy: restrict each step to the k nearest spatial neighbors.
 
-    This strategy uses a KD-tree to find the k nearest neighbors spatially,
-    and the walk then picks whichever of them is nearest under the metric.
-    This changes *which* point can be chosen (only spatial neighbors), not the
-    cost of a step: the metric and the spatial distance are still evaluated
-    for every point at each step, so this is not faster than `BruteForce`.
+    `init` builds a KD-tree and queries the ``k`` nearest spatial neighbors of
+    every point once, giving an ``(n, k + 1)`` neighbor table. Each walk step
+    then looks up the current point's row and evaluates the metric on those
+    candidates only, so a step's own work is O(k) rather than O(n). Building
+    the table is one batched KD-tree query over all points; on CPU that
+    one-off cost dominates, so this is faster than `BruteForce` only for large
+    datasets (tens of thousands of points and up).
 
-    The KD-tree is built once at the start of the walk.
+    Because only spatial neighbors are candidates, the walk can pick a
+    different point than `BruteForce` would: one that is nearer under the
+    metric but not among the ``k`` nearest in space is never considered.
 
     Requires jaxkd optional dependency.
     """
@@ -174,6 +213,19 @@ class KDTree(AbstractQueryStrategy):
             raise ImportError(msg) from None
         self._jaxkd = jaxkd
 
+    def _n_query(self, n_points: int) -> int:
+        # Query one extra neighbor to make room for the current point itself.
+        # Otherwise ``k`` yields only ``k - 1`` usable candidates and small
+        # ``k`` can deadlock the walk: the sole non-self neighbor may already
+        # be visited, leaving no candidate and terminating the walk
+        # prematurely. Self is NOT dropped positionally: with coincident points
+        # the tree may return a duplicate before self, so slicing off slot 0
+        # would drop an unvisited duplicate and keep self. Instead self stays
+        # in the candidate set and is excluded by index via the walk's visited
+        # mask (the current point is always visited). Clamp to the point count
+        # since jaxkd errors when ``k`` exceeds the tree size.
+        return min(self.k + 1, n_points)
+
     def init(
         self,
         positions: VectorComponents,
@@ -181,11 +233,28 @@ class KDTree(AbstractQueryStrategy):
         *,
         metadata: object,  # noqa: ARG002
     ) -> dict[str, Any]:
-        """Build KD-tree from positions and return strategy state."""
-        pos_arrays = [positions[k] for k in sorted(positions.keys())]
-        pos_flat = jnp.stack(pos_arrays, axis=-1)
+        """Build the KD-tree and every point's neighbor table."""
+        pos_flat = jnp.stack([positions[k] for k in sorted(positions)], axis=-1)
         tree = self._jaxkd.build_tree(pos_flat)
-        return {"tree": tree, "n_points": pos_flat.shape[0]}
+        n_query = self._n_query(pos_flat.shape[0])
+        neighbors, _ = self._jaxkd.query_neighbors(tree, pos_flat, k=n_query)
+        return {"tree": tree, "n_query": n_query, "neighbors": neighbors}
+
+    def _candidates(
+        self,
+        indices: Array,
+        current_pos: dict[str, Array],
+        current_vel: dict[str, Array],
+        positions: VectorComponents,
+        velocities: VectorComponents,
+        metric_fn: AbstractDistanceMetric,
+        metric_scale: FLikeSz0,
+    ) -> QueryResult:
+        cand_pos, cand_vel = get_w_at(positions, velocities, indices)
+        distances = metric_fn(
+            current_pos, current_vel, cand_pos, cand_vel, metric_scale
+        )
+        return QueryResult(distances=distances, indices=indices)
 
     def query(
         self,
@@ -198,35 +267,39 @@ class KDTree(AbstractQueryStrategy):
         metric_fn: AbstractDistanceMetric,
         metric_scale: FLikeSz0,
     ) -> QueryResult:
-        """Query k nearest neighbors and apply metric.
-
-        Returns distances to all points, but algorithm will use kdtree
-        indices to filter candidates before metric selection.
-        """
-        # Flatten current position
-        current_pos_arr = jnp.array(  # (n_dims,)
-            [current_pos[k] for k in sorted(current_pos.keys())]
-        )
-
-        # Query one extra neighbor to make room for the current point itself.
-        # Otherwise ``k`` yields only ``k - 1`` usable candidates and small
-        # ``k`` can deadlock the walk: the sole non-self neighbor may already
-        # be visited, leaving no candidate and terminating the walk
-        # prematurely. Self is NOT dropped positionally: with coincident points
-        # the tree may return a duplicate before self, so slicing off slot 0
-        # would drop an unvisited duplicate and keep self. Instead self stays
-        # in the candidate set and is excluded by index via the walk's visited
-        # mask (the current point is always visited). Clamp to the point count
-        # since jaxkd errors when ``k`` exceeds the tree size.
-        n_query = min(self.k + 1, kd_state["n_points"])
+        """Query the KD-tree at an arbitrary position; metric on candidates only."""
+        current_pos_arr = jnp.array([current_pos[k] for k in sorted(current_pos)])
         indices, _ = self._jaxkd.query_neighbors(
-            kd_state["tree"], current_pos_arr[None, :], k=n_query
+            kd_state["tree"], current_pos_arr[None, :], k=kd_state["n_query"]
         )
-        indices = indices[0]
-
-        # Compute metric distances to all points
-        distances_metric = metric_fn(
-            current_pos, current_vel, positions, velocities, metric_scale
+        return self._candidates(
+            indices[0],
+            current_pos,
+            current_vel,
+            positions,
+            velocities,
+            metric_fn,
+            metric_scale,
         )
 
-        return QueryResult(distances=distances_metric, indices=indices)
+    def query_at(
+        self,
+        kd_state: dict[str, Any],
+        current_idx: ISz0,
+        /,
+        positions: VectorComponents,
+        velocities: VectorComponents,
+        metric_fn: AbstractDistanceMetric,
+        metric_scale: FLikeSz0,
+    ) -> QueryResult:
+        """Look up the data point's precomputed neighbors; O(k) per step."""
+        current_pos, current_vel = get_w_at(positions, velocities, current_idx)
+        return self._candidates(
+            kd_state["neighbors"][current_idx],
+            current_pos,
+            current_vel,
+            positions,
+            velocities,
+            metric_fn,
+            metric_scale,
+        )
