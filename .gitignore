@@ -5,3 +5,12 @@ __pycache__
 
 # Local-only design/planning artifacts (superpowers)
 docs/superpowers/
+
+# hypothesis example database
+.hypothesis/
+
+# coverage.py data & reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
