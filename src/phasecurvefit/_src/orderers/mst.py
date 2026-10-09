@@ -523,18 +523,18 @@ class MSTOrderer(AbstractOrderer):
     velocity_weight
         Mechanism 1. If ``> 0``, edge weights become
         ``||dq|| + velocity_weight * (1 - cos(v_i, v_j))``. ``0`` (default) is
-        pure spatial.
+        pure spatial and accepts any velocities. If ``> 0``, every velocity must
+        be finite and nonzero; a missing one raises ``ValueError`` (drop or
+        impute those tracers first).
     sever_cos_threshold
         Mechanism 2. If not ``None``, edges with ``cos(v_i, v_j)`` below this are
-        severed (e.g. ``0.0`` cuts anti-parallel arms).
-
-        Mechanisms 1 and 2 need every velocity to be finite and nonzero; a
-        missing velocity raises ``ValueError`` (drop or impute those tracers
-        first). The pure-spatial default accepts any velocities, and
-        ``orient_by_velocity`` skips non-finite ones.
+        severed (e.g. ``0.0`` cuts anti-parallel arms). If set, every velocity
+        must be finite and nonzero; a missing one raises ``ValueError`` (drop or
+        impute those tracers first).
     orient_by_velocity
         Mechanism 3. If ``True``, flip the ordering so ``gamma`` increases along
-        the mean velocity.
+        the mean velocity. Tracers with a non-finite velocity are skipped in
+        that vote.
     on_disconnected
         Policy when the graph splits into multiple components (a gap in the
         stream, or a ``jump_cap``/``sever_cos_threshold`` that is too tight):
