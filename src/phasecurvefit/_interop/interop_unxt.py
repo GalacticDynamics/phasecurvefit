@@ -615,7 +615,7 @@ def _local_flow_walk(
     n_max: int | None = None,
     config: WalkConfig = WalkConfig(),  # noqa: B008
     direction: Direction = "forward",
-    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    metadata: StateMetadata | None = None,
     usys: u.AbstractUnitSystem | None = None,
 ) -> WalkLocalFlowResult:
     """Implement for Quantity-valued phase-space data.
@@ -692,14 +692,15 @@ def _local_flow_walk(
     )
 
     """
-    # Process the metadata
+    # Process the metadata. ``metadata`` is None whenever the caller omitted
+    # it -- a shared ``StateMetadata()`` default would be one instance created
+    # at definition time, and its ``_data`` is a plain dict, so a mutation
+    # reaching through that attribute would leak into every later call.
     if usys is not None:
-        metadata = StateMetadata(**(dict(metadata) | {"usys": usys}))
+        carried = dict(metadata) if metadata is not None else {}
+        metadata = StateMetadata(**(carried | {"usys": usys}))
 
-    usys = metadata.get("usys")
-    if not isinstance(usys, u.AbstractUnitSystem):
-        msg = "`usys` must be an `unxt.AbstractUnitSystem`."  # type: ignore[unreachable]
-        raise TypeError(msg)
+    usys = _require_usys(metadata, hint=_USYS_VIA_WALK)
 
     if not isinstance(metric_scale, u.AbstractQuantity):
         msg = "`metric_scale` must be an `unxt.AbstractQuantity`."  # type: ignore[unreachable]
@@ -768,13 +769,24 @@ def transform(
 # ==============================================================================
 
 
-def _require_usys(metadata: StateMetadata) -> u.AbstractUnitSystem:
-    usys = metadata.get("usys")
+# How to supply the unit system, per entry point. The orderer dispatches take
+# ``metadata`` only; ``walk_local_flow`` also accepts ``usys`` directly, so
+# naming just one of them there would send the caller the long way round.
+_USYS_VIA_ORDER = "order(q, p, metadata=StateMetadata(usys=...))"
+_USYS_VIA_WALK = (
+    "walk_local_flow(..., usys=...) or "
+    "walk_local_flow(..., metadata=StateMetadata(usys=...))"
+)
+
+
+def _require_usys(
+    metadata: StateMetadata | None, /, *, hint: str = _USYS_VIA_ORDER
+) -> u.AbstractUnitSystem:
+    # ``metadata`` is None whenever the caller omitted it: both the ``order``
+    # facade and ChainOrderer forward it unconditionally.
+    usys = metadata.get("usys") if metadata is not None else None
     if not isinstance(usys, u.AbstractUnitSystem):
-        msg = (
-            "`usys` must be provided for Quantity inputs, e.g. "
-            "order(q, p, metadata=StateMetadata(usys=...))."
-        )
+        msg = f"`usys` must be provided for Quantity inputs, e.g. {hint}."
         raise TypeError(msg)
     return usys
 
@@ -785,7 +797,7 @@ def order(
     positions: VectorQComponents,
     velocities: VectorQComponents,
     *,
-    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    metadata: StateMetadata | None = None,
 ) -> OrderingResult:
     """Order Quantity-valued tracers with the MST backbone.
 
@@ -818,7 +830,7 @@ def order(
     positions: VectorQComponents,
     velocities: VectorQComponents,
     *,
-    metadata: StateMetadata = StateMetadata(),  # noqa: B008
+    metadata: StateMetadata | None = None,
 ) -> WalkLocalFlowResult:
     """Order Quantity-valued tracers with the local-flow walk.
 
