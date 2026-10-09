@@ -33,8 +33,9 @@ class TestLayout:
 class TestSelect:
     """Exact k-smallest selection."""
 
+    @pytest.mark.parametrize("top_k", [False, True])
     @pytest.mark.parametrize("width", [3, 13, 52, 208])
-    def test_matches_sort_with_ties_and_infs(self, width):
+    def test_matches_sort_with_ties_and_infs(self, width, top_k):
         """Values equal np.sort; columns reproduce them, distinct, stable on ties."""
         k = 10
         rng = np.random.default_rng(width)
@@ -44,7 +45,8 @@ class TestSelect:
         a[:7] = np.inf
         a[:7, 0] = 0.1  # rows with fewer than k finite entries
         ids = jnp.broadcast_to(jnp.arange(width), a.shape)
-        vals, cols = jax.jit(functools.partial(ksmallest, k=k))(jnp.asarray(a), ids)
+        f = functools.partial(ksmallest, k=k, top_k=top_k)
+        vals, cols = jax.jit(f)(jnp.asarray(a), ids)
         vals, cols = np.asarray(vals), np.asarray(cols)
         padded = np.concat(
             [a, np.full((500, max(0, k - width)), np.inf, np.float32)], axis=1
@@ -69,6 +71,24 @@ class TestSelect:
         vals, out = ksmallest(a, ids, 3, top_k=top_k)
         np.testing.assert_array_equal(np.asarray(vals), [[0.0, 1.0, 1.0]])
         np.testing.assert_array_equal(np.asarray(out), [[2, 4, 7]])
+
+    def test_top_k_path_both_branches_under_vmap(self):
+        """The truncated-tie second pass agrees with the reference under vmap.
+
+        Under vmap the gating cond becomes a select, so a batch mixing a
+        tie-free row with a truncated-tie row exercises both branches at once.
+        """
+        rng = np.random.default_rng(3)
+        a = rng.random((2, 4, 40)).astype(np.float32)
+        a[1, :, :12] = 0.25  # 12 tied at the k-th value, k=5: truncated
+        ids = rng.permutation(2 * 4 * 40).reshape(2, 4, 40).astype(np.int32)
+        f = jax.vmap(functools.partial(ksmallest, k=5, top_k=True))
+        vals, out = map(np.asarray, f(jnp.asarray(a), jnp.asarray(ids)))
+        for b in range(2):
+            for r in range(4):
+                o = np.lexsort((ids[b, r], a[b, r]))[:5]
+                np.testing.assert_array_equal(vals[b, r], a[b, r][o])
+                np.testing.assert_array_equal(out[b, r], ids[b, r][o])
 
     def test_top_k_path_exact_beyond_float32_columns(self):
         """Rows wider than 2**24: a strictly nearer point is never dropped.

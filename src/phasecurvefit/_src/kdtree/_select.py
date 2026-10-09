@@ -96,22 +96,31 @@ def ksmallest(
     w = a.shape[-1]
     if top_k:
         # Strictly-nearer entries come straight from the first top_k (its
-        # values are exact); a second top_k only picks which entries tied at
-        # tau fill the remaining slots. Float keys: XLA's CPU top_k is ~70x
-        # slower on int32. ponytail: ids >= 2**24 round in float32, so ties
-        # among them may not follow id order (the distances stay exact).
+        # values are exact). Only a row whose group tied at tau does not fit
+        # in the remaining slots needs a second top_k to pick the lowest ids;
+        # it runs only if some row needs it (continuous data: never). Under
+        # vmap the cond becomes a select and both branches run. Float keys:
+        # XLA's CPU top_k is ~70x slower on int32. ponytail: ids >= 2**24
+        # round in float32, so ties among them may not follow id order (the
+        # distances stay exact).
         v1, c1 = jax.lax.top_k(-a, k)
         v1 = -v1
         # max, not [:, -1:]: slicing top_k's output made XLA CPU ~60x slower.
         tau = jnp.max(v1, axis=1, keepdims=True)
         n_lt = jnp.sum(v1 < tau, axis=1, keepdims=True)  # all of them are in v1
-        kdt = jnp.promote_types(a.dtype, jnp.float32)
-        tie_key = jnp.where(a == tau, ids.astype(kdt), jnp.inf)
-        c2 = jax.lax.top_k(-tie_key, k)[1]
-        slot = jnp.arange(k)[None]
-        c2 = jnp.take_along_axis(c2, jnp.clip(slot - n_lt, 0, k - 1), 1)
-        col = jnp.where(slot < n_lt, c1, c2)
-        vals = jnp.where(slot < n_lt, v1, tau)
+        n_eq = jnp.sum(a == tau, axis=1, keepdims=True)
+        cut = jnp.any(jnp.isfinite(tau) & (n_lt + n_eq > k))
+
+        def lowest_tied_ids() -> Array:
+            kdt = jnp.promote_types(a.dtype, jnp.float32)
+            tie_key = jnp.where(a == tau, ids.astype(kdt), jnp.inf)
+            c2 = jax.lax.top_k(-tie_key, k)[1]
+            slot = jnp.arange(k)[None]
+            c2 = jnp.take_along_axis(c2, jnp.clip(slot - n_lt, 0, k - 1), 1)
+            return jnp.where(slot < n_lt, c1, c2)
+
+        col = jax.lax.cond(cut, lowest_tied_ids, lambda: c1)
+        vals = jnp.where(jnp.arange(k)[None] < n_lt, v1, tau)
         out = jnp.take_along_axis(ids, col, 1)
         return _sort_pairs(vals, out, k)
     # (W, Q) layout for the networks; pass ``ids`` as ``x.T`` to skip a copy.
