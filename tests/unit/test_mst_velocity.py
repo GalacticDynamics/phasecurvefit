@@ -144,9 +144,10 @@ class TestMissingVelocities:
         pos = {"x": jnp.asarray(x), "y": jnp.zeros(60)}
         vel = {"x": jnp.ones(60).at[10:15].set(jnp.nan), "y": jnp.zeros(60)}
         res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, **kw).order(pos, vel)
-        ordered = np.asarray(res.ordering)
-        assert len(ordered) == 60
-        assert np.all(np.diff(ordered) == 1) or np.all(np.diff(ordered) == -1)
+        steps = np.diff(np.asarray(res.ordering))
+        assert len(steps) == 59
+        assert np.all(np.abs(steps) == 1)  # neighbours along the line...
+        assert np.all(steps == steps[0])  # ...all in one direction
 
     def test_small_unit_velocities_keep_their_direction(self):
         """|v| ~ 1e-7 still separates the arms (an absolute floor ignored them)."""

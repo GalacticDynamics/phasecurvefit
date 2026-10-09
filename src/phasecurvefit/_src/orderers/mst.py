@@ -155,13 +155,13 @@ def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarra
 
     Scale-free: an absolute floor on ``|v_i| |v_j|`` would read every
     small-unit velocity (``|v| <~ 1e-6``) as directionless. Raises unless
-    every velocity has a direction (`_check_velocity_directions`).
+    every velocity has a direction (``_check_velocity_directions``).
     """
     _check_velocity_directions(V)
     vi, vj = V[rows], V[cols]
     num = np.sum(vi * vj, axis=1)
     den = np.linalg.norm(vi, axis=1) * np.linalg.norm(vj, axis=1)
-    return np.where(den > 0.0, num / np.where(den > 0.0, den, 1.0), 0.0)
+    return np.divide(num, den, out=np.zeros_like(num), where=den > 0.0)
 
 
 def _backbone_on_component(
