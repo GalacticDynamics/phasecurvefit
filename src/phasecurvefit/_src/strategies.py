@@ -43,8 +43,9 @@ class QueryResult(NamedTuple):
         ``(n,)``); otherwise to each candidate, aligned with ``indices``
         (``distances[i]`` is the distance to point ``indices[i]``).
     indices : Array or None
-        Candidate indices (for `KDTree`, the k nearest spatial neighbors), or
-        None if every point is a candidate.
+        Candidate indices, or None if every point is a candidate. For `KDTree`
+        these are the ``k + 1`` nearest spatial points, which include the
+        current point itself; the walk excludes it as already visited.
 
     """
 
