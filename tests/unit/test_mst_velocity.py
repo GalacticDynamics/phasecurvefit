@@ -5,6 +5,7 @@ in-arm spacing) with **opposite** velocities. Pure-spatial ordering zigzags
 between the arms; velocity information should keep them apart or orient them.
 """
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -97,3 +98,61 @@ class TestTipOrientation:
         assert xo_neg[0] > xo_neg[-1]
         # flipping the velocity flips the orientation
         assert xo_pos[0] < xo_pos[-1]
+
+
+class TestMissingVelocities:
+    """Mechanisms 1 and 2 refuse tracers without a velocity direction."""
+
+    @pytest.mark.parametrize("bad", [np.nan, np.inf, 0.0], ids=["nan", "inf", "zero"])
+    @pytest.mark.parametrize(
+        "kw",
+        [{"velocity_weight": 5.0}, {"sever_cos_threshold": 0.0}],
+        ids=["velocity_weight", "sever"],
+    )
+    def test_raises(self, kw, bad):
+        """One directionless velocity raises instead of bridging the arms.
+
+        Every silent stand-in (cos = 0, cos = 1, neighbour imputation) lets
+        that one tracer reconnect the anti-parallel arms of the hairpin.
+        """
+        pos, vel = _hairpin()
+        vel = {"x": vel["x"].at[20].set(bad), "y": vel["y"]}
+        if bad == 0.0:
+            vel["y"] = vel["y"].at[20].set(0.0)
+        orderer = pcf.orderers.MSTOrderer(
+            k=6, jump_cap=1.0, on_disconnected="largest", **kw
+        )
+        with pytest.raises(ValueError, match="velocity direction"):
+            orderer.order(pos, vel)
+
+    def test_raises_under_jit(self):
+        """Traced, the same error surfaces from the host stage at run time."""
+        pos, vel = _hairpin()
+        vel = {"x": vel["x"].at[20].set(jnp.nan), "y": vel["y"]}
+        orderer = pcf.orderers.MSTOrderer(k=6, jump_cap=1.0, velocity_weight=5.0)
+        with pytest.raises(Exception, match="velocity direction"):
+            jax.block_until_ready(
+                jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
+            )
+
+    @pytest.mark.parametrize(
+        "kw", [{}, {"orient_by_velocity": True}], ids=["spatial", "orient"]
+    )
+    def test_unused_or_tolerant_mechanisms_accept_nan(self, kw):
+        """Velocities the graph never compares may be missing."""
+        x = np.linspace(0.0, 10.0, 60)
+        pos = {"x": jnp.asarray(x), "y": jnp.zeros(60)}
+        vel = {"x": jnp.ones(60).at[10:15].set(jnp.nan), "y": jnp.zeros(60)}
+        res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, **kw).order(pos, vel)
+        ordered = np.asarray(res.ordering)
+        assert len(ordered) == 60
+        assert np.all(np.diff(ordered) == 1) or np.all(np.diff(ordered) == -1)
+
+    def test_small_unit_velocities_keep_their_direction(self):
+        """|v| ~ 1e-7 still separates the arms (an absolute floor ignored them)."""
+        pos, vel = _hairpin(n_a=50, n_b=40)
+        vel = {c: v * 1e-7 for c, v in vel.items()}
+        res = pcf.orderers.MSTOrderer(
+            k=6, jump_cap=1.0, sever_cos_threshold=0.0, on_disconnected="largest"
+        ).order(pos, vel)
+        assert int((res.indices >= 0).sum()) == 50

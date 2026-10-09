@@ -64,7 +64,6 @@ from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
 
 OnDisconnected = Literal["raise", "warn", "largest", "connect"]
-_TINY = 1e-12
 # An edge must be at least this multiple of the median length to be a clip
 # candidate. Floors the (multiplicative) threshold so a uniformly-sampled
 # backbone -- where the robust spread collapses to ~0 -- is not shredded by
@@ -127,12 +126,42 @@ def _run_in_thread[T](fn: Callable[[], T]) -> T:
     return payload  # type: ignore[return-value]
 
 
+def _check_velocity_directions(V: np.ndarray, /) -> None:
+    """Raise unless every velocity has a direction (finite and nonzero).
+
+    ``velocity_weight`` and ``sever_cos_threshold`` compare velocity directions
+    across edges. A tracer without one leaves them nothing to compare, and every
+    stand-in fails silently where those mechanisms matter (two close,
+    anti-parallel arms): treating it as perpendicular (``cos = 0``) or as
+    aligned (``cos = 1``) lets it bridge the arms, and imputing it from spatial
+    neighbours averages the two arms to nothing. So refuse, and say what to do.
+    """
+    norm = np.linalg.norm(V, axis=1)
+    bad = ~(np.isfinite(norm) & (norm > 0.0))
+    if bad.any():
+        first = int(np.flatnonzero(bad)[0])
+        msg = (
+            "velocity_weight and sever_cos_threshold need a velocity direction "
+            f"for every tracer, but {int(bad.sum())} of {len(V)} velocities are "
+            f"non-finite or zero (first at index {first}). Drop or impute those "
+            "tracers, or disable velocity_weight and sever_cos_threshold "
+            "(orient_by_velocity ignores missing velocities)."
+        )
+        raise ValueError(msg)
+
+
 def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
-    """Cosine similarity of velocities across each candidate edge (i, j)."""
+    """Cosine similarity of velocities across each candidate edge (i, j).
+
+    Scale-free: an absolute floor on ``|v_i| |v_j|`` would read every
+    small-unit velocity (``|v| <~ 1e-6``) as directionless. Raises unless
+    every velocity has a direction (`_check_velocity_directions`).
+    """
+    _check_velocity_directions(V)
     vi, vj = V[rows], V[cols]
     num = np.sum(vi * vj, axis=1)
     den = np.linalg.norm(vi, axis=1) * np.linalg.norm(vj, axis=1)
-    return np.where(den > _TINY, num / np.maximum(den, _TINY), 0.0)
+    return np.where(den > 0.0, num / np.where(den > 0.0, den, 1.0), 0.0)
 
 
 def _backbone_on_component(
@@ -467,6 +496,11 @@ class MSTOrderer(AbstractOrderer):
     sever_cos_threshold
         Mechanism 2. If not ``None``, edges with ``cos(v_i, v_j)`` below this are
         severed (e.g. ``0.0`` cuts anti-parallel arms).
+
+        Mechanisms 1 and 2 need every velocity to be finite and nonzero; a
+        missing velocity raises ``ValueError`` (drop or impute those tracers
+        first). The pure-spatial default and ``orient_by_velocity`` accept
+        missing velocities.
     orient_by_velocity
         Mechanism 3. If ``True``, flip the ordering so ``gamma`` increases along
         the mean velocity.
