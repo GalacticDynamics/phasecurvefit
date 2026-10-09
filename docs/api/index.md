@@ -13,13 +13,59 @@ MST backbone refined by a SOM; `fit_track` goes on to fit the autoencoder.
 
 ```{eval-rst}
 .. autofunction:: order
-   :no-index:
 
 .. autofunction:: phasecurvefit.orderers.default_pipeline
-   :no-index:
 
 .. autofunction:: fit_track
-   :no-index:
+
+.. autofunction:: combine_results
+```
+
+## Orderers
+
+Pluggable ordering stages, composable with `|`. See the
+[Orderers guide](../guides/orderers.md).
+
+```{eval-rst}
+.. currentmodule:: phasecurvefit.orderers
+
+.. autoclass:: AbstractOrderer
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: LocalFlowOrderer
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: MSTOrderer
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: SOMOrderer
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: ChainOrderer
+   :members: order
+   :show-inheritance:
+
+.. autoclass:: OrderingResult
+   :members:
+   :special-members: __call__
+   :show-inheritance:
+
+.. currentmodule:: phasecurvefit
+```
+
+## Walk Configuration
+
+```{eval-rst}
+.. autoclass:: WalkConfig
+   :members:
+
+.. autoclass:: StateMetadata
+   :members:
+   :no-inherited-members:
 ```
 
 ## Result Accessor
@@ -28,7 +74,6 @@ Helper function to extract ordered data from results.
 
 ```{eval-rst}
 .. autofunction:: order_w
-   :no-index:
 ```
 
 ## Distance Metrics
@@ -40,24 +85,45 @@ See the [Metrics Guide](../guides/metrics.md) for usage examples.
 .. currentmodule:: phasecurvefit.metrics
 
 .. autoclass:: AbstractDistanceMetric
-   :no-index:
    :members:
    :show-inheritance:
 
 .. autoclass:: AlignedMomentumDistanceMetric
-   :no-index:
    :members:
    :show-inheritance:
 
 .. autoclass:: SpatialDistanceMetric
-   :no-index:
    :members:
    :show-inheritance:
 
 .. autoclass:: FullPhaseSpaceDistanceMetric
-   :no-index:
    :members:
    :show-inheritance:
+
+.. currentmodule:: phasecurvefit
+```
+
+## Query Strategies
+
+Neighbour-query strategies for the walk, set via `WalkConfig(strategy=...)`.
+
+```{eval-rst}
+.. currentmodule:: phasecurvefit.strats
+
+.. autoclass:: AbstractQueryStrategy
+   :members:
+   :show-inheritance:
+
+.. autoclass:: BruteForce
+   :members:
+   :show-inheritance:
+
+.. autoclass:: KDTree
+   :members:
+   :show-inheritance:
+
+.. autoclass:: QueryResult
+   :members:
 
 .. currentmodule:: phasecurvefit
 ```
@@ -70,19 +136,16 @@ Low-level functions for phase-space operations. Available in the `phasecurvefit.
 .. currentmodule:: phasecurvefit.w
 
 .. autofunction:: euclidean_distance
-   :no-index:
 
 .. autofunction:: unit_direction
-   :no-index:
 
 .. autofunction:: unit_velocity
-   :no-index:
+
+.. autofunction:: velocity_norm
 
 .. autofunction:: cosine_similarity
-   :no-index:
 
 .. autofunction:: get_w_at
-   :no-index:
 
 .. currentmodule:: phasecurvefit
 ```
@@ -91,7 +154,6 @@ Low-level functions for phase-space operations. Available in the `phasecurvefit.
 
 ```{eval-rst}
 .. autoclass:: WalkLocalFlowResult
-   :no-index:
    :members:
    :show-inheritance:
 
@@ -134,33 +196,63 @@ Neural network for interpolating skipped tracers. See [Autoencoder Guide](../gui
 
 ```{eval-rst}
 .. autoclass:: phasecurvefit.nn.PathAutoencoder
-   :no-index:
    :members: encode, decode, decode_position, predict
    :show-inheritance:
 
 .. autoclass:: phasecurvefit.nn.OrderingNet
-   :no-index:
    :members: __call__
    :show-inheritance:
 
 .. autoclass:: phasecurvefit.nn.TrackNet
-   :no-index:
    :members: __call__
    :show-inheritance:
 
 .. autoclass:: phasecurvefit.nn.TrainingConfig
-   :no-index:
    :members:
+
+.. autoclass:: phasecurvefit.nn.AbstractTrackNet
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.nn.FourierTrackNet
+   :members: __call__
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.nn.AbstractAutoencoder
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.nn.AbstractExternalDecoder
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.nn.EncoderExternalDecoder
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.nn.RunningMeanDecoder
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.nn.AutoencoderResult
+   :members:
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.nn.OrderingTrainingConfig
+   :members:
+
+.. autoclass:: phasecurvefit.nn.AbstractNormalizer
+   :show-inheritance:
+
+.. autoclass:: phasecurvefit.nn.StandardScalerNormalizer
+   :show-inheritance:
 ```
 
 ### Training Functions
 
 ```{eval-rst}
 .. autofunction:: phasecurvefit.nn.train_autoencoder
-   :no-index:
 
 .. autofunction:: phasecurvefit.nn.fill_ordering_gaps
-   :no-index:
+
+.. autofunction:: phasecurvefit.nn.train_ordering_net
+
+.. autofunction:: phasecurvefit.nn.encoder_loss
 ```
 
 ### Membership & Outlier Rejection
@@ -170,31 +262,23 @@ Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
 
 ```{eval-rst}
 .. autoclass:: phasecurvefit.nn.MixtureMembershipConfig
-   :no-index:
    :members:
 
 .. autoclass:: phasecurvefit.nn.WidthNet
-   :no-index:
    :members: __call__
    :show-inheritance:
 
 .. autofunction:: phasecurvefit.nn.posterior_membership
-   :no-index:
 
 .. autofunction:: phasecurvefit.nn.mixture_membership_loss
-   :no-index:
 
 .. autofunction:: phasecurvefit.nn.membership_responsibility
-   :no-index:
 
 .. autofunction:: phasecurvefit.nn.sigma_ceiling
-   :no-index:
 
 .. autofunction:: phasecurvefit.nn.membership_rampup
-   :no-index:
 
 .. autofunction:: phasecurvefit.nn.uniform_background_density
-   :no-index:
 ```
 
 ## SOM Module
@@ -202,36 +286,29 @@ Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
 Self-Organizing Map ordering, after Starkman et al. (2023). See
 {doc}`/guides/som`.
 
-```{eval-rst}
-.. autoclass:: phasecurvefit.orderers.SOMOrderer
-   :no-index:
-   :members: order
-   :show-inheritance:
+{class}`~phasecurvefit.orderers.SOMOrderer` is listed under [Orderers](#orderers).
 
-.. autoclass:: phasecurvefit.orderers.ChainOrderer
-   :no-index:
-   :members: order
-   :show-inheritance:
+```{eval-rst}
+.. py:module:: phasecurvefit.som
 
 .. autoclass:: phasecurvefit.som.SOM1D
-   :no-index:
    :members: make, fit, backbone, chord, n_prototypes
    :show-inheritance:
 
 .. autofunction:: phasecurvefit.som.init_prototypes
-   :no-index:
 
 .. autofunction:: phasecurvefit.som.fit
-   :no-index:
 
 .. autofunction:: phasecurvefit.som.densify
-   :no-index:
 
 .. autofunction:: phasecurvefit.som.chord
-   :no-index:
 
 .. autofunction:: phasecurvefit.som.bootstrap_weights
-   :no-index:
+
+.. autofunction:: phasecurvefit.som.bmu_distance
+
+.. autoclass:: phasecurvefit.som.FitResult
+   :members:
 ```
 
 ## Neighbour Backends

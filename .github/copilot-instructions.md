@@ -11,11 +11,27 @@ using a variety of tools.
 
 ## Main Components
 
-### Core Algorithm
+### Ordering (`phasecurvefit.order`, `phasecurvefit.orderers`)
 
-- `order(positions, velocities, orderer=None)`: Main entry point for ordering
-  phase-space data. With no orderer it runs the MST | SOM default pipeline; pass
-  e.g. `LocalFlowOrderer(...)` for the local-flow walk (`WalkLocalFlowResult`).
+- `order(positions, velocities, orderer=None)`: Main entry point. Returns an
+  `OrderingResult`. With no `orderer` it runs `default_pipeline`: an MST
+  backbone refined by a SOM (`MSTOrderer() | SOMOrderer()`), falling back to the
+  MST alone when there are too few tracers for the SOM.
+- Orderers (`phasecurvefit.orderers`), all subclasses of `AbstractOrderer`:
+  - `LocalFlowOrderer`: the local-flow walk (Nibauer et al. 2022); takes a
+    `WalkConfig`, `metric_scale`, `start_idx`, `direction`, `max_dist`, etc.
+  - `MSTOrderer`: velocity-aware minimum-spanning-tree backbone, with optional
+    edge-length sigma-clipping (`edge_clip_sigma`) for outlier rejection.
+  - `SOMOrderer`: 1-D Self-Organizing Map (Starkman et al. 2023); see also the
+    `phasecurvefit.som` module.
+  - `ChainOrderer`: runs stages in sequence, threading each result into the next
+    as `init`. Built with `|`, e.g. `MSTOrderer(k=10) | LocalFlowOrderer()`.
+- `fit_track(positions, velocities, key=...)`: end to end — runs the default
+  pipeline, then builds and trains a `PathAutoencoder`.
+- `walk_local_flow` was **removed** in v0.4; use `order()` with
+  `LocalFlowOrderer`.
+- `WalkConfig(metric=..., strategy=...)` composes a distance metric and a query
+  strategy.
 - Phase-space data: Two dicts with matching keys, e.g.,
   `{"x": array, "y": array}` for positions and velocities.
 
@@ -23,59 +39,82 @@ using a variety of tools.
 
 Pluggable metrics determine how the algorithm selects the next point:
 
-- `FullPhaseSpaceDistanceMetric` (default): True 6D Euclidean distance
-- `AlignedMomentumDistanceMetric`: NN+p metric with velocity alignment
+- `AlignedMomentumDistanceMetric` (default): NN+p metric with velocity alignment
+- `FullPhaseSpaceDistanceMetric`: True 6D Euclidean distance
 - `SpatialDistanceMetric`: Position-only (standard nearest-neighbor)
 - `AbstractDistanceMetric`: Base class for custom metrics
 
-### Query Strategies
+### Query Strategies (`phasecurvefit.strats`)
 
 Strategies control how neighbors are found:
 
 - `BruteForce()`: Default, computes distances to all points
-- `KDTree(k=...)`: KD-tree prefiltering (requires `jaxkd`)
+- `KDTree(k=...)`: KD-tree prefiltering (requires `jaxkd`). `k` counts usable
+  neighbors: the query point itself is excluded, and `k` is clamped to the
+  number of points.
 
-### Autoencoder for Gap Filling (`phasecurvefit.nn`)
+### Neural Networks (`phasecurvefit.nn`)
 
-Neural network for interpolating skipped tracers (Appendix A.2 of the paper):
+Networks for interpolating skipped tracers (Appendix A.2 of the paper) and
+modelling the track. Training is built on `jaxmore.nn`.
 
-- `Autoencoder`: Maps phase-space → ordering parameter γ ∈ [-1, 1]
-- `train_autoencoder(autoencoder, result, config)`: Train on output
+- `PathAutoencoder` (`AbstractAutoencoder`): Maps phase-space → ordering
+  parameter γ; decoders include `EncoderExternalDecoder` and
+  `RunningMeanDecoder`
+- `OrderingNet`, `TrackNet` / `FourierTrackNet`: ordering and track networks
+- `train_autoencoder`, `train_ordering_net`, with `TrainingConfig` /
+  `OrderingTrainingConfig`
 - `fill_ordering_gaps(result, autoencoder)`: Fill in skipped indices
-- `TrainingConfig`: Configure epochs, learning rate, etc.
+- Membership / outlier rejection (Hogg, Bovy & Lang 2010, sec. 3):
+  `MixtureMembershipConfig`, `posterior_membership`, `mixture_membership_loss`,
+  etc.
 
 ### Unit Support (`unxt` integration)
 
-When `unxt` is installed, orderers accept `Quantity` values (with a unit system
-in `metadata`):
+When `unxt` is installed, `order` accepts `Quantity` values:
 
 ```python
+import phasecurvefit as pcf
 import unxt as u
 
 pos = {"x": u.Q([0, 1, 2], "kpc"), "y": u.Q([0, 0.5, 1], "kpc")}
 vel = {"x": u.Q([1, 1, 1], "km/s"), "y": u.Q([0.5, 0.5, 0.5], "km/s")}
-orderer = pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=u.Q(1.0, "kpc"))
-result = pcf.order(
-    pos, vel, orderer, metadata=pcf.StateMetadata(usys=u.unitsystems.galactic)
-)
+orderer = pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(1.0, "kpc"))
+meta = pcf.StateMetadata(usys=u.unitsystems.galactic)
+result = pcf.order(pos, vel, orderer, metadata=meta)
 ```
+
+Quantity inputs require a unit system via `metadata=StateMetadata(usys=...)`;
+without it the orderers raise.
 
 ## Folder Structure
 
 - `/src/phasecurvefit/`: Public API
-  - `__init__.py`: Main exports (`order`, strategies, result types)
+  - `__init__.py`: Main exports (`order`, `fit_track`, `WalkConfig`, result
+    types)
+  - `orderers.py`: Orderer classes, `default_pipeline`, and `OrderingResult`
+  - `som.py`: Self-Organizing Map
   - `metrics.py`: Distance metric classes
-  - `nn.py`: Autoencoder neural network module
-  - `w.py`: Phase-space accessor utilities
+  - `strats.py`: Query strategy classes
+  - `nn.py`: Neural network module
+  - `w.py`: Phase-space utilities (distances, directions, similarities)
 - `/src/phasecurvefit/_src/`: Private implementation
-  - `algorithm.py`: Core local-flow walk implementation
-  - `autoencoder.py`: Neural network implementation (Equinox)
+  - `orderers/`: `order()`, `AbstractOrderer`, the orderers, `default_pipeline`,
+    `OrderingResult`
+  - `algorithm.py`: Local-flow walk implementation, `StateMetadata`
+  - `som.py`: SOM implementation
+  - `pipeline.py`: `fit_track`
+  - `nn/`: Neural networks, training, and membership (Equinox)
   - `metrics.py`: Metric base classes and implementations
   - `strategies.py`: Query strategy classes
+  - `query_config.py`: `WalkConfig`
+  - `phasespace.py`: Phase-space operations
 - `/src/phasecurvefit/_interop/`: Optional dependency integrations
   - `interop_unxt.py`: `unxt` Quantity support via Quax dispatch
-- `/docs/guides/`: User guides (quickstart, metrics, JAX integration, etc.)
-- `/tests/`: Test suite organized by component
+- `/docs/guides/`: User guides (quickstart, orderers, SOM, metrics, outliers,
+  JAX integration, etc.); `/docs/migration/` records API changes per version
+- `/tests/`: `unit/`, `integration/`, `smoke/`, `static/` (source-sweep checks),
+  `benchmarks/`, and `usage/`
 
 ## Coding Style
 
@@ -146,19 +185,26 @@ uv run pre-commit run -a # Run all pre-commit hooks
 - Use `pytest` for all test suites
 - Add unit tests for every new function or class
 - Test JAX compatibility (`jit`, `vmap`, `grad`) where applicable
-- Tests for Quantity support in `tests/unit/test_quantity_support.py`
+- Tests for Quantity support in `tests/unit/test_quantity_support.py`,
+  `tests/unit/test_interop_unxt.py`, and `tests/unit/test_orderers_unxt.py`
+- Tests run with beartype runtime type checking and warnings as errors
 - Assertions should be atomic (no `assert a and b`, use separate asserts)
 
 ## Architecture Notes
 
 ### Result Structure
 
-`WalkLocalFlowResult` contains:
+`OrderingResult` (returned by all orderers) contains:
 
-- `indices`: Array of indices in walk order (-1 for skipped)
-- `positions`: Original position dict
+- `indices`: Array of indices in order (`-1` for unvisited slots; never use
+  these directly as indices)
+- `positions`: Original (not reordered) position dict
 - `velocities`: Original velocity dict
-- `skipped_indices`: Property returning indices that were skipped
+- `gamma_range`: Valid range of the ordering parameter for `__call__`
+- `backbone`: Optional ordered polyline (e.g. from `MSTOrderer`); `__call__`
+  interpolates along it, or along the visited observations if `None`
+
+`WalkLocalFlowResult` (from `LocalFlowOrderer`) is a thin subclass.
 
 ## Final Notes
 

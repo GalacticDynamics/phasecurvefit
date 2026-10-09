@@ -57,8 +57,8 @@ built for stellar streams but applies to any ordered phase-space data.
   `jaxtyping`
 - **Pluggable metrics**: Customizable distance metrics for different physical
   interpretations
-- **Pluggable query strategies**: Flexible neighbor search strategies (e.g.,
-  brute-force, KD-tree) to optimize performance
+- **Pluggable query strategies**: Choose which neighbors each step may move to
+  (e.g., all points, or only the k spatially nearest via a KD-tree)
 - **Pluggable orderers**: One interface over multiple ordering algorithms — by
   default an MST backbone refined by a SOM, with the velocity-following walk as
   an alternative
@@ -107,7 +107,8 @@ uv pip install -e .  # editable mode
 phasecurvefit has optional dependencies for extended functionality:
 
 - **unxt**: Physical units support for phase-space calculations
-- **tree (jaxkd)**: Spatial KD-tree queries for large datasets
+- **kdtree (jaxkd)**: KD-tree strategy that restricts each step to the k
+  spatially nearest points
 
 Install with optional dependencies:
 
@@ -409,9 +410,13 @@ in the walk.
 `phasecurvefit` provides two built-in strategies:
 
 1. **BruteForce** (default): Compute distances to all remaining points and
-   select the nearest one. Efficient for small to medium datasets.
-2. **KDTree**: Use spatial KD-tree prefiltering to accelerate neighbor searches
-   for large datasets (requires optional `jaxkd` dependency).
+   select the nearest one.
+2. **KDTree**: Restrict each step's candidates to the `k` spatially nearest
+   points, then select by the metric (requires optional `jaxkd` dependency).
+   Each step costs O(k) instead of O(n), after a one-off batched KD-tree query
+   that builds every point's neighbor list. On CPU that setup dominates, so it
+   beats `BruteForce` only on large datasets (tens of thousands of points and
+   up).
 
 ### Using Built-in Strategies
 
@@ -427,7 +432,7 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 config_brute = pcf.WalkConfig(strategy=pcf.strats.BruteForce())
 result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config_brute))
 
-# KD-tree strategy for faster neighbor queries (large datasets)
+# KD-tree strategy: only the k spatially nearest points are candidates
 config_kdtree = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2))
 result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config_kdtree))
 ```

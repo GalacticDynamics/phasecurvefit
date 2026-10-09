@@ -1,3 +1,11 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+  language: python
+---
+
 # Distance Metrics Guide
 
 The local-flow walk uses distance metrics to determine how to select the next
@@ -22,7 +30,7 @@ velocity-alignment idea — the
 Metrics are configured via `WalkConfig`, which composes a metric with a query
 strategy (discussed in a separate guide):
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 import phasecurvefit as pcf
 from phasecurvefit.metrics import FullPhaseSpaceDistanceMetric
@@ -59,7 +67,7 @@ where $d_0$ is the Euclidean distance between positions. The `metric_scale` para
 
 **Usage:**
 
-```python
+```{code-cell} python
 from phasecurvefit.metrics import SpatialDistanceMetric
 
 # Pure nearest-neighbor search in position space
@@ -92,7 +100,7 @@ This metric combines spatial proximity with velocity alignment. Points that lie 
 
 **Usage:**
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 import phasecurvefit as pcf
 from phasecurvefit.metrics import AlignedMomentumDistanceMetric
@@ -138,7 +146,7 @@ Unlike `AlignedMomentumDistanceMetric`, this metric has no directional bias from
 
 **Usage:**
 
-```python
+```{code-cell} python
 from phasecurvefit.metrics import FullPhaseSpaceDistanceMetric
 
 # Full 6D phase-space distance
@@ -196,7 +204,7 @@ Custom metrics enable alternative distance calculations for specific use cases. 
 
 All metrics must inherit from `AbstractDistanceMetric` and implement the `__call__` method:
 
-```python
+```{code-cell} python
 import equinox as eqx
 from phasecurvefit.metrics import AbstractDistanceMetric
 
@@ -216,7 +224,7 @@ Here's a complete example of a metric that computes full 6D Cartesian distance.
 (This is what the built-in `FullPhaseSpaceDistanceMetric` does; it is written out
 here to show the interface.)
 
-```python
+```{code-cell} python
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -268,7 +276,7 @@ result = pcf.order(
 
 A metric that ignores velocity entirely and uses weighted position coordinates:
 
-```python
+```{code-cell} python
 class WeightedPositionMetric(AbstractDistanceMetric):
     """Position-only metric with per-component weights."""
 
@@ -301,7 +309,7 @@ result = pcf.order(
 
 When using physical units via `unxt`, ensure your metric correctly handles unit propagation:
 
-```python
+```{code-cell} python
 import unxt as u
 from phasecurvefit.metrics import (
     AlignedMomentumDistanceMetric,
@@ -358,43 +366,59 @@ result_6d = pcf.order(
 
 ## Metric Comparison Example
 
-Here's a comparison of different metrics on the same data:
+The metrics differ where the curve crosses itself. At a crossing the nearest
+point is often on the *other* branch, and only a velocity-aware metric keeps
+the walk on its own. An epitrochoid crosses itself many times:
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import phasecurvefit as pcf
 from phasecurvefit.metrics import (
     AlignedMomentumDistanceMetric,
     SpatialDistanceMetric,
 )
 
-# Sample spiral trajectory
-theta = jnp.linspace(0, 4 * jnp.pi, 100)
+# Epitrochoid, ordered along t, with an open 10-degree gap
+t = jnp.linspace(jnp.deg2rad(5), jnp.deg2rad(355), 300)
+R, r, d = 5.0, 1.0, 4.5
+k = (R + r) / r
 pos = {
-    "x": jnp.cos(theta) * jnp.exp(theta / 10),
-    "y": jnp.sin(theta) * jnp.exp(theta / 10),
+    "x": (R + r) * jnp.cos(t) - d * jnp.cos(k * t),
+    "y": (R + r) * jnp.sin(t) - d * jnp.sin(k * t),
 }
 vel = {
-    "x": jnp.gradient(pos["x"]),
-    "y": jnp.gradient(pos["y"]),
+    "x": -(R + r) * jnp.sin(t) + d * k * jnp.sin(k * t),
+    "y": (R + r) * jnp.cos(t) - d * k * jnp.cos(k * t),
 }
 
-# Compare metrics
+# Compare metrics. metric_scale is ~20x the point spacing (~0.57) for the
+# momentum metric, and ignored by the spatial one.
 metrics = {
-    "Momentum": AlignedMomentumDistanceMetric(),
-    "Spatial": SpatialDistanceMetric(),
+    "Spatial": (SpatialDistanceMetric(), 0.0),
+    "Aligned momentum": (AlignedMomentumDistanceMetric(), 12.0),
 }
 
-for name, metric in metrics.items():
+fig, axs = plt.subplots(1, 2, figsize=(9, 4.5), sharex=True, sharey=True)
+for ax, (name, (metric, scale)) in zip(axs, metrics.items()):
     config = pcf.WalkConfig(metric=metric)
     result = pcf.order(
         pos,
         vel,
-        pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=1.0),
+        pcf.orderers.LocalFlowOrderer(config=config, start_idx=0, metric_scale=scale),
     )
-    n_visited = len([i for i in result.indices if i >= 0])
-    print(f"{name}: {n_visited}/100 points ordered")
+    # Steps that jump more than 5 places along the true curve
+    n_jumps = int(jnp.sum(jnp.abs(jnp.diff(result.ordering)) > 5))
+    print(f"{name}: {n_jumps} jumps between branches")
+
+    ordered_pos, _ = pcf.order_w(result)
+    ax.plot(pos["x"], pos["y"], ".", c="0.75", ms=3)
+    ax.plot(ordered_pos["x"], ordered_pos["y"], lw=1)
+    ax.set(title=f"{name}: {n_jumps} jumps", aspect="equal")
 ```
+
+The spatial walk short-cuts across the crossings; the momentum walk follows
+the loops.
 
 ## See Also
 

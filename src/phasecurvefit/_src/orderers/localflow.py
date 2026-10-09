@@ -2,12 +2,12 @@
 
 __all__: tuple[str, ...] = ("LocalFlowOrderer",)
 
+import dataclasses
+
 import equinox as eqx
 import jax.numpy as jnp
 import plum
 from jaxtyping import Array, Int
-
-import dataclassish
 
 from .base import AbstractOrderer, chord_along_ordering
 from phasecurvefit._src.abstract_result import AbstractResult
@@ -70,7 +70,7 @@ def _finalize(
     the plain dispatch's call site, and not here, is exactly the silent drift
     between the two paths that cost #56, #67 and #70 (see #71).
     """
-    return dataclassish.replace(
+    return dataclasses.replace(
         result, chord=chord_along_ordering(positions, result.indices)
     )
 

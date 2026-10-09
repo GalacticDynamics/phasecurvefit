@@ -1,3 +1,11 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+  language: python
+---
+
 # Orderers
 
 An **orderer** turns phase-space tracers `(positions, velocities)` into an
@@ -45,7 +53,7 @@ under a pluggable phase-space **metric**, tracing the coherent flow of the
 velocity field. It is **fully JAX-traceable** (jit / vmap / grad); the MST is
 too with its default `neighbors` backend, though its graph stage runs on the host.
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 
 import phasecurvefit as pcf
@@ -64,7 +72,8 @@ The hyperparameters (carried by the orderer object) are:
   the default {class}`~phasecurvefit.metrics.AlignedMomentumDistanceMetric`).
 - **`config`** — a {class}`~phasecurvefit.WalkConfig` composing the distance
   **metric** with the neighbor-query **strategy** (brute force, or
-  {class}`~phasecurvefit.strats.KDTree` for large datasets). See the
+  {class}`~phasecurvefit.strats.KDTree` to restrict candidates to spatial
+  neighbors). See the
   [Metrics guide](metrics.md).
 - **`start_idx`** — index of the starting tracer.
 - **`direction`** — `"forward"` follows the velocity field, `"backward"` traces
@@ -92,7 +101,7 @@ eager-only `SciPy()`). Its graph algorithms are **host-side** (NumPy/SciPy);
 `order()` runs them through `jax.pure_callback` when traced, so it works under
 `jit` and `vmap`. Pure-spatial is the default:
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 
 import phasecurvefit as pcf
@@ -170,7 +179,7 @@ because the head is called without it, but raises `TypeError` if placed after
 another stage — loudly, rather than silently dropping the ordering it was
 handed.
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 
 import phasecurvefit as pcf
@@ -188,7 +197,7 @@ assert int(result.n_visited) == 60
 `a | b | c` is one three-stage chain rather than a nest. The explicit form is
 equivalent:
 
-```python
+```{code-cell} python
 chain = pcf.orderers.ChainOrderer(
     pcf.orderers.MSTOrderer(k=8, jump_cap=3.0),
     pcf.orderers.LocalFlowOrderer(),
@@ -215,7 +224,7 @@ chain differs from one written by hand in three ways:
 - it cannot run under `jit` or `vmap`: whether the SOM stage runs depends on the
   number of tracers the MST visited.
 
-```python
+```{code-cell} python
 result = pcf.orderers.default_pipeline(pos, vel, n_prototypes=12)
 assert int(result.n_visited) == 60
 assert result.gamma_range == (-1.0, 1.0)
@@ -223,7 +232,7 @@ assert result.gamma_range == (-1.0, 1.0)
 
 A gap in the stream wider than the neighbours reach does not cost you a side of it:
 
-```python
+```{code-cell} python
 t = jnp.concatenate([jnp.linspace(0.0, 1.0, 60), jnp.linspace(1.2, 2.2, 60)])
 gappy = {"x": t, "y": jnp.zeros(120)}
 flow = {"x": jnp.ones(120), "y": jnp.zeros(120)}
@@ -235,7 +244,7 @@ Any {class}`~phasecurvefit.orderers.SOMOrderer` keyword (`sigma_end`,
 MST stage instead -- a finite `jump_cap`, velocity-aware edges, outlier rejection
 with `edge_clip_sigma` -- build the chain and pass it to `pcf.order`:
 
-```python
+```{code-cell} python
 chain = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0, edge_clip_sigma=3.0) | (
     pcf.orderers.SOMOrderer(n_prototypes=12)
 )
@@ -254,8 +263,41 @@ right when the input happens to arrive already ordered.
 
 The MST has no such problem: it orders along the graph diameter, tip to tip, so
 its first observation *is* an endpoint. Chained, the walk takes its start from
-there — measured on a shuffled 400-point arc, `|rho|` goes from 0.68 walking
-from index 0 to 1.00 walking from the MST's tip.
+there. On a shuffled 400-point arc, the rank correlation `|rho|` between the
+walk's order and the true order goes from about 0.6 walking from index 0 to
+1.00 walking from the MST's tip:
+
+```{code-cell} python
+import jax
+import matplotlib.pyplot as plt
+import numpy as np
+
+ang = jax.random.permutation(jax.random.key(0), jnp.linspace(0.0, jnp.pi, 400))
+arc = {"x": 5.0 * jnp.cos(ang), "y": 5.0 * jnp.sin(ang)}
+arc_vel = {"x": -jnp.sin(ang), "y": jnp.cos(ang)}
+
+walk = pcf.orderers.LocalFlowOrderer(metric_scale=1.0)
+runs = {
+    "walk from index 0": walk,
+    "MST | walk": pcf.orderers.MSTOrderer(k=8, jump_cap=3.0) | walk,
+}
+
+fig, axs = plt.subplots(1, 2, figsize=(9, 3.2), sharey=True)
+for ax, (name, orderer) in zip(axs, runs.items()):
+    res = pcf.order(arc, arc_vel, orderer)
+    rho = np.corrcoef(np.arange(400), np.asarray(ang)[res.ordering])[0, 1]
+    q, _ = pcf.order_w(res)
+    ax.plot(arc["x"], arc["y"], ".", c="0.75", ms=3)
+    ax.plot(q["x"], q["y"], lw=1)
+    ax.plot(q["x"][0], q["y"][0], "*", ms=12, label="start")
+    ax.set(title=f"{name}: |rho| = {abs(rho):.2f}", aspect="equal")
+axs[0].legend()
+
+assert abs(rho) > 0.999  # the chained walk recovers the order
+```
+
+From index 0 (a random point, after shuffling) the walk runs to one end, then
+jumps back to cover the rest; from the MST's tip it runs end to end.
 
 An explicit `start_idx` always wins, so this changes nothing for callers who
 already pass one; `start_idx=None` is the default and means "ask `init`, else

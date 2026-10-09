@@ -1034,7 +1034,7 @@ def chord(
     -------
     Float[Array, " N"]
         Arc length per observation, in input order. Values outside
-        ``[0, L]`` are data beyond the tips (see :func:`_segment_projection`).
+        ``[0, L]`` are data beyond the tips (see ``_segment_projection``).
 
     Examples
     --------

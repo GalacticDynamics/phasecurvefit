@@ -40,8 +40,7 @@ language = "en"
 # -- General configuration ---------------------------------------------------
 
 extensions = [
-    "myst_parser",  # General MyST markdown support
-    "nbsphinx",  # Jupyter notebook support
+    "myst_nb",  # MyST markdown + Jupyter notebook support
     "sphinx_design",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
@@ -57,11 +56,13 @@ extensions = [
 
 python_use_unqualified_type_names = True
 
-# Use a known lexer for notebook code cells to avoid Pygments warnings.
-nbsphinx_codecell_lexer = "python"
-# On ReadTheDocs, don't execute notebooks (no kernel available)
-# Locally, execute them to update outputs
-nbsphinx_execute = "never" if os.environ.get("READTHEDOCS") else "always"
+# Locally, execute everything. On ReadTheDocs, execute the MyST markdown guides
+# (cheap, and their figures are not stored) but not the tutorial notebooks.
+_ON_RTD = os.environ.get("READTHEDOCS") == "True"  # the value RTD sets
+nb_execution_mode = "auto" if _ON_RTD else "force"
+nb_execution_excludepatterns = ["tutorials/*"] if _ON_RTD else []
+nb_execution_timeout = -1  # tutorials train models; no per-cell timeout
+nb_execution_raise_on_error = True
 pygments_lexers = {"ipython3": PythonLexer()}
 
 exclude_patterns = [
@@ -74,7 +75,8 @@ exclude_patterns = [
 ]
 
 source_suffix = {
-    ".md": "markdown",
+    ".md": "myst-nb",
+    ".ipynb": "myst-nb",
     ".rst": "restructuredtext",
 }
 
@@ -89,6 +91,9 @@ intersphinx_mapping = {
 # -- Napoleon settings ---------------------------------------------------
 
 napoleon_use_math = True
+# Render "Attributes" sections as field lists, so dataclass fields documented by
+# ``:members:`` are not described twice.
+napoleon_use_ivar = True
 
 # -- Autodoc settings ---------------------------------------------------
 
@@ -131,7 +136,30 @@ nitpick_ignore_regex: Final[list[tuple[str, str]]] = [
     ("py:data", _SHAPE_TUPLE_RE),
     ("py:class", _SHAPE_NAME_RE),
     ("py:data", _SHAPE_NAME_RE),
+    # Array annotations. jaxtyping publishes no Sphinx inventory, and the jax /
+    # numpy names are rendered unqualified from the jaxtyping annotations.
+    ("py:class", r"^jaxtyping\..*"),
+    ("py:class", r"^(?:Array|ndarray|TypedNdArray|PRNGKeyArray|Float|Int)$"),
+    ("py:class", r"^(?:jax|quax|optax)\._src\..*|^quax\._values\..*"),
+    # unxt / Python typing names missing from their projects' inventories
+    ("py:class", r"^(?:unxt\.)?(?:AbstractQuantity|Quantity)$"),
+    ("py:data", r"^typing\.Union$"),
+    # Private implementation classes (e.g. base classes via :show-inheritance:)
+    ("py:class", r"^phasecurvefit\._src\..*"),
+    # Type aliases documented with ``.. data::`` but referenced as classes
+    ("py:class", r"^(?:ScalarComponents|VectorComponents|FLikeSz0|FSzN|ISzN|Bool)$"),
+    ("py:class", r"^AbstractResult$"),
+    # Free-text fragments numpydoc "type" fields split into references:
+    # "optional", "default=0.5", "shape (N, D)", quoted literals, ...
+    ("py:class", r"^(?:optional|keyword-only|callable|scalar|shape|M|2\*n_dims|2D)$"),
+    # The first name of a combined "a, b : type" parameter line (renders fine)
+    ("py:class", r"^(?:width_size|prototype_positions)$"),
+    ("py:class", r"^default=.*"),
+    ("py:class", r"""^['"{ ].*"""),
 ]
+
+# optax's recursive ``OptState`` alias contains an unresolvable ``ArrayTree``.
+suppress_warnings = ["sphinx_autodoc_typehints.forward_reference"]
 
 nitpick_ignore = [
     ("py:class", "_io.StringIO"),

@@ -1,3 +1,11 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+  language: python
+---
+
 # Autoencoder for Gap Filling
 
 An orderer can leave tracers unvisited — the local-flow walk skips some because of its momentum condition, and the default MST | SOM pipeline can leave out tracers an outlier-rejecting chain (`edge_clip_sigma`) has dropped. This guide explains how to use an autoencoder to assign ordering values ($\gamma$) to these skipped tracers, and to fit a smooth track through the lot.
@@ -33,7 +41,7 @@ decoder can replace the trained one; see the
 
 ## Quick Start
 
-```python
+```{code-cell} python
 import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
@@ -60,10 +68,25 @@ gamma = result.gamma
 ordered_all = result.indices
 ```
 
+The trained model gives every tracer a $\gamma$, and evaluating the result at
+any $\gamma$ traces the fitted track:
+
+```{code-cell} python
+import matplotlib.pyplot as plt
+
+track = result(jnp.linspace(*result.gamma_range, 200))
+
+fig, ax = plt.subplots(figsize=(6, 3))
+im = ax.scatter(pos["x"], pos["y"], c=gamma, s=15)
+ax.plot(track["x"], track["y"], c="k", lw=1, label="track")
+fig.colorbar(im, ax=ax, label=r"$\gamma$")
+ax.legend();
+```
+
 These four steps -- order, normalize, build, train -- collapse into one call
 via {func}`~phasecurvefit.fit_track`:
 
-```python
+```{code-cell} python
 _fast_config = pcf.nn.TrainingConfig(  # to make the examples fast.
     n_epochs_encoder=5, n_epochs_decoder=5, n_epochs_both=5, show_pbar=False
 )
@@ -98,7 +121,7 @@ reading the loss curve and checking the final model with a fixed measure.
 The default settings appear to work for most cases,
 but can be set by the user.
 
-```python
+```{code-cell} python
 config = pcf.nn.TrainingConfig(
     n_epochs_encoder=800,  # Encoder-only epochs
     n_epochs_decoder=100,  # Decoder-only epochs

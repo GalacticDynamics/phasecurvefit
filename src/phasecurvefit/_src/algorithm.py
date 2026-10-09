@@ -43,7 +43,7 @@ from zeroth import zeroth
 
 from .custom_types import ISz0, RLikeSz0, VectorComponents
 from .orderers.result import OrderingResult
-from .phasespace import euclidean_distance, get_w_at
+from .phasespace import euclidean_distance
 from .query_config import WalkConfig
 
 vec_euclidean_distance = jax.jit(jax.vmap(euclidean_distance, in_axes=(None, 0)))
@@ -171,8 +171,9 @@ class WalkLocalFlowResult(OrderingResult):
     - :attr:`ordered`: Positions/velocities reordered by walk
     - :attr:`skipped_indices`: Indices of unvisited observations
 
-    The interpolation method (:meth:`__call__`) enables smooth spatial
-    interpolation along the discovered path using a continuous ordering
+    The interpolation method
+    (:meth:`~phasecurvefit.orderers.OrderingResult.__call__`) enables smooth
+    spatial interpolation along the discovered path using a continuous ordering
     parameter $\gamma \in [0, 1]$.
 
     Examples
@@ -325,7 +326,7 @@ def _local_flow_walk(
         Configuration for neighbor queries, containing both the distance metric
         and the query strategy. Use ``WalkConfig(metric=..., strategy=...)`` to
         customize. Defaults to ``WalkConfig()`` which uses
-        ``FullPhaseSpaceDistanceMetric`` with ``BruteForce``.
+        ``AlignedMomentumDistanceMetric`` with ``BruteForce``.
 
     metadata
         Optional metadata to pass through the algorithm state without
@@ -476,48 +477,56 @@ def _local_flow_walk(
         # Unpack carry: path indices
         path, unvisited, cur_idx, step, _, metadata = state
 
-        # Get current xs and velocity (scalar dicts)
-        cur_x, cur_v = get_w_at(xs, vs, cur_idx)
-
-        # Query strategy for candidate neighbors and compute distance
-        query_result = config.strategy.query(
-            query_state, cur_x, cur_v, xs, vs, config.metric, metric_scale
+        # Query the strategy at the current point. With candidate indices
+        # (e.g. KDTree), every quantity below is computed over the candidates
+        # only, so a step costs O(k) rather than O(n).
+        query_result = config.strategy.query_at(
+            query_state, cur_idx, xs, vs, config.metric, metric_scale
         )
         ds = query_result.distances
         candidate_idxs = query_result.indices
-
-        if candidate_idxs is not None:
-            ds_candidates = jnp.full_like(ds, jnp.inf)
-            ds_candidates = ds_candidates.at[candidate_idxs].set(ds[candidate_idxs])
+        if candidate_idxs is None:
+            cand_unvisited, cand_xs = unvisited, xs
         else:
-            ds_candidates = ds
+            if ds.shape != candidate_idxs.shape:
+                msg = (
+                    "QueryResult.distances must be aligned with "
+                    f"QueryResult.indices; got shapes {ds.shape} and "
+                    f"{candidate_idxs.shape}."
+                )
+                raise ValueError(msg)
+            cand_unvisited = unvisited[candidate_idxs]
+            cand_xs = jtu.map(lambda x: x[candidate_idxs], xs)
 
-        # Mask visited points (where mask is 0) by setting inf
-        inf_mask = jnp.full_like(ds, jnp.inf) * max_dist
-        ds_masked = jnp.where(unvisited, ds_candidates, inf_mask)
+        # Nearest unvisited candidate under the metric.
+        ds_masked = jnp.where(cand_unvisited, ds, jnp.inf)
+        best = jnp.argmin(ds_masked)
+        best_dist = ds_masked[best]
+        best_idx = best if candidate_idxs is None else candidate_idxs[best]
 
-        # Find nearest neighbor (within candidates if provided)
-        best_idx = jnp.argmin(ds_masked)
-        best_dist = jnp.min(ds_masked)
-
-        # Check termination BEFORE adding the point
-        # Stop if:
+        # Check termination BEFORE adding the point. Stop if:
         # 1. All unvisited points exceed max distance (min_dist > max_dist), OR
         # 2. No unvisited candidates remain (isinf best_dist), OR
         # 3. Selected point itself exceeds max spatial distance (forced to
         #    backtrack)
-        spatial_ds = vec_euclidean_distance(cur_x, xs)
-        spatial_ds_masked = jnp.where(unvisited, spatial_ds, inf_mask)
-        min_dist = jnp.min(spatial_ds_masked)
+        # For KDTree, (1) is computed over the candidates only. Whenever some
+        # candidate is unvisited this equals (1) over all points: the
+        # candidates are the nearest points in space, so the nearest unvisited
+        # point is among them. When every candidate is visited, min_dist is
+        # inf rather than the global value, but (2) stops the walk regardless.
+        cur_x = jtu.map(lambda x: x[cur_idx], xs)
+        spatial_ds = vec_euclidean_distance(cur_x, cand_xs)
+        min_dist = jnp.min(jnp.where(cand_unvisited, spatial_ds, jnp.inf))
         new_stop = jnp.logical_or(
             jnp.logical_or(min_dist > max_dist, jnp.isinf(best_dist)),
-            spatial_ds[best_idx] > max_dist,
+            spatial_ds[best] > max_dist,
         )
 
-        # Conditional update: only add if not terminating
-        new_path = jnp.where(new_stop, path, path.at[step].set(best_idx))
-        new_unvisited = jnp.where(
-            new_stop, unvisited, unvisited.at[best_idx].set(False)
+        # Conditional update: only add if not terminating. Written as
+        # single-element updates so a step doesn't touch all n entries.
+        new_path = path.at[step].set(jnp.where(new_stop, path[step], best_idx))
+        new_unvisited = unvisited.at[best_idx].set(
+            jnp.logical_and(new_stop, unvisited[best_idx])
         )
         new_step = jnp.where(new_stop, step, step + 1)
         new_cur_idx = jnp.where(new_stop, cur_idx, best_idx)
