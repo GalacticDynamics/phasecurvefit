@@ -247,7 +247,9 @@ class KDTree(AbstractQueryStrategy):
         metric_scale: FLikeSz0,
     ) -> QueryResult:
         cand_pos, cand_vel = get_w_at(positions, velocities, indices)
-        distances = metric_fn(current_pos, current_vel, cand_pos, cand_vel, metric_scale)
+        distances = metric_fn(
+            current_pos, current_vel, cand_pos, cand_vel, metric_scale
+        )
         return QueryResult(distances=distances, indices=indices)
 
     def query(

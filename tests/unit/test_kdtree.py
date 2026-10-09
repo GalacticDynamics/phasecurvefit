@@ -96,11 +96,11 @@ def test_kdtree_query_at_evaluates_metric_on_candidates_only():
     """`query_at` returns the k + 1 nearest points with aligned distances (#168)."""
     pos = {"x": jnp.arange(10.0), "y": jnp.zeros(10)}
     vel = {"x": jnp.ones(10), "y": jnp.zeros(10)}
-    strat = pcf.strats.KDTree(k=3)
+    strategy = pcf.strats.KDTree(k=3)
     metric = pcf.metrics.SpatialDistanceMetric()
-    state = strat.init(pos, metadata=None)
+    state = strategy.init(pos, metadata=None)
 
-    res = strat.query_at(state, jnp.asarray(5), pos, vel, metric, 1.0)
+    res = strategy.query_at(state, jnp.asarray(5), pos, vel, metric, 1.0)
 
     assert res.indices.shape == (4,)
     assert res.distances.shape == (4,)
@@ -116,15 +116,15 @@ def test_kdtree_query_at_matches_query_by_position():
     t = jnp.linspace(0, 6, 30)
     pos = {"x": jnp.cos(t), "y": jnp.sin(t)}
     vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
-    strat = pcf.strats.KDTree(k=5)
+    strategy = pcf.strats.KDTree(k=5)
     metric = pcf.metrics.AlignedMomentumDistanceMetric()
-    state = strat.init(pos, metadata=None)
+    state = strategy.init(pos, metadata=None)
 
     for i in (0, 7, 29):
-        at = strat.query_at(state, jnp.asarray(i), pos, vel, metric, 0.5)
+        at = strategy.query_at(state, jnp.asarray(i), pos, vel, metric, 0.5)
         cur_pos = {k: v[i] for k, v in pos.items()}
         cur_vel = {k: v[i] for k, v in vel.items()}
-        live = strat.query(state, cur_pos, cur_vel, pos, vel, metric, 0.5)
+        live = strategy.query(state, cur_pos, cur_vel, pos, vel, metric, 0.5)
         assert (at.indices == live.indices).all()
         assert jnp.allclose(at.distances, live.distances)
 
@@ -133,10 +133,10 @@ def test_walk_rejects_unaligned_candidate_distances():
     """A strategy returning per-point distances with candidates is an error."""
 
     class FullDistancesWithCandidates(pcf.strats.AbstractQueryStrategy):
-        def init(self, positions, /, *, metadata):
+        def init(self, positions, /, *, metadata):  # noqa: ARG002
             return None
 
-        def query(self, state, /, cur_pos, cur_vel, positions, velocities, m, s):
+        def query(self, state, /, cur_pos, cur_vel, positions, velocities, m, s):  # noqa: ARG002
             n = positions["x"].shape[0]
             return pcf.strats.QueryResult(
                 distances=jnp.ones(n), indices=jnp.array([0, 1])
