@@ -509,9 +509,11 @@ def _local_flow_walk(
         # 2. No unvisited candidates remain (isinf best_dist), OR
         # 3. Selected point itself exceeds max spatial distance (forced to
         #    backtrack)
-        # For KDTree, (1) over the candidates equals (1) over all points: the
-        # candidates are the nearest points in space, so if any is unvisited
-        # the nearest unvisited point is among them; if none is, (2) stops.
+        # For KDTree, (1) is computed over the candidates only. Whenever some
+        # candidate is unvisited this equals (1) over all points: the
+        # candidates are the nearest points in space, so the nearest unvisited
+        # point is among them. When every candidate is visited, min_dist is
+        # inf rather than the global value, but (2) stops the walk regardless.
         cur_x = jtu.map(lambda x: x[cur_idx], xs)
         spatial_ds = vec_euclidean_distance(cur_x, cand_xs)
         min_dist = jnp.min(jnp.where(cand_unvisited, spatial_ds, jnp.inf))

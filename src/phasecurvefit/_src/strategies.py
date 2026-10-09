@@ -57,8 +57,11 @@ class AbstractQueryStrategy(ABC):
     """Abstract base class for neighbor query strategies.
 
     Strategies are minimally stateful. Configure via `__init__` (e.g., KD-tree
-    `k`). Call `init(positions)` once to build and return a strategy state
-    object. Then call `query(state, ...)` for each step.
+    `k`). The walk calls `init(positions)` once to build a strategy state, then
+    `query_at(state, idx, ...)` at each step. Subclasses must implement `query`,
+    which answers for an arbitrary position; the default `query_at` looks up
+    the data point at ``idx`` and delegates to it. Override `query_at` only to
+    use precomputed per-point state, as `KDTree` does.
     """
 
     @abstractmethod
