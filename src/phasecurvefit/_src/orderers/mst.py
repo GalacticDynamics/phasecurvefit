@@ -346,11 +346,12 @@ def _orient_along_velocity(
     tang = np.diff(Cb, axis=0)
     vseg = V[backbone_nodes]
     vmid = 0.5 * (vseg[:-1] + vseg[1:])
-    # Sum finite terms only: one NaN velocity must not turn this test into a
-    # coin flip (``nan < 0`` is False, so the flip would silently never
-    # happen), and one inf velocity must not outvote every other tracer.
+    # Skip segments whose velocity is not wholly finite: one NaN velocity
+    # must not turn this test into a coin flip (``nan < 0`` is False, so the
+    # flip would silently never happen), one inf velocity must not outvote
+    # every other tracer, and a partly NaN one must not count half a dot.
     dots = tang * vmid
-    if np.sum(dots[np.isfinite(dots)]) < 0.0:
+    if np.sum(dots[np.isfinite(dots).all(axis=1)]) < 0.0:
         return order_idx[::-1], backbone_nodes[::-1]
     return order_idx, backbone_nodes
 

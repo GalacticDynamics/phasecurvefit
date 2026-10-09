@@ -169,6 +169,24 @@ class TestMissingVelocities:
         steps = np.diff(x[np.asarray(res.ordering)])
         assert np.all(steps > 0)
 
+    def test_orientation_skips_partly_non_finite_velocities(self):
+        """A velocity with any non-finite component is skipped whole.
+
+        On a diagonal, (NaN, -1e6) used to keep its finite y component, whose
+        huge term against the flow flipped the ordering.
+        """
+        t = np.linspace(0.0, 10.0, 60)
+        pos = {"x": jnp.asarray(t), "y": jnp.asarray(t)}
+        vel = {
+            "x": jnp.ones(60).at[30].set(jnp.nan),
+            "y": jnp.ones(60).at[30].set(-1e6),
+        }
+        res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, orient_by_velocity=True).order(
+            pos, vel
+        )
+        steps = np.diff(t[np.asarray(res.ordering)])
+        assert np.all(steps > 0)
+
     def test_small_unit_velocities_keep_their_direction(self):
         """|v| ~ 1e-7 still separates the arms (an absolute floor ignored them)."""
         pos, vel = _hairpin(n_a=50, n_b=40)
