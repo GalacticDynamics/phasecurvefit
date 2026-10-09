@@ -179,6 +179,26 @@ class TestContract:
         with pytest.raises(ValueError, match="finite"):
             backend.knn(jnp.asarray(p), 3, queries=jnp.asarray(q))
 
+    @pytest.mark.parametrize("scale", [1e19, 3e19, 1e30])
+    def test_huge_coordinates_float32(self, backend, scale):
+        """Squared distances that overflow float32 still give real neighbours.
+
+        1 kpc is ~3.1e19 m: unscaled, these d2 overflow to inf and came back as
+        sentinels. Coordinates are scaled by a power of two (exact) first.
+        """
+        p = (np.random.default_rng(4).normal(size=(30, 3)) * scale).astype(np.float32)
+        idx, dist = map(np.asarray, backend.knn(jnp.asarray(p), 2))
+        assert np.all(idx < 30)
+        np.testing.assert_allclose(dist, _ref(p, 2), rtol=1e-5)
+
+    def test_non_finite_with_empty_input_raises(self, backend):
+        """NaN is caught even when the other input is empty."""
+        nan = jnp.full((2, 3), jnp.nan, jnp.float32)
+        empty = jnp.zeros((0, 3), jnp.float32)
+        for pts, qs in ((empty, nan), (nan, empty)):
+            with pytest.raises(ValueError, match="finite"):
+                backend.knn(pts, 2, queries=qs)
+
     def test_non_finite_raises(self, backend):
         """Review Focus 2: NaN input is an error, not a silently wrong answer."""
         p = np.random.default_rng(0).normal(size=(50, 3)).astype(np.float32)

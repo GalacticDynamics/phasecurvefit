@@ -812,3 +812,16 @@ class TestMSTBackends:
             np.asarray(eager.indices), np.asarray(want.indices)
         )
         np.testing.assert_array_equal(np.asarray(jitted), np.asarray(want.indices))
+
+    def test_huge_coordinates_match_scipy(self):
+        """Float32 positions in metres at kpc scale: no d2 overflow (was IndexError)."""
+        x = np.random.default_rng(2).permutation(np.linspace(0, 32e19, 40))
+        pos = {"x": jnp.asarray(x, jnp.float32), "y": jnp.zeros(40, jnp.float32)}
+        vel = {"x": jnp.ones(40), "y": jnp.zeros(40)}
+        kw = {"k": 5, "jump_cap": 1e30}
+        want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw).order(
+            pos, vel
+        )
+        got = pcf.orderers.MSTOrderer(**kw).order(pos, vel)
+        assert int(got.n_visited) == 40
+        np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))

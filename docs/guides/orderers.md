@@ -42,7 +42,8 @@ The {class}`~phasecurvefit.orderers.LocalFlowOrderer` is the velocity-following
 greedy walk — the original `phasecurvefit` ordering algorithm, now behind the
 orderer interface. From `start_idx` it repeatedly steps to the nearest unvisited tracer
 under a pluggable phase-space **metric**, tracing the coherent flow of the
-velocity field. Unlike the MST it is **fully JAX-traceable** (jit / vmap / grad).
+velocity field. It is **fully JAX-traceable** (jit / vmap / grad); the MST is
+too with its default `neighbors` backend, though its graph stage runs on the host.
 
 ```python
 import jax.numpy as jnp

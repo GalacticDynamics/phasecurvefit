@@ -85,6 +85,20 @@ def _check_args(points: Array, k: int, queries: Array | None, /) -> None:
         raise ValueError(msg)
 
 
+def _pow2_scale(points: Array, queries: Array | None, /) -> Array:
+    """Power of two bringing every coordinate to magnitude < 1 (gradient-free).
+
+    Dividing by a power of two is exact, so neighbour selection, ties
+    included, is unchanged; it only keeps squared distances from overflowing
+    float32 (coordinate gaps above ~1.8e19, e.g. metres at kpc scale).
+    """
+    m = jnp.max(jnp.abs(points), initial=0.0)
+    if queries is not None:
+        m = jnp.maximum(m, jnp.max(jnp.abs(queries), initial=0.0))
+    _, e = jnp.frexp(m)  # m = f * 2**e, f in [0.5, 1)
+    return jax.lax.stop_gradient(jnp.ldexp(jnp.ones((), points.dtype), e))
+
+
 def _check_finite(points: Array, queries: Array | None, /) -> Array:
     bad = ~jnp.all(jnp.isfinite(points))
     if queries is not None:
@@ -129,8 +143,10 @@ class AbstractNeighborSearch(eqx.Module):
     distances, rows sorted ascending; a missing neighbour (fewer than k
     candidates) is index ``len(points)`` with distance ``inf``. Equidistant
     neighbours: ``BucketKDTree`` and ``BruteForce`` take the lower index
-    (identically eager and under jit); ``JaxKD`` and ``SciPy`` follow their
-    library's order.
+    (identically eager and under jit; for ``BucketKDTree`` with indices below
+    2**24, beyond which its overflow tiers may order such ties differently,
+    distances unaffected); ``JaxKD`` and ``SciPy`` follow their library's
+    order.
     """
 
     @abc.abstractmethod
@@ -181,6 +197,7 @@ class BucketKDTree(AbstractNeighborSearch):
         _check_args(points, k, queries)
         points = _as_float(points)
         queries = None if queries is None else _as_float(queries)
+        points = _check_finite(points, queries)
         n = points.shape[0]
         m = n if queries is None else queries.shape[0]
         if m == 0:
@@ -189,13 +206,15 @@ class BucketKDTree(AbstractNeighborSearch):
             return jnp.full((m, k), 0, jnp.int32), jnp.full(
                 (m, k), jnp.inf, points.dtype
             )
-        points = _check_finite(points, queries)
+        scale = _pow2_scale(points, queries)
+        points = points / scale
+        queries = None if queries is None else queries / scale
         if _traced(points, queries):
             sq = None if queries is None else jax.lax.stop_gradient(queries)
             ii, _ = _knn_core_jit(
                 jax.lax.stop_gradient(points), sq, k, self.leaf_size, self.frontier
             )
-            return ii, _gathered_distance(points, queries, ii)
+            return ii, _gathered_distance(points, queries, ii) * scale
         extent = points if queries is None else jnp.concat([points, queries])
         padded = jnp.concat([points, far_rows(extent, _bucket(n) - n)])
         qpad = None
@@ -205,7 +224,8 @@ class BucketKDTree(AbstractNeighborSearch):
         ii, d2 = _knn_core_jit(padded, qpad, k, self.leaf_size, self.frontier)
         ii, d2 = ii[:m], d2[:m]
         fake = ii >= n  # only when fewer than k real candidates exist
-        return jnp.where(fake, n, ii), _safe_sqrt(jnp.where(fake, jnp.inf, d2))
+        dist = _safe_sqrt(jnp.where(fake, jnp.inf, d2)) * scale
+        return jnp.where(fake, n, ii), dist
 
 
 class BruteForce(AbstractNeighborSearch):
@@ -223,8 +243,10 @@ class BruteForce(AbstractNeighborSearch):
         _check_args(points, k, queries)
         q = None if queries is None else _as_float(queries)
         points = _check_finite(_as_float(points), q)
-        ii, d2 = _kd.brute_knn(points, k, queries=q, chunk=self.chunk)
-        return ii, _safe_sqrt(d2)
+        scale = _pow2_scale(points, q)
+        q = None if q is None else q / scale
+        ii, d2 = _kd.brute_knn(points / scale, k, queries=q, chunk=self.chunk)
+        return ii, _safe_sqrt(d2) * scale
 
 
 def _pad_k(ii: Array, dd: Array, k: int, n: int, /) -> KnnOut:
@@ -264,29 +286,32 @@ class JaxKD(AbstractNeighborSearch):
         if n == 0:  # jaxkd cannot build an empty tree
             m = 0 if q is None else q.shape[0]
             return jnp.zeros((m, k), jnp.int32), jnp.full((m, k), jnp.inf, points.dtype)
+        scale = _pow2_scale(points, q)
+        points = points / scale
+        q = None if q is None else q / scale
         ps = jax.lax.stop_gradient(points)  # jaxkd's traversal is a while_loop
         tree = jaxkd.build_tree(ps)
         if q is not None:
             ii, dd = jaxkd.query_neighbors(tree, jax.lax.stop_gradient(q), k=min(k, n))
             ii, _ = _pad_k(ii.astype(jnp.int32), dd, k, n)
-            return ii, _gathered_distance(points, q, ii)
+            return ii, _gathered_distance(points, q, ii) * scale
         kk = min(k + 1, n)
         ii, dd = jaxkd.query_neighbors(tree, ps, k=kk)
         is_self = ii == jnp.arange(n)[:, None]
         order = jnp.argsort(is_self, axis=1, stable=True)  # self (if listed) last
         ii = jnp.take_along_axis(ii, order, 1)[:, : kk - 1].astype(jnp.int32)
         ii, _ = _pad_k(ii, dd[:, : kk - 1], k, n)
-        return ii, _gathered_distance(points, None, ii)
+        return ii, _gathered_distance(points, None, ii) * scale
 
 
 SCIPY_TRACED = (
-    "neighbors.SciPy cannot run under jax.jit/vmap/grad (it is host "
-    "code). Use neighbors.BucketKDTree() to trace."
+    "neighbors.SciPy cannot take traced inputs (jax.jit/vmap/grad arguments; "
+    "it is host code). Use neighbors.BucketKDTree() to trace."
 )
 
 
 class SciPy(AbstractNeighborSearch):
-    """scipy's ``cKDTree``: fastest on CPU, but eager-only (raises when traced).
+    """scipy's ``cKDTree``: fastest on CPU, but host-only (raises on traced inputs).
 
     ``workers`` is scipy's thread count: -1 (default) uses every core.
     """

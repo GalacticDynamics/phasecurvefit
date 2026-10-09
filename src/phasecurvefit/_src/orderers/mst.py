@@ -316,7 +316,7 @@ def _host_graph(
     exactly as before the backends existed, so backends that return the same
     neighbours give the same graph. (With equidistant neighbours, only
     ``BucketKDTree`` and ``BruteForce`` are guaranteed to agree: both take the
-    lower index.)
+    lower index, for ``BucketKDTree`` up to n ~ 2**24.)
 
     Returns ``(backbone (n,) int32 padded by repeating its last index,
     backbone_len int32, in_component (n,) bool, flip bool)``; ``flip`` says the
@@ -474,7 +474,7 @@ class MSTOrderer(AbstractOrderer):
         The exact kNN backend (``phasecurvefit.neighbors``): ``BucketKDTree()``
         (default; JAX-native, traceable), ``BruteForce()``, ``JaxKD()``
         (optional dependency), or ``SciPy(workers=-1)`` (fastest on CPU, but
-        eager-only: it raises under jit/vmap/grad).
+        host-only: it raises when its inputs are traced by jit/vmap/grad).
 
     Examples
     --------
