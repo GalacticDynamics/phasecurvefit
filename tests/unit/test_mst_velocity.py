@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 import phasecurvefit as pcf
+from phasecurvefit._src.orderers import mst as mst_module
 
 pytest.importorskip("scipy")
 
@@ -233,6 +234,22 @@ class TestMissingVelocities:
             nan_policy="omit",
         ).order(pos, vel)
         assert int(res.n_visited) <= 51  # arm A, plus at most that one leaf
+
+    def test_one_directed_tracer_still_makes_every_other_a_leaf(self):
+        """The split holds down to a single directed tracer: a star around it.
+
+        Skipping it there left the directionless tracers in the full kNN
+        graph -- the arm-bridging behaviour the split exists to avoid.
+        """
+        _, pos, vel = _line(n=6)
+        vel = {"x": jnp.zeros(6).at[0].set(1.0), "y": vel["y"]}
+        P = np.stack([np.asarray(pos[c]) for c in "xy"], axis=1)
+        V = np.stack([np.asarray(vel[c]) for c in "xy"], axis=1)
+        split = mst_module._directionless_as_leaves(P, V, k=3, workers=1)
+        assert split is not None
+        rows, cols, _ = split
+        assert sorted(rows.tolist()) == [1, 2, 3, 4, 5]  # one edge each...
+        assert set(cols.tolist()) == {0}  # ...to the directed tracer
 
     @pytest.mark.parametrize("mechanism", ["velocity_weight", "sever_cos_threshold"])
     def test_a_stationary_tracer_does_not_raise(self, mechanism):

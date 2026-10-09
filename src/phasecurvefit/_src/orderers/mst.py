@@ -223,11 +223,14 @@ def _directionless_as_leaves(
     by attaching each directionless tracer to its nearest directed one. A
     leaf has one edge, so it cannot join two components. A leaf longer than
     ``jump_cap`` is cut like any edge, leaving that tracer to
-    ``on_disconnected``. ``None`` when there is nothing to split.
+    ``on_disconnected``. A single directed tracer is still a valid split: the
+    graph is then a star around it. ``None`` when there is nothing to split
+    -- every tracer, or none, has a direction; with none there is nothing
+    for mechanisms 1 and 2 to compare, and the graph stays spatial.
     """
     dirless = ~(np.linalg.norm(V, axis=1) > 0.0)  # zero or NaN
     directed = np.flatnonzero(~dirless)
-    if not dirless.any() or len(directed) < 2:
+    if not dirless.any() or not directed.size:
         return None
     r, c, d = _knn_edges(P[directed], k, workers=workers)
     d_leaf, near = cKDTree(P[directed]).query(P[dirless], workers=workers)
