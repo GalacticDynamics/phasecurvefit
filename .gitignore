@@ -13,3 +13,4 @@ docs/superpowers/
 .coverage
 .coverage.*
 htmlcov/
+coverage.xml
