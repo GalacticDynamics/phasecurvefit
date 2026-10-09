@@ -64,7 +64,8 @@ uv pip install -e .  # editable mode
 phasecurvefit has optional dependencies for extended functionality:
 
 - **unxt**: Physical units support for phase-space calculations
-- **tree (jaxkd)**: Spatial KD-tree queries for large datasets
+- **kdtree (jaxkd)**: KD-tree strategy that restricts each step to the k
+  spatially nearest points
 
 Install with optional dependencies:
 
@@ -356,9 +357,11 @@ in the walk.
 `phasecurvefit` provides two built-in strategies:
 
 1. **BruteForce** (default): Compute distances to all remaining points and
-   select the nearest one. Efficient for small to medium datasets.
-2. **KDTree**: Use spatial KD-tree prefiltering to accelerate neighbor searches
-   for large datasets (requires optional `jaxkd` dependency).
+   select the nearest one.
+2. **KDTree**: Restrict each step's candidates to the `k` spatially nearest
+   points, then select by the metric (requires optional `jaxkd` dependency).
+   This is a candidate filter, not a speedup: each step still computes distances
+   to every point, so it is not faster than `BruteForce`.
 
 ### Using Built-in Strategies
 
@@ -374,7 +377,7 @@ vel = {"x": jnp.array([1.0, 1.0, 1.0]), "y": jnp.array([0.5, 0.5, 0.5])}
 config_brute = pcf.WalkConfig(strategy=pcf.strats.BruteForce())
 result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config_brute))
 
-# KD-tree strategy for faster neighbor queries (large datasets)
+# KD-tree strategy: only the k spatially nearest points are candidates
 config_kdtree = pcf.WalkConfig(strategy=pcf.strats.KDTree(k=2))
 result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config_kdtree))
 ```
