@@ -122,8 +122,12 @@ class TestMissingVelocities:
         orderer = pcf.orderers.MSTOrderer(
             k=6, jump_cap=1.0, on_disconnected="largest", **kw
         )
-        with pytest.raises(ValueError, match="velocity direction"):
+        with pytest.raises(ValueError, match="velocity direction") as err:
             orderer.order(pos, vel)
+        (enabled,) = kw  # the message names only the enabled mechanism
+        other = {"velocity_weight", "sever_cos_threshold"} - {enabled}
+        assert enabled in str(err.value)
+        assert other.pop() not in str(err.value)
 
     def test_raises_under_jit(self):
         """Traced, the same error surfaces from the host stage at run time."""

@@ -126,8 +126,10 @@ def _run_in_thread[T](fn: Callable[[], T]) -> T:
     return payload  # type: ignore[return-value]
 
 
-def _check_velocity_directions(V: np.ndarray, /) -> None:
+def _check_velocity_directions(V: np.ndarray, /, *, used: str) -> None:
     """Raise unless every velocity has a direction (finite and nonzero).
+
+    ``used`` names the enabled mechanism(s), for the message.
 
     ``velocity_weight`` and ``sever_cos_threshold`` compare velocity directions
     across edges. A tracer without one leaves them nothing to compare, and every
@@ -141,23 +143,39 @@ def _check_velocity_directions(V: np.ndarray, /) -> None:
     if bad.any():
         first = int(np.flatnonzero(bad)[0])
         msg = (
-            "velocity_weight and sever_cos_threshold need a velocity direction "
-            f"for every tracer, but {int(bad.sum())} of {len(V)} velocities are "
-            f"non-finite or zero (first at index {first}). Drop or impute those "
-            "tracers, or disable velocity_weight and sever_cos_threshold "
-            "(orient_by_velocity skips non-finite velocities)."
+            f"Enabling {used} requires a velocity direction for every tracer, but "
+            f"{int(bad.sum())} of {len(V)} velocities are non-finite or zero "
+            f"(first at index {first}). Drop or impute those tracers, or "
+            f"disable {used} (orient_by_velocity skips non-finite velocities)."
         )
         raise ValueError(msg)
 
 
-def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
+def _edge_cosine(
+    V: np.ndarray,
+    rows: np.ndarray,
+    cols: np.ndarray,
+    /,
+    *,
+    velocity_weight: float,
+    sever_cos_threshold: float | None,
+) -> np.ndarray:
     """Cosine similarity of velocities across each candidate edge (i, j).
 
     Scale-free: an absolute floor on ``|v_i| |v_j|`` would read every
     small-unit velocity (``|v| <~ 1e-6``) as directionless. Raises unless
-    every velocity has a direction (``_check_velocity_directions``).
+    every velocity has a direction (``_check_velocity_directions``), naming
+    whichever of the two mechanisms is enabled.
     """
-    _check_velocity_directions(V)
+    on = [
+        name
+        for name, enabled in (
+            ("velocity_weight", velocity_weight > 0.0),
+            ("sever_cos_threshold", sever_cos_threshold is not None),
+        )
+        if enabled
+    ]
+    _check_velocity_directions(V, used=" and ".join(on))
     vi, vj = V[rows], V[cols]
     num = np.sum(vi * vj, axis=1)
     den = np.linalg.norm(vi, axis=1) * np.linalg.norm(vj, axis=1)
@@ -377,7 +395,17 @@ def _mst_backbone(
 
     # velocity alignment (only computed when a mechanism needs it)
     need_cos = velocity_weight > 0.0 or sever_cos_threshold is not None
-    cos = _edge_cosine(V, rows, cols) if need_cos else None
+    cos = (
+        _edge_cosine(
+            V,
+            rows,
+            cols,
+            velocity_weight=velocity_weight,
+            sever_cos_threshold=sever_cos_threshold,
+        )
+        if need_cos
+        else None
+    )
 
     weights = d_edges.copy()
     if velocity_weight > 0.0:  # Mechanism 1: phase-space edge weights
