@@ -42,7 +42,7 @@ class OptDeps(OptionalDependencyEnum):  # pylint: disable=invalid-enum-extension
     """Optional dependencies for phasecurvefit."""
 
     UNXT = auto()
-    KDTREE = auto()
+    JAXKD = auto()
     MATPLOTLIB = auto()
 
 
@@ -51,7 +51,7 @@ if not OptDeps.UNXT.installed:
     collect_ignore_glob.append("tests/unit/test_interop_unxt.py")
 if not OptDeps.MATPLOTLIB.installed:
     collect_ignore_glob.append("tests/usage/test_epitrochoid.py")
-if not OptDeps.KDTREE.installed:
+if not OptDeps.JAXKD.installed:
     collect_ignore_glob.append("tests/unit/test_kdtree.py")
 
 
