@@ -470,7 +470,7 @@ def _local_flow_walk(
             ds_candidates = ds
 
         # Mask visited points (where mask is 0) by setting inf
-        inf_mask = jnp.full_like(ds, jnp.inf) * max_dist
+        inf_mask = jnp.full_like(ds, jnp.inf)
         ds_masked = jnp.where(unvisited, ds_candidates, inf_mask)
 
         # Find nearest neighbor (within candidates if provided)
