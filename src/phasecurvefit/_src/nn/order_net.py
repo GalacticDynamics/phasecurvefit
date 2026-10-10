@@ -291,10 +291,11 @@ class OrderingTrainingConfig:
     r"""Blend factor for arclength-like targets.
 
     If 0.0, the training targets use uniform spacing in $\gamma$. If 1.0, the
-    targets are proportional to cumulative arclength along the ordered tracers
-    (computed from the position components of `all_ws`). Values in (0, 1)
-    linearly blend the two targets; values outside [0, 1] are clipped. The
-    default, 0.8, leans towards arclength.
+    targets are proportional to cumulative arclength along the ordered tracers:
+    the orderer's ``chord`` when `train_ordering_net` is given one, otherwise
+    the sum of straight-line steps between consecutive ordered positions in
+    `all_ws`. Values in (0, 1) linearly blend the two targets; values outside
+    [0, 1] are clipped. The default, 0.8, leans towards arclength.
 
     """
 
