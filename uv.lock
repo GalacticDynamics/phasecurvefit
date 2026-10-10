@@ -1080,6 +1080,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/52/bdb86d6286fc9847b1add5fbe227f8f1f9702775e51337aa9f67e63b79ea/jaxmore-0.4.0-py3-none-any.whl", hash = "sha256:bce27de0c758980eada7a6c0a89d71c5c39d000b16a707bccb7807ac9057adfb", size = 43103, upload-time = "2026-07-13T01:13:45.218Z" },
 ]
 
+[package.optional-dependencies]
+tqdm = [
+    { name = "jax-tqdm" },
+]
+
 [[package]]
 name = "jaxtyping"
 version = "0.3.11"
@@ -1270,15 +1275,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/99/dd/841e9a66c4715477ea0abc78da039832fbb09dac5c35c58dc4c41a407b8a/kiwisolver-1.4.9-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:aedff62918805fb62d43a4aa2ecd4482c380dc76cd31bd7c8878588a61bd0369", size = 2391835, upload-time = "2025-08-10T21:27:34.23Z" },
     { url = "https://files.pythonhosted.org/packages/0c/28/4b2e5c47a0da96896fdfdb006340ade064afa1e63675d01ea5ac222b6d52/kiwisolver-1.4.9-cp314-cp314t-win_amd64.whl", hash = "sha256:1fa333e8b2ce4d9660f2cda9c0e1b6bafcfb2457a9d259faa82289e73ec24891", size = 79988, upload-time = "2025-08-10T21:27:35.587Z" },
     { url = "https://files.pythonhosted.org/packages/80/be/3578e8afd18c88cdf9cb4cffde75a96d2be38c5a903f1ed0ceec061bd09e/kiwisolver-1.4.9-cp314-cp314t-win_arm64.whl", hash = "sha256:4a48a2ce79d65d363597ef7b567ce3d14d68783d2b2263d98db3d9477805ba32", size = 70260, upload-time = "2025-08-10T21:27:36.606Z" },
-]
-
-[[package]]
-name = "latexcodec"
-version = "3.0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/27/dd/4270b2c5e2ee49316c3859e62293bd2ea8e382339d63ab7bbe9f39c0ec3b/latexcodec-3.0.1.tar.gz", hash = "sha256:e78a6911cd72f9dec35031c6ec23584de6842bfbc4610a9678868d14cdfb0357", size = 31222, upload-time = "2025-06-17T18:47:34.051Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b5/40/23569737873cc9637fd488606347e9dd92b9fa37ba4fcda1f98ee5219a97/latexcodec-3.0.1-py3-none-any.whl", hash = "sha256:a9eb8200bff693f0437a69581f7579eb6bca25c4193515c09900ce76451e452e", size = 18532, upload-time = "2025-06-17T18:47:30.726Z" },
 ]
 
 [[package]]
@@ -1787,16 +1783,13 @@ source = { editable = "." }
 dependencies = [
     { name = "equinox" },
     { name = "jax" },
-    { name = "jax-tqdm" },
-    { name = "jaxmore" },
+    { name = "jaxmore", extra = ["tqdm"] },
     { name = "jaxtyping" },
     { name = "optax" },
-    { name = "optional-dependencies" },
     { name = "plum-dispatch", version = "2.7.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
     { name = "plum-dispatch", version = "2.10.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
     { name = "quax" },
     { name = "scipy" },
-    { name = "zeroth" },
 ]
 
 [package.optional-dependencies]
@@ -1835,7 +1828,6 @@ dev = [
     { name = "pylint" },
     { name = "pytest" },
     { name = "pytest-arraydiff" },
-    { name = "pytest-benchmark" },
     { name = "pytest-codspeed" },
     { name = "pytest-cov" },
     { name = "pytest-env" },
@@ -1843,7 +1835,6 @@ dev = [
     { name = "pytest-mpl" },
     { name = "pytest-randomly" },
     { name = "pytest-timeout" },
-    { name = "pytz" },
     { name = "sphinx" },
     { name = "sphinx-autobuild" },
     { name = "sphinx-autodoc-typehints" },
@@ -1852,7 +1843,6 @@ dev = [
     { name = "sphinx-design" },
     { name = "sphinx-prompt" },
     { name = "sphinx-togglebutton" },
-    { name = "sphinxcontrib-bibtex" },
     { name = "sphinxext-opengraph" },
     { name = "sybil", extra = ["pytest"] },
     { name = "unxt" },
@@ -1864,7 +1854,6 @@ docs = [
     { name = "jaxkd" },
     { name = "matplotlib" },
     { name = "myst-nb" },
-    { name = "pytz" },
     { name = "sphinx" },
     { name = "sphinx-autobuild" },
     { name = "sphinx-autodoc-typehints" },
@@ -1873,7 +1862,6 @@ docs = [
     { name = "sphinx-design" },
     { name = "sphinx-prompt" },
     { name = "sphinx-togglebutton" },
-    { name = "sphinxcontrib-bibtex" },
     { name = "sphinxext-opengraph" },
 ]
 lint = [
@@ -1892,7 +1880,6 @@ test = [
     { name = "matplotlib" },
     { name = "pytest" },
     { name = "pytest-arraydiff" },
-    { name = "pytest-benchmark" },
     { name = "pytest-codspeed" },
     { name = "pytest-cov" },
     { name = "pytest-env" },
@@ -1909,22 +1896,19 @@ requires-dist = [
     { name = "equinox", specifier = ">=0.13.5" },
     { name = "galax", marker = "extra == 'tutorials'", git = "https://github.com/GalacticDynamics/galax" },
     { name = "jax", specifier = ">=0.7.2" },
-    { name = "jax-tqdm", specifier = ">=0.4.0" },
     { name = "jaxkd", marker = "extra == 'all'", specifier = ">=0.0.5" },
     { name = "jaxkd", marker = "extra == 'kdtree'", specifier = ">=0.0.5" },
     { name = "jaxkd", marker = "extra == 'tutorials'", specifier = ">=0.0.5" },
-    { name = "jaxmore", specifier = ">=0.4.0" },
+    { name = "jaxmore", extras = ["tqdm"], specifier = ">=0.4.0" },
     { name = "jaxtyping", specifier = ">=0.3.5" },
     { name = "matplotlib", marker = "extra == 'tutorials'", specifier = ">=3.10.8" },
     { name = "optax", specifier = ">=0.2.4" },
-    { name = "optional-dependencies", specifier = ">=0.4.0" },
     { name = "plum-dispatch", specifier = ">=2.6.1" },
     { name = "quax", specifier = ">=0.4" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "unxt", marker = "extra == 'all'", specifier = ">=1.10.4" },
     { name = "unxt", marker = "extra == 'interop'", specifier = ">=1.10.4" },
     { name = "unxt", marker = "extra == 'tutorials'", specifier = ">=1.10.4" },
-    { name = "zeroth", specifier = ">=1.0.1" },
 ]
 provides-extras = ["all", "interop", "kdtree", "tutorials"]
 
@@ -1948,7 +1932,6 @@ dev = [
     { name = "pylint", specifier = ">=3.3.8" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-arraydiff", specifier = ">=0.6.1" },
-    { name = "pytest-benchmark", specifier = ">=5.1.0" },
     { name = "pytest-codspeed", specifier = ">=4.2.0" },
     { name = "pytest-cov", specifier = ">=6.2.1" },
     { name = "pytest-env", specifier = ">=1.1.5" },
@@ -1956,7 +1939,6 @@ dev = [
     { name = "pytest-mpl", specifier = ">=0.17.0" },
     { name = "pytest-randomly", specifier = ">=3.16.0" },
     { name = "pytest-timeout", specifier = ">=2.3.1" },
-    { name = "pytz", specifier = ">=2024.2" },
     { name = "sphinx", specifier = ">=8.1.3" },
     { name = "sphinx-autobuild", specifier = ">=2024.10.3" },
     { name = "sphinx-autodoc-typehints", specifier = ">=2.6.1" },
@@ -1965,7 +1947,6 @@ dev = [
     { name = "sphinx-design", specifier = ">=0.6.1" },
     { name = "sphinx-prompt", specifier = ">=1.9.0" },
     { name = "sphinx-togglebutton", specifier = ">=0.3.2" },
-    { name = "sphinxcontrib-bibtex", specifier = ">=2.6.3" },
     { name = "sphinxext-opengraph", specifier = ">=0.9.2" },
     { name = "sybil", extras = ["pytest"], specifier = ">=8.0.0" },
     { name = "unxt", specifier = ">=1.10.4" },
@@ -1977,7 +1958,6 @@ docs = [
     { name = "jaxkd", specifier = ">=0.0.5" },
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "myst-nb", specifier = ">=1.3.0" },
-    { name = "pytz", specifier = ">=2024.2" },
     { name = "sphinx", specifier = ">=8.1.3" },
     { name = "sphinx-autobuild", specifier = ">=2024.10.3" },
     { name = "sphinx-autodoc-typehints", specifier = ">=2.6.1" },
@@ -1986,7 +1966,6 @@ docs = [
     { name = "sphinx-design", specifier = ">=0.6.1" },
     { name = "sphinx-prompt", specifier = ">=1.9.0" },
     { name = "sphinx-togglebutton", specifier = ">=0.3.2" },
-    { name = "sphinxcontrib-bibtex", specifier = ">=2.6.3" },
     { name = "sphinxext-opengraph", specifier = ">=0.9.2" },
 ]
 lint = [
@@ -2005,7 +1984,6 @@ test = [
     { name = "matplotlib", specifier = ">=3.8" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-arraydiff", specifier = ">=0.6.1" },
-    { name = "pytest-benchmark", specifier = ">=5.1.0" },
     { name = "pytest-codspeed", specifier = ">=4.2.0" },
     { name = "pytest-cov", specifier = ">=6.2.1" },
     { name = "pytest-env", specifier = ">=1.1.5" },
@@ -2259,41 +2237,6 @@ wheels = [
 ]
 
 [[package]]
-name = "py-cpuinfo"
-version = "9.0.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/37/a8/d832f7293ebb21690860d2e01d8115e5ff6f2ae8bbdc953f0eb0fa4bd2c7/py-cpuinfo-9.0.0.tar.gz", hash = "sha256:3cdbbf3fac90dc6f118bfd64384f309edeadd902d7c8fb17f02ffa1fc3f49690", size = 104716, upload-time = "2022-10-25T20:38:06.303Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e0/a9/023730ba63db1e494a271cb018dcd361bd2c917ba7004c3e49d5daf795a2/py_cpuinfo-9.0.0-py3-none-any.whl", hash = "sha256:859625bc251f64e21f077d099d4162689c762b5d6a4c3c97553d56241c9674d5", size = 22335, upload-time = "2022-10-25T20:38:27.636Z" },
-]
-
-[[package]]
-name = "pybtex"
-version = "0.25.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "latexcodec" },
-    { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5f/bc/c2be05ca72f8c103670e983df8be26d1e288bc6556f487fa8cccaa27779f/pybtex-0.25.1.tar.gz", hash = "sha256:9eaf90267c7e83e225af89fea65c370afbf65f458220d3946a9e3049e1eca491", size = 406157, upload-time = "2025-06-26T13:27:41.903Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/25/68/ceb5d6679baa326261f5d3e5113d9cfed6efef2810afd9f18bffb8ed312b/pybtex-0.25.1-py2.py3-none-any.whl", hash = "sha256:9053b0d619409a0a83f38abad5d9921de5f7b3ede00742beafcd9f10ad0d8c5c", size = 127437, upload-time = "2025-06-26T13:27:43.585Z" },
-]
-
-[[package]]
-name = "pybtex-docutils"
-version = "1.0.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "docutils" },
-    { name = "pybtex" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/7e/84/796ea94d26188a853660f81bded39f8de4cfe595130aef0dea1088705a11/pybtex-docutils-1.0.3.tar.gz", hash = "sha256:3a7ebdf92b593e00e8c1c538aa9a20bca5d92d84231124715acc964d51d93c6b", size = 18348, upload-time = "2023-08-22T18:47:54.833Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/b1/ce1f4596211efb5410e178a803f08e59b20bedb66837dcf41e21c54f9ec1/pybtex_docutils-1.0.3-py3-none-any.whl", hash = "sha256:8fd290d2ae48e32fcb54d86b0efb8d573198653c7e2447d5bec5847095f430b9", size = 6385, upload-time = "2023-08-22T06:43:20.513Z" },
-]
-
-[[package]]
 name = "pycparser"
 version = "2.23"
 source = { registry = "https://pypi.org/simple" }
@@ -2402,19 +2345,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/1e/8a/c43e892759d10d134763b6cccf853e66a18cd956616bebd4b7d782471534/pytest-arraydiff-0.6.1.tar.gz", hash = "sha256:2937b1450fc935620f24709d87d40c67e055a043d7b8541a25fdfa994dda67de", size = 16907, upload-time = "2023-11-27T10:52:18.175Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cf/2a/2f8efb1ef8048aec7b44f37bc3fecb8c2c22e3238781d3e93c58d9c89268/pytest_arraydiff-0.6.1-py3-none-any.whl", hash = "sha256:64be1cc8e79874203eca80b1959134b8bb7a47b41cf7631310ba7fe6e5840694", size = 10042, upload-time = "2023-11-27T10:52:16.382Z" },
-]
-
-[[package]]
-name = "pytest-benchmark"
-version = "5.2.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "py-cpuinfo" },
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/24/34/9f732b76456d64faffbef6232f1f9dbec7a7c4999ff46282fa418bd1af66/pytest_benchmark-5.2.3.tar.gz", hash = "sha256:deb7317998a23c650fd4ff76e1230066a76cb45dcece0aca5607143c619e7779", size = 341340, upload-time = "2025-11-09T18:48:43.215Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/29/e756e715a48959f1c0045342088d7ca9762a2f509b945f362a316e9412b7/pytest_benchmark-5.2.3-py3-none-any.whl", hash = "sha256:bc839726ad20e99aaa0d11a127445457b4219bdb9e80a1afc4b51da7f96b0803", size = 45255, upload-time = "2025-11-09T18:48:39.765Z" },
 ]
 
 [[package]]
@@ -2539,15 +2469,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/0c/57/250bd238b966cece44328235eb85290045d059265fdaf7527a3a958123db/python_discovery-1.6.1.tar.gz", hash = "sha256:cf87d3627dfb4412437fdd5b13eae402607722998d21567993aedbc59b23c15e", size = 84338, upload-time = "2026-09-18T01:31:53.971Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/16/7d/e9ffbadfbf89c93848412d04594135c4ae8c1d37d9e053b9c3ed718fabc4/python_discovery-1.6.1-py3-none-any.whl", hash = "sha256:d43fcdef879fe795352bd13ccf8d185ba5a9f86f36cfcd00529f596e737442b3", size = 38664, upload-time = "2026-09-18T01:31:52.448Z" },
-]
-
-[[package]]
-name = "pytz"
-version = "2025.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f8/bf/abbd3cdfb8fbc7fb3d4d38d320f2441b1e7cbe29be4f23797b4a2b5d8aac/pytz-2025.2.tar.gz", hash = "sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3", size = 320884, upload-time = "2025-03-25T02:25:00.538Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/c4/34e93fe5f5429d7570ec1fa436f1986fb1f00c3e0f43a589fe2bbcd22c3f/pytz-2025.2-py2.py3-none-any.whl", hash = "sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00", size = 509225, upload-time = "2025-03-25T02:24:58.468Z" },
 ]
 
 [[package]]
@@ -3131,21 +3052,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ba/6e/b837e84a1a704953c62ef8776d45c3e8d759876b4a84fe14eba2859106fe/sphinxcontrib_applehelp-2.0.0.tar.gz", hash = "sha256:2f29ef331735ce958efa4734873f084941970894c6090408b079c61b2e1c06d1", size = 20053, upload-time = "2024-07-29T01:09:00.465Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5d/85/9ebeae2f76e9e77b952f4b274c27238156eae7979c5421fba91a28f4970d/sphinxcontrib_applehelp-2.0.0-py3-none-any.whl", hash = "sha256:4cd3f0ec4ac5dd9c17ec65e9ab272c9b867ea77425228e68ecf08d6b28ddbdb5", size = 119300, upload-time = "2024-07-29T01:08:58.99Z" },
-]
-
-[[package]]
-name = "sphinxcontrib-bibtex"
-version = "2.6.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "docutils" },
-    { name = "pybtex" },
-    { name = "pybtex-docutils" },
-    { name = "sphinx" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/de/83/1488c9879f2fa3c2cbd6f666c7a3a42a1fa9e08462bec73281fa6c092cba/sphinxcontrib_bibtex-2.6.5.tar.gz", hash = "sha256:9b3224dd6fece9268ebd8c905dc0a83ff2f6c54148a9235fe70e9d1e9ff149c0", size = 118462, upload-time = "2025-06-27T10:40:14.061Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/a0/3a612da94f828f26cabb247817393e79472c32b12c49222bf85fb6d7b6c8/sphinxcontrib_bibtex-2.6.5-py3-none-any.whl", hash = "sha256:455ea4509642ea0b28ede3721550273626f85af65af01f161bfd8e19dc1edd7d", size = 40410, upload-time = "2025-06-27T10:40:12.274Z" },
 ]
 
 [[package]]

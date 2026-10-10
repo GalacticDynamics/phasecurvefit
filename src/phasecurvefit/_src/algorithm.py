@@ -39,7 +39,6 @@ import quax
 from jaxtyping import Array, Bool, Int
 
 from jaxmore import bounded_while_loop
-from zeroth import zeroth
 
 from .custom_types import ISz0, RLikeSz0, VectorComponents
 from .orderers.result import OrderingResult
@@ -440,7 +439,7 @@ def _local_flow_walk(
     # ---------------------------------------------------------------
 
     # Get number of observations from first xs array
-    key0 = zeroth(xs)
+    key0 = next(iter(xs))
     n_obs = jnp.shape(xs[key0])[0]
 
     # Validate start_idx. A concrete index is checked in Python so the error

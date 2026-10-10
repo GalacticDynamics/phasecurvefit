@@ -42,7 +42,6 @@ import numpy as np
 from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from jaxmore import bounded_while_loop
-from zeroth import zeroth
 
 from phasecurvefit._src.custom_types import FSz0, ISzN, VectorComponents
 from phasecurvefit._src.metrics import (
@@ -69,7 +68,7 @@ def _check_matching_keys(**components: VectorComponents) -> None:
 
     Empty dicts are rejected for the same reason: with no components there is
     nothing to stack, and the failure surfaces as a bare `StopIteration` from
-    the first `zeroth` call with no message at all.
+    the first ``next(iter(...))`` call with no message at all.
     """
     (ref_name, ref), *rest = components.items()
     for name, comps in rest:
@@ -207,7 +206,7 @@ def init_prototypes(
             f"not a mask -- pass an OrderingResult's `ordering`, not `visited`."
         )
         raise TypeError(msg)
-    n_obs = len(zeroth(positions.values()))
+    n_obs = len(next(iter(positions.values())))
     ordering = eqx.error_if(
         ordering,
         jnp.any(ordering < 0) | jnp.any(ordering >= n_obs),
@@ -373,7 +372,7 @@ def _fit_core(
         raise ValueError(msg)
 
     keys = tuple(sorted(proto_positions))
-    n_prototypes = len(zeroth(proto_positions.values()))
+    n_prototypes = len(next(iter(proto_positions.values())))
     if n_prototypes < 2:
         # K=0 reaches `argmin` on an empty (N, 0) distance matrix; K=1 trains a
         # lattice that `densify` and `chord` then reject. Same floor as
@@ -674,7 +673,7 @@ def fit(
             sigma_end=sigma_end,
             weights=weights,
         )
-        n = len(zeroth(positions.values()))
+        n = len(next(iter(positions.values())))
         return FitResult(trained_q, trained_p, jnp.ones(n, dtype=bool))
 
     if weights is not None:
@@ -687,8 +686,8 @@ def fit(
         msg = f"outlier_clip_max_iters must be >= 1, got {outlier_clip_max_iters}."
         raise ValueError(msg)
 
-    n = len(zeroth(positions.values()))
-    dtype = zeroth(positions.values()).dtype
+    n = len(next(iter(positions.values())))
+    dtype = next(iter(positions.values())).dtype
     log_floor = jnp.log(_OUTLIER_CLIP_MIN_RATIO)
 
     def refit(kept: Bool[Array, " N"]) -> tuple[VectorComponents, VectorComponents]:
@@ -953,7 +952,7 @@ def densify(
     _check_matching_keys(
         proto_positions=proto_positions, proto_velocities=proto_velocities
     )
-    n_prototypes = len(zeroth(proto_positions.values()))
+    n_prototypes = len(next(iter(proto_positions.values())))
     if n_prototypes < 2:
         msg = (
             f"densify needs at least 2 prototypes to form a backbone, got "
@@ -1102,7 +1101,7 @@ def chord(
         backbone_velocities=backbone_velocities,
     )
     _check_symmetric(metric)
-    n_vertices = len(zeroth(backbone_positions.values()))
+    n_vertices = len(next(iter(backbone_positions.values())))
     if n_vertices < 2:
         msg = (
             f"backbone must have at least 2 vertices to project onto, got "
@@ -1196,7 +1195,7 @@ class SOM1D(eqx.Module):
     @property
     def n_prototypes(self) -> int:
         """Number of prototypes, ``K``."""
-        return len(zeroth(self.prototype_positions.values()))
+        return len(next(iter(self.prototype_positions.values())))
 
     def fit(
         self, positions: VectorComponents, velocities: VectorComponents, /
