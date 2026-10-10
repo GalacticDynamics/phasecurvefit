@@ -268,6 +268,7 @@ class WalkLocalFlowResult(OrderingResult):
 
 
 Direction: TypeAlias = Literal["forward", "backward", "both"]  # noqa: UP040
+NanPolicy: TypeAlias = Literal["raise", "omit"]  # noqa: UP040
 State: TypeAlias = tuple[  # noqa: UP040
     Int[Array, " n_obs"],  # indices in walk order (-1 for skipped)
     Array,  # visited_mask: float array of shape (n_obs,)
@@ -276,6 +277,36 @@ State: TypeAlias = tuple[  # noqa: UP040
     Bool[Array, ""],  # stop: scalar flag
     StateMetadata,  # metadata: contains dummy array so JAX preserves it
 ]
+
+
+def _check_velocities(vs: VectorComponents, nan_policy: str, /) -> VectorComponents:
+    """Raise on an infinite velocity, and on NaN unless ``nan_policy="omit"``.
+
+    Called only when the metric reads velocities. Left alone, a non-finite
+    velocity makes every distance it touches non-finite, and ``argmin`` then
+    returns the first NaN -- the lowest-index unvisited tracer, wherever it
+    is: one NaN on a shuffled line sent the walk back and forth 4 times
+    (103 times under ``FullPhaseSpaceDistanceMetric``). ``eqx.error_if`` so
+    the check survives ``jit`` and ``vmap``.
+    """
+    comps = [jnp.asarray(v) for v in vs.values()]
+    vs = eqx.error_if(
+        vs,
+        jnp.any(jnp.stack([jnp.any(jnp.isinf(v)) for v in comps])),
+        "LocalFlowOrderer found an infinite velocity. inf is not a measurement "
+        "-- it comes from an overflow or a bug upstream -- so it raises under "
+        "either nan_policy. Fix or drop those tracers.",
+    )
+    if nan_policy == "omit":
+        return vs
+    return eqx.error_if(
+        vs,
+        jnp.any(jnp.stack([jnp.any(jnp.isnan(v)) for v in comps])),
+        "LocalFlowOrderer's metric reads velocities and found a NaN. To treat "
+        "NaN as a missing velocity pass nan_policy='omit'; or drop those "
+        "tracers; or walk on position alone "
+        "(WalkConfig(metric=SpatialDistanceMetric())).",
+    )
 
 
 @plum.dispatch
@@ -292,6 +323,7 @@ def _local_flow_walk(
     config: WalkConfig = WalkConfig(),  # noqa: B008
     metadata: StateMetadata | None = None,
     direction: Direction = "forward",
+    nan_policy: NanPolicy = "raise",
 ) -> WalkLocalFlowResult:
     r"""Find an ordered path through phase-space using the local flow.
 
@@ -335,6 +367,8 @@ def _local_flow_walk(
         Direction to walk the local flow. 'forward' walks along the velocity
         field, 'backward' walks against the velocity field, and 'both' walks in
         both directions.  Default is 'forward'.
+    nan_policy
+        See :class:`~phasecurvefit.orderers.LocalFlowOrderer`.
 
     Returns
     -------
@@ -397,6 +431,7 @@ def _local_flow_walk(
             "n_max": n_max,
             "config": config,
             "metadata": metadata,
+            "nan_policy": nan_policy,
         }
         result_forward = _local_flow_walk(xs, vs, **kwargs, direction="forward")
         result_backward = _local_flow_walk(xs, vs, **kwargs, direction="backward")
@@ -424,6 +459,9 @@ def _local_flow_walk(
 
     # Initialize terminate_indices as empty set if None
     terminate_indices = set() if terminate_indices is None else terminate_indices
+
+    if config.metric.uses_velocity:
+        vs = _check_velocities(vs, nan_policy)
 
     # Store original velocities for the result and optionally negate velocities
     # for backward walk (internal use only).
@@ -498,6 +536,13 @@ def _local_flow_walk(
             cand_unvisited = unvisited[candidate_idxs]
             cand_xs = jtu.map(lambda x: x[candidate_idxs], xs)
 
+        # A candidate whose metric distance is not finite -- a missing (NaN)
+        # velocity under ``nan_policy="omit"``, at either end -- is scored by
+        # position alone. Left NaN, ``argmin`` would return the first NaN.
+        cur_x = jtu.map(lambda x: x[cur_idx], xs)
+        spatial_ds = vec_euclidean_distance(cur_x, cand_xs)
+        ds = jnp.where(jnp.isfinite(ds), ds, spatial_ds)
+
         # Nearest unvisited candidate under the metric.
         ds_masked = jnp.where(cand_unvisited, ds, jnp.inf)
         best = jnp.argmin(ds_masked)
@@ -514,8 +559,6 @@ def _local_flow_walk(
         # candidates are the nearest points in space, so the nearest unvisited
         # point is among them. When every candidate is visited, min_dist is
         # inf rather than the global value, but (2) stops the walk regardless.
-        cur_x = jtu.map(lambda x: x[cur_idx], xs)
-        spatial_ds = vec_euclidean_distance(cur_x, cand_xs)
         min_dist = jnp.min(jnp.where(cand_unvisited, spatial_ds, jnp.inf))
         new_stop = jnp.logical_or(
             jnp.logical_or(min_dist > max_dist, jnp.isinf(best_dist)),
@@ -728,8 +771,10 @@ def combine_results(
     # Full equality check using efficient tree operations
     # Use tuples to combine positions and velocities for one map/reduce pass
     # (tuples compile more efficiently than dicts)
+    # ``equal_nan``: a missing (NaN) velocity, allowed under
+    # ``nan_policy="omit"``, is still the same data in both walks.
     matches = jtu.map(
-        jnp.array_equal,
+        lambda a, b: jnp.array_equal(a, b, equal_nan=True),
         (result_fwd.positions, result_fwd.velocities),
         (result_bwd.positions, result_bwd.velocities),
     )
