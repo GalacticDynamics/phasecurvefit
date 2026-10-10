@@ -245,11 +245,38 @@ class TestMissingVelocities:
         vel = {"x": jnp.zeros(6).at[0].set(1.0), "y": vel["y"]}
         P = np.stack([np.asarray(pos[c]) for c in "xy"], axis=1)
         V = np.stack([np.asarray(vel[c]) for c in "xy"], axis=1)
-        split = mst_module._directionless_as_leaves(P, V, k=3, workers=1)
+        nbr_dir, leaf = mst_module._directed_knn(
+            jnp.asarray(P), jnp.asarray(V), 3, pcf.neighbors.BucketKDTree()
+        )
+        split = mst_module._directionless_as_leaves(
+            V, np.asarray(nbr_dir), np.asarray(leaf)
+        )
         assert split is not None
-        rows, cols, _ = split
+        rows, cols = split
         assert sorted(rows.tolist()) == [1, 2, 3, 4, 5]  # one edge each...
         assert set(cols.tolist()) == {0}  # ...to the directed tracer
+
+    @pytest.mark.parametrize("mechanism", ["velocity_weight", "sever_cos_threshold"])
+    def test_split_uses_the_selected_backend(self, mechanism):
+        """Directionless tracers split off through the backend, not a host tree.
+
+        SciPy, the kd-tree eagerly and the kd-tree under jit (a pure_callback
+        carrying the directed-only tables) give one ordering.
+        """
+        pos, vel = _hairpin()
+        vel = {
+            "x": vel["x"].at[20].set(0.0).at[60].set(jnp.nan),
+            "y": vel["y"].at[20].set(0.0),
+        }
+        kw = {"k": 6, "jump_cap": 1.0, "on_disconnected": "largest"}
+        kw |= {"nan_policy": "omit", **_MECHANISMS[mechanism]}
+        scipy = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw)
+        bucket = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.BucketKDTree(), **kw)
+        want = np.asarray(scipy.order(pos, vel).indices)
+        eager = np.asarray(bucket.order(pos, vel).indices)
+        jitted = jax.jit(lambda p, v: bucket.order(p, v).indices)(pos, vel)
+        np.testing.assert_array_equal(eager, want)
+        np.testing.assert_array_equal(np.asarray(jitted), want)
 
     @pytest.mark.parametrize("mechanism", ["velocity_weight", "sever_cos_threshold"])
     def test_a_stationary_tracer_does_not_raise(self, mechanism):
@@ -317,3 +344,52 @@ class TestMissingVelocities:
             k=6, jump_cap=1.0, sever_cos_threshold=0.0, on_disconnected="largest"
         ).order(pos, vel)
         assert int((res.indices >= 0).sum()) == 50
+
+
+class TestDirectionExtremes:
+    """A velocity with a direction keeps it, at any scale; huge positions work."""
+
+    def test_tiny_float64_velocity_keeps_its_direction(self):
+        """|v| ~ 1e-200: its norm underflowed to 0 and the cosine fell back to 1."""
+        with jax.enable_x64(new_val=True):
+            V = np.array([[1e-200, 0.0], [1.0, 0.0], [-1.0, 0.0]])
+            cos = mst_module._edge_cosine(V, np.array([0, 0]), np.array([1, 2]))
+        np.testing.assert_allclose(cos, [1.0, -1.0])
+
+    def test_tiny_float64_velocity_does_not_bridge_the_arms(self):
+        """A tracer between the arms with a tiny +x velocity joins only arm A."""
+        with jax.enable_x64(new_val=True):
+            jitter = np.random.default_rng(0).normal(0.0, 1e-3, 60)
+            x = np.r_[np.linspace(0, 10, 30), np.linspace(0, 10, 30)] + jitter
+            y = np.r_[np.zeros(30), np.full(30, 0.05)]
+            y[15] = 0.025
+            vx = np.r_[np.ones(30), -np.ones(30)]
+            vx[15] = 1e-200
+            pos = {"x": jnp.asarray(x), "y": jnp.asarray(y)}
+            vel = {"x": jnp.asarray(vx), "y": jnp.zeros(60)}
+            res = pcf.orderers.MSTOrderer(
+                k=6, jump_cap=1.0, sever_cos_threshold=0.0, on_disconnected="largest"
+            ).order(pos, vel)
+        signs = np.sign(vx[np.asarray(res.ordering)])
+        assert np.all(signs == signs[0])
+
+    def test_split_with_float32_coordinates_near_max(self):
+        """~1e38 float32 positions with a stationary tracer: no false "not finite".
+
+        The split's far row overflowed to inf before the coordinates were scaled.
+        """
+        vel = {"x": jnp.ones(40).at[20].set(0.0), "y": jnp.zeros(40)}
+
+        def order(scale):
+            x = jnp.linspace(0.0, 1.0, 40, dtype=jnp.float32) * scale
+            pos = {"x": x, "y": jnp.zeros(40, jnp.float32)}
+            orderer = pcf.orderers.MSTOrderer(
+                k=5, jump_cap=float(scale), velocity_weight=0.5
+            )
+            return orderer.order(pos, vel)
+
+        huge, unit = order(1e38), order(1.0)
+        assert int(huge.n_visited) == 40
+        np.testing.assert_array_equal(
+            np.asarray(huge.indices), np.asarray(unit.indices)
+        )

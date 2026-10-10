@@ -311,6 +311,46 @@ Self-Organizing Map ordering, after Starkman et al. (2023). See
    :members:
 ```
 
+## Neighbour Backends
+
+Exact k-nearest-neighbour backends for
+{class}`~phasecurvefit.orderers.MSTOrderer` (`neighbors=`).
+
+**Choosing a backend.** `SciPy` is **eager-only**: it raises `TypeError`
+inside `jit`, `vmap` or `grad`, including on arrays a jitted function captures
+rather than takes as arguments. Under those transforms use
+`BucketKDTree` (or `BruteForce`/`JaxKD`). `MSTOrderer`'s default
+(`neighbors=None`) makes that choice per call: `SciPy` for concrete inputs,
+`BucketKDTree` when traced.
+
+The kd-tree buys traceability, not CPU speed. Compiled under `jit`, it is
+slower than eager `SciPy`, and it compiles once per input shape. Measured on
+an Apple M2 Pro (10 cores, under load, so treat these as rough):
+
+| n | `jit` compile, first call | kNN (k=10): jit kd-tree / SciPy | `MSTOrderer` (k=10): jit kd-tree / SciPy |
+|---|---|---|---|
+| ~2,000 | ~8–9 s | ~3× slower | ~2× slower |
+| 10,000–100,000 | ~11–13 s | ~6.5–8.5× slower | ~1.6–2.8× slower (20,000–100,000) |
+| 1,000,000 | ~27 s | ~6× slower | not measured |
+
+`SciPy` queries with every core (`workers=-1`); the kd-tree query is only
+partly parallel on CPU. GPU was not measured.
+
+```{eval-rst}
+.. py:module:: phasecurvefit.neighbors
+
+.. autoclass:: phasecurvefit.neighbors.AbstractNeighborSearch
+   :members: knn
+
+.. autoclass:: phasecurvefit.neighbors.BucketKDTree
+
+.. autoclass:: phasecurvefit.neighbors.BruteForce
+
+.. autoclass:: phasecurvefit.neighbors.JaxKD
+
+.. autoclass:: phasecurvefit.neighbors.SciPy
+```
+
 ## Index
 
 ```{eval-rst}

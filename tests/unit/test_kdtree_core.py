@@ -1,0 +1,406 @@
+"""Tests for the self-contained JAX kd-tree (``phasecurvefit._src.kdtree``)."""
+
+import functools
+import importlib
+
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
+from phasecurvefit._src import kdtree as kd
+from phasecurvefit._src.kdtree._build import build_tree
+from phasecurvefit._src.kdtree._layout import layout
+from phasecurvefit._src.kdtree._select import ksmallest, kth_smallest
+
+
+class TestLayout:
+    """Static tree layout."""
+
+    @pytest.mark.parametrize("n", [0, 1, 2, 15, 16, 17, 100, 1000, 100_000])
+    @pytest.mark.parametrize("leaf_size", [8, 16, 32])
+    def test_padding_under_one_row_per_leaf(self, n, leaf_size):
+        """n_pad covers n, padding is < one row per leaf, spread as 0/1 per leaf."""
+        lay = layout(n, leaf_size)
+        assert lay.n_leaves == 2**lay.depth
+        assert lay.n_pad == lay.n_leaves * lay.leaf_size >= n
+        assert lay.n_pad - n < lay.n_leaves or n == 0
+        assert int(lay.leaf_valid.sum()) == max(n, 0) or n == 0
+        assert set(np.unique(lay.leaf_size - lay.leaf_valid)) <= {0, 1}
+        assert lay.leaf_size <= max(leaf_size, 1) or lay.depth == 0
+
+
+class TestSelect:
+    """Exact k-smallest selection."""
+
+    @pytest.mark.parametrize("top_k", [False, True])
+    @pytest.mark.parametrize("width", [3, 13, 52, 208])
+    def test_matches_sort_with_ties_and_infs(self, width, top_k):
+        """Values equal np.sort; columns reproduce them, distinct, stable on ties."""
+        k = 10
+        rng = np.random.default_rng(width)
+        a = rng.random((500, width)).astype(np.float32)
+        a[:, 1 % width] = 0.5
+        a[:, 2 % width] = 0.5  # ties
+        a[:7] = np.inf
+        a[:7, 0] = 0.1  # rows with fewer than k finite entries
+        ids = jnp.broadcast_to(jnp.arange(width), a.shape)
+        f = functools.partial(ksmallest, k=k, top_k=top_k)
+        vals, cols = jax.jit(f)(jnp.asarray(a), ids)
+        vals, cols = np.asarray(vals), np.asarray(cols)
+        padded = np.concat(
+            [a, np.full((500, max(0, k - width)), np.inf, np.float32)], axis=1
+        )
+        ref = np.sort(padded, 1)[:, :k]
+        np.testing.assert_array_equal(vals, ref)
+        finite = np.isfinite(vals)
+        np.testing.assert_array_equal(
+            np.take_along_axis(padded, np.where(finite, cols, 0), 1)[finite],
+            ref[finite],
+        )
+        for r in range(7, 500):
+            assert len(set(cols[r][finite[r]].tolist())) == finite[r].sum()
+        kth = np.asarray(kth_smallest(jnp.asarray(a), k))
+        np.testing.assert_array_equal(kth, ref[:, -1])
+
+    @pytest.mark.parametrize("top_k", [False, True])
+    def test_ties_go_to_lower_id_not_column(self, top_k):
+        """At the k-th value, the lower *id* wins whatever the column order."""
+        a = jnp.asarray([[3.0, 1.0, 1.0, 1.0, 0.0]])
+        ids = jnp.asarray([[0, 9, 4, 7, 2]])
+        vals, out = ksmallest(a, ids, 3, top_k=top_k)
+        np.testing.assert_array_equal(np.asarray(vals), [[0.0, 1.0, 1.0]])
+        np.testing.assert_array_equal(np.asarray(out), [[2, 4, 7]])
+
+    def test_top_k_path_both_branches_under_vmap(self):
+        """The truncated-tie second pass agrees with the reference under vmap.
+
+        Under vmap the gating cond becomes a select, so a batch mixing a
+        tie-free row with a truncated-tie row exercises both branches at once.
+        """
+        rng = np.random.default_rng(3)
+        a = rng.random((2, 4, 40)).astype(np.float32)
+        a[1, :, :12] = 0.25  # 12 tied at the k-th value, k=5: truncated
+        ids = rng.permutation(2 * 4 * 40).reshape(2, 4, 40).astype(np.int32)
+        f = jax.vmap(functools.partial(ksmallest, k=5, top_k=True))
+        vals, out = map(np.asarray, f(jnp.asarray(a), jnp.asarray(ids)))
+        for b in range(2):
+            for r in range(4):
+                o = np.lexsort((ids[b, r], a[b, r]))[:5]
+                np.testing.assert_array_equal(vals[b, r], a[b, r][o])
+                np.testing.assert_array_equal(out[b, r], ids[b, r][o])
+
+    def test_top_k_path_exact_beyond_float32_columns(self):
+        """Rows wider than 2**24: a strictly nearer point is never dropped.
+
+        A float32 key over column numbers stops being exact there and used to
+        let a point tied at the k-th value displace the nearest one.
+        """
+        w = 2**24 + 4
+        a = jnp.full((1, w), 2.0, jnp.float32).at[0, w - 1].set(0.0)
+        a = a.at[0, :2].set(1.0)
+        vals, ids = ksmallest(a, jnp.arange(w, dtype=jnp.int32)[None], 2, top_k=True)
+        np.testing.assert_array_equal(np.asarray(vals), [[0.0, 1.0]])
+        np.testing.assert_array_equal(np.asarray(ids), [[w - 1, 0]])
+
+    @pytest.mark.parametrize("top_k", [False, True])
+    def test_large_ids_tie_to_the_lower_id(self, top_k):
+        """Ids near 2**24 still break ties by id (no float key rounding)."""
+        base = 2**24 - 100
+        a = jnp.asarray([[3.0, 1.0, 1.0, 1.0, 0.0]])
+        ids = jnp.asarray([[0, 9, 4, 7, 2]]) + base
+        _, out = ksmallest(a, ids, 3, top_k=top_k)
+        np.testing.assert_array_equal(np.asarray(out), [[base + 2, base + 4, base + 7]])
+
+    def test_trace_size_flat_in_k(self):
+        """k=64 traces to a small program (an unrolled O(k**2) sort was ~19k ops).
+
+        Counting jaxpr equations bounds compile time deterministically; a timed
+        compile could hang the run instead of failing it.
+        """
+        a = jnp.zeros((8, 256), jnp.float32)
+        ids = jnp.zeros((8, 256), jnp.int32)
+        for top_k in (False, True):
+            jx = jax.make_jaxpr(lambda x, i, t=top_k: ksmallest(x, i, 64, top_k=t))(
+                a, ids
+            )
+            assert len(jx.jaxpr.eqns) < 1000
+
+    def test_large_k_compiles(self):
+        """Trace size does not grow as k**2 (k=64 compiled for minutes before)."""
+        a = jnp.asarray(np.random.default_rng(0).random((50, 256)), jnp.float32)
+        vals, _ = jax.jit(functools.partial(ksmallest, k=64))(
+            a, jnp.broadcast_to(jnp.arange(256), a.shape)
+        )
+        np.testing.assert_array_equal(np.asarray(vals), np.sort(a, 1)[:, :64])
+
+
+def _stream(n, seed=0, interlopers=0.0):
+    """Noisy, shuffled 3-D stream; optionally 1% (etc.) scattered interlopers."""
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0.0, 1.0, n)
+    p = np.c_[10 * t, np.sin(3 * t), 0.3 * np.cos(2 * t)] + rng.normal(0, 0.02, (n, 3))
+    m = int(interlopers * n)
+    if m:
+        idx = rng.choice(n, m, replace=False)
+        pad = np.array([0.0, 3.0, 3.0])
+        p[idx] = rng.uniform(p.min(0) - pad, p.max(0) + pad, (m, 3))
+    return p[rng.permutation(n)].astype(np.float32)
+
+
+class TestBuild:
+    """Balanced, pointer-free build."""
+
+    @pytest.mark.parametrize("n", [1, 2, 15, 17, 100, 1001])
+    def test_perm_is_a_permutation_and_points_match(self, n):
+        """Valid rows hold every input point once; padding is masked with sentinel n."""
+        p = np.random.default_rng(n).normal(size=(n, 3)).astype(np.float32)
+        tree = jax.jit(build_tree)(jnp.asarray(p))
+        perm, valid = np.asarray(tree.perm), np.asarray(tree.valid)
+        assert sorted(perm[valid].tolist()) == list(range(n))
+        assert np.all(perm[~valid] == n)
+        np.testing.assert_array_equal(np.asarray(tree.points)[valid], p[perm[valid]])
+
+    @pytest.mark.parametrize("n", [17, 100, 1001])
+    def test_leaf_cells_contain_their_points(self, n):
+        """Every valid point lies inside (or on the boundary of) its leaf's cell."""
+        p = np.random.default_rng(n).normal(size=(n, 3)).astype(np.float32)
+        tree = jax.jit(build_tree)(jnp.asarray(p))
+        b = tree.leaf_size
+        pts = np.asarray(tree.points).reshape(tree.n_leaves, b, 3)
+        ok = np.asarray(tree.valid).reshape(tree.n_leaves, b)
+        lo = np.asarray(tree.cell_lo[tree.depth])[:, None]
+        hi = np.asarray(tree.cell_hi[tree.depth])[:, None]
+        inside = np.all((pts >= lo) & (pts <= hi), -1)
+        assert np.all(inside[ok])
+
+    def test_duplicates_and_degenerate_extent(self):
+        """Hundreds of identical points still build a valid tree."""
+        p = np.zeros((300, 3), np.float32)
+        tree = jax.jit(build_tree)(jnp.asarray(p))
+        assert sorted(np.asarray(tree.perm)[np.asarray(tree.valid)].tolist()) == list(
+            range(300)
+        )
+
+
+def _ref_sq(points, k, queries=None):
+    """Float64 brute-force sorted squared distances (self excluded if no queries)."""
+    q = points if queries is None else queries
+    d2 = ((q[:, None].astype(np.float64) - points[None]) ** 2).sum(-1)
+    if queries is None:
+        np.fill_diagonal(d2, np.inf)
+    if points.shape[0] < k:
+        d2 = np.concat([d2, np.full((len(q), k - points.shape[0]), np.inf)], axis=1)
+    return np.sort(d2, 1)[:, :k]
+
+
+def _assert_exact(points, idx, d2, k, queries=None):
+    idx, d2 = np.asarray(idx), np.asarray(d2)
+    n = len(points)
+    ref = _ref_sq(points, k, queries)
+    fin = np.isfinite(ref)
+    np.testing.assert_array_equal(np.isfinite(d2), fin)
+    if fin.any():
+        rel = np.abs(d2[fin] - ref[fin]) / np.maximum(ref[fin], 1e-30)
+        assert rel.max() < 1e-5
+        q = points if queries is None else queries
+        rows = np.nonzero(fin)
+        realised = ((q[rows[0]] - points[idx[rows]]) ** 2).sum(-1)
+        np.testing.assert_allclose(realised, d2[rows], rtol=1e-5, atol=1e-12)
+    assert np.all(idx[~fin] == n)
+    if queries is None:
+        assert not np.any(idx == np.arange(n)[:, None])
+    for r in range(min(len(idx), 500)):
+        row = idx[r][fin[r]]
+        assert len(set(row.tolist())) == len(row)
+
+
+def _all(points, k=10, **kw):
+    return jax.jit(functools.partial(kd.all_knn, k=k, **kw))(jnp.asarray(points))
+
+
+def _bi(points, queries, k=10, leaf_size=16, **kw):
+    f = jax.jit(lambda p, q: kd.knn(kd.build_tree(p, leaf_size=leaf_size), q, k, **kw))
+    return f(jnp.asarray(points), jnp.asarray(queries))
+
+
+SIZES = [0, 1, 2, 9, 10, 11, 15, 16, 17, 31, 33, 100, 257, 1000]
+KNOBS = [{}, {"leaf_size": 8}, {"frontier": 2}]  # frontier=2 forces every overflow tier
+
+
+class TestAllKnn:
+    """Exact all-points kNN."""
+
+    @pytest.mark.parametrize("kw", KNOBS, ids=["default", "leaf8", "frontier2"])
+    @pytest.mark.parametrize("n", SIZES)
+    def test_edge_sizes(self, n, kw):
+        """Every n, including n <= k (sentinel rows), matches brute force."""
+        p = np.random.default_rng(n).normal(size=(n, 3)).astype(np.float32)
+        _assert_exact(p, *_all(p, **kw), 10)
+
+    @pytest.mark.parametrize("n", [17, 100, 300])
+    def test_float64(self, n):
+        """Under x64, float64 points stay float64 and stay exact."""
+        p = np.random.default_rng(n).normal(size=(n, 3))
+        with jax.enable_x64(new_val=True):
+            idx, d2 = kd.all_knn(jnp.asarray(p), 10, frontier=2)
+            assert d2.dtype == jnp.float64
+            _assert_exact(p, idx, d2, 10)
+
+    @pytest.mark.parametrize("leaf_size", [1, 2, 16])
+    def test_bound_block_stays_local(self, leaf_size):
+        """leaf_size=1 grew the bound block to the whole tree (O(n**2))."""
+        from phasecurvefit._src.kdtree._query import _bound_leaves  # noqa: PLC0415
+
+        p = jnp.asarray(np.random.default_rng(0).normal(size=(10_000, 3)), jnp.float32)
+        tree = build_tree(p, leaf_size=leaf_size)
+        bb = _bound_leaves(tree, 10)
+        assert bb * 64 <= tree.n_leaves  # a local block, not the whole tree
+        per_block = layout(10_000, leaf_size).leaf_valid.reshape(-1, bb).sum(1)
+        assert per_block.min() >= 10 + 1  # still enough for the k-th bound
+
+    @pytest.mark.parametrize("seed", [1, 2])
+    def test_cutoff_rounding_does_not_prune_the_kth_neighbour(self, seed):
+        """2-D, n=20k, defaults: a 1-ulp box-vs-point difference pruned a leaf.
+
+        The k-th neighbour can sit exactly on a split plane; its leaf's box
+        distance then equals its point distance up to rounding, and an exact
+        ``<= r2`` cut-off dropped it in the overflow tier.
+        """
+        x = np.random.default_rng(seed).normal(size=(20_000, 2)).astype(np.float32)
+        _, d2 = jax.jit(lambda p: kd.all_knn(p, 10))(jnp.asarray(x))
+        want = np.empty((len(x), 10))
+        x64 = x.astype(np.float64)
+        for s in range(0, len(x), 2000):
+            dd = ((x64[s : s + 2000, None] - x64[None]) ** 2).sum(-1)
+            dd[np.arange(dd.shape[0]), np.arange(s, s + dd.shape[0])] = np.inf
+            want[s : s + 2000] = np.sort(dd, axis=1)[:, :10]
+        np.testing.assert_allclose(np.asarray(d2), want, rtol=1e-5)
+
+    @pytest.mark.parametrize("frontier", [16, 2])
+    def test_ties_lower_index_large_k(self, frontier):
+        """For k > 16 (the lax.sort path), ties still go to the lower index."""
+        g = np.stack(np.meshgrid(np.arange(9.0), np.arange(9.0)), -1).reshape(-1, 2)
+        g = g[np.random.default_rng(0).permutation(len(g))].astype(np.float32)
+        idx, _ = kd.all_knn(jnp.asarray(g), 24, frontier=frontier)
+        d2 = ((g[:, None].astype(np.float64) - g[None]) ** 2).sum(-1)
+        np.fill_diagonal(d2, np.inf)
+        want = np.argsort(d2, axis=1, kind="stable")[:, :24]  # ties: lower index
+        np.testing.assert_array_equal(np.asarray(idx), want)
+
+    @pytest.mark.parametrize("frontier", [16, 2])
+    def test_duplicates(self, frontier):
+        """More than a leaf of identical points, including the last row."""
+        p = np.random.default_rng(1).normal(size=(500, 3)).astype(np.float32)
+        p[100:200] = p[0]
+        p[-1] = p[0]
+        _assert_exact(p, *_all(p, frontier=frontier), 10)
+
+    def test_all_identical(self):
+        """A single coincident clump."""
+        p = np.zeros((300, 3), np.float32)
+        _assert_exact(p, *_all(p), 10)
+
+    def test_far_last_row(self):
+        """Row n-1 is never corrupted by a -1 sentinel (regression)."""
+        p = np.random.default_rng(2).normal(size=(1001, 3)).astype(np.float32)
+        p[-1] = 100.0
+        _assert_exact(p, *_all(p), 10)
+
+    @pytest.mark.parametrize("d", [1, 2, 4])
+    def test_dimensions(self, d):
+        """Dimensions other than 3."""
+        p = np.random.default_rng(d).normal(size=(700, d)).astype(np.float32)
+        _assert_exact(p, *_all(p), 10)
+
+    @pytest.mark.parametrize("frac", [0.0, 0.01], ids=["stream", "interlopers"])
+    def test_stream_10k(self, frac):
+        """A realistic stream, with and without interlopers."""
+        p = _stream(10_000, interlopers=frac)
+        _assert_exact(p, *_all(p), 10)
+
+    def test_vmap_mixed_batch_exact(self):
+        """Review Focus 4: vmap over clouds that differ stays exact for each."""
+        batch = np.stack([_stream(2000, 0), _stream(2000, 1, interlopers=0.05)])
+        idx, d2 = jax.jit(jax.vmap(functools.partial(kd.all_knn, k=10)))(
+            jnp.asarray(batch)
+        )
+        for b in range(2):
+            _assert_exact(batch[b], idx[b], d2[b], 10)
+
+
+class TestKnn:
+    """Exact bichromatic kNN (queries are not tree points)."""
+
+    @pytest.mark.parametrize("kw", KNOBS, ids=["default", "leaf8", "frontier2"])
+    @pytest.mark.parametrize("n", [1, 2, 9, 11, 17, 100, 1000])
+    @pytest.mark.parametrize("k", [1, 10])
+    def test_edge_sizes(self, n, k, kw):
+        """Random queries against random trees, k=1 (projection) and k=10."""
+        rng = np.random.default_rng(n + k)
+        p = rng.normal(size=(n, 3)).astype(np.float32)
+        q = rng.normal(size=(37, 3)).astype(np.float32)
+        _assert_exact(p, *_bi(p, q, k=k, **kw), k, queries=q)
+
+    def test_stream_projection_10k(self):
+        """k=1 queries near a stream, as the MST projection uses it."""
+        p = _stream(10_000)
+        q = p[::7] + 0.01
+        _assert_exact(p, *_bi(p, q, k=1), 1, queries=q)
+
+    def test_locate_leaves_finds_the_containing_cell(self):
+        """Each query is inside the cell of the leaf it is located in."""
+        p = _stream(3000)
+        tree = jax.jit(kd.build_tree)(jnp.asarray(p))
+        q = np.random.default_rng(3).normal(size=(200, 3)).astype(np.float32) * 5
+        leaf = np.asarray(jax.jit(kd.locate_leaves)(tree, jnp.asarray(q)))
+        lo = np.asarray(tree.cell_lo[tree.depth])[leaf]
+        hi = np.asarray(tree.cell_hi[tree.depth])[leaf]
+        assert np.all((q >= lo) & (q <= hi))
+
+
+class TestBrute:
+    """The brute-force oracle itself."""
+
+    def test_matches_reference(self):
+        """All-points and bichromatic brute force match float64 NumPy."""
+        rng = np.random.default_rng(4)
+        p = rng.normal(size=(700, 3)).astype(np.float32)
+        q = rng.normal(size=(50, 3)).astype(np.float32)
+        _assert_exact(
+            p, *jax.jit(functools.partial(kd.brute_knn, k=10))(jnp.asarray(p)), 10
+        )
+        _assert_exact(
+            p, *kd.brute_knn(jnp.asarray(p), 10, queries=jnp.asarray(q)), 10, queries=q
+        )
+
+
+class TestBruteTier:
+    """The final brute-force overflow tier, forced by tiny tier constants."""
+
+    @pytest.mark.parametrize("frontier", [1, 2])
+    def test_forced_tiers_exact(self, monkeypatch, frontier):
+        """All-points and bichromatic (incl. far) queries stay exact through brute."""
+        q_mod = importlib.import_module("phasecurvefit._src.kdtree._query")
+        monkeypatch.setattr(q_mod, "TIERS", (2, 4))
+        monkeypatch.setattr(q_mod, "TIER_CHUNK", (3, 5))
+        monkeypatch.setattr(q_mod, "BRUTE_CHUNK", 7)
+        chunks = []
+        real = q_mod._finish
+
+        def spy(*args):
+            chunks.append(args[6])  # the chunk size of each overflow stage
+            return real(*args)
+
+        monkeypatch.setattr(q_mod, "_finish", spy)
+        jax.clear_caches()  # constants are read at trace time
+        p = _stream(300, seed=3, interlopers=0.1)
+        rng = np.random.default_rng(1)
+        q = np.concat(
+            [p[:20] + 0.01, 100 * rng.normal(size=(10, 3)).astype(np.float32)]
+        ).astype(np.float32)
+        _assert_exact(p, *_all(p, k=8, leaf_size=4, frontier=frontier), 8)
+        _assert_exact(p, *_bi(p, q, k=8, leaf_size=4, frontier=frontier), 8, queries=q)
+        assert 7 in chunks  # brute tier was traced
+        assert 5 in chunks  # ... after an overflow tier
+        jax.clear_caches()

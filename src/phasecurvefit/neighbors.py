@@ -1,0 +1,30 @@
+"""Exact k-nearest-neighbour backends, selectable per orderer.
+
+``BucketKDTree`` and ``BruteForce`` are JAX-native and trace under
+``jax.jit``/``vmap``/``grad``; ``JaxKD`` wraps the optional jaxkd package;
+``SciPy`` is scipy's ``cKDTree`` -- fastest on CPU, eager-only. By default
+``MSTOrderer`` uses ``SciPy`` for concrete inputs and ``BucketKDTree`` when
+traced; pass one to pin it. Under ``jit`` the kd-tree is slower on CPU than
+eager ``SciPy`` (roughly 2-8x, plus a one-off compile per input shape); it is
+there for traceability (see the API reference for measurements)::
+
+    import phasecurvefit as pcf
+
+    orderer = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy())
+"""
+
+__all__: tuple[str, ...] = (
+    "AbstractNeighborSearch",
+    "BruteForce",
+    "BucketKDTree",
+    "JaxKD",
+    "SciPy",
+)
+
+from ._src.neighbors import (
+    AbstractNeighborSearch,
+    BruteForce,
+    BucketKDTree,
+    JaxKD,
+    SciPy,
+)

@@ -30,7 +30,11 @@ from jaxtyping import Array
 
 from .custom_types import FLikeSz0, ISz0, VectorComponents
 from .metrics import AbstractDistanceMetric
+from .optional_deps import OptDeps
 from .phasespace import get_w_at
+
+if OptDeps.JAXKD.installed:
+    import jaxkd
 
 
 class QueryResult(NamedTuple):
@@ -203,15 +207,12 @@ class KDTree(AbstractQueryStrategy):
         """
         self.k = k
 
-        try:
-            import jaxkd  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
-        except ImportError:
+        if not OptDeps.JAXKD.installed:
             msg = (
                 "KDTree requires jaxkd optional dependency. "
                 "Install with: uv add phasecurvefit[kdtree]"
             )
-            raise ImportError(msg) from None
-        self._jaxkd = jaxkd
+            raise ImportError(msg)
 
     def _n_query(self, n_points: int, /) -> int:
         # Query one extra neighbor to make room for the current point itself.
@@ -235,9 +236,9 @@ class KDTree(AbstractQueryStrategy):
     ) -> dict[str, Any]:
         """Build the KD-tree and every point's neighbor table."""
         pos_flat = jnp.stack([positions[k] for k in sorted(positions)], axis=-1)
-        tree = self._jaxkd.build_tree(pos_flat)
+        tree = jaxkd.build_tree(pos_flat)
         n_query = self._n_query(pos_flat.shape[0])
-        neighbors, _ = self._jaxkd.query_neighbors(tree, pos_flat, k=n_query)
+        neighbors, _ = jaxkd.query_neighbors(tree, pos_flat, k=n_query)
         return {"tree": tree, "n_query": n_query, "neighbors": neighbors}
 
     def _candidates(
@@ -270,7 +271,7 @@ class KDTree(AbstractQueryStrategy):
     ) -> QueryResult:
         """Query the KD-tree at an arbitrary position; metric on candidates only."""
         current_pos_arr = jnp.array([current_pos[k] for k in sorted(current_pos)])
-        indices, _ = self._jaxkd.query_neighbors(
+        indices, _ = jaxkd.query_neighbors(
             kd_state["tree"], current_pos_arr[None, :], k=kd_state["n_query"]
         )
         return self._candidates(
