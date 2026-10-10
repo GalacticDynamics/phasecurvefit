@@ -367,16 +367,24 @@ class TestBucketing:
         dmin = np.min(np.linalg.norm(np.asarray(p)[:, None] - far[None], axis=-1))
         assert dmin > diam
 
-    @pytest.mark.parametrize("scale", [1e-16, 1.0, 1e16])
-    def test_far_rows_stay_near_the_data_scale(self, scale):
-        """The padding row's magnitude is a constant multiple of the data's.
+    @pytest.mark.parametrize("exponent", [-53, 0, 53])
+    def test_far_rows_are_relative_to_the_data(self, exponent):
+        """Scaling the data by 2**e scales the padding rows by exactly 2**e.
 
-        An absolute ``+1`` offset (or one growing with the row count) inflated
-        tiny data's range, and the coordinate scaling then underflowed it.
+        An absolute ``+1`` offset swamped tiny data's range, and the coordinate
+        scaling then underflowed it.
         """
-        p = np.random.default_rng(5).normal(size=(100, 3)) * scale
-        far = np.asarray(nb_src.far_rows(jnp.asarray(p, jnp.float32), 500))
-        assert np.abs(far).max() <= (4 * np.sqrt(3) + 3) * np.abs(p).max() * 1.01
+        p = np.random.default_rng(5).normal(size=(100, 3)).astype(np.float32)
+        s = np.float32(2.0**exponent)
+        far = np.asarray(nb_src.far_rows(jnp.asarray(p), 50))
+        far_s = np.asarray(nb_src.far_rows(jnp.asarray(p * s), 50))
+        np.testing.assert_array_equal(far_s, far * s)
+
+    def test_far_rows_are_distinct(self):
+        """Identical padding rows sent every padding query into brute force."""
+        p = jnp.asarray(np.random.default_rng(6).normal(size=(100, 3)), jnp.float32)
+        far = np.asarray(nb_src.far_rows(p, 200))
+        assert len(np.unique(far, axis=0)) == 200
 
     def test_far_rows_beyond_the_data_at_large_magnitude(self):
         """|x| >> spread in float32: the far row still lies beyond the data."""

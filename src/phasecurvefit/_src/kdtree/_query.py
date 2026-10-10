@@ -60,6 +60,11 @@ def _descend(tree: Tree, xq: Array, r2: Array, cap: int, /) -> tuple[Array, Arra
     front = jnp.broadcast_to(seed, (nq, cap))
     over = jnp.zeros(nq, bool)
     slots = jnp.arange(cap, dtype=jnp.int32)
+    # Slack on the cut-off: r2 is often exactly a point's squared distance (the
+    # k-th so far), and that point's leaf box distance equals it only up to
+    # rounding (computed in another fusion). An exact ``<=`` pruned the k-th
+    # neighbour's leaf by one ulp. Extra candidates cannot change the result.
+    r2 = r2 * (1.0 + 4.0 * xq.shape[1] * jnp.finfo(xq.dtype).eps)
 
     def keep(cand: Array, nn: int, lvl: int) -> tuple[Array, Array]:
         lo = tree.cell_lo[lvl].at[cand].get(mode="fill", fill_value=0)
@@ -104,11 +109,27 @@ def _merge(
     return dd, jnp.where(jnp.isinf(dd), tree.n, ii)
 
 
+def _bound_leaves(tree: Tree, k: int, /) -> int:
+    """Leaves per aligned block guaranteed to hold ``k + 1`` valid points.
+
+    Padding is spread evenly (``layout``), so ``bb`` aligned leaves hold at
+    most ``ceil(bb * pad / n_leaves)`` padding rows. Assuming ``leaf_size - 1``
+    valid per leaf instead is 0 at leaf_size 1, which grew the block to the
+    whole tree: O(n^2) time and memory (8.7 GB at n = 1e5).
+    """
+    bb = min(BLOCK_LEAVES, tree.n_leaves)
+    pad = tree.n_pad - tree.n
+    while (
+        bb < tree.n_leaves
+        and bb * tree.leaf_size - (-(-bb * pad // tree.n_leaves)) < k + 1
+    ):
+        bb *= 2
+    return bb
+
+
 def _bound(tree: Tree, xq: Array, qself: Array, qleaf: Array, k: int, /) -> Array:
     """k-th squared distance to the valid points of each query's leaf block."""
-    bb = min(BLOCK_LEAVES, tree.n_leaves)
-    while bb < tree.n_leaves and bb * max(tree.leaf_size - 1, 0) < k + 1:
-        bb *= 2
+    bb = _bound_leaves(tree, k)
     s = bb * tree.leaf_size
     blk = qleaf // bb
     xb = tree.points.reshape(-1, s, tree.points.shape[1])[blk]

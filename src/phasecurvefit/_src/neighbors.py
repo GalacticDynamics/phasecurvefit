@@ -132,14 +132,14 @@ def _bucket(n: int, /) -> int:
 
 
 def far_rows(points: Float[Array, "n d"], count: int, /) -> Float[Array, "count d"]:
-    """``count`` copies of a row farther from every row of ``points`` than its diameter.
+    """``count`` distinct rows farther from every row of ``points`` than its diameter.
 
     Padding a search with these never changes the k nearest real neighbours of
     any query that was included in the array passed here (so pass the union of
-    points and queries), while at least k real points exist. The row is placed
-    relative to the data, within (4 sqrt(d) + 3) times its largest magnitude, so
-    it never inflates the coordinate range (and with it the scaling) by more
-    than that constant.
+    points and queries), while at least k real points exist. Placed relative to
+    the data (no absolute offset, so tiny data is not swamped) and one ``span``
+    apart: identical rows made every padding query's own search overflow into
+    brute force (~20x slower eager ``BucketKDTree`` just above a bucket size).
     """
     d = points.shape[1]
     lo, hi = points.min(0), points.max(0)
@@ -147,8 +147,8 @@ def far_rows(points: Float[Array, "n d"], count: int, /) -> Float[Array, "count 
     # once |hi| / spread >~ 1e7, which would put "far" rows on real points.
     span = jnp.maximum(jnp.max(hi - lo), jnp.max(jnp.abs(jnp.stack([lo, hi]))))
     span = jnp.where(span > 0, span, 1.0)  # all-zero data
-    row = lo.at[0].set(hi[0] + (2.0 * math.sqrt(d) + 1.0) * span)
-    return jnp.broadcast_to(row, (count, d))
+    offset = (2.0 * math.sqrt(d) + 1.0 + jnp.arange(count, dtype=points.dtype)) * span
+    return jnp.broadcast_to(lo, (count, d)).at[:, 0].set(hi[0] + offset)
 
 
 class AbstractNeighborSearch(eqx.Module):

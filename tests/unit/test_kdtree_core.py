@@ -247,6 +247,36 @@ class TestAllKnn:
             assert d2.dtype == jnp.float64
             _assert_exact(p, idx, d2, 10)
 
+    @pytest.mark.parametrize("leaf_size", [1, 2, 16])
+    def test_bound_block_stays_local(self, leaf_size):
+        """leaf_size=1 grew the bound block to the whole tree (O(n**2))."""
+        from phasecurvefit._src.kdtree._query import _bound_leaves  # noqa: PLC0415
+
+        p = jnp.asarray(np.random.default_rng(0).normal(size=(10_000, 3)), jnp.float32)
+        tree = build_tree(p, leaf_size=leaf_size)
+        bb = _bound_leaves(tree, 10)
+        assert bb * 64 <= tree.n_leaves  # a local block, not the whole tree
+        per_block = layout(10_000, leaf_size).leaf_valid.reshape(-1, bb).sum(1)
+        assert per_block.min() >= 10 + 1  # still enough for the k-th bound
+
+    @pytest.mark.parametrize("seed", [1, 2])
+    def test_cutoff_rounding_does_not_prune_the_kth_neighbour(self, seed):
+        """2-D, n=20k, defaults: a 1-ulp box-vs-point difference pruned a leaf.
+
+        The k-th neighbour can sit exactly on a split plane; its leaf's box
+        distance then equals its point distance up to rounding, and an exact
+        ``<= r2`` cut-off dropped it in the overflow tier.
+        """
+        x = np.random.default_rng(seed).normal(size=(20_000, 2)).astype(np.float32)
+        _, d2 = jax.jit(lambda p: kd.all_knn(p, 10))(jnp.asarray(x))
+        want = np.empty((len(x), 10))
+        x64 = x.astype(np.float64)
+        for s in range(0, len(x), 2000):
+            dd = ((x64[s : s + 2000, None] - x64[None]) ** 2).sum(-1)
+            dd[np.arange(dd.shape[0]), np.arange(s, s + dd.shape[0])] = np.inf
+            want[s : s + 2000] = np.sort(dd, axis=1)[:, :10]
+        np.testing.assert_allclose(np.asarray(d2), want, rtol=1e-5)
+
     @pytest.mark.parametrize("frontier", [16, 2])
     def test_ties_lower_index_large_k(self, frontier):
         """For k > 16 (the lax.sort path), ties still go to the lower index."""
