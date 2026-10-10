@@ -70,8 +70,8 @@ from phasecurvefit._src.neighbors import (
     BucketKDTree,
     SciPy,
     _as_float,
+    _pow2_scale,
     _traced,
-    far_rows,
 )
 
 OnDisconnected = Literal["raise", "warn", "largest", "connect"]
@@ -322,7 +322,9 @@ def _host_graph(
     backbone_len int32, in_component (n,) bool, flip bool)``; ``flip`` says the
     ordering must run against the backbone's stored direction.
     """
-    P = np.asarray(P)
+    # Host-side geometry in float64: float32 squared lengths overflow once
+    # coordinate gaps exceed ~1.8e19 (metres at kpc scale).
+    P = np.asarray(P, np.float64)
     V = np.asarray(V)
     n, k_eff = nbr.shape
     rows = np.repeat(np.arange(n), k_eff)
@@ -399,6 +401,7 @@ def _orient_backbone(full, blen, flip, xp, /):  # noqa: ANN001, ANN202
 
 def _finish_numpy(P, full, blen, in_comp, flip, workers, /):  # noqa: ANN001, ANN202
     """Stage (c) in NumPy (the eager scipy path): projection and ordering."""
+    P = np.asarray(P, np.float64)  # float32 segment lengths overflow (~1.8e19)
     n = P.shape[0]
     cb = P[full[:blen]]
     seg = np.linalg.norm(np.diff(cb, axis=0), axis=1)
@@ -413,15 +416,16 @@ def _finish_numpy(P, full, blen, in_comp, flip, workers, /):  # noqa: ANN001, AN
 def _finish_jax(P, full, blen, in_comp, flip, neighbors, /):  # noqa: ANN001, ANN202
     """Stage (c) in JAX: arc-length projection onto the backbone, then ordering.
 
-    The padded backbone tail is replaced by far rows, which can never be any
-    point's nearest vertex, so the k=1 query sees only real vertices.
+    The padded backbone tail repeats the last real vertex: a tie with it goes
+    to the real one (lower index), and either way the tail's arc length equals
+    the last vertex's, so the k=1 query needs no masking.
     """
     n = P.shape[0]
     cb = P[full]
-    seg = jnp.linalg.norm(jnp.diff(cb, axis=0), axis=1)  # 0 across the padded tail
+    scale = _pow2_scale(P, None)  # segment lengths without float32 overflow
+    seg = jnp.linalg.norm(jnp.diff(cb / scale, axis=0), axis=1) * scale
     s_bb = jnp.concat([jnp.zeros(1, P.dtype), jnp.cumsum(seg)])
-    ref = jnp.where((jnp.arange(n) < blen)[:, None], cb, far_rows(P, n))
-    near = neighbors.knn(ref, 1, queries=P)[0][:, 0]
+    near = neighbors.knn(cb, 1, queries=P)[0][:, 0]
     primary, secondary = _order_keys(s_bb[near], in_comp, flip, n, jnp)
     order = jnp.lexsort((secondary, primary)).astype(jnp.int32)
     idx = jnp.where(jnp.arange(n) < in_comp.sum(), order, -1)

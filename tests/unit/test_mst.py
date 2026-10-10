@@ -813,6 +813,34 @@ class TestMSTBackends:
         )
         np.testing.assert_array_equal(np.asarray(jitted), np.asarray(want.indices))
 
+    @pytest.mark.parametrize("make", [pcf.neighbors.SciPy, pcf.neighbors.BucketKDTree])
+    def test_kpc_in_metres_gaps(self, make):
+        """3e19-metre gaps: float32 arc lengths overflowed and scrambled the order."""
+        x = np.random.default_rng(3).permutation(np.linspace(0, 40 * 3e19, 40))
+        pos = {"x": jnp.asarray(x, jnp.float32), "y": jnp.zeros(40, jnp.float32)}
+        vel = {"x": jnp.ones(40), "y": jnp.zeros(40)}
+        res = pcf.orderers.MSTOrderer(k=5, jump_cap=1e30, neighbors=make()).order(
+            pos, vel
+        )
+        steps = np.diff(x[np.asarray(res.ordering)])
+        assert np.all(np.abs(steps) > 0)
+        assert np.all(np.sign(steps) == np.sign(steps[0]))
+
+    def test_tiny_coordinates_match_scipy(self):
+        """1e-16-scale float32 data: the projection picked index-ordered ties."""
+        rng = np.random.default_rng(8)
+        t = np.sort(rng.uniform(0, 1, 400))
+        p = (np.c_[10 * t, np.sin(3 * t)] + rng.normal(0, 0.01, (400, 2))) * 1e-16
+        p = p[rng.permutation(400)].astype(np.float32)
+        pos = {"x": jnp.asarray(p[:, 0]), "y": jnp.asarray(p[:, 1])}
+        vel = {"x": jnp.ones(400), "y": jnp.zeros(400)}
+        kw = {"k": 10, "jump_cap": 1.0}
+        want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw).order(
+            pos, vel
+        )
+        got = pcf.orderers.MSTOrderer(**kw).order(pos, vel)
+        np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
+
     def test_huge_coordinates_match_scipy(self):
         """Float32 positions in metres at kpc scale: no d2 overflow (was IndexError)."""
         x = np.random.default_rng(2).permutation(np.linspace(0, 32e19, 40))

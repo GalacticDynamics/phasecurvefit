@@ -191,6 +191,34 @@ class TestContract:
         assert np.all(idx < 30)
         np.testing.assert_allclose(dist, _ref(p, 2), rtol=1e-5)
 
+    @pytest.mark.parametrize("scale", [1e-14, 1e-30])
+    def test_tiny_coordinates_float32(self, backend, scale):
+        """Tiny coordinates keep their neighbours (no squared-distance underflow)."""
+        p = (np.random.default_rng(6).normal(size=(30, 3)) * scale).astype(np.float32)
+        idx, dist = map(np.asarray, backend.knn(jnp.asarray(p), 2))
+        np.testing.assert_allclose(dist, _ref(p, 2), rtol=1e-5)
+        _assert_indices_give_distances(p, None, idx, dist)
+
+    def test_near_float32_max_coordinates(self, backend):
+        """Coordinates near float32's maximum do not overflow the scale factor."""
+        p = np.array([[3e38], [1e38], [2e38]], np.float32)
+        idx, dist = map(np.asarray, backend.knn(jnp.asarray(p), 1))
+        np.testing.assert_array_equal(idx[:, 0], [2, 2, 1])
+        assert np.all(np.isfinite(dist))
+
+    def test_tight_cluster_beside_distant_outlier(self, backend):
+        """A 1e-15 cluster beside a 1e15 outlier keeps its own neighbours.
+
+        Normalising every coordinate below 1 underflowed the cluster's squared
+        distances to 0; in range, coordinates are left unscaled.
+        """
+        rng = np.random.default_rng(7)
+        p = np.concat([rng.normal(size=(50, 2)) * 1e-15, [[1e15, 0.0]]])
+        p = p.astype(np.float32)
+        idx, dist = map(np.asarray, backend.knn(jnp.asarray(p), 3))
+        np.testing.assert_allclose(dist, _ref(p, 3), rtol=1e-5)
+        _assert_indices_give_distances(p, None, idx, dist)
+
     def test_non_finite_with_empty_input_raises(self, backend):
         """NaN is caught even when the other input is empty."""
         nan = jnp.full((2, 3), jnp.nan, jnp.float32)
@@ -327,7 +355,17 @@ class TestBucketing:
         )
         dmin = np.min(np.linalg.norm(np.asarray(p)[:, None] - far[None], axis=-1))
         assert dmin > diam
-        assert len({tuple(r) for r in far.tolist()}) == 7
+
+    @pytest.mark.parametrize("scale", [1e-16, 1.0, 1e16])
+    def test_far_rows_stay_near_the_data_scale(self, scale):
+        """The padding row's magnitude is a constant multiple of the data's.
+
+        An absolute ``+1`` offset (or one growing with the row count) inflated
+        tiny data's range, and the coordinate scaling then underflowed it.
+        """
+        p = np.random.default_rng(5).normal(size=(100, 3)) * scale
+        far = np.asarray(nb_src.far_rows(jnp.asarray(p, jnp.float32), 500))
+        assert np.abs(far).max() <= (4 * np.sqrt(3) + 3) * np.abs(p).max() * 1.01
 
     def test_far_rows_large_magnitude_float32(self):
         """|x| >> spread in float32: far rows must not round onto real points."""

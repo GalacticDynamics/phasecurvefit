@@ -85,18 +85,31 @@ def _check_args(points: Array, k: int, queries: Array | None, /) -> None:
         raise ValueError(msg)
 
 
-def _pow2_scale(points: Array, queries: Array | None, /) -> Array:
-    """Power of two bringing every coordinate to magnitude < 1 (gradient-free).
+# Coordinates whose largest magnitude has binary exponent in this window are
+# left unscaled; outside it they are moved to its nearer edge. 2**60 keeps
+# float32 squared distances finite in up to 64 dimensions (d * 2**122 < 2**128);
+# 2**-20 keeps them well above float32's smallest normal (2**-126).
+_SCALE_WINDOW = (-20, 60)
 
-    Dividing by a power of two is exact, so neighbour selection, ties
-    included, is unchanged; it only keeps squared distances from overflowing
-    float32 (coordinate gaps above ~1.8e19, e.g. metres at kpc scale).
+
+def _pow2_scale(points: Array, queries: Array | None, /) -> Array:
+    """Power of two to divide coordinates by so squared distances stay finite.
+
+    1 (no scaling) unless the largest coordinate magnitude falls outside
+    ``2**_SCALE_WINDOW``. Dividing by a power of two is exact, so neighbour
+    selection, ties included, is unchanged; it only keeps squared distances
+    from overflowing float32 (coordinate gaps above ~1.8e19, e.g. metres at
+    kpc scale) or underflowing to zero for tiny coordinates. Scaling only out
+    of range, rather than always normalising, keeps a tight cluster next to a
+    distant outlier from underflowing. Gradient-free.
     """
     m = jnp.max(jnp.abs(points), initial=0.0)
     if queries is not None:
         m = jnp.maximum(m, jnp.max(jnp.abs(queries), initial=0.0))
-    _, e = jnp.frexp(m)  # m = f * 2**e, f in [0.5, 1)
-    return jax.lax.stop_gradient(jnp.ldexp(jnp.ones((), points.dtype), e))
+    _, e = jnp.frexp(m)  # m = f * 2**e, f in [0.5, 1); e = 0 for m = 0
+    lo, hi = _SCALE_WINDOW
+    shift = e - jnp.clip(e, lo, hi)
+    return jax.lax.stop_gradient(jnp.ldexp(jnp.ones((), points.dtype), shift))
 
 
 def _check_finite(points: Array, queries: Array | None, /) -> Array:
@@ -119,19 +132,23 @@ def _bucket(n: int, /) -> int:
 
 
 def far_rows(points: Float[Array, "n d"], count: int, /) -> Float[Array, "count d"]:
-    """``count`` distinct rows farther from every row of ``points`` than its diameter.
+    """``count`` copies of a row farther from every row of ``points`` than its diameter.
 
     Padding a search with these never changes the k nearest real neighbours of
     any query that was included in the array passed here (so pass the union of
-    points and queries), while at least k real points exist.
+    points and queries), while at least k real points exist. The row is placed
+    relative to the data, within (4 sqrt(d) + 3) times its largest magnitude, so
+    it never inflates the coordinate range (and with it the scaling) by more
+    than that constant.
     """
     d = points.shape[1]
     lo, hi = points.min(0), points.max(0)
     # Cover the magnitude too: in float32, hi + c * spread rounds back to hi
     # once |hi| / spread >~ 1e7, which would put "far" rows on real points.
-    span = jnp.maximum(jnp.max(hi - lo), jnp.max(jnp.abs(jnp.stack([lo, hi])))) + 1.0
-    offset = (2.0 * math.sqrt(d) + 1.0 + jnp.arange(count, dtype=points.dtype)) * span
-    return jnp.broadcast_to(lo, (count, d)).at[:, 0].set(hi[0] + offset)
+    span = jnp.maximum(jnp.max(hi - lo), jnp.max(jnp.abs(jnp.stack([lo, hi]))))
+    span = jnp.where(span > 0, span, 1.0)  # all-zero data
+    row = lo.at[0].set(hi[0] + (2.0 * math.sqrt(d) + 1.0) * span)
+    return jnp.broadcast_to(row, (count, d))
 
 
 class AbstractNeighborSearch(eqx.Module):
