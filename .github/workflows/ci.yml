@@ -131,12 +131,13 @@ jobs:
         run: |
           uv sync --no-default-groups --group test --locked
 
-      # Correctness only: --benchmark-disable runs each benchmark body exactly
-      # once, so breakage surfaces without timing noise or meaningful CI time.
+      # Correctness only: without --codspeed, pytest-codspeed's `benchmark`
+      # fixture runs each benchmark body exactly once, so breakage surfaces
+      # without timing noise or meaningful CI time.
       # (Timing lives in the CodSpeed `benchmark` job below.)
       - name: Run benchmarks once
         run: |
-          uv run --frozen --no-default-groups --group test pytest tests/benchmarks/ --benchmark-disable
+          uv run --frozen --no-default-groups --group test pytest tests/benchmarks/
 
   benchmark:
     name: Run Benchmarks
