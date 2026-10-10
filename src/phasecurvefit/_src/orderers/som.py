@@ -22,7 +22,7 @@ produced here.
 __all__: tuple[str, ...] = ("SOMOrderer",)
 
 import warnings
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import equinox as eqx
 import jax
@@ -89,6 +89,43 @@ def _train_and_project(
         backbone_q, backbone_p, sub_q, sub_p, metric=metric, metric_scale=metric_scale
     )
     return backbone_q, backbone_p, lam, result.kept
+
+
+def _check_nan_policy(nan_policy: str, /) -> None:
+    if nan_policy not in ("raise", "omit"):
+        msg = f"nan_policy must be 'raise' or 'omit', got {nan_policy!r}."
+        raise ValueError(msg)
+
+
+def _check_velocities(
+    velocities: VectorComponents, nan_policy: str, /
+) -> VectorComponents:
+    """Raise on an infinite velocity, and on NaN unless ``nan_policy="omit"``.
+
+    Called only when the stage reads velocities. ``eqx.error_if`` so the
+    check survives ``jit`` and ``vmap``.
+    """
+    # Per component, then reduced: no (N * D) copy just to validate.
+    comps = [jnp.asarray(v) for v in velocities.values()]
+    has_inf = jnp.any(jnp.stack([jnp.any(jnp.isinf(v)) for v in comps]))
+    has_nan = jnp.any(jnp.stack([jnp.any(jnp.isnan(v)) for v in comps]))
+    velocities = eqx.error_if(
+        velocities,
+        has_inf,
+        "SOMOrderer found an infinite velocity. inf is not a measurement -- it "
+        "comes from an overflow or a bug upstream -- so it raises under either "
+        "nan_policy. Fix or drop those tracers.",
+    )
+    if nan_policy == "omit":
+        return velocities
+    return eqx.error_if(
+        velocities,
+        has_nan,
+        "SOMOrderer reads velocities here (a velocity-aware metric or "
+        "orient_by_velocity) and found a NaN. To treat NaN as a missing "
+        "velocity pass nan_policy='omit'; or drop those tracers; or order on "
+        "position alone (metric=SpatialDistanceMetric(), no orient_by_velocity).",
+    )
 
 
 def _scale_is_nonzero(scale: float | FSz0, /, *, remedy: str) -> bool:
@@ -213,6 +250,21 @@ class SOMOrderer(AbstractOrderer):
         a prior stage never visited -- composing with, not overriding, a prior
         stage's own rejections. See :func:`phasecurvefit.som.fit`'s
         ``outlier_clip_sigma`` parameter for the algorithm.
+    nan_policy
+        What to do with a NaN velocity when this stage reads velocities, i.e.
+        with a velocity-aware ``metric`` or ``orient_by_velocity``. A
+        position-only stage never reads them, so never raises.
+
+        ``"raise"`` (default) raises -- under ``jit`` at run time, as a
+        :class:`RuntimeError`. ``"omit"`` treats NaN as a missing measurement
+        (catalogues often lack radial velocities): it is left out of the
+        prototype velocity averages, a tracer whose ``metric`` distances are
+        not all finite is matched by position alone, and it is skipped when
+        orienting. More missing velocities move the ordering toward the
+        position-only one.
+
+        A zero velocity is data (a stationary tracer), not missing. An
+        infinite one is neither, so it raises under either policy.
 
     Notes
     -----
@@ -266,11 +318,13 @@ class SOMOrderer(AbstractOrderer):
     orient_by_velocity: bool = eqx.field(static=True, default=False)
     outlier_clip_sigma: float | None = eqx.field(static=True, default=None)
     outlier_clip_max_iters: int = eqx.field(static=True, default=5)
+    nan_policy: Literal["raise", "omit"] = eqx.field(static=True, default="raise")
 
     __citation__: ClassVar[str] = "https://arxiv.org/abs/2212.00949"
 
     def __check_init__(self) -> None:
         """Reject invalid configuration early, at construction."""
+        _check_nan_policy(self.nan_policy)
         if self.metric is not None and not self.metric.is_symmetric:
             # Documented on ``metric`` above; enforced here so the failure lands
             # at construction rather than deep inside a jitted fit.
@@ -406,7 +460,10 @@ class SOMOrderer(AbstractOrderer):
         # differences are steps along the track.
         length = _polyline_length(sub_q)
         sigma_phys = self.sigma_end * length / (self.n_prototypes - 1)
-        speed = jnp.median(jnp.linalg.norm(v, axis=-1))
+        # Over finite speeds only: one NaN made the median NaN, and the guard
+        # below then silently set the scale -- and velocity awareness -- to 0.
+        norm = jnp.linalg.norm(v, axis=-1)
+        speed = jnp.nanmedian(jnp.where(jnp.isfinite(norm), norm, jnp.nan))
         # A uniformly tiny (not zero) ``speed`` -- a near-static clump, or a
         # unit system where the numeric magnitude is small -- does not blow
         # this up: ``scale`` and ``speed`` are reciprocal by construction, so
@@ -589,6 +646,8 @@ class SOMOrderer(AbstractOrderer):
             else self.sigma_start
         )
         metric, metric_scale = self._resolve_metric(sub_q, sub_p, init)
+        if metric.uses_velocity or self.orient_by_velocity:
+            sub_p = _check_velocities(sub_p, self.nan_policy)
         backbone_q, backbone_p, lam, kept = _train_and_project(
             self, proto_q, proto_p, sub_q, sub_p, sigma_start, metric, metric_scale
         )
@@ -601,7 +660,11 @@ class SOMOrderer(AbstractOrderer):
             bb_vel = jnp.stack([backbone_p[k] for k in comps], axis=-1)
             tangent = jnp.diff(bb, axis=0)
             vel_mid = 0.5 * (bb_vel[:-1] + bb_vel[1:])
-            flip = jnp.sum(tangent * vel_mid) < 0.0
+            # Finite terms only, as in MSTOrderer: ``nan < 0`` is False, so a
+            # NaN term would silently forbid the flip, and an inf one would
+            # outvote every other segment.
+            dots = tangent * vel_mid
+            flip = jnp.sum(jnp.where(jnp.isfinite(dots), dots, 0.0)) < 0.0
             total = jnp.sum(jnp.linalg.norm(tangent, axis=-1))
             # ``total - lam`` also reverses the end-cap extrapolations, which
             # sit outside [0, total], symmetrically.
