@@ -439,7 +439,7 @@ def posterior_membership(
     )
 
 
-def _unit_rows(x: Float[Array, "N D"]) -> Float[Array, "N D"]:
+def _unit_rows(x: Float[Array, "N D"], /) -> Float[Array, "N D"]:
     """Normalise each row to unit length; zero rows stay zero."""
     norm = jnp.linalg.norm(x, axis=1, keepdims=True)
     nonzero = norm > 0
@@ -448,7 +448,10 @@ def _unit_rows(x: Float[Array, "N D"]) -> Float[Array, "N D"]:
 
 
 def _velocity_and_tangent_hats(
-    model: PathAutoencoder, ws: Float[Array, "N TwoF"], gamma: Float[Array, " N"]
+    model: PathAutoencoder,
+    ws: Float[Array, "N TwoF"],
+    gamma: Float[Array, " N"],
+    /,
 ) -> tuple[Float[Array, "N D"], Float[Array, "N D"]]:
     r"""Return the unit velocity $\hat{p}$ and unit decoder tangent $\hat{t}$.
 
