@@ -39,6 +39,7 @@ TIERS = (128, 512)  # frontier caps for the overflow tiers, then brute force
 TIER_CHUNK = (1024, 256)
 BRUTE_CHUNK = 128
 QUERY_CHUNK = 16384
+_ONEHOT_MAX_CAP = 32  # _descend compaction: one-hot sum up to here, scatter above
 
 
 def _box_d2(q: Array, lo: Array, hi: Array, /) -> Array:
@@ -58,12 +59,17 @@ def _descend(tree: Tree, xq: Array, r2: Array, cap: int, /) -> tuple[Array, Arra
     seed = jnp.concat([jnp.arange(n0), jnp.full(cap - n0, n0)]).astype(jnp.int32)
     front = jnp.broadcast_to(seed, (nq, cap))
     over = jnp.zeros(nq, bool)
+    slots = jnp.arange(cap, dtype=jnp.int32)
 
     def keep(cand: Array, nn: int, lvl: int) -> tuple[Array, Array]:
         lo = tree.cell_lo[lvl].at[cand].get(mode="fill", fill_value=0)
         hi = tree.cell_hi[lvl].at[cand].get(mode="fill", fill_value=0)
         ok = (cand < nn) & (_box_d2(xq[:, None], lo, hi) <= r2[:, None])
         rank = jnp.where(ok, jnp.cumsum(ok, 1) - 1, cap)
+        if cap <= _ONEHOT_MAX_CAP:  # (Q, cap, 2cap) one-hot beats a CPU scatter
+            hit = rank[:, None, :] == slots[None, :, None]
+            out = jnp.sum(jnp.where(hit, cand[:, None, :] - nn, 0), -1) + nn
+            return out.astype(jnp.int32), ok.sum(1)
         out = jnp.full((nq, cap), nn, jnp.int32).at[rows, rank].set(cand, mode="drop")
         return out, ok.sum(1)
 
