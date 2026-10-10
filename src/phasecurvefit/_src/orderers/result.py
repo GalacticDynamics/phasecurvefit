@@ -26,6 +26,7 @@ from jaxtyping import Array, Bool, Int, PRNGKeyArray
 from zeroth import zeroth
 
 from phasecurvefit._src.abstract_result import AbstractResult
+from phasecurvefit._src.checks import value_error_if
 from phasecurvefit._src.custom_types import BSzN, FSzN, ISz0, ISzN, VectorComponents
 
 
@@ -204,7 +205,8 @@ class OrderingResult(AbstractResult):
         Uses linear interpolation between consecutive control points. The
         control points are the ``backbone`` polyline vertices when a backbone is
         present, otherwise the ordered visited observations. ``gamma`` must lie
-        within ``gamma_range``; values outside it raise (via ``eqx.error_if``).
+        within ``gamma_range``; values outside it raise ``ValueError`` (under
+        ``jit``, a JAX runtime error at run time).
         It is normalized to ``[0, 1]`` before interpolation.
         """
         del key
@@ -212,7 +214,7 @@ class OrderingResult(AbstractResult):
 
         min_gamma, max_gamma = self.gamma_range
         gamma_range_width = max_gamma - min_gamma
-        gamma = eqx.error_if(
+        gamma = value_error_if(
             gamma,
             jnp.any(jnp.logical_or(gamma < min_gamma, gamma > max_gamma)),
             "gamma must be in [min_gamma, max_gamma]",

@@ -729,6 +729,10 @@ def _local_flow_walk(
 
     q_values = {k: u.ustrip(usys, v) for k, v in positions.items()}
     p_values = {k: u.ustrip(usys, v) for k, v in velocities.items()}
+    # Check before quaxify: inside it even concrete arrays are quax tracers, so
+    # the check could only defer (an EquinoxRuntimeError, not ValueError).
+    if config.metric.uses_velocity:
+        p_values = algorithm.check_velocities(p_values, nan_policy)
 
     # Quaxify the walk so Quantities are handled properly
     # by custom dispatches in the quax context. StateMetadata is part of init

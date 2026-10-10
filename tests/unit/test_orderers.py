@@ -391,7 +391,7 @@ class TestLocalFlowNonFiniteVelocities:
         """Skipping a missing velocity has to be asked for."""
         x, pos, vel, start = _shuffled_line()
         vel = self._spoil(vel, x, (100,), jnp.nan)
-        with pytest.raises(RuntimeError, match="nan_policy='omit'"):
+        with pytest.raises(ValueError, match="nan_policy='omit'"):
             pcf.orderers.LocalFlowOrderer(start_idx=start).order(pos, vel)
 
     def test_nan_is_fine_when_the_metric_ignores_velocity(self):
@@ -411,7 +411,7 @@ class TestLocalFlowNonFiniteVelocities:
         x, pos, vel, start = _shuffled_line()
         vel = self._spoil(vel, x, (100,), bad)
         orderer = pcf.orderers.LocalFlowOrderer(start_idx=start, nan_policy=policy)
-        with pytest.raises(RuntimeError, match="infinite velocity"):
+        with pytest.raises(ValueError, match="infinite velocity"):
             orderer.order(pos, vel)
 
     def test_raises_under_jit(self):
@@ -574,3 +574,35 @@ def test_mst_rejects_a_negative_velocity_weight():
     """
     with pytest.raises(ValueError, match="velocity_weight must be >= 0"):
         pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, velocity_weight=-1.0)
+
+
+_VELOCITY_READERS = {
+    "localflow": lambda: pcf.orderers.LocalFlowOrderer(start_idx=0),
+    "mst": lambda: pcf.orderers.MSTOrderer(k=5, jump_cap=2.0, velocity_weight=1.0),
+    "som": lambda: pcf.orderers.SOMOrderer(n_prototypes=6, orient_by_velocity=True),
+}
+
+
+@pytest.mark.parametrize("bad", [np.nan, np.inf], ids=["nan", "inf"])
+@pytest.mark.parametrize("name", list(_VELOCITY_READERS))
+def test_every_orderer_raises_value_error_eagerly(name, bad):
+    """One mistake, one exception type: eager input errors are ``ValueError``.
+
+    ``eqx.error_if`` raised ``EquinoxRuntimeError`` even on concrete inputs,
+    so SOMOrderer and LocalFlowOrderer disagreed with MSTOrderer.
+    """
+    x = jnp.linspace(0.0, 10.0, 40)
+    pos = {"x": x, "y": jnp.zeros(40)}
+    vel = {"x": jnp.ones(40).at[7].set(bad), "y": jnp.zeros(40)}
+    with pytest.raises(ValueError, match="velocit"):
+        _VELOCITY_READERS[name]().order(pos, vel)
+
+
+def test_result_call_out_of_range_raises_value_error():
+    """``OrderingResult.__call__`` outside ``gamma_range`` is a ``ValueError``."""
+    x = jnp.linspace(0.0, 10.0, 40)
+    pos = {"x": x, "y": jnp.zeros(40)}
+    vel = {"x": jnp.ones(40), "y": jnp.zeros(40)}
+    result = pcf.orderers.MSTOrderer(k=5, jump_cap=2.0).order(pos, vel)
+    with pytest.raises(ValueError):  # noqa: PT011
+        result(jnp.asarray(5.0))

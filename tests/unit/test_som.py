@@ -1,6 +1,5 @@
 """Tests for the JAX Self-Organizing Map core."""
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -432,7 +431,7 @@ def test_init_prototypes_rejects_a_padded_ordering(line):
     pos, vel = line(n, 11.0)
     padded = jnp.concatenate([jnp.arange(n - 2, -1, -1), jnp.array([-1])])
 
-    with pytest.raises(eqx.EquinoxRuntimeError, match="only valid indices"):
+    with pytest.raises(ValueError, match="only valid indices"):
         som.init_prototypes(pos, vel, n_prototypes=5, ordering=padded)
 
     # The documented remedy works, and gives a different answer.
@@ -442,7 +441,7 @@ def test_init_prototypes_rejects_a_padded_ordering(line):
     # The upper bound is guarded too. An index past the end is clamped to the
     # last element rather than raising, so it mis-bins exactly like the -1 case.
     too_big = jnp.concatenate([jnp.arange(n - 1), jnp.array([n + 7])])
-    with pytest.raises(eqx.EquinoxRuntimeError, match="only valid indices"):
+    with pytest.raises(ValueError, match="only valid indices"):
         som.init_prototypes(pos, vel, n_prototypes=5, ordering=too_big)
 
 
@@ -849,7 +848,7 @@ class TestNumericalHazards:
         pos = {"x": jnp.linspace(0.0, 9.0, 20), "y": jnp.zeros(20)}
         vel = {"x": jnp.ones(20), "y": jnp.zeros(20)}
         dup = jnp.concatenate([jnp.arange(10), jnp.arange(10)])
-        with pytest.raises(eqx.EquinoxRuntimeError, match="must not repeat"):
+        with pytest.raises(ValueError, match="must not repeat"):
             som.init_prototypes(pos, vel, n_prototypes=5, ordering=dup)
 
     def test_a_visited_subset_is_still_accepted(self):
