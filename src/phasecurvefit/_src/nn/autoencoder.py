@@ -244,10 +244,10 @@ class TrainingConfig:
     """Number of epochs for Phase 3 training (encoder + decoder)"""
 
     lambda_q: float = 1.0
-    """Weight for phase-2 spatial training."""
+    """Weight for Phase 3 (joint) spatial reconstruction."""
 
     lambda_p: tuple[float, float] = (1.0, 5.0)
-    """Weight range for phase-2 velocity training."""
+    """Weight range ``(start, stop)`` for Phase 3 (joint) velocity alignment."""
 
     weight_by_density: bool | Mapping[str, object] = False
     """Whether to inverse density weight the samples. USE WITH CARE."""
@@ -379,7 +379,9 @@ def posterior_membership(
 def _unit_rows(x: Float[Array, "N D"]) -> Float[Array, "N D"]:
     """Normalise each row to unit length; zero rows stay zero."""
     norm = jnp.linalg.norm(x, axis=1, keepdims=True)
-    return jnp.where(norm > 0, x / norm, jnp.zeros_like(x))
+    nonzero = norm > 0
+    # Divide by a safe denominator so zero rows never form x / 0 (NaN).
+    return jnp.where(nonzero, x / jnp.where(nonzero, norm, 1), jnp.zeros_like(x))
 
 
 def _velocity_and_tangent_hats(
@@ -484,10 +486,10 @@ def compute_decoder_loss(
     sigma_ceil: FSz0 | float = 1.0,
     rampup: FSz0 | float = 1.0,
 ) -> FSz0:
-    r"""Compute decoder loss for Phase 2 training.
+    r"""Compute the Phase 3 (joint encoder + decoder) loss.
 
     This function computes the combined loss for spatial reconstruction and
-    velocity alignment in the decoder training phase.
+    velocity alignment in the joint training phase.
 
     The loss combines two terms:
 
@@ -696,11 +698,11 @@ def train_ordering_and_track_net(
     *,
     key: PRNGKeyArray,
 ) -> tuple[PathAutoencoder, optax.OptState, Float[Array, " {config.n_epochs_both}"]]:
-    r"""Train the decoder (TrackNet) in Phase 2 of autoencoder training.
+    r"""Train encoder and decoder jointly: Phase 3 of autoencoder training.
 
     This phase trains the decoder to reconstruct spatial positions from $\gamma$
-    values while aligning with velocity directions. The encoder can optionally be
-    frozen during this phase.
+    values while aligning with velocity directions, updating the encoder too
+    unless ``config.freeze_encoder_final_training`` is set.
 
     The training uses lax.scan for efficient batching and supports:
     - Linear ramping of lambda_p from min to max over epochs

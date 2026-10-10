@@ -129,7 +129,23 @@ class EqxScanTrainer(AbstractScanNNTrainer):
     def unpack_carry_state(
         self, carry: tuple[Any, ...], static: dict[str, Any] | None
     ) -> EqxTrainCarry:
-        """Recombine the model so `make_step` receives a callable model."""
+        """Recombine the model so `make_step` receives a callable model.
+
+        Raises
+        ------
+        ValueError
+            If `static` does not carry the ``"model_static"`` produced by
+            `pack_carry_state`. The two are a matched pair; a missing key means
+            the trainer was wired up wrong, so fail loudly rather than
+            recombining against an empty static half.
+
+        """
         model_dynamic, opt_state, key = carry
+        if static is None or "model_static" not in static:
+            msg = (
+                "expected 'model_static' in the static state from "
+                f"`pack_carry_state()`, got {static!r}"
+            )
+            raise ValueError(msg)
         model = eqx.combine(model_dynamic, static["model_static"])
         return (model, opt_state, key)
