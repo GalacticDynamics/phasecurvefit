@@ -245,11 +245,38 @@ class TestMissingVelocities:
         vel = {"x": jnp.zeros(6).at[0].set(1.0), "y": vel["y"]}
         P = np.stack([np.asarray(pos[c]) for c in "xy"], axis=1)
         V = np.stack([np.asarray(vel[c]) for c in "xy"], axis=1)
-        split = mst_module._directionless_as_leaves(P, V, k=3, workers=1)
+        nbr_dir, leaf = mst_module._directed_knn(
+            jnp.asarray(P), jnp.asarray(V), 3, pcf.neighbors.BucketKDTree()
+        )
+        split = mst_module._directionless_as_leaves(
+            V, np.asarray(nbr_dir), np.asarray(leaf)
+        )
         assert split is not None
-        rows, cols, _ = split
+        rows, cols = split
         assert sorted(rows.tolist()) == [1, 2, 3, 4, 5]  # one edge each...
         assert set(cols.tolist()) == {0}  # ...to the directed tracer
+
+    @pytest.mark.parametrize("mechanism", ["velocity_weight", "sever_cos_threshold"])
+    def test_split_uses_the_selected_backend(self, mechanism):
+        """Directionless tracers split off through the backend, not a host tree.
+
+        SciPy, the kd-tree eagerly and the kd-tree under jit (a pure_callback
+        carrying the directed-only tables) give one ordering.
+        """
+        pos, vel = _hairpin()
+        vel = {
+            "x": vel["x"].at[20].set(0.0).at[60].set(jnp.nan),
+            "y": vel["y"].at[20].set(0.0),
+        }
+        kw = {"k": 6, "jump_cap": 1.0, "on_disconnected": "largest"}
+        kw |= {"nan_policy": "omit", **_MECHANISMS[mechanism]}
+        scipy = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw)
+        bucket = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.BucketKDTree(), **kw)
+        want = np.asarray(scipy.order(pos, vel).indices)
+        eager = np.asarray(bucket.order(pos, vel).indices)
+        jitted = jax.jit(lambda p, v: bucket.order(p, v).indices)(pos, vel)
+        np.testing.assert_array_equal(eager, want)
+        np.testing.assert_array_equal(np.asarray(jitted), want)
 
     @pytest.mark.parametrize("mechanism", ["velocity_weight", "sever_cos_threshold"])
     def test_a_stationary_tracer_does_not_raise(self, mechanism):

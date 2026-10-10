@@ -73,6 +73,7 @@ from phasecurvefit._src.neighbors import (
     _as_float,
     _pow2_scale,
     _traced,
+    far_rows,
 )
 
 OnDisconnected = Literal["raise", "warn", "largest", "connect"]
@@ -214,27 +215,36 @@ def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarra
     return np.divide(num, den, out=np.ones(num.shape), where=den > 0.0)
 
 
-def _knn_edges(
-    P: np.ndarray, k: int, /, *, workers: int, tree: cKDTree | None = None
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Directed kNN edges ``(rows, cols, length)``, self excluded.
+def _has_direction(V, xp, /):  # noqa: ANN001, ANN202
+    """Rows with a velocity direction: some component nonzero, none NaN.
 
-    ``tree`` is ``cKDTree(P)``, if the caller already built it.
+    Component-wise rather than ``norm > 0``: a float32 norm of a tiny velocity
+    underflows to 0, and the JAX (float32) and host (float64) sides must agree.
     """
-    tree = cKDTree(P) if tree is None else tree
-    nn_d, nn_i = tree.query(P, k=int(min(k, len(P) - 1)) + 1, workers=workers)
-    nn_d = np.atleast_2d(nn_d)
-    nn_i = np.atleast_2d(nn_i)
-    # Exclude self by index, not by dropping column 0: with coincident points
-    # cKDTree may list a duplicate before the point itself.
-    not_self = nn_i != np.arange(len(P))[:, None]
-    return np.nonzero(not_self)[0], nn_i[not_self], nn_d[not_self]
+    return xp.any(V != 0, axis=1) & ~xp.any(xp.isnan(V), axis=1)
+
+
+def _directed_knn(P, V, k_eff, neighbors, /):  # noqa: ANN001, ANN202
+    """KNN among directed tracers, and each tracer's nearest directed one.
+
+    Stage (a) of ``_directionless_as_leaves``, in the selected backend with
+    static shapes (so it traces): directionless tracers are moved onto one
+    far row, which is never nearer than any real tracer, so each directed
+    tracer's nearest neighbours are exactly its nearest directed ones (any
+    far row past them is dropped on the host). Returns ``(nbr_dir (n, k_eff),
+    leaf (n,))``.
+    """
+    directed = _has_direction(V, jnp)
+    P_dir = jnp.where(directed[:, None], P, far_rows(P, 1))
+    nbr_dir = neighbors.knn(P_dir, k_eff)[0]
+    leaf = neighbors.knn(P_dir, 1, queries=P)[0][:, 0]
+    return nbr_dir, leaf
 
 
 def _directionless_as_leaves(
-    P: np.ndarray, V: np.ndarray, /, *, k: int, workers: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
-    """Build kNN edges among tracers with a direction, plus a leaf for each other.
+    V: np.ndarray, nbr_dir: np.ndarray, leaf: np.ndarray, /
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """KNN edges among tracers with a direction, plus a leaf for each other.
 
     A stationary tracer (or a missing velocity under ``nan_policy="omit"``)
     gives mechanisms 1 and 2 nothing to compare, and any cosine it is given
@@ -249,18 +259,21 @@ def _directionless_as_leaves(
     graph is then a star around it. ``None`` when there is nothing to split
     -- every tracer, or none, has a direction; with none there is nothing
     for mechanisms 1 and 2 to compare, and the graph stays spatial.
+
+    ``nbr_dir`` and ``leaf`` come from ``_directed_knn`` (the selected
+    backend); returns ``(rows, cols)``.
     """
-    dirless = ~(np.linalg.norm(V, axis=1) > 0.0)  # zero or NaN
-    directed = np.flatnonzero(~dirless)
-    if not dirless.any() or not directed.size:
+    directed = _has_direction(V, np)
+    if directed.all() or not directed.any():
         return None
-    tree = cKDTree(P[directed])
-    r, c, d = _knn_edges(P[directed], k, workers=workers, tree=tree)
-    d_leaf, near = tree.query(P[dirless], workers=workers)
+    n, k_eff = nbr_dir.shape
+    rows = np.repeat(np.arange(n), k_eff)
+    cols = np.asarray(nbr_dir).ravel()
+    keep = directed[rows] & directed[np.minimum(cols, n - 1)] & (cols < n)
+    dirless = np.flatnonzero(~directed)
     return (
-        np.concatenate([directed[r], np.flatnonzero(dirless)]),
-        np.concatenate([directed[c], directed[near]]),
-        np.concatenate([d, d_leaf]),
+        np.concatenate([rows[keep], dirless]),
+        np.concatenate([cols[keep], np.asarray(leaf)[dirless]]),
     )
 
 
@@ -413,6 +426,8 @@ def _host_graph(
     P: np.ndarray,
     V: np.ndarray,
     nbr: np.ndarray,
+    nbr_dir: np.ndarray,
+    leaf: np.ndarray,
     /,
     *,
     k: int,
@@ -429,9 +444,11 @@ def _host_graph(
     """Stage (b): the graph algorithms, on the host.
 
     ``nbr`` (n, k_eff) holds each point's self-excluded neighbour indices from
-    any backend. Edge lengths, cosines and weights are computed here in float64,
-    exactly as before the backends existed, so backends that return the same
-    neighbours give the same graph. (With equidistant neighbours, only
+    any backend; ``nbr_dir`` and ``leaf`` the same among directed tracers
+    (``_directed_knn``), used only when a velocity mechanism splits off
+    directionless tracers. Edge lengths, cosines and weights are computed
+    here in float64, exactly as before the backends existed, so backends that
+    return the same neighbours give the same graph. (With equidistant neighbours, only
     ``BucketKDTree`` and ``BruteForce`` are guaranteed to agree: both take the
     lower index, for ``BucketKDTree`` up to n ~ 2**24.)
 
@@ -453,14 +470,14 @@ def _host_graph(
     n, k_eff = nbr.shape
     need_cos = velocity_weight > 0.0 or sever_cos_threshold is not None
     # Directionless tracers (stationary, or NaN under nan_policy="omit") join
-    # only as leaves: the kNN graph is rebuilt among directed tracers.
-    split = _directionless_as_leaves(P, V, k=k, workers=workers) if need_cos else None
+    # only as leaves, using the backend's kNN among directed tracers.
+    split = _directionless_as_leaves(V, nbr_dir, leaf) if need_cos else None
     if split is not None:
-        rows, cols, d_edges = split
+        rows, cols = split
     else:
         rows = np.repeat(np.arange(n), k_eff)
         cols = np.asarray(nbr).ravel()
-        d_edges = np.linalg.norm(P[rows] - P[cols], axis=1)
+    d_edges = np.linalg.norm(P[rows] - P[cols], axis=1)
     cos = _edge_cosine(V, rows, cols) if need_cos else None
     weights = d_edges.copy()
     if velocity_weight > 0.0:  # Mechanism 1: phase-space edge weights
@@ -754,6 +771,11 @@ class MSTOrderer(AbstractOrderer):
             )
             raise TypeError(msg)
 
+    @property
+    def _splits_directionless(self) -> bool:
+        """Whether a velocity mechanism reads directions (mechanisms 1, 2)."""
+        return self.velocity_weight > 0.0 or self.sever_cos_threshold is not None
+
     @plum.dispatch
     def order(
         self,
@@ -811,10 +833,16 @@ class MSTOrderer(AbstractOrderer):
             # concrete and knn would not notice.
             if _traced(P, V):
                 raise TypeError(SCIPY_TRACED)
-            nbr = np.asarray(neighbors.knn(P, min(self.k, n - 1))[0])
+            k_eff = min(self.k, n - 1)
+            nbr = np.asarray(neighbors.knn(P, k_eff)[0])
+            nbr_dir, leaf = nbr, nbr[:, 0]  # placeholders: unused unless split
+            if self._splits_directionless:
+                nbr_dir, leaf = map(np.asarray, _directed_knn(P, V, k_eff, neighbors))
             Pn, Vn = np.asarray(P), np.asarray(V)
             workers = neighbors.workers
-            full, blen, in_comp, flip = _host_graph(Pn, Vn, nbr, **cfg, workers=workers)
+            full, blen, in_comp, flip = _host_graph(
+                Pn, Vn, nbr, nbr_dir, leaf, **cfg, workers=workers
+            )
             idx, bb = _finish_numpy(Pn, full, blen, in_comp, flip, workers)
             idx_full, backbone_idx = jnp.asarray(idx), jnp.asarray(bb)
             backbone_len = jnp.asarray(blen)
@@ -824,12 +852,15 @@ class MSTOrderer(AbstractOrderer):
             # below, from the original P.
             P_s = jax.lax.stop_gradient(P)
             V_s = jax.lax.stop_gradient(V)
-            nbr = neighbors.knn(P_s, min(self.k, n - 1))[0]
+            k_eff = min(self.k, n - 1)
+            nbr = neighbors.knn(P_s, k_eff)[0]
+            nbr_dir, leaf = nbr, nbr[:, 0]  # placeholders: unused unless split
+            if self._splits_directionless:
+                nbr_dir, leaf = _directed_knn(P_s, V_s, k_eff, neighbors)
 
-            def host(p: np.ndarray, v: np.ndarray, nb: np.ndarray) -> tuple:
-                return _host_graph(
-                    np.asarray(p), np.asarray(v), np.asarray(nb), **cfg, workers=-1
-                )
+            def host(p, v, nb, nb_dir, lf) -> tuple:  # noqa: ANN001
+                arrs = map(np.asarray, (p, v, nb, nb_dir, lf))
+                return _host_graph(*arrs, **cfg, workers=-1)
 
             if _traced(P, V):
                 shapes = (
@@ -845,16 +876,18 @@ class MSTOrderer(AbstractOrderer):
                 # on_disconnected="raise" failure surfaces as
                 # jax.errors.JaxRuntimeError rather than ValueError.
                 full, blen, in_comp, flip = jax.pure_callback(
-                    lambda p, v, nb: _run_in_thread(lambda: host(p, v, nb)),
+                    lambda *a: _run_in_thread(lambda: host(*a)),
                     shapes,
                     P_s,
                     V_s,
                     nbr,
+                    nbr_dir,
+                    leaf,
                     vmap_method="sequential",
                 )
             else:
                 full, blen, in_comp, flip = map(
-                    jnp.asarray, host(np.asarray(P_s), np.asarray(V_s), np.asarray(nbr))
+                    jnp.asarray, host(P_s, V_s, nbr, nbr_dir, leaf)
                 )
             idx_full, backbone_idx = _finish_jax(
                 P_s, full, blen, in_comp, flip, neighbors
