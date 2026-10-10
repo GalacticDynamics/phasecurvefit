@@ -320,6 +320,26 @@ class TestTrainAutoencoder:
         leaves = [x for x in jax.tree.leaves(grads) if eqx.is_array(x)]
         assert all(jnp.all(jnp.isfinite(g)) for g in leaves), "non-finite gradient"
 
+    def test_loss_rejects_odd_column_count(self, rng_key: PRNGKeyArray):
+        """`ws` must split evenly into positions and velocities."""
+        normalizer = pcf.nn.StandardScalerNormalizer(
+            {"x": jnp.linspace(0, 1, 4)}, {"x": jnp.ones(4)}
+        )
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(0.0, 1.0), key=rng_key
+        )
+
+        with pytest.raises(ValueError, match="even number of columns"):
+            compute_decoder_loss(
+                ae,
+                jnp.zeros((4, 3)),
+                jnp.ones(4, dtype=bool),
+                lambda_q=1.0,
+                lambda_p=1.0,
+                member_threshold=0.5,
+                key=rng_key,
+            )
+
     def test_training_runs(self, simple_wlf_result, rng_key: PRNGKeyArray):
         """Test that training completes without errors."""
         normalizer = pcf.nn.StandardScalerNormalizer(
