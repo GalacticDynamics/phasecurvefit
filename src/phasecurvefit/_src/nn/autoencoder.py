@@ -197,6 +197,57 @@ def compute_weights(
 
 
 @dataclass
+class EncoderDecoderTrainingConfig:
+    r"""Configuration for Phase 3: joint encoder + decoder training."""
+
+    _: KW_ONLY
+
+    optimizer: optax.GradientTransformation = default_optimizer
+    """Optax optimizer for training."""
+
+    n_epochs: int = 200
+    """Number of epochs for training."""
+
+    batch_size: int = 100
+    """Batch size for training."""
+
+    lambda_q: float = 1.0
+    """Weight for spatial reconstruction loss."""
+
+    lambda_p: tuple[float, float] = (1.0, 5.0)
+    """Weight schedule (start, stop) for velocity alignment loss."""
+
+    member_threshold: float = 0.5
+    """Membership p > threshold for identifying stream members.
+
+    Only used by the legacy (classifier) membership loss. The mixture model
+    replaces this arbitrary cut with a calibrated posterior; see
+    `MixtureMembershipConfig`.
+    """
+
+    membership: MixtureMembershipConfig | None = None
+    r"""Opt in to mixture-model membership (outlier rejection).
+
+    ``None`` (the default) keeps the existing classifier-style membership loss,
+    bit-for-bit. Supply a `MixtureMembershipConfig` to model the data as a
+    stream + background mixture in the sense of Hogg, Bovy & Lang (2010), §3, so
+    that membership becomes a *posterior* driven by the reconstruction residual
+    rather than a label inherited from the orderer.
+
+    Use this if outliers survive as "members".
+    """
+
+    freeze_encoder: bool = False
+    """Whether to freeze the encoder during Phase 3 (joint) training."""
+
+    weight_by_density: bool | Mapping[str, object] = False
+    """Whether to inverse density weight the samples. USE WITH CARE."""
+
+    show_pbar: bool = True
+    """Show an epoch progress bar via `tqdm`."""
+
+
+@dataclass
 class TrainingConfig:
     r"""Configuration for three-phase autoencoder training."""
 
@@ -214,13 +265,8 @@ class TrainingConfig:
     show_pbar: bool = True
     """Show an epoch progress bar via `tqdm`."""
 
-    member_threshold: float = 0.5
-    """Membership p > threshold for identifying stream members.
-
-    Only used by the legacy (classifier) membership loss. The mixture model
-    replaces this arbitrary cut with a calibrated posterior; see
-    `MixtureMembershipConfig`.
-    """
+    member_threshold: float = EncoderDecoderTrainingConfig.member_threshold
+    """Membership p > threshold for identifying stream members."""
 
     # -------------------------------
     # Encoder-only training
@@ -240,19 +286,21 @@ class TrainingConfig:
     # -------------------------------
     # Encoder + Decoder training
 
-    n_epochs_both: int = 200
+    n_epochs_both: int = EncoderDecoderTrainingConfig.n_epochs
     """Number of epochs for Phase 3 training (encoder + decoder)"""
 
-    lambda_q: float = 1.0
+    lambda_q: float = EncoderDecoderTrainingConfig.lambda_q
     """Weight for Phase 3 (joint) spatial reconstruction."""
 
-    lambda_p: tuple[float, float] = (1.0, 5.0)
+    lambda_p: tuple[float, float] = EncoderDecoderTrainingConfig.lambda_p
     """Weight range ``(start, stop)`` for Phase 3 (joint) velocity alignment."""
 
-    weight_by_density: bool | Mapping[str, object] = False
+    weight_by_density: bool | Mapping[str, object] = (
+        EncoderDecoderTrainingConfig.weight_by_density
+    )
     """Whether to inverse density weight the samples. USE WITH CARE."""
 
-    freeze_encoder_final_training: bool = False
+    freeze_encoder_final_training: bool = EncoderDecoderTrainingConfig.freeze_encoder
     """Whether to freeze the encoder during phase 3 training."""
 
     membership: MixtureMembershipConfig | None = None
@@ -291,6 +339,21 @@ class TrainingConfig:
             n_epochs=self.n_epochs_decoder,
             batch_size=self.batch_size,
             show_pbar=self.show_pbar,
+        )
+
+    def autoencoder_config(self) -> EncoderDecoderTrainingConfig:
+        """Construct the Autoencoder config."""
+        return EncoderDecoderTrainingConfig(
+            optimizer=self.optimizer,
+            n_epochs=self.n_epochs_both,
+            batch_size=self.batch_size,
+            show_pbar=self.show_pbar,
+            lambda_q=self.lambda_q,
+            lambda_p=self.lambda_p,
+            member_threshold=self.member_threshold,
+            membership=self.membership,
+            freeze_encoder=self.freeze_encoder_final_training,
+            weight_by_density=self.weight_by_density,
         )
 
 
@@ -694,15 +757,15 @@ def train_ordering_and_track_net(
     all_ws: Float[Array, "N TwoF"],
     /,
     mask: Bool[Array, " N"],
-    config: TrainingConfig,
+    config: EncoderDecoderTrainingConfig,
     *,
     key: PRNGKeyArray,
-) -> tuple[PathAutoencoder, optax.OptState, Float[Array, " {config.n_epochs_both}"]]:
+) -> tuple[PathAutoencoder, optax.OptState, Float[Array, " {config.n_epochs}"]]:
     r"""Train encoder and decoder jointly: Phase 3 of autoencoder training.
 
     This phase trains the decoder to reconstruct spatial positions from $\gamma$
     values while aligning with velocity directions, updating the encoder too
-    unless ``config.freeze_encoder_final_training`` is set.
+    unless ``config.freeze_encoder`` is set.
 
     The training uses lax.scan for efficient batching and supports:
     - Linear ramping of lambda_p from min to max over epochs
@@ -718,10 +781,9 @@ def train_ordering_and_track_net(
         All phase-space coordinates (positions + velocities).
     mask : Array, shape (N,)
         Binary mask where True = use for training (stream members).
-    config : TrainingConfig
-        Training configuration; this phase reads the ``n_epochs_both``,
-        ``lambda_q``, ``lambda_p``, ``member_threshold``, ``membership`` and
-        ``freeze_encoder_final_training`` fields, plus the common ones.
+    config : EncoderDecoderTrainingConfig
+        Phase 3 configuration: epochs, batch size, loss weights, etc. Build it
+        from the full config with `TrainingConfig.autoencoder_config`.
     key : PRNGKeyArray
         Random key for shuffling and batching.
 
@@ -766,7 +828,7 @@ def train_ordering_and_track_net(
         )
 
     # Model surgery: decide which parts of the model are trainable.
-    if config.freeze_encoder_final_training:
+    if config.freeze_encoder:
         # True for arrays, but False everywhere in the encoder subtree, so that
         # the encoder receives no gradient updates during this phase.
         filter_spec = jtu.map(eqx.is_array, model)
@@ -806,7 +868,7 @@ def train_ordering_and_track_net(
     (model, opt_state, _), epoch_losses = trainer.run(
         initial_carry,
         epoch_data,
-        num_epochs=config.n_epochs_both,
+        num_epochs=config.n_epochs,
         batch_size=config.batch_size,
         key=key,
         show_pbar=config.show_pbar,
@@ -964,7 +1026,7 @@ def train_autoencoder(
     # Train Encoder & Decoder together
 
     model, autoencoder_opt_state, autoencoder_losses = train_ordering_and_track_net(
-        model, all_ws, mask=is_member, config=config, key=keys[4]
+        model, all_ws, mask=is_member, config=config.autoencoder_config(), key=keys[4]
     )
 
     # ===========================================

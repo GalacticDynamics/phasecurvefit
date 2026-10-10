@@ -256,6 +256,13 @@ class TestTrainingConfig:
         assert decoder.n_epochs == 100
         assert decoder.batch_size == 64
 
+        # Check autoencoder config
+        autoencoder = config.autoencoder_config()
+        assert autoencoder.n_epochs == 200
+        assert autoencoder.batch_size == 64
+        assert autoencoder.lambda_q == 0.5
+        assert autoencoder.lambda_p == (1.0, 150.0)
+
     def test_gamma_range_validation(self):
         """Test that gamma_range is validated in OrderingNet."""
         # Valid ranges should work
@@ -339,7 +346,7 @@ class TestTrainAutoencoder:
             batch_size=32,
             show_pbar=False,
             freeze_encoder_final_training=True,
-        )
+        ).autoencoder_config()
 
         trained, _, _ = train_ordering_and_track_net(
             ae, ws, mask=jnp.ones(n, dtype=bool), config=config, key=rng_key
@@ -375,7 +382,7 @@ class TestTrainAutoencoder:
         def train(wbd):
             config = pcf.nn.TrainingConfig(
                 n_epochs_both=3, batch_size=32, show_pbar=False, weight_by_density=wbd
-            )
+            ).autoencoder_config()
             mask = jnp.ones(n, dtype=bool)
             return train_ordering_and_track_net(
                 ae, ws, mask=mask, config=config, key=rng_key
