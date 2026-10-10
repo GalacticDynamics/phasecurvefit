@@ -366,10 +366,12 @@ class OrderingTrainingConfig:
     arclength_alpha: float = 0.8
     r"""Blend factor for arclength-like targets.
 
-    If 0.0 (default), the training targets use uniform spacing in $\gamma$.
-    If 1.0, the targets are proportional to cumulative arclength along the
-    ordered tracers (computed from the position components of `all_ws`). Values
-    in (0, 1) linearly blend the two targets.
+    If 0.0, the training targets use uniform spacing in $\gamma$. If 1.0, the
+    targets are proportional to cumulative arclength along the ordered tracers:
+    the orderer's ``chord`` when `train_ordering_net` is given one, otherwise
+    the sum of straight-line steps between consecutive ordered positions in
+    `all_ws`. Values in (0, 1) linearly blend the two targets; values outside
+    [0, 1] are clipped. The default, 0.8, leans towards arclength.
 
     """
 
@@ -511,10 +513,11 @@ def train_ordering_net(
         Indices representing the ordering of tracers.  Unvisited tracers have
         indices of -1.
     config : OrderingTrainingConfig | None
-        Training configuration. If None, uses default config.  Set
-        `arclength_alpha>0` to encourage $\gamma$ to be proportional to
-        cumulative arclength along the ordered tracers (reducing local
-        compression and improving rolling-mean decoders).
+        Training configuration. If None, uses default config. Its
+        `arclength_alpha` (default 0.8) blends the targets towards cumulative
+        arclength along the ordered tracers, which reduces local compression of
+        $\gamma$ and improves rolling-mean decoders; set it to 0.0 for uniform
+        spacing in $\gamma$.
     key : PRNGKeyArray
         Random key for shuffling and random sampling.
 
