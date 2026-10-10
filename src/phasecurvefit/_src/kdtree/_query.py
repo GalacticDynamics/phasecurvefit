@@ -34,7 +34,9 @@ from ._select import ksmallest, kth_smallest
 
 BLOCK_LEAVES = 16
 TIERS = (128, 512)  # frontier caps for the overflow tiers, then brute force
-TIER_CHUNK = (256, 32)
+# Max queries per tier chunk; scaled down as nq // 128 (floor 32) so a sparse
+# tier at small n does not pad a few overflowing queries to a wide chunk.
+TIER_CHUNK = (1024, 256)
 BRUTE_CHUNK = 128
 QUERY_CHUNK = 16384
 
@@ -206,6 +208,7 @@ def _query(
             d_new, i_new = _merge(tree, xs, ss, front, k, top_k=True)
             return d_new, i_new, o
 
+        tchunk = min(tchunk, max(32, nq // 128))  # noqa: PLW2901
         dd, ii, over, r2 = _finish(xq, qself, over, dd, ii, r2, tchunk, tier)
         over = over & qvalid
 
