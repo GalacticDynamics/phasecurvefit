@@ -100,9 +100,10 @@ are concrete (fastest on CPU, nothing to compile) and the JAX-native
 {class}`~phasecurvefit.neighbors.BucketKDTree` when they are traced; see
 {mod}`phasecurvefit.neighbors` to pin one. SciPy is **eager-only**: it raises
 `TypeError` inside `jit`, `vmap` or `grad` (even on arrays a jitted function
-captures), which is why traced calls use the kd-tree. Its
-graph algorithms are **host-side** (NumPy/SciPy); `order()` runs them through
-`jax.pure_callback` when traced, so it works under `jit` and `vmap`.
+captures), which is why traced calls use the kd-tree. With every JAX backend
+the graph algorithms (MST, components, diameter path, edge-clip, bridging) run
+in pure JAX too, so `order()` works under `jit`, `vmap` and `grad` with no host
+callback; only `SciPy()` runs the whole pipeline eagerly on the host.
 
 Tuning the kd-tree matters only for traced calls, since eager ones use SciPy.
 For large `k` (≥ 32), set `frontier` near `k`:
@@ -165,7 +166,7 @@ system:
 result = orderer.order(qs, ps, metadata=pcf.StateMetadata(usys=usys))
 ```
 
-Because the MST's graph stage is host-side, unit handling is a simple strip-in / reattach-out:
+Because the MST's graph stage works on plain arrays, unit handling is a simple strip-in / reattach-out:
 `positions`/`velocities` keep their input units and `backbone` is returned in the
 position units. `velocity_weight` and `jump_cap` are interpreted in the `usys`
 length units.

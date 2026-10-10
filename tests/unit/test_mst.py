@@ -1,5 +1,8 @@
 """Tests for the MST-backbone orderer (``pcf.orderers.MSTOrderer``)."""
 
+import functools
+import re
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -8,6 +11,7 @@ import pytest
 import phasecurvefit as pcf
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.optional_deps import OptDeps
+from phasecurvefit._src.orderers import mst
 
 
 def _open_arc(n=200, seed=0):
@@ -404,7 +408,7 @@ class TestMSTEdgeClip:
 class TestMSTJaxTraceability:
     """``order()`` stays traceable under jit/vmap/grad.
 
-    Host algorithms run via ``jax.pure_callback`` when traced, returning only
+    The graph stage runs in pure JAX on stop-gradiented inputs, returning only
     indices; backbone coordinates are gathered from positions/velocities in
     ordinary JAX, so gradient flows through them like any other data-dependent
     gather. See the module docstring.
@@ -458,14 +462,12 @@ class TestMSTJaxTraceability:
         assert jnp.any(jax.grad(loss)(pos["x"]) != 0.0)
 
     def test_jit_does_not_crash_the_process_on_unlucky_knn_shapes(self):
-        """Regression test for a real segfault, not just a failing assertion.
+        """Regression input for a past segfault, not just a failing assertion.
 
-        ``jax.pure_callback``'s host-dispatch thread was found to have too
-        small a stack for some (unlucky, not adversarial) ``cKDTree`` query
-        shapes -- this exact input reliably crashed the whole process (not a
-        catchable exception) before ``_run_in_thread`` gave the host
-        computation a normal thread's stack instead. If that regresses, this
-        test does not fail cleanly -- it takes the interpreter down.
+        When the graph stage ran on the host through ``jax.pure_callback``,
+        this exact input crashed the whole process (scipy's ``cKDTree`` on the
+        callback's dispatch thread). The graph stage is pure JAX now; the input
+        stays as a jit + edge-clip regression case.
         """
         xs = jnp.concatenate([jnp.linspace(0.0, 9.0, 40), jnp.array([30.0])])
         ys = jnp.concatenate([jnp.zeros(40), jnp.array([30.0])])
@@ -907,3 +909,157 @@ class TestMSTBackends:
         ).order(pos, vel)
         assert int(got.n_visited) == 40
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
+
+
+def _host_callbacks(jaxpr):
+    """``(primitive, callback module)`` of every callback in a jaxpr, recursively."""
+    from jax.extend import core as jcore  # noqa: PLC0415
+
+    found = set()
+    for eqn in jaxpr.eqns:
+        if "callback" in eqn.primitive.name:
+            cb = eqn.params.get("callback")
+            fn = getattr(cb, "callback_func", cb)
+            found.add((eqn.primitive.name, getattr(fn, "__module__", "?")))
+        for value in eqn.params.values():
+            for sub in value if isinstance(value, (list, tuple)) else [value]:
+                if isinstance(sub, jcore.ClosedJaxpr):
+                    found |= _host_callbacks(sub.jaxpr)
+                elif isinstance(sub, jcore.Jaxpr):
+                    found |= _host_callbacks(sub)
+    return found
+
+
+def _two_segments():
+    """Two separated, slightly jittered segments: disconnected for jump_cap=1.
+
+    The jitter breaks exact distance ties (uniform spacing has many), so the
+    MST is unique and eager and traced calls must agree.
+    """
+    rng = np.random.default_rng(7)
+    x = np.concat([np.linspace(0.0, 5.0, 30), np.linspace(20.0, 25.0, 30)])
+    y = rng.normal(0.0, 0.01, 60)
+    vel = {"x": jnp.ones(60), "y": jnp.zeros(60)}
+    return {"x": jnp.asarray(x, jnp.float32), "y": jnp.asarray(y, jnp.float32)}, vel
+
+
+class TestMSTPureJax:
+    """The JAX backends' graph stage runs in pure JAX: no host computation."""
+
+    @pytest.mark.parametrize("connect", [False, True])
+    def test_connect_kernel_folds_no_large_constants(self, connect):
+        """No constant scatter updates or masks: XLA folds them to big literals."""
+        n = 256
+        P = jax.random.normal(jax.random.key(0), (n, 2))
+        nbr, _ = pcf.neighbors.BucketKDTree().knn(P, 5)
+        fn = jax.jit(
+            functools.partial(
+                mst._jax_graph,
+                jump_cap=1.0,
+                velocity_weight=0.0,
+                sever_cos_threshold=None,
+                orient_by_velocity=False,
+                connect=connect,
+                edge_clip_sigma=None,
+                edge_clip_max_iters=5,
+            )
+        )
+        real = jnp.ones(n, bool)  # no split: nbr doubles as the directed table
+        one = jnp.ones((), P.dtype)  # scale: P is already in range
+        hlo = fn.lower(P, P, nbr, nbr, nbr[:, 0], real, one).compile().as_text()
+        big = []
+        for line in hlo.splitlines():
+            if " constant(" in line:
+                m = re.search(r"\w+\[([\d,]*)\]", line)
+                size = int(np.prod([int(s) for s in m.group(1).split(",") if s]))
+                if size > n // 2:
+                    big.append(line.strip())
+        assert not big, big
+
+    @pytest.mark.parametrize("mode", ["raise", "warn", "largest", "connect"])
+    def test_no_host_callbacks(self, mode):
+        """Only equinox's error hook remains (plus debug_callback for "warn")."""
+        pos, vel = _two_segments()
+        orderer = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=1.0, on_disconnected=mode, edge_clip_sigma=3.0
+        )
+        jaxpr = jax.make_jaxpr(lambda p, v: orderer.order(p, v).indices)(pos, vel)
+        found = _host_callbacks(jaxpr.jaxpr)
+        pure = {mod for prim, mod in found if prim == "pure_callback"}
+        assert all(mod.startswith("equinox") for mod in pure), pure
+        prims = {prim for prim, _ in found}
+        assert prims <= {"pure_callback", "debug_callback"}
+        assert ("debug_callback" in prims) == (mode == "warn")
+
+    def test_no_worker_thread(self):
+        """The host-callback worker thread and its helper are gone."""
+        import threading  # noqa: PLC0415
+
+        from phasecurvefit._src.orderers import mst  # noqa: PLC0415
+
+        assert not hasattr(mst, "_run_in_thread")
+        assert "phasecurvefit-mst-host" not in {t.name for t in threading.enumerate()}
+
+    def test_eager_count_ignores_padding(self):
+        """Eager calls pad n=60 to a 64-row bucket; padded rows never count."""
+        pos, vel = _two_segments()
+        orderer = pcf.orderers.MSTOrderer(k=5, jump_cap=1.0, on_disconnected="warn")
+        with pytest.warns(UserWarning, match="disconnected into 2 components"):
+            orderer.order(pos, vel)
+
+    def test_raise_under_jit(self):
+        """``"raise"`` is a runtime error under jit, with a static message."""
+        pos, vel = _two_segments()
+        orderer = pcf.orderers.MSTOrderer(k=5, jump_cap=1.0, on_disconnected="raise")
+        with pytest.raises(Exception, match="multiple components"):
+            jax.block_until_ready(
+                jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
+            )
+
+    def test_warn_under_jit(self):
+        """``"warn"`` warns under jit with today's message (the real count)."""
+        pos, vel = _two_segments()
+        orderer = pcf.orderers.MSTOrderer(k=5, jump_cap=1.0, on_disconnected="warn")
+        with pytest.warns(UserWarning, match="disconnected into 2 components"):
+            out = jax.block_until_ready(
+                jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
+            )
+        assert int((out >= 0).sum()) == 30  # the largest piece is ordered
+
+    @pytest.mark.parametrize(
+        "kw",
+        [
+            {"jump_cap": 1.0, "on_disconnected": "connect"},
+            {"jump_cap": 50.0, "edge_clip_sigma": 3.0, "on_disconnected": "largest"},
+            {
+                "jump_cap": 2.0,
+                "velocity_weight": 1.0,
+                "orient_by_velocity": True,
+                "on_disconnected": "largest",
+            },
+            {"jump_cap": 1.0, "sever_cos_threshold": 0.0, "on_disconnected": "largest"},
+        ],
+        ids=["connect", "clip", "velocity", "sever"],
+    )
+    def test_jit_matches_eager(self, kw):
+        """Every graph-stage option gives the same result traced and eager."""
+        pos, vel = _two_segments()
+        orderer = pcf.orderers.MSTOrderer(k=5, **kw)
+        eager = orderer.order(pos, vel)
+        jitted = jax.jit(orderer.order)(pos, vel)
+        np.testing.assert_array_equal(
+            np.asarray(jitted.indices), np.asarray(eager.indices)
+        )
+        assert int(jitted.backbone_size) == int(eager.backbone_size)
+
+    def test_vmap_connect(self):
+        """Vmap over bridged graphs equals separate eager calls."""
+        a, b = _two_segments(), _open_arc(n=60, seed=2)[:2]
+        orderer = pcf.orderers.MSTOrderer(k=5, jump_cap=1.0, on_disconnected="connect")
+        batch_p = {c: jnp.stack([a[0][c], b[0][c]]) for c in a[0]}
+        batch_v = {c: jnp.stack([a[1][c], b[1][c]]) for c in a[1]}
+        got = jax.vmap(lambda p, v: orderer.order(p, v).indices)(batch_p, batch_v)
+        for i, (p, v) in enumerate((a, b)):
+            np.testing.assert_array_equal(
+                np.asarray(got[i]), np.asarray(orderer.order(p, v).indices)
+            )

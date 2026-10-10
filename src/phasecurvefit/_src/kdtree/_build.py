@@ -68,15 +68,10 @@ def build_tree(points: Float[Array, "n d"], /, *, leaf_size: int = 16) -> Tree:
         last = jnp.take_along_axis(pp[last_id], dims[:, None, None], 2)[..., 0]
         dim = jnp.argmax(jnp.where(vj[None] > 0, last - first, -inf), 0)  # (nn,)
         os_ = jnp.take_along_axis(o, dim[None, :, None], 0)[0]  # order on split dim
-        i = np.arange(m)[None]
-        left = (i < vl[:, None]) | (
-            (i >= v[:, None]) & (i < v[:, None] + (h - vl[:, None]))
-        )
-        side = (
-            jnp.zeros(n_pad, bool)
-            .at[os_.reshape(-1)]
-            .set(jnp.asarray(left).reshape(-1))
-        )
+        i = jnp.arange(m)[None]  # traced iota: a numpy mask would fold to a literal
+        vlj = jnp.asarray(vl, jnp.int32)[:, None]
+        left = (i < vlj) | ((i >= vj[:, None]) & (i < vj[:, None] + (h - vlj)))
+        side = jnp.zeros(n_pad, bool).at[os_.reshape(-1)].set(left.reshape(-1))
         right_first = jnp.take_along_axis(os_, jnp.asarray(vl, jnp.int32)[:, None], 1)[
             :, 0
         ]
