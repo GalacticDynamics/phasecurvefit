@@ -195,7 +195,9 @@ def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarra
     vi, vj = V[rows], V[cols]
     num = np.sum(vi * vj, axis=1)
     den = np.linalg.norm(vi, axis=1) * np.linalg.norm(vj, axis=1)
-    return np.divide(num, den, out=np.ones_like(num), where=den > 0.0)
+    # A float buffer: ``ones_like`` would inherit an integer dtype from integer
+    # velocities, which the float quotient cannot be cast into.
+    return np.divide(num, den, out=np.ones(num.shape), where=den > 0.0)
 
 
 def _knn_edges(

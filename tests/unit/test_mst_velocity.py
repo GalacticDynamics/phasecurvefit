@@ -296,6 +296,19 @@ class TestMissingVelocities:
         vel = {"x": vel["x"].at[10:15].set(jnp.nan), "y": vel["y"]}
         assert int(pcf.order(pos, vel).n_visited) == 60
 
+    @pytest.mark.parametrize("mechanism", sorted(_MECHANISMS))
+    def test_integer_velocities(self, mechanism):
+        """Integer velocities, zeros included, are valid input."""
+        _, pos, _ = _line()
+        vel = {
+            "x": jnp.ones(60, dtype=jnp.int32).at[30].set(0),
+            "y": jnp.zeros(60, dtype=jnp.int32),
+        }
+        res = pcf.orderers.MSTOrderer(
+            k=6, jump_cap=2.0, **_MECHANISMS[mechanism]
+        ).order(pos, vel)
+        assert int(res.n_visited) == 60
+
     def test_small_unit_velocities_keep_their_direction(self):
         """|v| ~ 1e-7 still separates the arms (an absolute floor ignored them)."""
         pos, vel = _hairpin(n_a=50, n_b=40)
