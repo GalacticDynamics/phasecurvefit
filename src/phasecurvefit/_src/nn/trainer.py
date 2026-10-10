@@ -26,7 +26,7 @@ supplies only a loss function.
 
 __all__ = ("EqxScanTrainer", "EqxTrainCarry", "eqx_step")
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -48,15 +48,16 @@ def eqx_step(
     *,
     loss_fn: Callable[..., Array],
     optimizer: optax.GradientTransformation,
-    filter_spec: Any = eqx.is_array,
+    filter_spec: Any,
     **kw: Any,
 ) -> tuple[Array, EqxTrainCarry]:
     """Run one optimisation step on a batch.
 
     Calls ``loss_fn(model, *data, mask, key=subkey, **kw)`` and differentiates
     it w.r.t. the `filter_spec`-selected (dynamic) half of the model only.
-    `filter_spec` must match the trainer's, so that the step, the carry packing
-    and the optimizer state agree on which leaves are trainable.
+    `EqxScanTrainer` supplies `filter_spec` (see its `prepare_step_kw`), so the
+    step, the carry packing and the optimizer state always agree on which
+    leaves are trainable.
     """
     model, opt_state, key = carry
     mask, data = batch_inputs
@@ -106,6 +107,16 @@ class EqxScanTrainer(AbstractScanNNTrainer):
         """Build the initial carry and the epoch data ``(mask, data)``."""
         opt_state = optimizer.init(eqx.filter(model, self.filter_spec))
         return (model, opt_state, key), (mask, data)
+
+    def prepare_step_kw(
+        self, /, *, epoch_idx: Array, num_epochs: int, epoch_key: PRNGKeyArray
+    ) -> Mapping[str, Any]:
+        """Pass `filter_spec` to `make_step`: one source of truth for the split.
+
+        Subclasses that add per-epoch kwargs must merge in ``super()``'s.
+        """
+        del epoch_idx, num_epochs, epoch_key
+        return {"filter_spec": self.filter_spec}
 
     def pack_carry_state(
         self, carry: EqxTrainCarry

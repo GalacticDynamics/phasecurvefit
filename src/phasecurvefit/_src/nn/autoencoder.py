@@ -744,12 +744,14 @@ class PathAutoencoderTrainer(EqxScanTrainer):
         self, /, *, epoch_idx: Int[Array, ""], num_epochs: int, epoch_key: PRNGKeyArray
     ) -> Mapping[str, Any]:
         r"""Compute this epoch's schedules: $\lambda_p$, and the mixture ramps."""
-        del epoch_key
+        kw: dict[str, Any] = dict(
+            super().prepare_step_kw(
+                epoch_idx=epoch_idx, num_epochs=num_epochs, epoch_key=epoch_key
+            )
+        )
         lambda_p_min, lambda_p_max = self.lambda_p_range
         frac = epoch_idx / (num_epochs - 1) if num_epochs > 1 else 0.0
-        kw: dict[str, Any] = {
-            "lambda_p": lambda_p_min + (lambda_p_max - lambda_p_min) * frac
-        }
+        kw["lambda_p"] = lambda_p_min + (lambda_p_max - lambda_p_min) * frac
 
         if self.membership is not None:
             start, stop = self.membership.sigma_ceiling
@@ -862,7 +864,6 @@ def train_ordering_and_track_net(
             eqx_step,
             loss_fn=compute_decoder_loss,
             optimizer=optimizer,
-            filter_spec=filter_spec,
             lambda_q=config.lambda_q,
             member_threshold=config.member_threshold,
             membership=membership,

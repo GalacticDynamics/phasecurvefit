@@ -8,7 +8,10 @@ import pytest
 from jaxtyping import PRNGKeyArray
 
 import phasecurvefit as pcf
-from phasecurvefit._src.nn.autoencoder import compute_decoder_loss
+from phasecurvefit._src.nn.autoencoder import (
+    compute_decoder_loss,
+    train_ordering_and_track_net,
+)
 
 
 class TestOrderingNet:
@@ -321,6 +324,45 @@ class TestTrainAutoencoder:
         assert jnp.isfinite(loss), f"loss is {loss} when no star is a member"
         leaves = [x for x in jax.tree.leaves(grads) if eqx.is_array(x)]
         assert all(jnp.all(jnp.isfinite(g)) for g in leaves), "non-finite gradient"
+
+    def test_freeze_encoder_trains_only_decoder(self, rng_key: PRNGKeyArray):
+        """`freeze_encoder_final_training` leaves every encoder weight untouched.
+
+        The trainer and the step must split the model with the same
+        `filter_spec`; if they disagree, the frozen encoder trains anyway (or
+        the optimizer state and gradients no longer line up).
+        """
+        n = 64
+        t = jnp.linspace(0, 3, n)
+        pos = {"x": jnp.cos(t), "y": jnp.sin(t)}
+        vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
+        normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(-1.0, 1.0), key=rng_key
+        )
+        ws = jnp.concatenate(normalizer.transform(pos, vel), axis=1)
+        config = pcf.nn.TrainingConfig(
+            n_epochs_both=3,
+            batch_size=32,
+            show_pbar=False,
+            freeze_encoder_final_training=True,
+        ).autoencoder_config()
+
+        trained, _, _ = train_ordering_and_track_net(
+            ae, ws, mask=jnp.ones(n, dtype=bool), config=config, key=rng_key
+        )
+
+        def arrays(m):
+            return jax.tree.leaves(eqx.filter(m, eqx.is_array))
+
+        assert all(
+            jnp.array_equal(a, b)
+            for a, b in zip(arrays(trained.encoder), arrays(ae.encoder), strict=True)
+        ), "encoder changed while frozen"
+        assert not all(
+            jnp.array_equal(a, b)
+            for a, b in zip(arrays(trained.decoder), arrays(ae.decoder), strict=True)
+        ), "decoder did not train"
 
     def test_loss_rejects_odd_column_count(self, rng_key: PRNGKeyArray):
         """`ws` must split evenly into positions and velocities."""
