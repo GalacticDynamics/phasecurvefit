@@ -13,6 +13,7 @@ from .base import AbstractOrderer, chord_along_ordering
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import (
     Direction,
+    NanPolicy,
     StateMetadata,
     WalkLocalFlowResult,
     _local_flow_walk,
@@ -119,6 +120,20 @@ class LocalFlowOrderer(AbstractOrderer):
         Indices that terminate the walk when reached.
     n_max
         Maximum number of iterations.
+    nan_policy
+        What to do with a NaN velocity when the metric reads velocities (the
+        default :class:`~phasecurvefit.metrics.AlignedMomentumDistanceMetric`
+        does). A position-only metric never reads them, so never raises.
+
+        ``"raise"`` (default) raises -- under ``jit`` at run time, as a
+        :class:`RuntimeError`. ``"omit"`` treats NaN as a missing measurement
+        (catalogues often lack radial velocities): any step whose metric
+        distance is not finite is scored by position alone, so from a tracer
+        without a velocity the walk takes its nearest unvisited neighbour.
+
+        A zero velocity is data (a stationary tracer), not missing: under the
+        default metric that step is plain nearest-neighbour. An infinite one
+        is neither, so it raises under either policy.
 
     """
 
@@ -129,6 +144,13 @@ class LocalFlowOrderer(AbstractOrderer):
     max_dist: float = jnp.inf
     terminate_indices: frozenset[int] | None = eqx.field(static=True, default=None)
     n_max: int | None = eqx.field(static=True, default=None)
+    nan_policy: NanPolicy = eqx.field(static=True, default="raise")
+
+    def __check_init__(self) -> None:
+        """Reject an unknown ``nan_policy`` at construction."""
+        if self.nan_policy not in ("raise", "omit"):
+            msg = f"nan_policy must be 'raise' or 'omit', got {self.nan_policy!r}."
+            raise ValueError(msg)
 
     @plum.dispatch
     def order(
@@ -153,6 +175,7 @@ class LocalFlowOrderer(AbstractOrderer):
             n_max=self.n_max,
             config=self.config,
             direction=self.direction,
+            nan_policy=self.nan_policy,
             **kwargs,
         )
         return _finalize(result, result.positions)

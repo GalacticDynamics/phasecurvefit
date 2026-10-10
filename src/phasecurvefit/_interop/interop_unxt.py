@@ -45,7 +45,12 @@ from unxt.quantity import AllowValue
 
 from phasecurvefit._src import algorithm, phasespace
 from phasecurvefit._src.abstract_result import AbstractResult
-from phasecurvefit._src.algorithm import Direction, StateMetadata, WalkLocalFlowResult
+from phasecurvefit._src.algorithm import (
+    Direction,
+    NanPolicy,
+    StateMetadata,
+    WalkLocalFlowResult,
+)
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
 from phasecurvefit._src.orderers.localflow import (
@@ -623,6 +628,7 @@ def _local_flow_walk(
     direction: Direction = "forward",
     metadata: StateMetadata | None = None,
     usys: u.AbstractUnitSystem | None = None,
+    nan_policy: NanPolicy = "raise",
 ) -> WalkLocalFlowResult:
     """Implement for Quantity-valued phase-space data.
 
@@ -662,6 +668,8 @@ def _local_flow_walk(
     usys : unxt.AbstractUnitSystem, optional
         Unit system to use for consistent unit stripping of Quantities. Default
         is SI units.
+    nan_policy
+        See :class:`~phasecurvefit.orderers.LocalFlowOrderer`.
 
     Returns
     -------
@@ -736,6 +744,7 @@ def _local_flow_walk(
         config=config,
         metadata=metadata,
         direction=direction,
+        nan_policy=nan_policy,
     )
     return dataclasses.replace(result, positions=positions, velocities=velocities)
 
@@ -942,6 +951,7 @@ def order(
         config=self.config,
         direction=self.direction,
         usys=usys,
+        nan_policy=self.nan_policy,
     )
     # Calls the same ``_finalize`` the plain dispatch calls, on unit-stripped
     # positions, rather than re-deriving the chord computation here: a step
