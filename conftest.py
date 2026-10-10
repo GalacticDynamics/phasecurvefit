@@ -1,7 +1,13 @@
 """Pytest configuration for phasecurvefit tests."""
 
+import os
 from collections.abc import Callable, Iterable, Sequence
 from doctest import ELLIPSIS, NORMALIZE_WHITESPACE
+
+# Tests never need a GUI: without this, matplotlib picks TkAgg on Windows
+# runners, whose Tcl/Tk install is intermittently broken ("Can't find a usable
+# tk.tcl"), failing doc examples that only draw a figure.
+os.environ.setdefault("MPLBACKEND", "Agg")
 
 import jax
 import pytest
