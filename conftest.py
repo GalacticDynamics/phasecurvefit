@@ -2,13 +2,14 @@
 
 from collections.abc import Callable, Iterable, Sequence
 from doctest import ELLIPSIS, NORMALIZE_WHITESPACE
-from importlib.util import find_spec
 
 import jax
 import pytest
 from jaxtyping import PRNGKeyArray
 from sybil import Document, Region, Sybil
 from sybil.parsers import myst, rest
+
+from optional_dependencies import OptionalDependencyEnum, auto
 
 optionflags = ELLIPSIS | NORMALIZE_WHITESPACE
 
@@ -37,15 +38,21 @@ python = Sybil(
 pytest_collect_file = (docs + python).pytest()
 
 
-collect_ignore_glob = [
-    path
-    for pkg, path in (
-        ("unxt", "tests/unit/test_interop_unxt.py"),
-        ("matplotlib", "tests/usage/test_epitrochoid.py"),
-        ("jaxkd", "tests/unit/test_kdtree.py"),
-    )
-    if find_spec(pkg) is None
-]
+class OptDeps(OptionalDependencyEnum):  # pylint: disable=invalid-enum-extension
+    """Optional dependencies for phasecurvefit."""
+
+    UNXT = auto()
+    JAXKD = auto()
+    MATPLOTLIB = auto()
+
+
+collect_ignore_glob = []
+if not OptDeps.UNXT.installed:
+    collect_ignore_glob.append("tests/unit/test_interop_unxt.py")
+if not OptDeps.MATPLOTLIB.installed:
+    collect_ignore_glob.append("tests/usage/test_epitrochoid.py")
+if not OptDeps.JAXKD.installed:
+    collect_ignore_glob.append("tests/unit/test_kdtree.py")
 
 
 def pytest_configure(config):

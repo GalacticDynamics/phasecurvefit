@@ -23,9 +23,11 @@ dependencies = [
   "jaxmore[tqdm]>=0.4.0",
   "jaxtyping>=0.3.5",
   "optax>=0.2.4",
+  "optional-dependencies>=0.4.0",
   "plum-dispatch>=2.6.1",
   "quax>=0.4",
   "scipy>=1.11",
+  "zeroth>=1.0.1",
 ]
 description = "Walk through phase-space observations"
 dynamic = ["version"]
@@ -193,10 +195,17 @@ equinox                 = "eqx"
 phasecurvefit           = "pcf"
 
 [tool.ruff.lint.isort]
-combine-as-imports     = true
+combine-as-imports = true
 extra-standard-library = ["typing_extensions"]
-known-first-party      = ["is_annotated", "jaxmore", "quaxed", "unxt"]
-known-local-folder     = ["phasecurvefit"]
+known-first-party = [
+  "is_annotated",
+  "jaxmore",
+  "optional_dependencies",
+  "quaxed",
+  "unxt",
+  "zeroth",
+]
+known-local-folder = ["phasecurvefit"]
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -241,6 +250,7 @@ module = [
   "optax.*",
   "plum.*",
   "unxt.*",
+  "zeroth.*",
 ]
 
 
@@ -253,7 +263,7 @@ messages_control.disable = [
   "fixme",
   "abstract-method",
   "function-redefined",            # plum-dispatch
-  "import-error",                  # Optional dependencies handled via importlib.util.find_spec
+  "import-error",                  # Optional dependencies handled via OptionalDependencyEnum
   "invalid-name",                  # handled by ruff
   "line-too-long",
   "missing-function-docstring",

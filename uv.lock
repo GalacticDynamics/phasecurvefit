@@ -1786,10 +1786,12 @@ dependencies = [
     { name = "jaxmore", extra = ["tqdm"] },
     { name = "jaxtyping" },
     { name = "optax" },
+    { name = "optional-dependencies" },
     { name = "plum-dispatch", version = "2.7.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
     { name = "plum-dispatch", version = "2.10.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
     { name = "quax" },
     { name = "scipy" },
+    { name = "zeroth" },
 ]
 
 [package.optional-dependencies]
@@ -1903,12 +1905,14 @@ requires-dist = [
     { name = "jaxtyping", specifier = ">=0.3.5" },
     { name = "matplotlib", marker = "extra == 'tutorials'", specifier = ">=3.10.8" },
     { name = "optax", specifier = ">=0.2.4" },
+    { name = "optional-dependencies", specifier = ">=0.4.0" },
     { name = "plum-dispatch", specifier = ">=2.6.1" },
     { name = "quax", specifier = ">=0.4" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "unxt", marker = "extra == 'all'", specifier = ">=1.10.4" },
     { name = "unxt", marker = "extra == 'interop'", specifier = ">=1.10.4" },
     { name = "unxt", marker = "extra == 'tutorials'", specifier = ">=1.10.4" },
+    { name = "zeroth", specifier = ">=1.0.1" },
 ]
 provides-extras = ["all", "interop", "kdtree", "tutorials"]
 

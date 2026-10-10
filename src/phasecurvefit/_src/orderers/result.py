@@ -23,6 +23,8 @@ import jax.numpy as jnp
 import jax.tree as jt
 from jaxtyping import Array, Bool, Int, PRNGKeyArray
 
+from zeroth import zeroth
+
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.custom_types import BSzN, FSzN, ISz0, ISzN, VectorComponents
 
@@ -238,7 +240,7 @@ class OrderingResult(AbstractResult):
         arrays may be padded to a static shape beyond that point).
         """
         if self.backbone_size is None:
-            n_control = len(next(iter(self.backbone.values())))
+            n_control = len(zeroth(self.backbone.values()))
             if n_control == 0:
                 msg = "Cannot interpolate: the backbone has no vertices."
                 raise ValueError(msg)
