@@ -19,8 +19,9 @@ mechanisms, all reusing the phase-space notion of velocity alignment
 3. *tip orientation* (``orient_by_velocity``): flip the ordering so ``gamma``
    increases along the mean velocity.
 
-The exact kNN is computed by the selected ``neighbors`` backend (default
-``BucketKDTree``, JAX-native); the graph algorithms (MST, components,
+The exact kNN is computed by the selected ``neighbors`` backend (by default
+SciPy's ``cKDTree`` for concrete inputs and the JAX-native ``BucketKDTree``
+when traced); the graph algorithms (MST, components,
 diameter, edge-clip) remain **host-side** (SciPy) and deterministic. The
 *selection* they make (which edges, which nodes, in what order) is
 combinatorial and has no meaningful gradient, since it changes in discrete
@@ -614,10 +615,16 @@ class MSTOrderer(AbstractOrderer):
         Maximum sigma-clip iterations (default 5). Ignored when
         ``edge_clip_sigma`` is ``None``.
     neighbors
-        The exact kNN backend (``phasecurvefit.neighbors``): ``BucketKDTree()``
-        (default; JAX-native, traceable), ``BruteForce()``, ``JaxKD()``
-        (optional dependency), or ``SciPy(workers=-1)`` (fastest on CPU, but
-        host-only: it raises when its inputs are traced by jit/vmap/grad).
+        The exact kNN backend (``phasecurvefit.neighbors``). ``None`` (default)
+        picks per call: ``SciPy()`` when the inputs are concrete (fastest on
+        CPU, no compilation) and ``BucketKDTree()`` when they are traced by
+        jit/vmap/grad. Or pin one: ``BucketKDTree()`` (JAX-native, traceable;
+        compiles once per size bucket), ``BruteForce()``, ``JaxKD()`` (optional
+        dependency), or ``SciPy(workers=-1)`` (host-only: it raises when its
+        inputs are traced). With equidistant neighbours SciPy and
+        ``BucketKDTree`` may pick differently, so the default's eager and
+        traced orderings can differ on tied (e.g. grid) data; pin a backend if
+        that matters.
     nan_policy
         What to do with a NaN velocity when a mechanism reads velocities
         (``velocity_weight > 0``, ``sever_cos_threshold`` or
@@ -711,7 +718,7 @@ class MSTOrderer(AbstractOrderer):
     on_disconnected: OnDisconnected = eqx.field(static=True, default="raise")
     edge_clip_sigma: float | None = eqx.field(static=True, default=None)
     edge_clip_max_iters: int = eqx.field(static=True, default=5)
-    neighbors: AbstractNeighborSearch = eqx.field(static=True, default=BucketKDTree())
+    neighbors: AbstractNeighborSearch | None = eqx.field(static=True, default=None)
     nan_policy: Literal["raise", "omit"] = eqx.field(static=True, default="raise")
 
     def __check_init__(self) -> None:
@@ -738,7 +745,9 @@ class MSTOrderer(AbstractOrderer):
         if self.edge_clip_max_iters < 1:
             msg = f"edge_clip_max_iters must be >= 1, got {self.edge_clip_max_iters}."
             raise ValueError(msg)
-        if not isinstance(self.neighbors, AbstractNeighborSearch):
+        if self.neighbors is not None and not isinstance(
+            self.neighbors, AbstractNeighborSearch
+        ):
             msg = (
                 "neighbors must be a phasecurvefit.neighbors backend instance, "
                 f"e.g. pcf.neighbors.SciPy(); got {self.neighbors!r}."
@@ -756,9 +765,10 @@ class MSTOrderer(AbstractOrderer):
     ) -> OrderingResult:
         """Order tracers along the MST backbone.
 
-        Three stages. (a) The kNN runs in the ``neighbors`` backend: in JAX for
-        ``BucketKDTree``, ``BruteForce`` and ``JaxKD``, so it traces under
-        ``jax.jit``/``vmap``/``grad``. (b) The graph algorithms (MST,
+        Three stages. (a) The kNN runs in the ``neighbors`` backend (by
+        default SciPy when the inputs are concrete, ``BucketKDTree`` when
+        traced): in JAX for ``BucketKDTree``, ``BruteForce`` and ``JaxKD``, so
+        it traces under ``jax.jit``/``vmap``/``grad``. (b) The graph algorithms (MST,
         components, diameter, edge-clip) run on the host: directly when eager,
         through ``jax.pure_callback`` when traced. (c) The arc-length projection
         and ordering run in JAX. With ``SciPy`` every stage runs in NumPy, and a
@@ -788,18 +798,22 @@ class MSTOrderer(AbstractOrderer):
             "edge_clip_max_iters": self.edge_clip_max_iters,
         }
 
+        neighbors = self.neighbors
+        if neighbors is None:  # host SciPy when concrete; the JAX kd-tree when traced
+            neighbors = BucketKDTree() if _traced(P, V) else SciPy()
+
         if n < 2:  # nothing to connect: identity ordering and backbone
             idx_full = jnp.arange(n, dtype=jnp.int32)
             backbone_idx = jnp.arange(n, dtype=jnp.int32)
             backbone_len = jnp.asarray(n, jnp.int32)
-        elif isinstance(self.neighbors, SciPy):
+        elif isinstance(neighbors, SciPy):
             # Eager-only. Check V too: under grad w.r.t. velocities alone, P is
             # concrete and knn would not notice.
             if _traced(P, V):
                 raise TypeError(SCIPY_TRACED)
-            nbr = np.asarray(self.neighbors.knn(P, min(self.k, n - 1))[0])
+            nbr = np.asarray(neighbors.knn(P, min(self.k, n - 1))[0])
             Pn, Vn = np.asarray(P), np.asarray(V)
-            workers = self.neighbors.workers
+            workers = neighbors.workers
             full, blen, in_comp, flip = _host_graph(Pn, Vn, nbr, **cfg, workers=workers)
             idx, bb = _finish_numpy(Pn, full, blen, in_comp, flip, workers)
             idx_full, backbone_idx = jnp.asarray(idx), jnp.asarray(bb)
@@ -810,7 +824,7 @@ class MSTOrderer(AbstractOrderer):
             # below, from the original P.
             P_s = jax.lax.stop_gradient(P)
             V_s = jax.lax.stop_gradient(V)
-            nbr = self.neighbors.knn(P_s, min(self.k, n - 1))[0]
+            nbr = neighbors.knn(P_s, min(self.k, n - 1))[0]
 
             def host(p: np.ndarray, v: np.ndarray, nb: np.ndarray) -> tuple:
                 return _host_graph(
@@ -843,7 +857,7 @@ class MSTOrderer(AbstractOrderer):
                     jnp.asarray, host(np.asarray(P_s), np.asarray(V_s), np.asarray(nbr))
                 )
             idx_full, backbone_idx = _finish_jax(
-                P_s, full, blen, in_comp, flip, self.neighbors
+                P_s, full, blen, in_comp, flip, neighbors
             )
             backbone_len = blen
 

@@ -1,6 +1,6 @@
 """Selectable exact k-nearest-neighbour backends.
 
-``BucketKDTree`` (default) and ``BruteForce`` are JAX-native and trace under
+``BucketKDTree`` and ``BruteForce`` are JAX-native and trace under
 jit/vmap/grad; ``JaxKD`` wraps the optional jaxkd package; ``SciPy`` is scipy's
 ``cKDTree`` -- fastest on CPU but eager-only.
 """

@@ -9,7 +9,7 @@ so every example here names it explicitly. `pcf.order(pos, vel)` with **no**
 orderer runs the default MST | SOM pipeline, which is *not* traceable under `jit`
 or `vmap` (it raises a `TypeError` saying so): whether the SOM stage runs depends
 on the visited count, and a SOM stage chained after another cannot be traced. The
-{class}`~phasecurvefit.orderers.MSTOrderer` alone does trace: its exact kNN runs in JAX through its `neighbors` backend (default {class}`~phasecurvefit.neighbors.BucketKDTree`), and only the graph algorithms run host-side (SciPy) through `jax.pure_callback`. {class}`~phasecurvefit.neighbors.SciPy` is faster on CPU but host-only: it raises `TypeError` when its inputs are traced (arguments of `jit`, `vmap` or `grad`). A result's
+{class}`~phasecurvefit.orderers.MSTOrderer` alone does trace: under `jit`, `vmap` or `grad` its default `neighbors` backend is the JAX-native {class}`~phasecurvefit.neighbors.BucketKDTree` (eager calls use SciPy's `cKDTree`), and only the graph algorithms run host-side (SciPy) through `jax.pure_callback`. {class}`~phasecurvefit.neighbors.SciPy` is faster on CPU but host-only: it raises `TypeError` when its inputs are traced (arguments of `jit`, `vmap` or `grad`). A result's
 `__call__` interpolation is JAX-traceable whichever orderer produced it.
 ```
 

@@ -646,13 +646,15 @@ class TestMSTBackends:
     """``MSTOrderer(neighbors=...)``: every backend gives the scipy result."""
 
     def test_integer_positions(self):
-        """Integer positions work with the default backend and match scipy."""
+        """Integer positions work with the kd-tree backend and match scipy."""
         pos = {"x": jnp.arange(40), "y": jnp.arange(40) // 3}
         vel = {"x": jnp.ones(40), "y": jnp.ones(40)}
         want = pcf.orderers.MSTOrderer(
             k=5, jump_cap=3, neighbors=pcf.neighbors.SciPy()
         ).order(pos, vel)
-        got = pcf.orderers.MSTOrderer(k=5, jump_cap=3).order(pos, vel)
+        got = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=3, neighbors=pcf.neighbors.BucketKDTree()
+        ).order(pos, vel)
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
 
     @pytest.mark.parametrize(
@@ -694,11 +696,21 @@ class TestMSTBackends:
             np.asarray(got.backbone["x"]), np.asarray(want.backbone["x"])
         )
 
-    def test_default_is_bucket_kdtree(self):
-        """The kd-tree is the default backend."""
-        assert isinstance(
-            pcf.orderers.MSTOrderer().neighbors, pcf.neighbors.BucketKDTree
+    def test_default_picks_scipy_eager_and_kdtree_traced(self):
+        """``neighbors=None``: SciPy for concrete inputs, the kd-tree when traced."""
+        assert pcf.orderers.MSTOrderer().neighbors is None
+        pos, vel, _ = _open_arc(n=200)
+        kw = {"k": 10, "jump_cap": 2.0}
+        auto = pcf.orderers.MSTOrderer(**kw)
+        scipy = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw)
+        bucket = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.BucketKDTree(), **kw)
+        np.testing.assert_array_equal(
+            np.asarray(auto.order(pos, vel).indices),
+            np.asarray(scipy.order(pos, vel).indices),
         )
+        jitted = jax.jit(lambda p, v: auto.order(p, v).indices)(pos, vel)
+        want = jax.jit(lambda p, v: bucket.order(p, v).indices)(pos, vel)
+        np.testing.assert_array_equal(np.asarray(jitted), np.asarray(want))
 
     def test_scipy_raises_under_jit(self):
         """The scipy backend is eager-only, with a pointer to BucketKDTree."""
@@ -722,9 +734,9 @@ class TestMSTBackends:
         with pytest.raises(TypeError, match="BucketKDTree"):
             jax.grad(loss)(vel["x"])
 
-    @pytest.mark.parametrize("bad", ["scipy", None, pcf.neighbors.SciPy])
+    @pytest.mark.parametrize("bad", ["scipy", pcf.neighbors.SciPy])
     def test_bad_neighbors_rejected_at_construction(self, bad):
-        """A string, None or a class (not an instance) fails at construction."""
+        """A string or a class (not an instance) fails at construction."""
         with pytest.raises(TypeError, match="neighbors must be"):
             pcf.orderers.MSTOrderer(neighbors=bad)
 
@@ -733,15 +745,22 @@ class TestMSTBackends:
         g = np.stack(np.meshgrid(np.arange(7.0), np.arange(5.0)), -1).reshape(-1, 2)
         pos = {"x": jnp.asarray(g[:, 0], jnp.float32), "y": jnp.asarray(g[:, 1])}
         vel = {"x": jnp.ones(35), "y": jnp.zeros(35)}
-        orderer = pcf.orderers.MSTOrderer(k=3, jump_cap=1e9, on_disconnected="largest")
+        orderer = pcf.orderers.MSTOrderer(
+            k=3,
+            jump_cap=1e9,
+            on_disconnected="largest",
+            neighbors=pcf.neighbors.BucketKDTree(),
+        )
         eager = orderer.order(pos, vel).indices
         jitted = jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
         np.testing.assert_array_equal(np.asarray(jitted), np.asarray(eager))
 
-    def test_large_k_default_backend(self):
-        """k=50 on the default backend compiles in reasonable time (was a hang)."""
+    def test_large_k_kdtree_backend(self):
+        """k=50 on the kd-tree backend compiles in reasonable time (was a hang)."""
         pos, vel, _ = _open_arc(n=200)
-        result = pcf.orderers.MSTOrderer(k=50, jump_cap=2.0).order(pos, vel)
+        result = pcf.orderers.MSTOrderer(
+            k=50, jump_cap=2.0, neighbors=pcf.neighbors.BucketKDTree()
+        ).order(pos, vel)
         assert int(result.n_visited) == 200
 
     def test_workers_moved_to_scipy_backend(self):
@@ -772,7 +791,9 @@ class TestMSTBackends:
         want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw).order(
             pos, vel
         )
-        got = pcf.orderers.MSTOrderer(**kw).order(pos, vel)
+        got = pcf.orderers.MSTOrderer(
+            neighbors=pcf.neighbors.BucketKDTree(), **kw
+        ).order(pos, vel)
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
 
     def test_one_dimensional_matches_scipy(self):
@@ -783,7 +804,9 @@ class TestMSTBackends:
         want = pcf.orderers.MSTOrderer(
             k=8, jump_cap=1.0, neighbors=pcf.neighbors.SciPy()
         ).order(pos, vel)
-        got = pcf.orderers.MSTOrderer(k=8, jump_cap=1.0).order(pos, vel)
+        got = pcf.orderers.MSTOrderer(
+            k=8, jump_cap=1.0, neighbors=pcf.neighbors.BucketKDTree()
+        ).order(pos, vel)
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
 
     def test_non_finite_positions_raise(self):
@@ -829,7 +852,9 @@ class TestMSTBackends:
             want = pcf.orderers.MSTOrderer(
                 k=10, jump_cap=2.0, neighbors=pcf.neighbors.SciPy()
             ).order(pos, vel)
-            orderer = pcf.orderers.MSTOrderer(k=10, jump_cap=2.0)
+            orderer = pcf.orderers.MSTOrderer(
+                k=10, jump_cap=2.0, neighbors=pcf.neighbors.BucketKDTree()
+            )
             eager = orderer.order(pos, vel)
             jitted = jax.jit(lambda q, v: orderer.order(q, v).indices)(pos, vel)
             assert eager.backbone["x"].dtype == jnp.float64
@@ -863,7 +888,9 @@ class TestMSTBackends:
         want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw).order(
             pos, vel
         )
-        got = pcf.orderers.MSTOrderer(**kw).order(pos, vel)
+        got = pcf.orderers.MSTOrderer(
+            neighbors=pcf.neighbors.BucketKDTree(), **kw
+        ).order(pos, vel)
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))
 
     def test_huge_coordinates_match_scipy(self):
@@ -875,6 +902,8 @@ class TestMSTBackends:
         want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw).order(
             pos, vel
         )
-        got = pcf.orderers.MSTOrderer(**kw).order(pos, vel)
+        got = pcf.orderers.MSTOrderer(
+            neighbors=pcf.neighbors.BucketKDTree(), **kw
+        ).order(pos, vel)
         assert int(got.n_visited) == 40
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want.indices))

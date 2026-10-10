@@ -1,8 +1,10 @@
 """Exact k-nearest-neighbour backends, selectable per orderer.
 
-``BucketKDTree`` (default) and ``BruteForce`` are JAX-native and trace under
+``BucketKDTree`` and ``BruteForce`` are JAX-native and trace under
 ``jax.jit``/``vmap``/``grad``; ``JaxKD`` wraps the optional jaxkd package;
-``SciPy`` is scipy's ``cKDTree`` -- fastest on CPU, eager-only::
+``SciPy`` is scipy's ``cKDTree`` -- fastest on CPU, eager-only. By default
+``MSTOrderer`` uses ``SciPy`` for concrete inputs and ``BucketKDTree`` when
+traced; pass one to pin it::
 
     import phasecurvefit as pcf
 
