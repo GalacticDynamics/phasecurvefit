@@ -60,11 +60,15 @@ def kth_smallest(d2: Float[Array, "Q W"], /, k: int) -> Float[Array, " Q"]:
 # Above this k the final sort uses lax.sort: the unrolled transposition sort is
 # ~2.5x faster at k=10 but its trace grows as k**2 (k=50 compiled for minutes).
 _UNROLL_MAX_K = 16
+# At k = 7, 8 XLA CPU fuses the whole unrolled sort into the output
+# concatenate and recomputes it per column (~15-30x slower than k = 9);
+# lax.sort is ~7x faster there. k <= 6 and 9..16 are not affected.
+_FUSION_TRAP_K = (7, 8)
 
 
 def _sort_pairs(v: Array, ix: Array, k: int, /) -> tuple[Array, Array]:
     """Sort each row by (value, id)."""
-    if k > _UNROLL_MAX_K:
+    if k > _UNROLL_MAX_K or k in _FUSION_TRAP_K:
         return jax.lax.sort((v, ix), dimension=1, num_keys=2)
     v = [v[:, i] for i in range(k)]
     ix = [ix[:, i] for i in range(k)]
