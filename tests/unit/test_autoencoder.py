@@ -202,6 +202,7 @@ class TestTrainingConfig:
         assert config.lambda_q == 1.0
         assert config.lambda_p == (1.0, 5.0)
         assert config.member_threshold == 0.5
+        assert config.weight_by_density is False
         assert config.freeze_encoder_final_training is False
         assert config.show_pbar is True
 
@@ -309,6 +310,7 @@ class TestTrainAutoencoder:
         loss, grads = eqx.filter_value_and_grad(compute_decoder_loss)(
             ae,
             ws,
+            jnp.ones(n),
             mask,
             lambda_q=1.0,
             lambda_p=1.0,
@@ -333,6 +335,7 @@ class TestTrainAutoencoder:
             compute_decoder_loss(
                 ae,
                 jnp.zeros((4, 3)),
+                jnp.ones(4),
                 jnp.ones(4, dtype=bool),
                 lambda_q=1.0,
                 lambda_p=1.0,

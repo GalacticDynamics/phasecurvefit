@@ -134,6 +134,75 @@ class PathAutoencoder(AbstractAutoencoder):
 # ============================================================
 
 
+@eqx.filter_jit
+def compute_weights(
+    model: OrderingNet,
+    ws: Float[Array, "N TwoF"],
+    *,
+    bandwidth: float = 0.02,
+    key: PRNGKeyArray | None = None,
+) -> Float[Array, " N"]:
+    r"""Compute inverse density weights for phase-space samples.
+
+    Uses Gaussian kernel density estimation (KDE) on predicted $\gamma$ values
+    to compute sample weights inversely proportional to density. This provides
+    importance weighting that upweights rare regions of the stream.
+
+    The algorithm:
+    1. Predict $\gamma$ values for all samples using the OrderingNet
+    2. Compute KDE density at each $\gamma$ value
+    3. Return inverse density as weights: $w_i = 1 / \text{density}(\gamma_i)$
+
+    This matches the PyTorch implementation where samples in sparse regions
+    of $\gamma$-space receive higher weights.
+
+    Parameters
+    ----------
+    model : OrderingNet
+        Trained interpolation network for predicting gamma values.
+    ws : Array, shape (N, 2*n_dims)
+        Phase-space coordinates (position + velocity).
+    bandwidth : float, optional
+        Gaussian kernel bandwidth for KDE. Default: 0.02.
+    key : PRNGKeyArray, optional
+        Random key for any stochastic operations (not used here, but included
+        for signature consistency).
+
+    Returns
+    -------
+    weights : Array, shape (N,)
+        Inverse density weights for each sample.
+
+    Notes
+    -----
+    The KDE density at point $\gamma_i$ is:
+
+    $$ \hat{f}(\gamma_i) = \frac{1}{Nh} \sum_{j=1}^N
+        K\left(\frac{\gamma_i - \gamma_j}{h}\right) $$
+
+    where $K$ is the Gaussian kernel and $h$ is the bandwidth.
+
+    """
+    # Predict gamma values (only need gamma, not probability)
+    gamma_predict, _ = jax.vmap(model, (0, None))(ws, key)
+
+    # Compute pairwise distances in gamma space
+    # Shape: (N, N) where entry (i, j) is |gamma_i - gamma_j|
+    diff = gamma_predict[:, None] - gamma_predict[None, :]
+
+    # Gaussian kernel: K(u) = exp(-0.5 * u^2) / sqrt(2π)
+    # Normalization constant cancels when computing inverse weights
+    kernel_vals = jnp.exp(-0.5 * (diff / bandwidth) ** 2)
+
+    # KDE density estimate: mean of kernel evaluations
+    density = jnp.mean(kernel_vals, axis=1)  # Shape: (N,)
+
+    # Inverse density weights
+    weights = 1.0 / density
+
+    return weights  # noqa: RET504
+
+
 @dataclass
 class EncoderDecoderTrainingConfig:
     r"""Configuration for Encoder + Decoder training."""
@@ -177,6 +246,9 @@ class EncoderDecoderTrainingConfig:
 
     freeze_encoder: bool = False
     """Whether to freeze the encoder during phase 2 training."""
+
+    weight_by_density: bool | Mapping[str, object] = False
+    """Whether to inverse density weight the samples. USE WITH CARE."""
 
     show_pbar: bool = True
     """Show an epoch progress bar via `tqdm`."""
@@ -229,6 +301,11 @@ class TrainingConfig:
 
     lambda_p: tuple[float, float] = EncoderDecoderTrainingConfig.lambda_p
     """Weight range for phase-2 velocity training."""
+
+    weight_by_density: bool | Mapping[str, object] = (
+        EncoderDecoderTrainingConfig.weight_by_density
+    )
+    """Whether to inverse density weight the samples. USE WITH CARE."""
 
     freeze_encoder_final_training: bool = EncoderDecoderTrainingConfig.freeze_encoder
     """Whether to freeze the encoder during phase 2 training."""
@@ -286,6 +363,7 @@ class TrainingConfig:
             member_threshold=self.member_threshold,
             membership=self.membership,
             freeze_encoder=self.freeze_encoder_final_training,
+            weight_by_density=self.weight_by_density,
         )
 
 
@@ -454,6 +532,7 @@ def _mixture_decoder_loss(
 def compute_decoder_loss(
     model: PathAutoencoder,
     ws: Float[Array, " B TwoF"],
+    weights: Float[Array, " B"],
     mask: Bool[Array, " B"],
     *,
     lambda_q: FLikeSz0,
@@ -569,7 +648,7 @@ def compute_decoder_loss(
     def _path_loss() -> FSz0:
         return decoder_loss(
             qs_meas=ws[:, :D],
-            weights=jnp.ones(ws.shape[0], dtype=ws.dtype),
+            weights=weights,
             qs_pred=q_predict,
             t_hat=t_hat,
             p_hat=ps_hat,
@@ -701,6 +780,7 @@ def train_ordering_and_track_net(
 
     The training uses lax.scan for efficient batching and supports:
     - Linear ramping of lambda_p from min to max over epochs
+    - Optional KDE-based importance weighting
     - Membership probability filtering via member_threshold
     - Optional encoder freezing
 
@@ -727,6 +807,16 @@ def train_ordering_and_track_net(
         Training loss per epoch.
 
     """
+    # Uniform weights unless inverse-density weighting is requested. The key is
+    # split either way, so seeded runs draw the same stream as before.
+    key, subkey = jr.split(key)
+    if config.weight_by_density:
+        kde_kw = config.weight_by_density
+        kde_kw = kde_kw if isinstance(kde_kw, Mapping) else {}
+        weights = compute_weights(model.encoder, all_ws, key=subkey, **kde_kw)
+    else:
+        weights = jnp.ones(all_ws.shape[0], dtype=all_ws.dtype)
+
     # Mixture-model membership is opt-in. When enabled the model must carry a
     # `WidthNet`, and the background density is fixed once, from the
     # field.  This must happen *before* `filter_spec` is built, since a
@@ -763,8 +853,8 @@ def train_ordering_and_track_net(
     optimizer = config.optimizer
 
     # Preserve the original ``pad_value=1``; see `_pad_to_multiple`.
-    padded_mask, (padded_ws,) = _pad_to_multiple(
-        mask, all_ws, batch_size=config.batch_size, pad_value=1
+    padded_mask, (padded_ws, padded_weights) = _pad_to_multiple(
+        mask, all_ws, weights, batch_size=config.batch_size, pad_value=1
     )
 
     trainer = PathAutoencoderTrainer(
@@ -784,7 +874,7 @@ def train_ordering_and_track_net(
         membership=membership,
     )
     initial_carry, epoch_data = trainer.init(
-        model, (padded_ws,), padded_mask, optimizer=optimizer, key=key
+        model, (padded_ws, padded_weights), padded_mask, optimizer=optimizer, key=key
     )
     (model, opt_state, _), epoch_losses = trainer.run(
         initial_carry,
