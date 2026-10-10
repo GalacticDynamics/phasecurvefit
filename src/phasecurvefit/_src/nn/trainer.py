@@ -19,19 +19,21 @@ it just keeps the abstraction honest, and means `make_step` always receives a
 model it can actually call.
 
 Gradients must still be taken with respect to the *dynamic* half only -- that is
-what makes `freeze_encoder` work. Use `partitioned` to recover the split inside
-a step function.
+what makes `freeze_encoder` work. `eqx_step` does that split, so each network
+supplies only a loss function.
 
 """
 
-__all__ = ("AbstractEqxScanTrainer", "EqxTrainCarry")
+__all__ = ("EqxScanTrainer", "EqxTrainCarry", "eqx_step")
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 import equinox as eqx
+import jax.random as jr
 import optax
-from jaxtyping import PRNGKeyArray
+from jaxtyping import Array, Bool, PRNGKeyArray
 
 from jaxmore.nn import AbstractScanNNTrainer
 
@@ -40,12 +42,46 @@ from jaxmore.nn import AbstractScanNNTrainer
 type EqxTrainCarry = tuple[eqx.Module, optax.OptState, PRNGKeyArray]
 
 
+def eqx_step(
+    carry: EqxTrainCarry,
+    batch_inputs: tuple[Bool[Array, " B"], tuple[Array, ...]],
+    *,
+    loss_fn: Callable[..., Array],
+    optimizer: optax.GradientTransformation,
+    filter_spec: Any,
+    **kw: Any,
+) -> tuple[Array, EqxTrainCarry]:
+    """Run one optimisation step on a batch.
+
+    Calls ``loss_fn(model, *data, mask, key=subkey, **kw)`` and differentiates
+    it w.r.t. the `filter_spec`-selected (dynamic) half of the model only.
+    `EqxScanTrainer` supplies `filter_spec` (see its `prepare_step_kw`), so the
+    step, the carry packing and the optimizer state always agree on which
+    leaves are trainable.
+    """
+    model, opt_state, key = carry
+    mask, data = batch_inputs
+    model_dynamic, model_static = eqx.partition(model, filter_spec)
+    key, subkey = jr.split(key)
+
+    @eqx.filter_value_and_grad
+    def _loss(dynamic: eqx.Module, /) -> Array:
+        model = eqx.combine(dynamic, model_static)
+        return loss_fn(model, *data, mask, key=subkey, **kw)
+
+    loss, grads = _loss(model_dynamic)
+    updates, opt_state = optimizer.update(grads, opt_state, model_dynamic)
+    model_dynamic = eqx.apply_updates(model_dynamic, updates)
+    return loss, (eqx.combine(model_dynamic, model_static), opt_state, key)
+
+
 @dataclass(frozen=True)
-class AbstractEqxScanTrainer(AbstractScanNNTrainer):
+class EqxScanTrainer(AbstractScanNNTrainer):
     """Scan trainer for Equinox models, partitioned by `filter_spec`.
 
-    Subclasses supply `init`; `make_step` and `loss_agg_fn` are constructor
-    arguments (see `jaxmore.nn.AbstractScanNNTrainer`).
+    `make_step` and `loss_agg_fn` are constructor arguments (see
+    `jaxmore.nn.AbstractScanNNTrainer`); `make_step` is usually a partial of
+    `eqx_step`.
 
     Attributes
     ----------
@@ -57,6 +93,30 @@ class AbstractEqxScanTrainer(AbstractScanNNTrainer):
     """
 
     filter_spec: Any = eqx.is_array
+
+    def init(  # type: ignore[override]
+        self,
+        model: eqx.Module,
+        data: tuple[Array, ...],
+        mask: Bool[Array, " N"],
+        /,
+        *,
+        optimizer: optax.GradientTransformation,
+        key: PRNGKeyArray,
+    ) -> tuple[EqxTrainCarry, tuple[Bool[Array, " N"], tuple[Array, ...]]]:
+        """Build the initial carry and the epoch data ``(mask, data)``."""
+        opt_state = optimizer.init(eqx.filter(model, self.filter_spec))
+        return (model, opt_state, key), (mask, data)
+
+    def prepare_step_kw(
+        self, /, *, epoch_idx: Array, num_epochs: int, epoch_key: PRNGKeyArray
+    ) -> Mapping[str, Any]:
+        """Pass `filter_spec` to `make_step`: one source of truth for the split.
+
+        Subclasses that add per-epoch kwargs must merge in ``super()``'s.
+        """
+        del epoch_idx, num_epochs, epoch_key
+        return {"filter_spec": self.filter_spec}
 
     def pack_carry_state(
         self, carry: EqxTrainCarry

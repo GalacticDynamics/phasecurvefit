@@ -91,7 +91,7 @@ def chord_along_ordering(
 
 
 def _check_component_keys(
-    positions: VectorComponents, velocities: VectorComponents
+    positions: VectorComponents, velocities: VectorComponents, /
 ) -> None:
     """Reject mismatched component keys, naming both sides of the difference."""
     if set(positions) != set(velocities):

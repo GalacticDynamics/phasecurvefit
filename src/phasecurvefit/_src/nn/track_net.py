@@ -4,26 +4,24 @@ __all__: tuple[str, ...] = (
     "AbstractTrackNet",
     "TrackNet",
     "FourierTrackNet",
-    "TrackNetTrainer",
     "decoder_loss",
 )
 
 import abc
 import functools as ft
 from dataclasses import KW_ONLY, dataclass
-from typing import Any, cast
+from typing import cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import jax.random as jr
 import optax
 from jaxtyping import Array, Bool, Float, PRNGKeyArray, Real
 
 from jaxmore.nn import masked_mean
 
 from .order_net import default_optimizer
-from .trainer import AbstractEqxScanTrainer, EqxTrainCarry
+from .trainer import EqxScanTrainer, eqx_step
 from phasecurvefit._src.custom_types import FSz0, RSz0, RSzN
 
 
@@ -349,7 +347,6 @@ def decoder_loss(
     return prefactor * (lambda_q * spatial_l2 + lambda_p * tangent_l2)
 
 
-@eqx.filter_value_and_grad
 def compute_loss(
     model: TrackNet,
     gamma: Float[Array, " B"],
@@ -358,7 +355,7 @@ def compute_loss(
     *,
     key: PRNGKeyArray | None = None,
 ) -> FSz0:
-    """Compute loss and gradients for a batch of data."""
+    """Compute the loss for a batch of data."""
     # Predict positions from model
     qs_pred = jax.vmap(model, (0, None))(gamma, key)
 
@@ -372,31 +369,6 @@ def compute_loss(
         lambda_q=1,
         lambda_p=0.1,  # set to small value in loss
     )
-
-
-@eqx.filter_jit
-def make_step(
-    model_dynamic: TrackNet,
-    model_static: TrackNet,
-    gamma: Float[Array, " B"],
-    qs_mean: Real[Array, " B D"],
-    mask: Bool[Array, " B"],
-    opt_state: optax.OptState,
-    optimizer: optax.GradientTransformation,
-    *,
-    key: PRNGKeyArray,
-) -> tuple[FSz0, TrackNet, optax.OptState]:
-    """Make a single optimization step for the decoder."""
-    # Reconstruct full model from dynamic and static parts
-    model = eqx.combine(model_dynamic, model_static)
-
-    # Compute loss and gradients
-    loss, grads = compute_loss(model, gamma, qs_mean, mask, key=key)
-
-    # Update the dynamic components of the model
-    updates, opt_state = optimizer.update(grads, opt_state, model_dynamic)
-    model_dynamic = cast("TrackNet", optax.apply_updates(model_dynamic, updates))
-    return loss, model_dynamic, opt_state
 
 
 @dataclass
@@ -416,64 +388,6 @@ class TrackTrainingConfig:
 
     show_pbar: bool = True
     """Whether to show an epoch progress bar via tqdm."""
-
-
-def _track_step(
-    carry: EqxTrainCarry,
-    batch_inputs: tuple[Bool[Array, " B"], tuple[Array, ...]],
-    *,
-    optimizer: optax.GradientTransformation,
-    filter_spec: Any,
-) -> tuple[FSz0, EqxTrainCarry]:
-    """Run one batch of TrackNet training.
-
-    `batch_inputs` is ``(mask, (gamma, qs_mean))``.
-
-    `filter_spec` must be the same spec the trainer used to build `opt_state`
-    (see `TrackNetTrainer.init`), so that the step, the carry packing in
-    `AbstractEqxScanTrainer.pack_carry_state`, and the optimizer state all
-    agree on which leaves are trainable.
-    """
-    model, opt_state, key = carry
-    mask, (gamma, qs_mean) = batch_inputs
-
-    model_dynamic, model_static = eqx.partition(model, filter_spec)
-
-    key, subkey = jr.split(key)
-    loss, model_dynamic, opt_state = make_step(
-        model_dynamic,
-        model_static,
-        gamma=gamma,
-        qs_mean=qs_mean,
-        mask=mask,
-        opt_state=opt_state,
-        optimizer=optimizer,
-        key=subkey,
-    )
-
-    model = eqx.combine(model_dynamic, model_static)
-    return loss, (model, opt_state, key)
-
-
-@dataclass(frozen=True)
-class TrackNetTrainer(AbstractEqxScanTrainer):
-    """Scan trainer for `TrackNet`."""
-
-    def init(  # type: ignore[override]
-        self,
-        model: TrackNet,
-        /,
-        *,
-        gamma: Float[Array, " N"],
-        qs_mean: Real[Array, " N D"],
-        mask: Bool[Array, " N"],
-        optimizer: optax.GradientTransformation,
-        key: PRNGKeyArray,
-    ) -> tuple[EqxTrainCarry, tuple[Bool[Array, " N"], tuple[Array, ...]]]:
-        """Build the initial carry and the epoch data."""
-        model_dynamic, _ = eqx.partition(model, self.filter_spec)
-        opt_state = optimizer.init(model_dynamic)
-        return (model, opt_state, key), (mask, (gamma, qs_mean))
 
 
 def train_track_net(
@@ -501,17 +415,12 @@ def train_track_net(
 
     optimizer = config.optimizer
 
-    # Single source of truth for what is trainable: the step, the carry packing,
-    # and `optimizer.init` must all partition the model the same way.
-    filter_spec: Any = eqx.is_array
-
-    trainer = TrackNetTrainer(
-        make_step=ft.partial(_track_step, optimizer=optimizer, filter_spec=filter_spec),
+    trainer = EqxScanTrainer(
+        make_step=ft.partial(eqx_step, loss_fn=compute_loss, optimizer=optimizer),
         loss_agg_fn=masked_mean,
-        filter_spec=filter_spec,
     )
     initial_carry, epoch_data = trainer.init(
-        model, gamma=gamma, qs_mean=qs_mean, mask=mask, optimizer=optimizer, key=key
+        model, (gamma, qs_mean), mask, optimizer=optimizer, key=key
     )
     (model, opt_state, _), epoch_losses = trainer.run(
         initial_carry,

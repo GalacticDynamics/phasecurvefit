@@ -1,7 +1,13 @@
 """Pytest configuration for phasecurvefit tests."""
 
+import os
 from collections.abc import Callable, Iterable, Sequence
 from doctest import ELLIPSIS, NORMALIZE_WHITESPACE
+
+# Tests never need a GUI: without this, matplotlib picks TkAgg on Windows
+# runners, whose Tcl/Tk install is intermittently broken ("Can't find a usable
+# tk.tcl"), failing doc examples that only draw a figure.
+os.environ.setdefault("MPLBACKEND", "Agg")
 
 import jax
 import pytest
@@ -53,14 +59,6 @@ if not OptDeps.MATPLOTLIB.installed:
     collect_ignore_glob.append("tests/usage/test_epitrochoid.py")
 if not OptDeps.JAXKD.installed:
     collect_ignore_glob.append("tests/unit/test_kdtree.py")
-
-
-def pytest_configure(config):
-    """Configure pytest."""
-    # Suppress JAX warning about no GPU
-    import os
-
-    os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
 
 @pytest.fixture

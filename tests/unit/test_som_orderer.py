@@ -675,7 +675,7 @@ def test_som_orderer_rejects_init_indices_outside_the_contract(label, make):
     init = pcf.orderers.OrderingResult(
         positions=pos, velocities=vel, indices=make(n), velocity_aware=True
     )
-    with pytest.raises(eqx.EquinoxRuntimeError, match=r"outside \[-1, n_obs\)"):
+    with pytest.raises(ValueError, match=r"outside \[-1, n_obs\)"):
         pcf.orderers.SOMOrderer(n_prototypes=6).order(pos, vel, init=init)
 
 
@@ -697,7 +697,7 @@ def test_som_orderer_rejects_a_repeated_visited_index():
     init = pcf.orderers.OrderingResult(
         positions=pos, velocities=vel, indices=indices, velocity_aware=True
     )
-    with pytest.raises(eqx.EquinoxRuntimeError, match="repeated visited index"):
+    with pytest.raises(ValueError, match="repeated visited index"):
         pcf.orderers.SOMOrderer(n_prototypes=6).order(pos, vel, init=init)
 
 
@@ -1109,3 +1109,161 @@ class TestSOMOutlierClip:
         batched_vel = {k: jnp.stack([v, v]) for k, v in vel.items()}
         out = jax.vmap(lambda q, p: orderer.order(q, p).chord)(batched_pos, batched_vel)
         assert out.shape == (2, 60)
+
+
+class TestNonFiniteVelocities:
+    """NaN velocities are missing data, policed by ``nan_policy``; inf is an error.
+
+    Missing velocities are common in catalogues (no radial velocity). Summed
+    into the batch update, a single NaN reached every prototype through the
+    neighbourhood, so ``orient_by_velocity`` compared against NaN and never
+    flipped -- silently ordering against the flow.
+    """
+
+    @staticmethod
+    def _spoil(vel, value):
+        """Set one tracer's x velocity."""
+        return {"x": vel["x"].at[57].set(value), "y": vel["y"]}
+
+    @staticmethod
+    def _against_the_flow(straight, sign):
+        """Build a line whose *unflipped* SOM ordering runs against ``sign``.
+
+        ``straight(sign=sign)`` mirrors its positions with ``sign``, which
+        mirrors the initializer's axis too, so there the unflipped SOM already
+        agrees with the flow and a test would pass without ever flipping.
+        """
+        pos, _, _ = straight(sign=-sign)
+        return pos, {"x": jnp.full(200, 10.0 * sign), "y": jnp.zeros(200)}
+
+    @pytest.mark.parametrize("sign", [1.0, -1.0], ids=["flow+x", "flow-x"])
+    def test_omit_orients_along_the_flow(self, straight, sign):
+        """A missing velocity no longer stops the flip."""
+        pos, vel = self._against_the_flow(straight, sign)
+        vel = self._spoil(vel, jnp.nan)
+        orderer = pcf.orderers.SOMOrderer(orient_by_velocity=True, nan_policy="omit")
+        order = orderer.order(pos, vel).ordering
+        first, last = float(pos["x"][order[0]]), float(pos["x"][order[-1]])
+        assert (last - first) * sign > 0
+
+    @pytest.mark.parametrize("sign", [1.0, -1.0], ids=["flow+x", "flow-x"])
+    def test_a_stationary_tracer_is_data_not_missing(self, straight, sign):
+        """A zero velocity neither raises nor stops the flip."""
+        pos, vel = self._against_the_flow(straight, sign)
+        vel = self._spoil(vel, 0.0)
+        orderer = pcf.orderers.SOMOrderer(orient_by_velocity=True)
+        order = orderer.order(pos, vel).ordering
+        first, last = float(pos["x"][order[0]]), float(pos["x"][order[-1]])
+        assert (last - first) * sign > 0
+
+    @pytest.mark.parametrize(
+        "kw",
+        [
+            {"orient_by_velocity": True},
+            {
+                "metric": pcf.metrics.FullPhaseSpaceDistanceMetric(),
+                "metric_scale": 0.1,
+            },
+        ],
+        ids=["orient", "velocity-aware-metric"],
+    )
+    def test_nan_raises_by_default_when_velocities_are_read(self, straight, kw):
+        """Silently skipping a missing velocity has to be asked for."""
+        pos, vel, _ = straight()
+        vel = self._spoil(vel, jnp.nan)
+        with pytest.raises(ValueError, match="nan_policy='omit'"):
+            pcf.orderers.SOMOrderer(**kw).order(pos, vel)
+
+    def test_nan_is_fine_when_velocities_are_not_read(self, straight):
+        """A position-only stage never reads velocities, so never raises."""
+        pos, vel, _ = straight()
+        vel = self._spoil(vel, jnp.nan)
+        result = pcf.orderers.SOMOrderer().order(pos, vel)
+        assert int(result.n_visited) == 200
+
+    @pytest.mark.parametrize("policy", ["raise", "omit"])
+    @pytest.mark.parametrize("bad", [np.inf, -np.inf], ids=["+inf", "-inf"])
+    def test_inf_raises_under_either_policy(self, straight, policy, bad):
+        """Inf is not a missing measurement, so ``omit`` does not cover it."""
+        pos, vel, _ = straight()
+        vel = self._spoil(vel, bad)
+        orderer = pcf.orderers.SOMOrderer(orient_by_velocity=True, nan_policy=policy)
+        with pytest.raises(ValueError, match="infinite velocity"):
+            orderer.order(pos, vel)
+
+    def test_raises_under_jit(self, straight):
+        """Traced, the check still fires at run time."""
+        pos, vel, _ = straight()
+        vel = self._spoil(vel, jnp.nan)
+        orderer = pcf.orderers.SOMOrderer(n_prototypes=10, orient_by_velocity=True)
+        with pytest.raises(RuntimeError, match="nan_policy='omit'"):
+            jax.block_until_ready(
+                jax.jit(lambda q, p: orderer.order(q, p).chord)(pos, vel)
+            )
+
+    def test_rejects_an_unknown_nan_policy(self):
+        """A typo fails at construction, not at the first NaN."""
+        with pytest.raises(ValueError, match="nan_policy"):
+            pcf.orderers.SOMOrderer(nan_policy="propagate")
+
+    def test_prototype_velocities_stay_finite(self, straight):
+        """One NaN tracer used to make every prototype velocity NaN."""
+        pos, vel, _ = straight()
+        vel = self._spoil(vel, jnp.nan)
+        pq, pp = som.init_prototypes(pos, vel, n_prototypes=30)
+        assert bool(jnp.all(jnp.isfinite(pp["x"])))
+        result = som.fit(pq, pp, pos, vel, metric=pcf.metrics.SpatialDistanceMetric())
+        assert bool(jnp.all(jnp.isfinite(result.prototype_velocities["x"])))
+
+    def test_a_velocity_component_nobody_has_stays_finite(self, straight):
+        """Every contributor non-finite: the prototype keeps a finite value."""
+        pos, vel, _ = straight()
+        vel = {"x": vel["x"], "y": jnp.full_like(vel["y"], jnp.nan)}
+        pq, pp = som.init_prototypes(pos, vel, n_prototypes=30)
+        result = som.fit(pq, pp, pos, vel, metric=pcf.metrics.SpatialDistanceMetric())
+        assert bool(jnp.all(jnp.isfinite(result.prototype_velocities["y"])))
+
+    def test_derived_scale_ignores_a_nan_speed(self, straight):
+        """A NaN median speed used to zero the scale, disabling velocity."""
+        pos, vel, _ = straight()
+        init = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, velocity_weight=1.0).order(
+            pos, vel
+        )
+        sub_q = {k: v[init.ordering] for k, v in pos.items()}
+        sub_p = {k: v[init.ordering] for k, v in self._spoil(vel, jnp.nan).items()}
+        _, scale = pcf.orderers.SOMOrderer()._resolve_metric(sub_q, sub_p, init)
+        assert float(scale) > 0.0
+
+    def test_omit_keeps_the_arms_apart_under_a_velocity_aware_metric(self):
+        """A datum without a velocity is matched by position alone.
+
+        Left NaN, its distance to every prototype is NaN, ``argmin`` sends it
+        to prototype 0, and one such datum interleaves the anti-parallel arms.
+        The prior stage sees clean velocities so only the SOM sees the NaN.
+        """
+        pos, vel = TestMetricAndScaleResolveIndependently._hairpin()
+        n = len(pos["x"]) // 2
+        init = pcf.orderers.MSTOrderer(k=6, jump_cap=5.0, velocity_weight=1.0).order(
+            pos, vel
+        )
+        vel = {"x": vel["x"].at[20].set(jnp.nan), "y": vel["y"]}
+        orderer = pcf.orderers.SOMOrderer(n_prototypes=30, nan_policy="omit")
+        idx = np.asarray(orderer.order(pos, vel, init=init).ordering)
+        # One switch is a perfect traversal: down one arm and back the other.
+        assert int(np.abs(np.diff((idx >= n).astype(int))).sum()) == 1
+
+    def test_omit_traces_under_jit_and_vmap(self, straight):
+        """The masking adds no Python branching on traced values."""
+        pos, vel, _ = straight()
+        vel = self._spoil(vel, jnp.nan)
+        orderer = pcf.orderers.SOMOrderer(
+            n_prototypes=10, orient_by_velocity=True, nan_policy="omit"
+        )
+
+        chord = jax.jit(lambda q, p: orderer.order(q, p).chord)(pos, vel)
+        assert bool(jnp.all(jnp.isfinite(chord)))
+
+        batched_pos = {k: jnp.stack([v, v]) for k, v in pos.items()}
+        batched_vel = {k: jnp.stack([v, v]) for k, v in vel.items()}
+        out = jax.vmap(lambda q, p: orderer.order(q, p).chord)(batched_pos, batched_vel)
+        assert out.shape == (2, 200)

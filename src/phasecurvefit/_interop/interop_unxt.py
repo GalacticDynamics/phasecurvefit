@@ -45,7 +45,12 @@ from unxt.quantity import AllowValue
 
 from phasecurvefit._src import algorithm, phasespace
 from phasecurvefit._src.abstract_result import AbstractResult
-from phasecurvefit._src.algorithm import Direction, StateMetadata, WalkLocalFlowResult
+from phasecurvefit._src.algorithm import (
+    Direction,
+    NanPolicy,
+    StateMetadata,
+    WalkLocalFlowResult,
+)
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
 from phasecurvefit._src.orderers.localflow import (
@@ -68,351 +73,29 @@ VectorQComponents: TypeAlias = Mapping[str, Real[AbcQ, " N"]]  # noqa: UP040
 # ==============================================================================
 
 
-def _scan_p_helper(
-    usys: u.AbstractUnitSystem,
-    q: tuple[AbcQ, ...],
-    p: tuple[AbcQ, ...],
-    terminate_arr: ArrayLike,
-    *args: Any,
-    kw: dict[str, Any],
-) -> tuple[Array, Array, Array, Array, Array]:
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-        _,  # metadata placeholder
-    ) = lax.scan_p.bind(  # type: ignore[no-untyped-call]
+@quax.register(lax.scan_p)
+def scan_p_statemetadata_quantity(
+    metadata: StateMetadata, terminate_arr: ArrayLike, /, *args: Any, **kw: Any
+) -> tuple[Array, Array, Array, Array, Array, StateMetadata]:
+    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
+
+    Quax flattens the bounded_while_loop carry into positional args, with the
+    metadata first. The remaining args (positions, velocities, consts, state)
+    vary in number with dimensionality and query strategy, so strip units from
+    all of them, call the primitive, and re-attach the metadata.
+    """
+    usys = metadata.get("usys")
+    if usys is None:
+        msg = "No unit system found in StateMetadata"
+        raise RuntimeError(msg)
+
+    *out, _ = lax.scan_p.bind(  # type: ignore[no-untyped-call]
         jnp.array(True),  # noqa: FBT003
         terminate_arr,
-        *[u.ustrip(usys, x) for x in q],
-        *[u.ustrip(usys, v) for v in p],
         *[u.ustrip(AllowValue, usys, arg) for arg in args],
         **kw,
     )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop)
-
-
-@quax.register(lax.scan_p)
-def scan_p_statemetadata_quantity(
-    metadata: StateMetadata,
-    terminate_arr: ArrayLike,
-    q_x: AbcQ,
-    p_x: AbcQ,
-    metric_scale: AbcQ,
-    max_dist: AbcQ,
-    ordered_arr: ArrayLike,
-    visited_mask: ArrayLike,
-    current_idx: int,
-    step: int,
-    should_stop: bool,  # noqa: FBT001
-    arg0: ArrayLike,  # what is this?
-    /,
-    **kw: Any,
-) -> list[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, StateMetadata]:
-    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
-
-    Quax flattens the bounded_while_loop carry into positional args. In the
-    current flattening order we observe the metadata as the first positional
-    argument, followed by ``xs`` (typically an empty array for our scan), any
-    const arguments, and finally the remaining state elements plus the ``done``
-    flag. We peel the state off the tail, strip Quantities, call the primitive
-    implementation, and rewrap.
-    """
-    usys = metadata.get("usys")
-    if usys is None:
-        msg = "No unit system found in StateMetadata"
-        raise RuntimeError(msg)
-
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-    ) = _scan_p_helper(
-        usys,
-        (q_x,),
-        (p_x,),
-        terminate_arr,
-        metric_scale,
-        max_dist,
-        ordered_arr,
-        visited_mask,
-        current_idx,
-        step,
-        should_stop,
-        arg0,
-        kw=kw,
-    )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop, metadata)
-
-
-@quax.register(lax.scan_p)
-def scan_p_statemetadata_quantity(
-    metadata: StateMetadata,
-    terminate_arr: ArrayLike,
-    q_x: AbcQ,
-    q_y: AbcQ,
-    p_x: AbcQ,
-    p_y: AbcQ,
-    metric_scale: AbcQ,
-    max_dist: AbcQ,
-    ordered_arr: ArrayLike,
-    visited_mask: ArrayLike,
-    current_idx: int,
-    step: int,
-    should_stop: bool,  # noqa: FBT001
-    arg0: ArrayLike,  # what is this?
-    /,
-    **kw: Any,
-) -> list[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, StateMetadata]:
-    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
-
-    Quax flattens the bounded_while_loop carry into positional args. In the
-    current flattening order we observe the metadata as the first positional
-    argument, followed by ``xs`` (typically an empty array for our scan), any
-    const arguments, and finally the remaining state elements plus the ``done``
-    flag. We peel the state off the tail, strip Quantities, call the primitive
-    implementation, and rewrap.
-    """
-    usys = metadata.get("usys")
-    if usys is None:
-        msg = "No unit system found in StateMetadata"
-        raise RuntimeError(msg)
-
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-    ) = _scan_p_helper(
-        usys,
-        (q_x, q_y),
-        (p_x, p_y),
-        terminate_arr,
-        metric_scale,
-        max_dist,
-        ordered_arr,
-        visited_mask,
-        current_idx,
-        step,
-        should_stop,
-        arg0,
-        kw=kw,
-    )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop, metadata)
-
-
-@quax.register(lax.scan_p)
-def scan_p_statemetadata_quantity(
-    metadata: StateMetadata,
-    terminate_arr: ArrayLike,
-    q_x: AbcQ,
-    q_y: AbcQ,
-    q_z: AbcQ,
-    p_x: AbcQ,
-    p_y: AbcQ,
-    p_z: AbcQ,
-    metric_scale: AbcQ,
-    max_dist: AbcQ,
-    ordered_arr: ArrayLike,
-    visited_mask: ArrayLike,
-    current_idx: int,
-    step: int,
-    should_stop: bool,  # noqa: FBT001
-    arg0: ArrayLike,  # what is this?
-    /,
-    **kw: Any,
-) -> list[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, StateMetadata]:
-    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
-
-    Quax flattens the bounded_while_loop carry into positional args. In the
-    current flattening order we observe the metadata as the first positional
-    argument, followed by ``xs`` (typically an empty array for our scan), any
-    const arguments, and finally the remaining state elements plus the ``done``
-    flag. We peel the state off the tail, strip Quantities, call the primitive
-    implementation, and rewrap.
-    """
-    usys = metadata.get("usys")
-    if usys is None:
-        msg = "No unit system found in StateMetadata"
-        raise RuntimeError(msg)
-
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-    ) = _scan_p_helper(
-        usys,
-        (q_x, q_y, q_z),
-        (p_x, p_y, p_z),
-        terminate_arr,
-        metric_scale,
-        max_dist,
-        ordered_arr,
-        visited_mask,
-        current_idx,
-        step,
-        should_stop,
-        arg0,
-        kw=kw,
-    )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop, metadata)
-
-
-# ------------------------------------------------------
-# for KDTree
-
-
-# TODO: determinet the details of this
-@quax.register(lax.scan_p)
-def scan_p_qvvvvv(
-    pos: AbcQ,
-    arg1: ArrayLike,
-    arg2: ArrayLike,
-    arg3: ArrayLike,
-    arg4: ArrayLike,
-    arg5: ArrayLike,
-    **kw: Any,
-) -> list:
-    out_v = lax.scan_p.bind(u.ustrip(pos), arg1, arg2, arg3, arg4, arg5, **kw)
-    return out_v  # noqa: RET504
-
-
-@quax.register(lax.scan_p)
-def scan_p_statemetadata_quantity(
-    metadata: StateMetadata,
-    terminate_arr: ArrayLike,
-    q_x: AbcQ,
-    q_y: AbcQ,
-    p_x: AbcQ,
-    p_y: AbcQ,
-    q_xy: AbcQ,
-    ordered_arr: ArrayLike,
-    visited_mask: ArrayLike,
-    metric_scale: AbcQ,
-    max_dist: AbcQ,
-    arg0: ArrayLike,
-    arg1: ArrayLike,
-    current_idx: int,
-    step: int,
-    should_stop: bool,  # noqa: FBT001
-    arg2: ArrayLike,  # what is this?
-    /,
-    **kw: Any,
-) -> list[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, StateMetadata]:
-    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
-
-    Quax flattens the bounded_while_loop carry into positional args. In the
-    current flattening order we observe the metadata as the first positional
-    argument, followed by ``xs`` (typically an empty array for our scan), any
-    const arguments, and finally the remaining state elements plus the ``done``
-    flag. We peel the state off the tail, strip Quantities, call the primitive
-    implementation, and rewrap.
-    """
-    usys = metadata.get("usys")
-    if usys is None:
-        msg = "No unit system found in StateMetadata"
-        raise RuntimeError(msg)
-
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-    ) = _scan_p_helper(
-        usys,
-        (q_x, q_y),
-        (p_x, p_y),
-        terminate_arr,
-        q_xy,
-        ordered_arr,
-        visited_mask,
-        metric_scale,
-        max_dist,
-        arg0,
-        arg1,
-        current_idx,
-        step,
-        should_stop,
-        arg2,
-        kw=kw,
-    )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop, metadata)
-
-
-@quax.register(lax.scan_p)
-def scan_p_statemetadata_quantity(
-    metadata: StateMetadata,
-    terminate_arr: ArrayLike,
-    q_x: AbcQ,
-    q_y: AbcQ,
-    q_z: AbcQ,
-    p_x: AbcQ,
-    p_y: AbcQ,
-    p_z: AbcQ,
-    q_xyz: AbcQ,
-    ordered_arr: ArrayLike,
-    visited_mask: ArrayLike,
-    metric_scale: AbcQ,
-    max_dist: AbcQ,
-    arg0: ArrayLike,
-    arg1: ArrayLike,
-    current_idx: int,
-    step: int,
-    should_stop: bool,  # noqa: FBT001
-    arg2: ArrayLike,  # what is this?
-    /,
-    **kw: Any,
-) -> list[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, StateMetadata]:
-    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
-
-    Quax flattens the bounded_while_loop carry into positional args. In the
-    current flattening order we observe the metadata as the first positional
-    argument, followed by ``xs`` (typically an empty array for our scan), any
-    const arguments, and finally the remaining state elements plus the ``done``
-    flag. We peel the state off the tail, strip Quantities, call the primitive
-    implementation, and rewrap.
-    """
-    usys = metadata.get("usys")
-    if usys is None:
-        msg = "No unit system found in StateMetadata"
-        raise RuntimeError(msg)
-
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-    ) = _scan_p_helper(
-        usys,
-        (q_x, q_y, q_z),
-        (p_x, p_y, p_z),
-        terminate_arr,
-        q_xyz,
-        ordered_arr,
-        visited_mask,
-        metric_scale,
-        max_dist,
-        arg0,
-        arg1,
-        current_idx,
-        step,
-        should_stop,
-        arg2,
-        kw=kw,
-    )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop, metadata)
-
-
-# ------------------------------------------------------
+    return (*out, metadata)
 
 
 @quax.register(lax.scatter_p)
@@ -443,21 +126,7 @@ def scatter_p_array_quantity(
 
 @plum.dispatch
 def euclidean_distance(q_a: ScalarQComponents, q_b: ScalarQComponents, /) -> RQSz0:
-    """Euclidean distance between Quantity-valued component dictionaries.
-
-    Computes the distance between two phase-space positions represented as
-    dictionaries with unxt Quantity scalar values.
-
-    Parameters
-    ----------
-    q_a, q_b : Mapping[str, unxt.AbstractQuantity]
-        Position dictionaries with Quantity-valued components. Must have the
-        same keys. All values must have compatible length dimensions.
-
-    Returns
-    -------
-    unxt.Quantity
-        The Euclidean distance with the unit of the input components.
+    """Compute the distance between Quantity-valued positions, in their unit.
 
     Examples
     --------
@@ -476,23 +145,7 @@ def euclidean_distance(q_a: ScalarQComponents, q_b: ScalarQComponents, /) -> RQS
 def unit_direction(
     q_a: ScalarQComponents, q_b: ScalarQComponents, /
 ) -> ScalarQComponents:
-    """Compute unit direction vector from q_a to q_b for Quantity-valued components.
-
-    Computes the unit direction vector pointing from position `q_a` to `q_b`,
-    where both positions are represented as dictionaries with unxt Quantity
-    scalar values.
-
-    Parameters
-    ----------
-    q_a, q_b : Mapping[str, unxt.AbstractQuantity]
-        Position dictionaries with Quantity-valued components. Must have the
-        same keys. All values must have compatible length dimensions.
-
-    Returns
-    -------
-    Mapping[str, unxt.AbstractQuantity]
-        A dictionary representing the unit direction vector. The components
-        are dimensionless Quantities.
+    """Compute the unit direction from ``q_a`` to ``q_b`` (dimensionless).
 
     Examples
     --------
@@ -510,21 +163,7 @@ def unit_direction(
 
 @plum.dispatch
 def velocity_norm(velocity: ScalarQComponents, /) -> RQSz0:
-    """Compute the norm of a Quantity-valued velocity vector.
-
-    Computes the Euclidean norm of a velocity vector represented as a
-    dictionary with unxt Quantity scalar values.
-
-    Parameters
-    ----------
-    velocity : Mapping[str, unxt.AbstractQuantity]
-        Velocity dictionary with Quantity-valued components. All values must
-        have compatible velocity dimensions (length/time).
-
-    Returns
-    -------
-    unxt.Quantity
-        The Euclidean norm of the velocity with appropriate units.
+    """Compute the norm of a Quantity-valued velocity, in its unit.
 
     Examples
     --------
@@ -541,22 +180,7 @@ def velocity_norm(velocity: ScalarQComponents, /) -> RQSz0:
 
 @plum.dispatch
 def unit_velocity(velocity: ScalarQComponents, /) -> ScalarQComponents:
-    """Compute unit velocity vector for Quantity-valued components.
-
-    Computes the unit velocity vector from a velocity represented as a
-    dictionary with unxt Quantity scalar values.
-
-    Parameters
-    ----------
-    velocity : Mapping[str, unxt.AbstractQuantity]
-        Velocity dictionary with Quantity-valued components. All values must
-        have compatible velocity dimensions (length/time).
-
-    Returns
-    -------
-    Mapping[str, unxt.AbstractQuantity]
-        A dictionary representing the unit velocity vector. The components
-        are dimensionless Quantities.
+    """Compute the unit velocity vector (dimensionless).
 
     Examples
     --------
@@ -573,22 +197,7 @@ def unit_velocity(velocity: ScalarQComponents, /) -> ScalarQComponents:
 
 @plum.dispatch
 def cosine_similarity(vel_a: ScalarQComponents, vel_b: ScalarQComponents, /) -> RQSz0:
-    """Compute cosine similarity between Quantity-valued velocity components.
-
-    Computes the cosine similarity (dimensionless) between two vectors
-    represented as dictionaries with unxt Quantity scalar values.
-    The result is the cosine of the angle between the two vectors.
-
-    Parameters
-    ----------
-    vel_a, vel_b : Mapping[str, unxt.AbstractQuantity]
-        Velocity or direction dictionaries with Quantity-valued components.
-        Must have the same keys. All values must have compatible dimensions.
-
-    Returns
-    -------
-    unxt.Quantity
-        The dimensionless cosine similarity between the two vectors.
+    """Compute the cosine similarity of two Quantity-valued vectors.
 
     Examples
     --------
@@ -623,6 +232,7 @@ def _local_flow_walk(
     direction: Direction = "forward",
     metadata: StateMetadata | None = None,
     usys: u.AbstractUnitSystem | None = None,
+    nan_policy: NanPolicy = "raise",
 ) -> WalkLocalFlowResult:
     """Implement for Quantity-valued phase-space data.
 
@@ -662,6 +272,8 @@ def _local_flow_walk(
     usys : unxt.AbstractUnitSystem, optional
         Unit system to use for consistent unit stripping of Quantities. Default
         is SI units.
+    nan_policy
+        See :class:`~phasecurvefit.orderers.LocalFlowOrderer`.
 
     Returns
     -------
@@ -721,6 +333,10 @@ def _local_flow_walk(
 
     q_values = {k: u.ustrip(usys, v) for k, v in positions.items()}
     p_values = {k: u.ustrip(usys, v) for k, v in velocities.items()}
+    # Check before quaxify: inside it even concrete arrays are quax tracers, so
+    # the check could only defer (an EquinoxRuntimeError, not ValueError).
+    if config.metric.uses_velocity:
+        p_values = algorithm.check_velocities(p_values, nan_policy)
 
     # Quaxify the walk so Quantities are handled properly
     # by custom dispatches in the quax context. StateMetadata is part of init
@@ -736,6 +352,7 @@ def _local_flow_walk(
         config=config,
         metadata=metadata,
         direction=direction,
+        nan_policy=nan_policy,
     )
     return dataclasses.replace(result, positions=positions, velocities=velocities)
 
@@ -794,7 +411,7 @@ def _require_usys(metadata: StateMetadata | None, /) -> u.AbstractUnitSystem:
 
 
 def _chord_unit(
-    positions: VectorQComponents, usys: u.AbstractUnitSystem
+    positions: VectorQComponents, usys: u.AbstractUnitSystem, /
 ) -> u.AbstractUnit:
     """Pick the unit for ``chord``, which is one length for all components.
 
@@ -812,6 +429,7 @@ def _order_with_backbone_and_chord(
     orderer: MSTOrderer | SOMOrderer,
     positions: VectorQComponents,
     velocities: VectorQComponents,
+    /,
     *,
     metadata: StateMetadata | None,
     init: AbstractResult | None,
@@ -928,7 +546,7 @@ def order(
     """
     usys = _require_usys(metadata)
 
-    def _as_length_q(val: object) -> AbcQ:
+    def _as_length_q(val: object, /) -> AbcQ:
         return val if isinstance(val, u.AbstractQuantity) else u.Q(val, usys["length"])
 
     result = algorithm._local_flow_walk(  # noqa: SLF001
@@ -942,6 +560,7 @@ def order(
         config=self.config,
         direction=self.direction,
         usys=usys,
+        nan_policy=self.nan_policy,
     )
     # Calls the same ``_finalize`` the plain dispatch calls, on unit-stripped
     # positions, rather than re-deriving the chord computation here: a step

@@ -323,6 +323,128 @@ class TestLocalFlowOrdererRegression:
         )
 
 
+def _shuffled_line(n=200, seed=0):
+    """Build a +x line, shuffled so storage order cannot rescue the walk."""
+    x = np.random.default_rng(seed).permutation(np.linspace(0.0, 10.0, n))
+    pos = {"x": jnp.asarray(x), "y": jnp.zeros(n)}
+    vel = {"x": jnp.ones(n), "y": jnp.zeros(n)}
+    return x, pos, vel, int(np.argmin(x))
+
+
+class TestLocalFlowNonFiniteVelocities:
+    """NaN velocities are missing data, policed by ``nan_policy``; inf is an error.
+
+    Left alone, a non-finite velocity made every distance it touched NaN and
+    ``argmin`` took the first NaN -- the lowest-index unvisited tracer,
+    wherever it was -- so the walk jumped back and forth with no error.
+    """
+
+    @staticmethod
+    def _spoil(vel, x, ranks, value):
+        """Set the velocity of the tracers at these ranks along the line."""
+        idx = jnp.asarray(np.argsort(x)[list(ranks)])
+        return {"x": vel["x"].at[idx].set(value), "y": vel["y"]}
+
+    @pytest.mark.parametrize(
+        "metric",
+        [
+            pcf.metrics.AlignedMomentumDistanceMetric(),
+            pcf.metrics.FullPhaseSpaceDistanceMetric(),
+        ],
+        ids=["aligned", "full"],
+    )
+    @pytest.mark.parametrize(
+        "ranks", [(100,), tuple(range(5, 200, 20))], ids=["1", "10"]
+    )
+    def test_omit_walks_the_line_in_order(self, metric, ranks):
+        """From a tracer without a velocity the walk steps by position."""
+        x, pos, vel, start = _shuffled_line()
+        vel = self._spoil(vel, x, ranks, jnp.nan)
+        orderer = pcf.orderers.LocalFlowOrderer(
+            start_idx=start,
+            metric_scale=0.5,
+            config=pcf.WalkConfig(metric=metric),
+            nan_policy="omit",
+        )
+        res = orderer.order(pos, vel)
+        assert int(res.n_visited) == 200
+        assert np.all(np.diff(x[np.asarray(res.ordering)]) > 0)
+
+    def test_omit_walks_both_directions(self):
+        """``direction="both"`` forwards the policy, and combines NaN results.
+
+        ``max_dist`` stops each walk at its end of the line; without it each
+        walk doubles back over the other's half.
+        """
+        x, pos, vel, _ = _shuffled_line()
+        vel = self._spoil(vel, x, (50, 150), jnp.nan)
+        res = pcf.orderers.LocalFlowOrderer(
+            start_idx=int(np.argsort(x)[100]),
+            direction="both",
+            max_dist=0.1,
+            nan_policy="omit",
+        ).order(pos, vel)
+        assert int(res.n_visited) == 200
+        assert np.all(np.diff(x[np.asarray(res.ordering)]) > 0)
+
+    def test_nan_raises_by_default(self):
+        """Skipping a missing velocity has to be asked for."""
+        x, pos, vel, start = _shuffled_line()
+        vel = self._spoil(vel, x, (100,), jnp.nan)
+        with pytest.raises(ValueError, match="nan_policy='omit'"):
+            pcf.orderers.LocalFlowOrderer(start_idx=start).order(pos, vel)
+
+    def test_nan_is_fine_when_the_metric_ignores_velocity(self):
+        """A position-only metric never reads velocities, so never raises."""
+        x, pos, vel, start = _shuffled_line()
+        vel = self._spoil(vel, x, (100,), jnp.nan)
+        res = pcf.orderers.LocalFlowOrderer(
+            start_idx=start,
+            config=pcf.WalkConfig(metric=pcf.metrics.SpatialDistanceMetric()),
+        ).order(pos, vel)
+        assert int(res.n_visited) == 200
+
+    @pytest.mark.parametrize("policy", ["raise", "omit"])
+    @pytest.mark.parametrize("bad", [np.inf, -np.inf], ids=["+inf", "-inf"])
+    def test_inf_raises_under_either_policy(self, bad, policy):
+        """Infinity is not a missing measurement, so ``omit`` does not cover it."""
+        x, pos, vel, start = _shuffled_line()
+        vel = self._spoil(vel, x, (100,), bad)
+        orderer = pcf.orderers.LocalFlowOrderer(start_idx=start, nan_policy=policy)
+        with pytest.raises(ValueError, match="infinite velocity"):
+            orderer.order(pos, vel)
+
+    def test_raises_under_jit(self):
+        """Traced, the check still fires at run time."""
+        x, pos, vel, start = _shuffled_line()
+        vel = self._spoil(vel, x, (100,), jnp.nan)
+        orderer = pcf.orderers.LocalFlowOrderer(start_idx=start)
+        with pytest.raises(RuntimeError, match="nan_policy='omit'"):
+            jax.block_until_ready(
+                jax.jit(lambda q, p: orderer.order(q, p).indices)(pos, vel)
+            )
+
+    def test_omit_traces_under_jit(self):
+        """The fallback is branchless, so it traces."""
+        x, pos, vel, start = _shuffled_line()
+        vel = self._spoil(vel, x, (100,), jnp.nan)
+        orderer = pcf.orderers.LocalFlowOrderer(start_idx=start, nan_policy="omit")
+        idx = jax.jit(lambda q, p: orderer.order(q, p).indices)(pos, vel)
+        assert np.all(np.diff(x[np.asarray(idx)]) > 0)
+
+    def test_a_stationary_tracer_is_data_not_missing(self):
+        """A zero velocity neither raises nor throws off the default metric."""
+        x, pos, vel, start = _shuffled_line()
+        vel = self._spoil(vel, x, (100,), 0.0)
+        res = pcf.orderers.LocalFlowOrderer(start_idx=start).order(pos, vel)
+        assert np.all(np.diff(x[np.asarray(res.ordering)]) > 0)
+
+    def test_rejects_an_unknown_nan_policy(self):
+        """A typo fails at construction, not at the first NaN."""
+        with pytest.raises(ValueError, match="nan_policy"):
+            pcf.orderers.LocalFlowOrderer(nan_policy="propagate")
+
+
 class TestConformance:
     """Interface conformance shared by every orderer."""
 
@@ -452,3 +574,35 @@ def test_mst_rejects_a_negative_velocity_weight():
     """
     with pytest.raises(ValueError, match="velocity_weight must be >= 0"):
         pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, velocity_weight=-1.0)
+
+
+_VELOCITY_READERS = {
+    "localflow": lambda: pcf.orderers.LocalFlowOrderer(start_idx=0),
+    "mst": lambda: pcf.orderers.MSTOrderer(k=5, jump_cap=2.0, velocity_weight=1.0),
+    "som": lambda: pcf.orderers.SOMOrderer(n_prototypes=6, orient_by_velocity=True),
+}
+
+
+@pytest.mark.parametrize("bad", [np.nan, np.inf], ids=["nan", "inf"])
+@pytest.mark.parametrize("name", list(_VELOCITY_READERS))
+def test_every_orderer_raises_value_error_eagerly(name, bad):
+    """One mistake, one exception type: eager input errors are ``ValueError``.
+
+    ``eqx.error_if`` raised ``EquinoxRuntimeError`` even on concrete inputs,
+    so SOMOrderer and LocalFlowOrderer disagreed with MSTOrderer.
+    """
+    x = jnp.linspace(0.0, 10.0, 40)
+    pos = {"x": x, "y": jnp.zeros(40)}
+    vel = {"x": jnp.ones(40).at[7].set(bad), "y": jnp.zeros(40)}
+    with pytest.raises(ValueError, match="velocit"):
+        _VELOCITY_READERS[name]().order(pos, vel)
+
+
+def test_result_call_out_of_range_raises_value_error():
+    """``OrderingResult.__call__`` outside ``gamma_range`` is a ``ValueError``."""
+    x = jnp.linspace(0.0, 10.0, 40)
+    pos = {"x": x, "y": jnp.zeros(40)}
+    vel = {"x": jnp.ones(40), "y": jnp.zeros(40)}
+    result = pcf.orderers.MSTOrderer(k=5, jump_cap=2.0).order(pos, vel)
+    with pytest.raises(ValueError):  # noqa: PT011
+        result(jnp.asarray(5.0))

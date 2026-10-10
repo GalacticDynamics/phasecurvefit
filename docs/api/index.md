@@ -158,7 +158,7 @@ Low-level functions for phase-space operations. Available in the `phasecurvefit.
    :show-inheritance:
 
 .. data:: ScalarComponents
-   :annotation: : TypeAlias = Mapping[str, FLikeSz0]
+   :annotation: : TypeAlias = dict[str, RLikeSz0]
 
    Type alias for dictionaries mapping component names to scalar JAX arrays.
 
@@ -173,7 +173,7 @@ Low-level functions for phase-space operations. Available in the `phasecurvefit.
        }
 
 .. data:: VectorComponents
-   :annotation: : TypeAlias = Mapping[str, FLikeSzN]
+   :annotation: : TypeAlias = dict[str, RLikeSzN]
 
    Type alias for dictionaries mapping component names to 1D JAX arrays.
 

@@ -8,7 +8,10 @@ import pytest
 from jaxtyping import PRNGKeyArray
 
 import phasecurvefit as pcf
-from phasecurvefit._src.nn.autoencoder import compute_decoder_loss
+from phasecurvefit._src.nn.autoencoder import (
+    compute_decoder_loss,
+    train_ordering_and_track_net,
+)
 
 
 class TestOrderingNet:
@@ -302,19 +305,15 @@ class TestTrainAutoencoder:
             {"x": jnp.ones(n), "y": jnp.ones(n)},
         )
         ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
-        dynamic, static = eqx.partition(ae, eqx.is_array)
-
         ws = jr.normal(key2, (n, 2 * d))
-        weights = jnp.ones(n)
         mask = jnp.ones(n, dtype=bool)
 
         # `member_threshold > 1` makes `is_member` all-False, so the narrowed
         # mask is empty -- exactly the transient state hit during training.
-        loss, grads = compute_decoder_loss(
-            dynamic,
-            static,
+        loss, grads = eqx.filter_value_and_grad(compute_decoder_loss)(
+            ae,
             ws,
-            weights,
+            jnp.ones(n),
             mask,
             lambda_q=1.0,
             lambda_p=1.0,
@@ -325,6 +324,94 @@ class TestTrainAutoencoder:
         assert jnp.isfinite(loss), f"loss is {loss} when no star is a member"
         leaves = [x for x in jax.tree.leaves(grads) if eqx.is_array(x)]
         assert all(jnp.all(jnp.isfinite(g)) for g in leaves), "non-finite gradient"
+
+    def test_freeze_encoder_trains_only_decoder(self, rng_key: PRNGKeyArray):
+        """`freeze_encoder_final_training` leaves every encoder weight untouched.
+
+        The trainer and the step must split the model with the same
+        `filter_spec`; if they disagree, the frozen encoder trains anyway (or
+        the optimizer state and gradients no longer line up).
+        """
+        n = 64
+        t = jnp.linspace(0, 3, n)
+        pos = {"x": jnp.cos(t), "y": jnp.sin(t)}
+        vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
+        normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(-1.0, 1.0), key=rng_key
+        )
+        ws = jnp.concatenate(normalizer.transform(pos, vel), axis=1)
+        config = pcf.nn.TrainingConfig(
+            n_epochs_both=3,
+            batch_size=32,
+            show_pbar=False,
+            freeze_encoder_final_training=True,
+        ).autoencoder_config()
+
+        trained, _, _ = train_ordering_and_track_net(
+            ae, ws, mask=jnp.ones(n, dtype=bool), config=config, key=rng_key
+        )
+
+        def arrays(m):
+            return jax.tree.leaves(eqx.filter(m, eqx.is_array))
+
+        assert all(
+            jnp.array_equal(a, b)
+            for a, b in zip(arrays(trained.encoder), arrays(ae.encoder), strict=True)
+        ), "encoder changed while frozen"
+        assert not all(
+            jnp.array_equal(a, b)
+            for a, b in zip(arrays(trained.decoder), arrays(ae.decoder), strict=True)
+        ), "decoder did not train"
+
+    @pytest.mark.parametrize("weight_by_density", [True, {"bandwidth": 0.05}])
+    def test_weight_by_density_changes_training(
+        self, rng_key: PRNGKeyArray, weight_by_density
+    ):
+        """Inverse-density weighting runs, stays finite, and differs from uniform."""
+        n = 64
+        t = jnp.linspace(0, 3, n) ** 2  # uneven spacing, so densities differ
+        pos = {"x": jnp.cos(t), "y": jnp.sin(t)}
+        vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
+        normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(-1.0, 1.0), key=rng_key
+        )
+        ws = jnp.concatenate(normalizer.transform(pos, vel), axis=1)
+
+        def train(wbd):
+            config = pcf.nn.TrainingConfig(
+                n_epochs_both=3, batch_size=32, show_pbar=False, weight_by_density=wbd
+            ).autoencoder_config()
+            mask = jnp.ones(n, dtype=bool)
+            return train_ordering_and_track_net(
+                ae, ws, mask=mask, config=config, key=rng_key
+            )[2]
+
+        weighted, uniform = train(weight_by_density), train(wbd=False)
+        assert jnp.all(jnp.isfinite(weighted))
+        assert not jnp.allclose(weighted, uniform)
+
+    def test_loss_rejects_odd_column_count(self, rng_key: PRNGKeyArray):
+        """`ws` must split evenly into positions and velocities."""
+        normalizer = pcf.nn.StandardScalerNormalizer(
+            {"x": jnp.linspace(0, 1, 4)}, {"x": jnp.ones(4)}
+        )
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(0.0, 1.0), key=rng_key
+        )
+
+        with pytest.raises(ValueError, match="even number of columns"):
+            compute_decoder_loss(
+                ae,
+                jnp.zeros((4, 3)),
+                jnp.ones(4),
+                jnp.ones(4, dtype=bool),
+                lambda_q=1.0,
+                lambda_p=1.0,
+                member_threshold=0.5,
+                key=rng_key,
+            )
 
     def test_training_runs(self, simple_wlf_result, rng_key: PRNGKeyArray):
         """Test that training completes without errors."""

@@ -26,6 +26,7 @@ from jaxtyping import Array, Bool, Int, PRNGKeyArray
 from zeroth import zeroth
 
 from phasecurvefit._src.abstract_result import AbstractResult
+from phasecurvefit._src.checks import value_error_if
 from phasecurvefit._src.custom_types import BSzN, FSzN, ISz0, ISzN, VectorComponents
 
 
@@ -40,7 +41,16 @@ class OrderingResult(AbstractResult):
     velocities : dict[str, Array]
         Original velocity components, same shape as ``positions``.
     indices : Int[Array, " n_obs"]
-        Ordered indices of visited observations; unvisited slots are ``-1``.
+        Observation indices in visit order, padded with ``-1`` for unvisited
+        observations. The *position* in the array is the step in the ordering
+        and the *value* is the original observation index::
+
+            indices = [3, 7, 1, 5, -1, -1]
+            #          ^ 1st is observation 3
+            #             ^ 2nd is observation 7, and so on
+            #                      ^ two observations were not visited
+
+        Use `ordering` for the visited indices alone.
     gamma_range : tuple[float, float]
         Static valid range of the ordering parameter for ``__call__``.
     backbone : dict[str, Array] | None
@@ -70,6 +80,20 @@ class OrderingResult(AbstractResult):
         zero scale makes a phase-space metric numerically position-only, but
         the orderer is still configured to use velocity. Orderers that order on
         position alone leave it ``False``.
+
+    Notes
+    -----
+    Accessors, all derived from ``indices``:
+
+    - `visited`: boolean mask over observations, in input order
+    - `n_visited`, `n_skipped`, `all_visited`: counts and a summary flag
+    - `ordering`: visited indices in order (``indices`` without the ``-1``)
+    - `skipped_indices`: indices of observations that were not visited
+    - `ordered`: positions and velocities reordered along the ordering
+
+    Calling the result, ``result(gamma)``, interpolates a position along the
+    ordering for any $\gamma$ in ``gamma_range``: along ``backbone`` when there
+    is one, otherwise between the visited observations in order.
 
     Examples
     --------
@@ -134,6 +158,16 @@ class OrderingResult(AbstractResult):
     ... )
     >>> result_with_backbone(jnp.array(0.5))
     {'x': Array(1.5, dtype=float32), 'y': Array(0.75, dtype=float32)}
+
+    Interpolation works under ``jit``, ``vmap`` and ``grad``:
+
+    >>> import jax
+    >>> jax.jit(lambda g: result(g))(0.25)["x"]
+    Array(0.75, dtype=float32)
+    >>> jax.vmap(result)(jnp.linspace(0, 1, 5))["x"].shape
+    (5,)
+    >>> jax.grad(lambda g: result(g)["x"])(0.5)
+    Array(3., dtype=float32, weak_type=True)
 
     """
 
@@ -204,7 +238,8 @@ class OrderingResult(AbstractResult):
         Uses linear interpolation between consecutive control points. The
         control points are the ``backbone`` polyline vertices when a backbone is
         present, otherwise the ordered visited observations. ``gamma`` must lie
-        within ``gamma_range``; values outside it raise (via ``eqx.error_if``).
+        within ``gamma_range``; values outside it raise ``ValueError`` (under
+        ``jit``, a JAX runtime error at run time).
         It is normalized to ``[0, 1]`` before interpolation.
         """
         del key
@@ -212,7 +247,7 @@ class OrderingResult(AbstractResult):
 
         min_gamma, max_gamma = self.gamma_range
         gamma_range_width = max_gamma - min_gamma
-        gamma = eqx.error_if(
+        gamma = value_error_if(
             gamma,
             jnp.any(jnp.logical_or(gamma < min_gamma, gamma > max_gamma)),
             "gamma must be in [min_gamma, max_gamma]",
@@ -224,7 +259,7 @@ class OrderingResult(AbstractResult):
         return self._interp_ordered(gamma_normalized)
 
     @staticmethod
-    def _lerp_bracket(gamma_normalized: Array, n_control: Array) -> tuple:
+    def _lerp_bracket(gamma_normalized: Array, n_control: Array, /) -> tuple:
         """Bracketing indices and weights for linear interpolation over n points."""
         indices_float = gamma_normalized * (n_control - 1)
         floor = jnp.floor(indices_float)
@@ -233,7 +268,7 @@ class OrderingResult(AbstractResult):
         idx_upper = jnp.clip(ceil.astype(jnp.int32), 0, n_control - 1)
         return idx_lower, idx_upper, indices_float - floor
 
-    def _interp_backbone(self, gamma_normalized: Array) -> VectorComponents:
+    def _interp_backbone(self, gamma_normalized: Array, /) -> VectorComponents:
         """Interpolate along the backbone polyline vertices.
 
         Uses ``backbone_size`` as the valid vertex count when set (the backbone
@@ -253,7 +288,7 @@ class OrderingResult(AbstractResult):
 
         return jt.map(interpolate_component, self.backbone)
 
-    def _interp_ordered(self, gamma_normalized: Array) -> VectorComponents:
+    def _interp_ordered(self, gamma_normalized: Array, /) -> VectorComponents:
         """Interpolate along the ordered visited observations (legacy walk)."""
         visited_indices = jnp.where(self.indices >= 0, self.indices, 0)
         lo, hi, w = self._lerp_bracket(gamma_normalized, self.n_visited)

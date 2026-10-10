@@ -214,7 +214,7 @@ class KDTree(AbstractQueryStrategy):
             )
             raise ImportError(msg)
 
-    def _n_query(self, n_points: int) -> int:
+    def _n_query(self, n_points: int, /) -> int:
         # Query one extra neighbor to make room for the current point itself.
         # Otherwise ``k`` yields only ``k - 1`` usable candidates and small
         # ``k`` can deadlock the walk: the sole non-self neighbor may already
@@ -250,6 +250,7 @@ class KDTree(AbstractQueryStrategy):
         velocities: VectorComponents,
         metric_fn: AbstractDistanceMetric,
         metric_scale: FLikeSz0,
+        /,
     ) -> QueryResult:
         cand_pos, cand_vel = get_w_at(positions, velocities, indices)
         distances = metric_fn(

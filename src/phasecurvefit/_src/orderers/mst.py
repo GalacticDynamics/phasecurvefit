@@ -124,7 +124,7 @@ def _worker() -> None:
 threading.Thread(target=_worker, daemon=True, name="phasecurvefit-mst-host").start()
 
 
-def _run_in_thread[T](fn: Callable[[], T]) -> T:
+def _run_in_thread[T](fn: Callable[[], T], /) -> T:
     """Run ``fn`` on this module's persistent worker thread; re-raise there.
 
     Works around a segfault observed when scipy's ``cKDTree``/sparse-graph C
@@ -195,7 +195,7 @@ def _check_velocities(
         raise ValueError(msg)
 
 
-def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
+def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray, /) -> np.ndarray:
     """Cosine similarity of velocities across each candidate edge (i, j).
 
     An edge with an end that has no direction -- a stationary tracer, or a
@@ -289,6 +289,7 @@ def _sigma_clip_edges(
     tree: csr_matrix,
     P: np.ndarray,
     nodes: np.ndarray,
+    /,
     *,
     sigma: float,
     max_iters: int,
@@ -361,7 +362,7 @@ def _sigma_clip_edges(
 
 
 def _connect_components(
-    P: np.ndarray, graph: csr_matrix, *, workers: int
+    P: np.ndarray, graph: csr_matrix, /, *, workers: int
 ) -> csr_matrix:
     """Join a graph's connected components along their shortest links.
 
@@ -396,7 +397,7 @@ def _connect_components(
 
 
 def _disconnected_message(
-    n_comp: int, k: int, jump_cap: float, sever_cos_threshold: float | None
+    n_comp: int, k: int, jump_cap: float, sever_cos_threshold: float | None, /
 ) -> str:
     """Explain a disconnected kNN graph, blaming only what could be the cause."""
     causes = [f"k={k} too low"]
@@ -867,7 +868,7 @@ class MSTOrderer(AbstractOrderer):
             if self._splits_directionless:
                 nbr_dir, leaf = _directed_knn(P_s, V_s, k_eff, neighbors)
 
-            def host(p, v, nb, nb_dir, lf) -> tuple:  # noqa: ANN001
+            def host(p, v, nb, nb_dir, lf, /) -> tuple:  # noqa: ANN001
                 arrs = map(np.asarray, (p, v, nb, nb_dir, lf))
                 return _host_graph(*arrs, **cfg, workers=-1)
 

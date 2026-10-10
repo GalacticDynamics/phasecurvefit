@@ -94,6 +94,27 @@ class TestDefaultPipelineUnxt:
 class TestLocalFlowUnxt:
     """Tests for local flow unxt."""
 
+    @staticmethod
+    def _nan_line(policy):
+        q = {"x": u.Q(jnp.array([0.0, 1.0, 2.0, 3.0, 4.0]), "kpc")}
+        p = {"x": u.Q(jnp.array([1.0, 1.0, jnp.nan, 1.0, 1.0]), "km/s")}
+        orderer = pcf.orderers.LocalFlowOrderer(
+            metric_scale=u.Q(1.0, "kpc"), start_idx=0, nan_policy=policy
+        )
+        return orderer, q, p, StateMetadata(usys=u.unitsystems.galactic)
+
+    def test_quantity_nan_raises_by_default(self):
+        """The Quantity dispatch reaches the same check as the plain one."""
+        orderer, q, p, meta = self._nan_line("raise")
+        with pytest.raises(ValueError, match="nan_policy='omit'"):
+            orderer.order(q, p, metadata=meta)
+
+    def test_quantity_forwards_omit(self):
+        """``nan_policy="omit"`` survives the Quantity dispatch."""
+        orderer, q, p, meta = self._nan_line("omit")
+        res = orderer.order(q, p, metadata=meta)
+        assert jnp.array_equal(res.indices, jnp.arange(5))
+
     def test_localflow_quantity_delegates_to_walk(self):
         """Localflow quantity delegates to walk."""
         q = {"x": u.Q(jnp.array([0.0, 1.0, 2.0, 3.0, 4.0]), "kpc")}

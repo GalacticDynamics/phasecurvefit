@@ -45,6 +45,7 @@ from .custom_types import ISz0, RLikeSz0, VectorComponents
 from .orderers.result import OrderingResult
 from .phasespace import euclidean_distance
 from .query_config import WalkConfig
+from phasecurvefit._src.checks import value_error_if
 
 vec_euclidean_distance = jax.jit(jax.vmap(euclidean_distance, in_axes=(None, 0)))
 
@@ -123,151 +124,56 @@ class StateMetadata(quax.Value):
 
 
 class WalkLocalFlowResult(OrderingResult):
-    r"""Result of the local flow walk algorithm.
+    r"""Result of the local-flow walk (`LocalFlowOrderer`).
 
-    This class represents the complete output of the phase-flow walk algorithm.
-    It contains the walk ordering, original phase-space data, and provides methods
-    for examining and interpolating along the discovered stream.
+    An `OrderingResult` with no extra fields; see it for the attributes, the
+    layout of ``indices``, the accessors and interpolation. The subclass exists
+    as a type marker, so code can tell a walk's result from other orderers':
 
-    Attributes
-    ----------
-    positions : dict[str, Array]
-        Position dictionary with keys (e.g., "x", "y", "z") and values as
-        1D arrays of shape (n_obs,). These are the original positions from
-        the input, not reordered.
-    velocities : dict[str, Array]
-        Velocity dictionary with same keys and shape as ``positions``.
-        These are the original velocities from the input, not reordered.
-    indices : Int[Array, " n_obs"]
-        Ordered indices of visited observations. Shape (n_obs,).
-        Unvisited observations are marked with -1.
+    - `combine_results` dispatches on it: only two walk results (a forward and
+      a backward walk, as ``direction="both"`` produces) can be merged.
+    - ``isinstance(result, WalkLocalFlowResult)`` distinguishes a walk from,
+      e.g., the default MST | SOM pipeline, which returns a plain
+      `OrderingResult`.
 
-        The walk order can be extracted by filtering: `indices[indices >= 0]`.
-        See :attr:`ordering` property for a convenience accessor.
-    gamma_range : tuple[float, float]
-        Valid range of the ordering parameter in `__call__`. Default is (0.0, 1.0).
-        This is a static field and cannot be changed after construction.
+    What is specific to the walk:
 
-    Notes
-    -----
-    The walk algorithm discovers a path through phase-space by following the
-    local flow defined by the velocity field. The ordering encodes which
-    observations form a coherent sequence along this path.
-
-    **Key distinction**: ``indices`` is an array of length ``n_obs`` where the
-    *position* in the array indicates the *order* in the walk, and the *value*
-    at that position is the original observation index. For example::
-
-        indices = [3, 7, 1, -1, 5, ...]
-        #          ^ 1st visited observation is index 3
-        #             ^ 2nd visited observation is index 7
-        #                ^ 3rd visited observation is index 1
-        #                   ^ 4th observation was not visited
-        #                      ^ 5th visited observation is index 5
-
-    Properties provide convenient access to:
-    - :attr:`visited`: Boolean mask of visited observations
-    - :attr:`ordering`: Indices in walk order (filtered non-negative)
-    - :attr:`ordered`: Positions/velocities reordered by walk
-    - :attr:`skipped_indices`: Indices of unvisited observations
-
-    The interpolation method
-    (:meth:`~phasecurvefit.orderers.OrderingResult.__call__`) enables smooth
-    spatial interpolation along the discovered path using a continuous ordering
-    parameter $\gamma \in [0, 1]$.
+    - It follows the local flow of the velocity field from a start tracer, one
+      step at a time, and can stop before visiting every tracer (e.g. when no
+      unvisited tracer is within ``max_dist``). Skipped tracers leave ``-1``
+      slots at the end of ``indices``; see `skipped_indices` and `n_skipped`.
+    - It has no ``backbone``, so ``result(gamma)`` interpolates linearly
+      between the visited tracers in walk order, over
+      ``gamma_range == (0.0, 1.0)``.
 
     Examples
     --------
-    **Basic Usage: Extract Ordering and Properties**
-
     >>> import jax.numpy as jnp
     >>> import phasecurvefit as pcf
-    >>> pos = {
-    ...     "x": jnp.linspace(0, 10, 20),
-    ...     "y": jnp.sin(jnp.linspace(0, 2 * 3.14159, 20)),
-    ... }
-    >>> vel = {"x": jnp.ones(20), "y": jnp.cos(jnp.linspace(0, 2 * 3.14159, 20))}
-    >>> result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
-    >>> result.indices
-    Array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16,
-           17, 18, 19], dtype=int32)
-    >>> result.n_visited
-    Array(20, dtype=int32)
-    >>> result.n_skipped
-    Array(0, dtype=int32)
+    >>> t = jnp.linspace(0, 2 * jnp.pi, 20)
+    >>> pos = {"x": jnp.linspace(0, 10, 20), "y": jnp.sin(t)}
+    >>> vel = {"x": jnp.ones(20), "y": jnp.cos(t)}
 
-    **Accessing Ordered Data**
-
-    >>> qs_ordered, vs_ordered = result.ordered
-    >>> qs_ordered["x"].shape
-    (20,)
-
-    **Spatial Interpolation with Gamma Parameter**
-
-    The walk result can be called as a function to interpolate spatial positions
-    from an ordering parameter $\gamma \in [0, 1]$:
-
-    >>> gamma = jnp.array([0.0, 0.5, 1.0])
-    >>> positions_interp = result(gamma)
-    >>> positions_interp["x"]
-    Array([ 0.,  5., 10.], dtype=float32)
-
-    **Scalar Interpolation**
-
-    >>> pos_at_midpoint = result(0.5)
-    >>> pos_at_midpoint["x"]
+    >>> walk = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
+    >>> isinstance(walk, pcf.WalkLocalFlowResult)
+    True
+    >>> walk.gamma_range
+    (0.0, 1.0)
+    >>> walk.n_visited, walk.n_skipped
+    (Array(20, dtype=int32), Array(0, dtype=int32))
+    >>> walk(0.5)["x"]
     Array(5., dtype=float32)
 
-    **JAX Transformations: JIT Compilation**
+    The default pipeline is not a walk:
 
-    The interpolator is JIT-compatible for efficient compilation:
-
-    >>> import jax
-    >>> @jax.jit
-    ... def get_position(gamma):
-    ...     return result(gamma)
-    >>> get_position(0.25)
-    {'x': Array(2.5, dtype=float32), 'y': Array(0.9897884, dtype=float32)}
-
-    **JAX Transformations: Vectorization with vmap**
-
-    Interpolate multiple gamma values efficiently:
-
-    >>> gamma_batch = jnp.linspace(0, 1, 100)
-    >>> @jax.jit
-    ... def interpolate_many(gammas):
-    ...     return jax.vmap(result)(gammas)
-    >>> positions_batch = interpolate_many(gamma_batch)
-    >>> positions_batch["x"].shape
-    (100,)
-
-    **JAX Transformations: Automatic Differentiation**
-
-    Compute gradients of positions with respect to the ordering parameter:
-
-    >>> def loss(gamma):
-    ...     pos = result(gamma)
-    ...     return jnp.sum(pos["x"] ** 2 + pos["y"] ** 2)
-    >>> grad_fn = jax.grad(loss)
-    >>> grad_at_half = grad_fn(0.5)
-
-    **Composition: JIT + vmap + grad**
-
-    Combine transformations for maximum efficiency:
-
-    >>> @jax.jit
-    ... def compute_gradients(gammas):
-    ...     return jax.vmap(jax.grad(loss))(gammas)
-    >>> compute_gradients(jnp.linspace(0, 1, 50))
-    Array([  0. , 5.6351056, 11.270211 , ...],  dtype=float32)
-
-    >>> result.visited.shape
-    (20,)
+    >>> isinstance(pcf.order(pos, vel), pcf.WalkLocalFlowResult)
+    False
 
     """
 
 
 Direction: TypeAlias = Literal["forward", "backward", "both"]  # noqa: UP040
+NanPolicy: TypeAlias = Literal["raise", "omit"]  # noqa: UP040
 State: TypeAlias = tuple[  # noqa: UP040
     Int[Array, " n_obs"],  # indices in walk order (-1 for skipped)
     Array,  # visited_mask: float array of shape (n_obs,)
@@ -276,6 +182,57 @@ State: TypeAlias = tuple[  # noqa: UP040
     Bool[Array, ""],  # stop: scalar flag
     StateMetadata,  # metadata: contains dummy array so JAX preserves it
 ]
+
+
+def check_velocities(vs: VectorComponents, nan_policy: str, /) -> VectorComponents:
+    """Raise on an infinite velocity, and on NaN unless ``nan_policy="omit"``.
+
+    Called only when the metric reads velocities. Left alone, a non-finite
+    velocity makes every distance it touches non-finite, and ``argmin`` then
+    returns the first NaN -- the lowest-index unvisited tracer, wherever it
+    is: one NaN on a shuffled line sent the walk back and forth 4 times
+    (103 times under ``FullPhaseSpaceDistanceMetric``). ``value_error_if``: a
+    ``ValueError`` on concrete input, and it survives ``jit`` and ``vmap``.
+    """
+    comps = [jnp.asarray(v) for v in vs.values()]
+    vs = value_error_if(
+        vs,
+        jnp.any(jnp.stack([jnp.any(jnp.isinf(v)) for v in comps])),
+        "LocalFlowOrderer found an infinite velocity. inf is not a measurement "
+        "-- it comes from an overflow or a bug upstream -- so it raises under "
+        "either nan_policy. Fix or drop those tracers.",
+    )
+    if nan_policy == "omit":
+        return vs
+    return value_error_if(
+        vs,
+        jnp.any(jnp.stack([jnp.any(jnp.isnan(v)) for v in comps])),
+        "LocalFlowOrderer's metric reads velocities and found a NaN. To treat "
+        "NaN as a missing velocity pass nan_policy='omit'; or drop those "
+        "tracers; or walk on position alone "
+        "(WalkConfig(metric=SpatialDistanceMetric())).",
+    )
+
+
+def _turned_back(
+    start_x: VectorComponents,
+    start_v: VectorComponents,
+    next_x: VectorComponents,
+    step_length: Array,
+    /,
+    *,
+    at_start: Array,
+) -> Array:
+    """Whether a step heads back toward where the walk began.
+
+    On the first step (``at_start``), a step against the walk's own direction
+    at the start: nothing lies on this side, e.g. starting at an end. After
+    that, a next tracer nearer the start than to the current one. Strict, so
+    the first step -- from the start itself -- is never "nearer".
+    """
+    heading = sum((next_x[k] - start_x[k]) * start_v[k] for k in start_x)
+    nearer_start = euclidean_distance(start_x, next_x) < step_length
+    return jnp.where(at_start, heading < 0, nearer_start)
 
 
 @plum.dispatch
@@ -292,6 +249,8 @@ def _local_flow_walk(
     config: WalkConfig = WalkConfig(),  # noqa: B008
     metadata: StateMetadata | None = None,
     direction: Direction = "forward",
+    nan_policy: NanPolicy = "raise",
+    _stop_at_start: bool = False,
 ) -> WalkLocalFlowResult:
     r"""Find an ordered path through phase-space using the local flow.
 
@@ -334,7 +293,12 @@ def _local_flow_walk(
     direction
         Direction to walk the local flow. 'forward' walks along the velocity
         field, 'backward' walks against the velocity field, and 'both' walks in
-        both directions.  Default is 'forward'.
+        both directions.  Default is 'forward'. Under 'both', each half stops
+        where it would turn back toward ``start_idx`` (on its first step, a
+        step against its own direction; after that, a tracer nearer the start
+        than the current one), so it covers only its own side.
+    nan_policy
+        See :class:`~phasecurvefit.orderers.LocalFlowOrderer`.
 
     Returns
     -------
@@ -397,9 +361,18 @@ def _local_flow_walk(
             "n_max": n_max,
             "config": config,
             "metadata": metadata,
+            "nan_policy": nan_policy,
         }
-        result_forward = _local_flow_walk(xs, vs, **kwargs, direction="forward")
-        result_backward = _local_flow_walk(xs, vs, **kwargs, direction="backward")
+        # Each half stops where it would turn back toward the start, so it
+        # covers only its own side. Left to run out, each walk reaches its end
+        # and doubles back over the other's half: on a line 0..10 started at
+        # 5, the combined ordering came out [10 9 8 7 6 0 1 2 3 4 5].
+        result_forward = _local_flow_walk(
+            xs, vs, **kwargs, direction="forward", _stop_at_start=True
+        )
+        result_backward = _local_flow_walk(
+            xs, vs, **kwargs, direction="backward", _stop_at_start=True
+        )
         return combine_results(result_forward, result_backward)
 
     # ---------------------------------------------------------------
@@ -425,11 +398,19 @@ def _local_flow_walk(
     # Initialize terminate_indices as empty set if None
     terminate_indices = set() if terminate_indices is None else terminate_indices
 
+    if config.metric.uses_velocity:
+        vs = check_velocities(vs, nan_policy)
+
     # Store original velocities for the result and optionally negate velocities
     # for backward walk (internal use only).
     vs_original = vs
     if direction == "backward":
         vs = jtu.map(jnp.negative, vs)
+
+    # Where the walk began, and which way it set off (``vs`` is already negated
+    # for a backward walk), for ``_stop_at_start``.
+    start_x = jtu.map(lambda x: x[start_idx], xs)
+    start_v = jtu.map(lambda v: v[start_idx], vs)
 
     # Extract metric and strategy from config
     query_state = config.strategy.init(xs, metadata=metadata)
@@ -498,6 +479,13 @@ def _local_flow_walk(
             cand_unvisited = unvisited[candidate_idxs]
             cand_xs = jtu.map(lambda x: x[candidate_idxs], xs)
 
+        # A candidate whose metric distance is not finite -- a missing (NaN)
+        # velocity under ``nan_policy="omit"``, at either end -- is scored by
+        # position alone. Left NaN, ``argmin`` would return the first NaN.
+        cur_x = jtu.map(lambda x: x[cur_idx], xs)
+        spatial_ds = vec_euclidean_distance(cur_x, cand_xs)
+        ds = jnp.where(jnp.isfinite(ds), ds, spatial_ds)
+
         # Nearest unvisited candidate under the metric.
         ds_masked = jnp.where(cand_unvisited, ds, jnp.inf)
         best = jnp.argmin(ds_masked)
@@ -514,13 +502,21 @@ def _local_flow_walk(
         # candidates are the nearest points in space, so the nearest unvisited
         # point is among them. When every candidate is visited, min_dist is
         # inf rather than the global value, but (2) stops the walk regardless.
-        cur_x = jtu.map(lambda x: x[cur_idx], xs)
-        spatial_ds = vec_euclidean_distance(cur_x, cand_xs)
         min_dist = jnp.min(jnp.where(cand_unvisited, spatial_ds, jnp.inf))
         new_stop = jnp.logical_or(
             jnp.logical_or(min_dist > max_dist, jnp.isinf(best_dist)),
             spatial_ds[best] > max_dist,
         )
+        # One half of ``direction="both"`` also stops where it turns back.
+        # Always evaluated (a few scalar ops) and masked, rather than branched.
+        turned_back = _turned_back(
+            start_x,
+            start_v,
+            jtu.map(lambda x: x[best], cand_xs),
+            spatial_ds[best],
+            at_start=cur_idx == start_idx,
+        )
+        new_stop = jnp.logical_or(new_stop, _stop_at_start & turned_back)
 
         # Conditional update: only add if not terminating. Written as
         # single-element updates so a step doesn't touch all n entries.
@@ -606,7 +602,7 @@ DedupCarry: TypeAlias = tuple[  # noqa: UP040
 ]
 
 
-def _dedup_step(carry: DedupCarry, idx: Array) -> tuple[DedupCarry, None]:
+def _dedup_step(carry: DedupCarry, idx: Array, /) -> tuple[DedupCarry, None]:
     """Remove duplicate indices while preserving order (scan step function).
 
     Used by {func}`combine_results` to deduplicate the concatenated
@@ -728,15 +724,17 @@ def combine_results(
     # Full equality check using efficient tree operations
     # Use tuples to combine positions and velocities for one map/reduce pass
     # (tuples compile more efficiently than dicts)
+    # ``equal_nan``: a missing (NaN) velocity, allowed under
+    # ``nan_policy="omit"``, is still the same data in both walks.
     matches = jtu.map(
-        jnp.array_equal,
+        lambda a, b: jnp.array_equal(a, b, equal_nan=True),
         (result_fwd.positions, result_fwd.velocities),
         (result_bwd.positions, result_bwd.velocities),
     )
     all_match = jtu.reduce(jnp.logical_and, matches)
 
     # Error if they don't match
-    _ = eqx.error_if(
+    _ = value_error_if(
         all_match,
         jnp.logical_not(all_match),
         "result_fwd and result_bwd must have the same positions and velocities",
