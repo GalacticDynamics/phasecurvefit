@@ -202,7 +202,6 @@ class TestTrainingConfig:
         assert config.lambda_q == 1.0
         assert config.lambda_p == (1.0, 5.0)
         assert config.member_threshold == 0.5
-        assert config.weight_by_density is False
         assert config.freeze_encoder_final_training is False
         assert config.show_pbar is True
 
@@ -302,19 +301,14 @@ class TestTrainAutoencoder:
             {"x": jnp.ones(n), "y": jnp.ones(n)},
         )
         ae = pcf.nn.PathAutoencoder.make(normalizer, gamma_range=(0.0, 1.0), key=key1)
-        dynamic, static = eqx.partition(ae, eqx.is_array)
-
         ws = jr.normal(key2, (n, 2 * d))
-        weights = jnp.ones(n)
         mask = jnp.ones(n, dtype=bool)
 
         # `member_threshold > 1` makes `is_member` all-False, so the narrowed
         # mask is empty -- exactly the transient state hit during training.
-        loss, grads = compute_decoder_loss(
-            dynamic,
-            static,
+        loss, grads = eqx.filter_value_and_grad(compute_decoder_loss)(
+            ae,
             ws,
-            weights,
             mask,
             lambda_q=1.0,
             lambda_p=1.0,

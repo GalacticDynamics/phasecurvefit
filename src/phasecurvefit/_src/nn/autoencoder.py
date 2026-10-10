@@ -50,7 +50,7 @@ from .track_net import (
     decoder_loss,
     train_track_net,
 )
-from .trainer import AbstractEqxScanTrainer, EqxTrainCarry
+from .trainer import EqxScanTrainer, eqx_step
 from phasecurvefit._src.custom_types import FLikeSz0, FSz0, FSzN
 from phasecurvefit._src.orderers.result import OrderingResult
 
@@ -134,110 +134,6 @@ class PathAutoencoder(AbstractAutoencoder):
 # ============================================================
 
 
-@eqx.filter_jit
-def compute_weights(
-    model: OrderingNet,
-    ws: Float[Array, "N TwoF"],
-    *,
-    bandwidth: float = 0.02,
-    key: PRNGKeyArray | None = None,
-) -> Float[Array, " N"]:
-    r"""Compute inverse density weights for phase-space samples.
-
-    Uses Gaussian kernel density estimation (KDE) on predicted $\gamma$ values
-    to compute sample weights inversely proportional to density. This provides
-    importance weighting that upweights rare regions of the stream.
-
-    The algorithm:
-    1. Predict $\gamma$ values for all samples using the OrderingNet
-    2. Compute KDE density at each $\gamma$ value
-    3. Return inverse density as weights: $w_i = 1 / \text{density}(\gamma_i)$
-
-    This matches the PyTorch implementation where samples in sparse regions
-    of $\gamma$-space receive higher weights.
-
-    Parameters
-    ----------
-    model : OrderingNet
-        Trained interpolation network for predicting gamma values.
-    ws : Array, shape (N, 2*n_dims)
-        Phase-space coordinates (position + velocity).
-    bandwidth : float, optional
-        Gaussian kernel bandwidth for KDE. Default: 0.02.
-    key : PRNGKeyArray, optional
-        Random key for any stochastic operations (not used here, but included
-        for signature consistency).
-
-    Returns
-    -------
-    weights : Array, shape (N,)
-        Inverse density weights for each sample.
-
-    Notes
-    -----
-    The KDE density at point $\gamma_i$ is:
-
-    $$ \hat{f}(\gamma_i) = \frac{1}{Nh} \sum_{j=1}^N
-        K\left(\frac{\gamma_i - \gamma_j}{h}\right) $$
-
-    where $K$ is the Gaussian kernel and $h$ is the bandwidth.
-
-    """
-    # Predict gamma values (only need gamma, not probability)
-    gamma_predict, _ = jax.vmap(model, (0, None))(ws, key)
-
-    # Compute pairwise distances in gamma space
-    # Shape: (N, N) where entry (i, j) is |gamma_i - gamma_j|
-    diff = gamma_predict[:, None] - gamma_predict[None, :]
-
-    # Gaussian kernel: K(u) = exp(-0.5 * u^2) / sqrt(2π)
-    # Normalization constant cancels when computing inverse weights
-    kernel_vals = jnp.exp(-0.5 * (diff / bandwidth) ** 2)
-
-    # KDE density estimate: mean of kernel evaluations
-    density = jnp.mean(kernel_vals, axis=1)  # Shape: (N,)
-
-    # Inverse density weights
-    weights = 1.0 / density
-
-    return weights  # noqa: RET504
-
-
-@eqx.filter_jit
-def compute_uniform_weights(
-    model: OrderingNet,
-    ws: Float[Array, " N TwoF"],
-    *,
-    bandwidth: float = -1,
-    key: PRNGKeyArray | None = None,
-) -> Float[Array, " N"]:
-    """Compute uniform weights (all ones) for phase-space samples.
-
-    Returns an array of ones with the same length as the input. This function
-    has the same signature as `compute_weights` so it can be used as an
-    alternative branch in `jax.lax.cond`.
-
-    Parameters
-    ----------
-    model : OrderingNet
-        Interpolation network (unused, but required for signature matching).
-    ws : Array, shape (N, 2*n_dims)
-        Phase-space coordinates (position + velocity).
-    bandwidth : float, optional
-        Kernel bandwidth (unused, but required for signature matching).
-    key : PRNGKeyArray, optional
-        Random key (unused, but required for signature matching).
-
-    Returns
-    -------
-    weights : Array, shape (N,)
-        Array of ones with length N.
-
-    """
-    del model, bandwidth, key  # Unused parameters for signature matching
-    return jnp.ones(ws.shape[0], dtype=ws.dtype)
-
-
 @dataclass
 class EncoderDecoderTrainingConfig:
     r"""Configuration for Encoder + Decoder training."""
@@ -281,9 +177,6 @@ class EncoderDecoderTrainingConfig:
 
     freeze_encoder: bool = False
     """Whether to freeze the encoder during phase 2 training."""
-
-    weight_by_density: bool | Mapping[str, object] = False
-    """Whether to inverse density weight the samples. USE WITH CARE."""
 
     show_pbar: bool = True
     """Show an epoch progress bar via `tqdm`."""
@@ -336,11 +229,6 @@ class TrainingConfig:
 
     lambda_p: tuple[float, float] = EncoderDecoderTrainingConfig.lambda_p
     """Weight range for phase-2 velocity training."""
-
-    weight_by_density: bool | Mapping[str, object] = (
-        EncoderDecoderTrainingConfig.weight_by_density
-    )
-    """Whether to inverse density weight the samples. USE WITH CARE."""
 
     freeze_encoder_final_training: bool = EncoderDecoderTrainingConfig.freeze_encoder
     """Whether to freeze the encoder during phase 2 training."""
@@ -398,7 +286,6 @@ class TrainingConfig:
             member_threshold=self.member_threshold,
             membership=self.membership,
             freeze_encoder=self.freeze_encoder_final_training,
-            weight_by_density=self.weight_by_density,
         )
 
 
@@ -564,12 +451,9 @@ def _mixture_decoder_loss(
     return nll + lambda_velocity * lambda_p * tangent_l2
 
 
-@eqx.filter_value_and_grad
 def compute_decoder_loss(
-    model_dynamic: PathAutoencoder,
-    model_static: PathAutoencoder,
+    model: PathAutoencoder,
     ws: Float[Array, " B TwoF"],
-    weights: Float[Array, " B"],
     mask: Bool[Array, " B"],
     *,
     lambda_q: FLikeSz0,
@@ -581,12 +465,10 @@ def compute_decoder_loss(
     sigma_ceil: FSz0 | float = 1.0,
     rampup: FSz0 | float = 1.0,
 ) -> FSz0:
-    r"""Compute decoder loss with gradients for Phase 2 training.
+    r"""Compute decoder loss for Phase 2 training.
 
     This function computes the combined loss for spatial reconstruction and
-    velocity alignment in the decoder training phase. It is decorated with
-    `@eqx.filter_value_and_grad` to return both the loss value and gradients in
-    a single pass.
+    velocity alignment in the decoder training phase.
 
     The loss combines two terms:
 
@@ -613,9 +495,6 @@ def compute_decoder_loss(
     want if outliers are a problem.
 
     """
-    # Reconstruct full model from dynamic and static parts
-    model = eqx.combine(model_dynamic, model_static)
-
     # Get phase-space q,p separation index
     if ws.shape[1] % 2 != 0:
         msg = "ord_w has the wrong shape"
@@ -687,7 +566,7 @@ def compute_decoder_loss(
     def _path_loss() -> FSz0:
         return decoder_loss(
             qs_meas=ws[:, :D],
-            weights=weights,
+            weights=jnp.ones(ws.shape[0], dtype=ws.dtype),
             qs_pred=q_predict,
             t_hat=t_hat,
             p_hat=ps_hat,
@@ -706,60 +585,6 @@ def compute_decoder_loss(
     )
 
     return loss_mismember + loss_path
-
-
-@eqx.filter_jit
-def make_step(
-    model_dynamic: PathAutoencoder,
-    model_static: PathAutoencoder,
-    /,
-    ws: Float[Array, " B TwoF"],
-    weights: Float[Array, " B"],
-    mask: Bool[Array, " B"],
-    opt_state: optax.OptState,
-    optimizer: optax.GradientTransformation,
-    *,
-    lambda_q: FLikeSz0,
-    lambda_p: FLikeSz0,
-    member_threshold: float,
-    key: PRNGKeyArray,
-    membership: MixtureMembershipConfig | None = None,
-    log_bg_density: float = 0.0,
-    sigma_ceil: FSz0 | float = 1.0,
-    rampup: FSz0 | float = 1.0,
-) -> tuple[FSz0, PathAutoencoder, optax.OptState]:
-    r"""Run a single optimization step for Phase 2 decoder training.
-
-    Computes loss and gradients via `compute_decoder_loss`, then applies
-    gradient updates to the dynamic model parameters.
-
-    The ``membership`` / ``log_bg_density`` / ``sigma_ceil`` / ``rampup``
-    arguments are forwarded to `compute_decoder_loss` and select the opt-in
-    mixture-model membership. ``sigma_ceil`` and ``rampup`` are epoch-dependent
-    schedules supplied by `PathAutoencoderTrainer.prepare_step_kw`.
-
-    """
-    # Compute the loss
-    loss, grads = compute_decoder_loss(
-        model_dynamic,
-        model_static,
-        ws,
-        weights=weights,
-        mask=mask,
-        lambda_q=lambda_q,
-        lambda_p=lambda_p,
-        member_threshold=member_threshold,
-        key=key,
-        membership=membership,
-        log_bg_density=log_bg_density,
-        sigma_ceil=sigma_ceil,
-        rampup=rampup,
-    )
-
-    # Update the dynamic components of the model
-    updates, opt_state = optimizer.update(grads, opt_state, model_dynamic)
-    model_dynamic = cast("PathAutoencoder", eqx.apply_updates(model_dynamic, updates))
-    return loss, model_dynamic, opt_state
 
 
 # ===================================================================
@@ -808,59 +633,8 @@ def _pad_to_multiple(
     return padded_mask, padded_args
 
 
-def _autoencoder_step(
-    carry: EqxTrainCarry,
-    batch_inputs: tuple[Bool[Array, " B"], tuple[Array, ...]],
-    *,
-    optimizer: optax.GradientTransformation,
-    filter_spec: Any,
-    lambda_q: FLikeSz0,
-    member_threshold: float,
-    lambda_p: FLikeSz0,
-    membership: MixtureMembershipConfig | None = None,
-    log_bg_density: float = 0.0,
-    sigma_ceil: FSz0 | float = 1.0,
-    rampup: FSz0 | float = 1.0,
-) -> tuple[FSz0, EqxTrainCarry]:
-    """Run one batch of joint encoder+decoder training.
-
-    `batch_inputs` is ``(mask, (ws, weights))``. The epoch-dependent schedules --
-    `lambda_p`, and (for mixture membership) `sigma_ceil` and `rampup` -- arrive
-    via `step_kw` and are recomputed each epoch by
-    `PathAutoencoderTrainer.prepare_step_kw`.
-    """
-    model, opt_state, key = carry
-    mask, (ws, weights) = batch_inputs
-
-    # Gradients w.r.t. the dynamic half only. When `freeze_encoder` is set,
-    # `filter_spec` excludes the encoder, so it receives no updates.
-    model_dynamic, model_static = eqx.partition(model, filter_spec)
-
-    key, subkey = jr.split(key)
-    loss, model_dynamic, opt_state = make_step(
-        model_dynamic,
-        model_static,
-        ws=ws,
-        weights=weights,
-        mask=mask,
-        opt_state=opt_state,
-        optimizer=optimizer,
-        lambda_q=lambda_q,
-        lambda_p=lambda_p,
-        member_threshold=member_threshold,
-        key=subkey,
-        membership=membership,
-        log_bg_density=log_bg_density,
-        sigma_ceil=sigma_ceil,
-        rampup=rampup,
-    )
-
-    model = eqx.combine(model_dynamic, model_static)
-    return loss, (model, opt_state, key)
-
-
 @dataclass(frozen=True)
-class PathAutoencoderTrainer(AbstractEqxScanTrainer):
+class PathAutoencoderTrainer(EqxScanTrainer):
     r"""Scan trainer for joint encoder + decoder training.
 
     Owns the epoch-dependent schedules, all of which are computed in
@@ -883,22 +657,6 @@ class PathAutoencoderTrainer(AbstractEqxScanTrainer):
 
     membership: MixtureMembershipConfig | None = None
     """Mixture-model membership config, or None for the legacy classifier loss."""
-
-    def init(  # type: ignore[override]
-        self,
-        model: PathAutoencoder,
-        /,
-        *,
-        all_ws: Float[Array, "N TwoF"],
-        weights: Float[Array, " N"],
-        mask: Bool[Array, " N"],
-        optimizer: optax.GradientTransformation,
-        key: PRNGKeyArray,
-    ) -> tuple[EqxTrainCarry, tuple[Bool[Array, " N"], tuple[Array, ...]]]:
-        """Build the initial carry and the epoch data."""
-        model_dynamic, _ = eqx.partition(model, self.filter_spec)
-        opt_state = optimizer.init(model_dynamic)
-        return (model, opt_state, key), (mask, (all_ws, weights))
 
     def prepare_step_kw(
         self, /, *, epoch_idx: Int[Array, ""], num_epochs: int, epoch_key: PRNGKeyArray
@@ -940,7 +698,6 @@ def train_ordering_and_track_net(
 
     The training uses lax.scan for efficient batching and supports:
     - Linear ramping of lambda_p from min to max over epochs
-    - Optional KDE-based importance weighting
     - Membership probability filtering via member_threshold
     - Optional encoder freezing
 
@@ -967,18 +724,6 @@ def train_ordering_and_track_net(
         Training loss per epoch.
 
     """
-    # Compute weights
-    # TODO: compute masked weights?
-    key, subkey = jr.split(key)
-    if not config.weight_by_density:
-        weights = compute_uniform_weights(model, all_ws, key=subkey)
-    elif isinstance(config.weight_by_density, Mapping):
-        weights = compute_weights(
-            model.encoder, all_ws, key=subkey, **config.weight_by_density
-        )
-    else:
-        weights = compute_weights(model.encoder, all_ws)
-
     # Mixture-model membership is opt-in. When enabled the model must carry a
     # `WidthNet`, and the background density is fixed once, from the
     # field.  This must happen *before* `filter_spec` is built, since a
@@ -1015,13 +760,14 @@ def train_ordering_and_track_net(
     optimizer = config.optimizer
 
     # Preserve the original ``pad_value=1``; see `_pad_to_multiple`.
-    padded_mask, (padded_ws, padded_weights) = _pad_to_multiple(
-        mask, all_ws, weights, batch_size=config.batch_size, pad_value=1
+    padded_mask, (padded_ws,) = _pad_to_multiple(
+        mask, all_ws, batch_size=config.batch_size, pad_value=1
     )
 
     trainer = PathAutoencoderTrainer(
         make_step=ft.partial(
-            _autoencoder_step,
+            eqx_step,
+            loss_fn=compute_decoder_loss,
             optimizer=optimizer,
             filter_spec=filter_spec,
             lambda_q=config.lambda_q,
@@ -1035,12 +781,7 @@ def train_ordering_and_track_net(
         membership=membership,
     )
     initial_carry, epoch_data = trainer.init(
-        model,
-        all_ws=padded_ws,
-        weights=padded_weights,
-        mask=padded_mask,
-        optimizer=optimizer,
-        key=key,
+        model, (padded_ws,), padded_mask, optimizer=optimizer, key=key
     )
     (model, opt_state, _), epoch_losses = trainer.run(
         initial_carry,

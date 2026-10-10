@@ -5,7 +5,6 @@ __all__: tuple[str, ...] = (
     "OrderingNet",
     # Training functions
     "train_ordering_net",
-    "make_step",
     "OrderingNetTrainer",
     "OrderingTrainingConfig",
     # Loss functions
@@ -15,7 +14,7 @@ __all__: tuple[str, ...] = (
 
 import functools as ft
 from dataclasses import KW_ONLY, dataclass
-from typing import Any, ClassVar, cast
+from typing import ClassVar, cast
 
 import equinox as eqx
 import jax
@@ -26,7 +25,7 @@ from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
 from jaxmore.nn import masked_mean
 
-from .trainer import AbstractEqxScanTrainer, EqxTrainCarry
+from .trainer import EqxScanTrainer, EqxTrainCarry, eqx_step
 from phasecurvefit._src.custom_types import FSz0, FSzN
 
 
@@ -199,7 +198,6 @@ def encoder_loss(
     return gamma_loss + lambda_prob * (prob_ordered_penalty + prob_random_penalty)
 
 
-@eqx.filter_value_and_grad
 def compute_loss(
     model: OrderingNet,
     ws: Float[Array, " B TwoF"],
@@ -210,12 +208,7 @@ def compute_loss(
     *,
     key: PRNGKeyArray | None = None,
 ) -> FSz0:
-    r"""Compute interpolation network loss with gradients.
-
-    This function is decorated with ``@eqx.filter_value_and_grad`` to compute
-    both the loss value and gradients with respect to the model parameters in
-    a single pass. This is the recommended pattern for low-overhead training
-    loops in Equinox.
+    r"""Compute interpolation network loss.
 
     Parameters
     ----------
@@ -240,12 +233,6 @@ def compute_loss(
     loss : Array
         Scalar loss value.
 
-    Notes
-    -----
-    Due to the ``@eqx.filter_value_and_grad`` decorator, calling this function
-    returns a tuple ``(loss, grads)`` where ``grads`` contains gradients with
-    respect to the trainable parameters of ``model``.
-
     Examples
     --------
     >>> import jax
@@ -259,7 +246,7 @@ def compute_loss(
     >>> rand_ws = jax.random.normal(key, (10, 4))
     >>> mask = jnp.ones(10, dtype=bool)
 
-    >>> loss, grads = compute_loss(net, ws, gamma, rand_ws, mask, lambda_prob=1.0)
+    >>> loss = compute_loss(net, ws, gamma, rand_ws, mask, lambda_prob=1.0)
 
     """
     # Predictions on ordered stream tracers (vectorized over batch)
@@ -278,69 +265,6 @@ def compute_loss(
         mask=mask,
         lambda_prob=lambda_prob,
     )
-
-
-# TODO: https://docs.kidger.site/equinox/tricks/#low-overhead-training-loops
-@eqx.filter_jit
-def make_step(
-    model_dynamic: OrderingNet,
-    model_static: OrderingNet,
-    /,
-    ord_ws: Float[Array, "B 2D"],
-    ord_gamma: Float[Array, " B"],
-    rand_ws: Float[Array, "B 2D"],
-    mask: Bool[Array, " B"],
-    opt_state: optax.OptState,
-    optimizer: optax.GradientTransformation,
-    *,
-    lambda_prob: float,
-    key: PRNGKeyArray,
-) -> tuple[FSz0, OrderingNet, optax.OptState]:
-    r"""Run a single optimization step for the interpolation network.
-
-    Parameters
-    ----------
-    model_dynamic, model_static : OrderingNet
-        The dynamic and static components of the ordering network being trained.
-    ord_ws : Array, shape (B, 2*n_dims)
-        Batch of ordered phase-space coordinates from stream tracers.
-    ord_gamma : Array, shape (B,)
-        Target $\gamma$ values for the ordered stream tracers.
-    rand_ws : Array, shape (B, 2*n_dims)
-        Batch of random phase-space samples (not on stream).
-    mask : Array, shape (B,)
-        Binary mask where True = real data, False = padding.
-        Only masked positions contribute to the loss.
-    opt_state : optax.OptState
-        Optimizer state.
-    optimizer : optax.GradientTransformation
-        Optax optimizer instance.
-    lambda_prob : float, optional
-        Weight for probability loss terms. Default: 1.0.
-    key : PRNGKeyArray
-        Ranodm key.
-
-    Returns
-    -------
-    loss : Array
-        Scalar loss value.
-    model : OrderingNet
-        Updated model after applying gradients.
-    opt_state : optax.OptState
-        Updated optimizer state.
-
-    """
-    # Reconstruct full model from dynamic and static parts
-    model = eqx.combine(model_dynamic, model_static)
-
-    # Compute loss and gradients
-    loss, grads = compute_loss(
-        model, ord_ws, ord_gamma, rand_ws, mask, lambda_prob=lambda_prob, key=key
-    )
-    # Update the dynamic components of the model
-    updates, opt_state = optimizer.update(grads, opt_state, model_dynamic)
-    model_dynamic = cast("OrderingNet", eqx.apply_updates(model_dynamic, updates))
-    return loss, model_dynamic, opt_state
 
 
 default_optimizer = optax.adamw(learning_rate=1e-3, weight_decay=1e-7)
@@ -377,51 +301,8 @@ class OrderingTrainingConfig:
     """Show an epoch progress bar via tqdm."""
 
 
-def _ordering_step(
-    carry: EqxTrainCarry,
-    batch_inputs: tuple[Bool[Array, " B"], tuple[Array, ...]],
-    *,
-    optimizer: optax.GradientTransformation,
-    filter_spec: Any,
-    lambda_prob: float,
-) -> tuple[FSz0, EqxTrainCarry]:
-    """Run one batch of OrderingNet training.
-
-    `batch_inputs` is ``(mask, (ord_ws, ord_gamma, rand_ws))``, as produced by
-    `shuffle_and_batch` from the epoch data assembled in `OrderingNetTrainer.init`
-    and `OrderingNetTrainer.prepare_data_args`.
-
-    `filter_spec` must be the same spec the trainer used to build `opt_state`,
-    so that the step, the carry packing, and the optimizer state all agree on
-    which leaves are trainable.
-    """
-    model, opt_state, key = carry
-    mask, (ord_ws, ord_gamma, rand_ws) = batch_inputs
-
-    # Gradients are taken w.r.t. the dynamic half only; the static half carries
-    # any frozen parameters and the non-array structure.
-    model_dynamic, model_static = eqx.partition(model, filter_spec)
-
-    key, subkey = jr.split(key)
-    loss, model_dynamic, opt_state = make_step(
-        model_dynamic,
-        model_static,
-        ord_ws=ord_ws,
-        ord_gamma=ord_gamma,
-        rand_ws=rand_ws,
-        mask=mask,
-        opt_state=opt_state,
-        optimizer=optimizer,
-        lambda_prob=lambda_prob,
-        key=subkey,
-    )
-
-    model = eqx.combine(model_dynamic, model_static)
-    return loss, (model, opt_state, key)
-
-
 @dataclass(frozen=True)
-class OrderingNetTrainer(AbstractEqxScanTrainer):
+class OrderingNetTrainer(EqxScanTrainer):
     """Scan trainer for `OrderingNet`.
 
     Fresh random (off-stream) phase-space samples are drawn every epoch, so that
@@ -438,31 +319,6 @@ class OrderingNetTrainer(AbstractEqxScanTrainer):
 
     ws_max: FSzN | None = None
     """Upper bound of the phase-space box the negatives are drawn from."""
-
-    def init(  # type: ignore[override]
-        self,
-        model: OrderingNet,
-        /,
-        *,
-        ordered_ws: Float[Array, "N TwoF"],
-        gamma_target: Float[Array, " N"],
-        mask: Bool[Array, " N"],
-        optimizer: optax.GradientTransformation,
-        key: PRNGKeyArray,
-    ) -> tuple[EqxTrainCarry, tuple[Bool[Array, " N"], tuple[Array, ...]]]:
-        """Build the initial carry and the epoch data.
-
-        The third data array is a placeholder for the random negatives; it is
-        replaced every epoch by `prepare_data_args`. It is present here only so
-        the pytree structure that `jax.lax.scan` sees is fixed from the start.
-        """
-        model_dynamic, _ = eqx.partition(model, self.filter_spec)
-        opt_state = optimizer.init(model_dynamic)
-        initial_carry = (model, opt_state, key)
-
-        placeholder_rand_ws = jnp.zeros(self.random_ws_shape, dtype=ordered_ws.dtype)
-        epoch_data = (mask, (ordered_ws, gamma_target, placeholder_rand_ws))
-        return initial_carry, epoch_data
 
     def prepare_data_args(
         self,
@@ -602,28 +458,25 @@ def train_ordering_net(
     # Padding introduced by batching is still masked out by `shuffle_and_batch`.
     ordered_mask = jnp.ones(n_total, dtype=bool)
 
-    # Single source of truth for what is trainable: the step, the carry packing,
-    # and `optimizer.init` must all partition the model the same way.
-    filter_spec: Any = eqx.is_array
-
     trainer = OrderingNetTrainer(
         make_step=ft.partial(
-            _ordering_step,
+            eqx_step,
+            loss_fn=compute_loss,
             optimizer=optimizer,
-            filter_spec=filter_spec,
             lambda_prob=config.lambda_prob,
         ),
         loss_agg_fn=masked_mean,
-        filter_spec=filter_spec,
         random_ws_shape=shape,
         ws_min=ws_min,
         ws_max=ws_max,
     )
+    # The random negatives are a placeholder, redrawn every epoch by
+    # `prepare_data_args`; present only so the scan's pytree structure is fixed.
+    placeholder_rand_ws = jnp.zeros(shape, dtype=ordered_ws.dtype)
     initial_carry, epoch_data = trainer.init(
         model,
-        ordered_ws=ordered_ws,
-        gamma_target=gamma_target,
-        mask=ordered_mask,
+        (ordered_ws, gamma_target, placeholder_rand_ws),
+        ordered_mask,
         optimizer=optimizer,
         key=key,
     )
