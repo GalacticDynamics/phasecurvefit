@@ -336,8 +336,9 @@ class JaxKD(AbstractNeighborSearch):
 
 
 SCIPY_TRACED = (
-    "neighbors.SciPy cannot take traced inputs (jax.jit/vmap/grad arguments; "
-    "it is host code). Use neighbors.BucketKDTree() to trace."
+    "neighbors.SciPy cannot run inside jax.jit/vmap/grad (it is host code): "
+    "its inputs are traced there, including arrays captured by a jitted "
+    "function. Use neighbors.BucketKDTree() to trace."
 )
 
 

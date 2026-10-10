@@ -316,8 +316,9 @@ Self-Organizing Map ordering, after Starkman et al. (2023). See
 Exact k-nearest-neighbour backends for
 {class}`~phasecurvefit.orderers.MSTOrderer` (`neighbors=`).
 
-**Choosing a backend.** `SciPy` is **eager-only**: it raises `TypeError` on
-inputs traced by `jit`, `vmap` or `grad`. Under those transforms use
+**Choosing a backend.** `SciPy` is **eager-only**: it raises `TypeError`
+inside `jit`, `vmap` or `grad`, including on arrays a jitted function captures
+rather than takes as arguments. Under those transforms use
 `BucketKDTree` (or `BruteForce`/`JaxKD`). `MSTOrderer`'s default
 (`neighbors=None`) makes that choice per call: `SciPy` for concrete inputs,
 `BucketKDTree` when traced.

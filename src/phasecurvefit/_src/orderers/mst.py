@@ -205,11 +205,16 @@ def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarra
     direction, when there is no split and every edge gets ``cos = 1``, i.e.
     the graph is purely spatial.
     Scale-free otherwise: an absolute floor on ``|v_i| |v_j|`` would read
-    every small-unit velocity (``|v| <~ 1e-6``) as directionless.
+    every small-unit velocity (``|v| <~ 1e-6``) as directionless. Each row is
+    divided by its largest component first, so a velocity with a direction
+    (``_has_direction``) never has its norm underflow to 0, even ~1e-200 in
+    float64, which would give it ``cos = 1`` and let it bridge two arms.
     """
-    vi, vj = V[rows], V[cols]
-    num = np.sum(vi * vj, axis=1)
-    den = np.linalg.norm(vi, axis=1) * np.linalg.norm(vj, axis=1)
+    big = np.max(np.abs(V), axis=1, keepdims=True)  # NaN for NaN rows
+    U = np.divide(V, big, out=np.zeros(V.shape), where=big > 0.0)
+    ui, uj = U[rows], U[cols]
+    num = np.sum(ui * uj, axis=1)
+    den = np.linalg.norm(ui, axis=1) * np.linalg.norm(uj, axis=1)
     # A float buffer: ``ones_like`` would inherit an integer dtype from integer
     # velocities, which the float quotient cannot be cast into.
     return np.divide(num, den, out=np.ones(num.shape), where=den > 0.0)
@@ -235,6 +240,9 @@ def _directed_knn(P, V, k_eff, neighbors, /):  # noqa: ANN001, ANN202
     leaf (n,))``.
     """
     directed = _has_direction(V, jnp)
+    # Exact power-of-two scaling (neighbours unchanged) so the far row cannot
+    # overflow: float32 coordinates near 1e38 would otherwise put it at inf.
+    P = P / _pow2_scale(P, None)
     P_dir = jnp.where(directed[:, None], P, far_rows(P, 1))
     nbr_dir = neighbors.knn(P_dir, k_eff)[0]
     leaf = neighbors.knn(P_dir, 1, queries=P)[0][:, 0]
@@ -637,8 +645,9 @@ class MSTOrderer(AbstractOrderer):
         CPU, no compilation) and ``BucketKDTree()`` when they are traced by
         jit/vmap/grad. Or pin one: ``BucketKDTree()`` (JAX-native, traceable;
         compiles once per size bucket), ``BruteForce()``, ``JaxKD()`` (optional
-        dependency), or ``SciPy(workers=-1)`` (host-only: it raises when its
-        inputs are traced). With equidistant neighbours SciPy and
+        dependency), or ``SciPy(workers=-1)`` (host-only: it raises inside
+        jit/vmap/grad, even on arrays a jitted function captures). With
+        equidistant neighbours SciPy and
         ``BucketKDTree`` may pick differently, so the default's eager and
         traced orderings can differ on tied (e.g. grid) data; pin a backend if
         that matters.

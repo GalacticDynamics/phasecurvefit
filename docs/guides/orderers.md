@@ -99,7 +99,8 @@ default (`neighbors=None`) it picks per call: SciPy's `cKDTree` when the inputs
 are concrete (fastest on CPU, nothing to compile) and the JAX-native
 {class}`~phasecurvefit.neighbors.BucketKDTree` when they are traced; see
 {mod}`phasecurvefit.neighbors` to pin one. SciPy is **eager-only**: it raises
-`TypeError` on traced inputs, which is why traced calls use the kd-tree. Its
+`TypeError` inside `jit`, `vmap` or `grad` (even on arrays a jitted function
+captures), which is why traced calls use the kd-tree. Its
 graph algorithms are **host-side** (NumPy/SciPy); `order()` runs them through
 `jax.pure_callback` when traced, so it works under `jit` and `vmap`.
 
