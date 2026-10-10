@@ -9,11 +9,10 @@ __all__: tuple[str, ...] = ()
 
 import os
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
-import pytz
 from pygments.lexers.python import PythonLexer
 
 # Add the package to the path
@@ -31,7 +30,7 @@ except ImportError:
 
 author = "phasecurvefit Developers"
 project = "phasecurvefit"
-copyright = f"{datetime.now(pytz.timezone('UTC')).year}, {author}"
+copyright = f"{datetime.now(UTC).year}, {author}"
 version = __version__
 
 master_doc = "index"

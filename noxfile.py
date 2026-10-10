@@ -82,12 +82,6 @@ def pytest(s: nox.Session, /) -> None:
     s.run("pytest", *package_paths, *s.posargs)
 
 
-@session(uv_groups=["test"], reuse_venv=True)
-def pytest_benchmark(s: nox.Session, /) -> None:
-    """Run benchmark tests with pytest-benchmark."""
-    s.run("pytest", "tests/benchmarks/", "--benchmark-only", "-v", *s.posargs)
-
-
 @session(uv_groups=["test"])
 def codspeed(s: nox.Session, /) -> None:
     """Run CodSpeed benchmarks for CI."""
