@@ -68,9 +68,10 @@ def _check_matching_keys(**components: VectorComponents) -> None:
     has *extra* keys -- a silent drop of a component. Both are worse than
     failing here with the names.
 
-    Empty dicts are rejected for the same reason: with no components there is
-    nothing to stack, and the failure surfaces as a bare `StopIteration` from
-    the first `zeroth` call with no message at all.
+    Empty dicts are rejected too, with a `ValueError` that names the dict.
+    Without this check there would be nothing to stack, and the failure would
+    surface later as a bare `StopIteration` from the first `zeroth` call, with
+    no message at all.
     """
     (ref_name, ref), *rest = components.items()
     for name, comps in rest:
