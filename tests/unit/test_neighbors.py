@@ -61,7 +61,7 @@ def _assert_indices_give_distances(points, queries, idx, dist):
 class TestContract:
     """Every backend honours the same contract."""
 
-    @pytest.mark.parametrize("n", [0, 1, 2, 11, 300])
+    @pytest.mark.parametrize("n", [0, 1, 2, 5, 11, 300])  # 5: padded, n < k
     def test_all_points(self, backend, n):
         """Euclidean distances, sorted, self excluded, sentinel n when short."""
         p = np.random.default_rng(n).normal(size=(n, 3)).astype(np.float32)
@@ -219,6 +219,16 @@ class TestContract:
         np.testing.assert_allclose(dist, _ref(p, 3), rtol=1e-5)
         _assert_indices_give_distances(p, None, idx, dist)
 
+    def test_huge_queries_beside_small_points(self, backend):
+        """Scaling covers the queries too: huge queries against unit points."""
+        p = np.random.default_rng(0).normal(size=(50, 3)).astype(np.float32)
+        q = np.array([[3e19, 0, 0], [0, -1e25, 0]], np.float32)
+        idx, dist = map(
+            np.asarray, backend.knn(jnp.asarray(p), 2, queries=jnp.asarray(q))
+        )
+        assert np.all(idx < 50)
+        np.testing.assert_allclose(dist, _ref(p, 2, q), rtol=1e-5)
+
     def test_non_finite_with_empty_input_raises(self, backend):
         """NaN is caught even when the other input is empty."""
         nan = jnp.full((2, 3), jnp.nan, jnp.float32)
@@ -308,13 +318,13 @@ class TestTracing:
         with pytest.raises(TypeError, match="BucketKDTree"):
             jax.jit(lambda x: pcf.neighbors.SciPy().knn(x, 3))(p)
 
-    def test_gradient_finite_at_coincident_points(self):
+    def test_gradient_finite_at_coincident_points(self, jax_backend):
         """Distances differentiate with neighbour selection fixed; no NaN at d=0."""
         p = np.random.default_rng(2).normal(size=(64, 3)).astype(np.float32)
         p[1] = p[0]
 
         def loss(x):
-            return jnp.sum(pcf.neighbors.BucketKDTree().knn(x, 4)[1])
+            return jnp.sum(jax_backend.knn(x, 4)[1])
 
         g = np.asarray(jax.grad(loss)(jnp.asarray(p)))
         assert np.all(np.isfinite(g))
@@ -339,7 +349,8 @@ class TestBucketing:
             return all_knn(*args, **kwargs)
 
         monkeypatch.setattr(nb_src._kd, "all_knn", counting)
-        # An unusual leaf_size, so this test's first call is a fresh trace.
+        # An unusual leaf_size, and a cleared cache, so the first call traces.
+        nb_src._knn_core_jit.clear_cache()
         backend = pcf.neighbors.BucketKDTree(leaf_size=13)
         rng = np.random.default_rng(3)
         backend.knn(jnp.asarray(rng.normal(size=(1000, 3)), jnp.float32), 10)
@@ -366,6 +377,13 @@ class TestBucketing:
         p = np.random.default_rng(5).normal(size=(100, 3)) * scale
         far = np.asarray(nb_src.far_rows(jnp.asarray(p, jnp.float32), 500))
         assert np.abs(far).max() <= (4 * np.sqrt(3) + 3) * np.abs(p).max() * 1.01
+
+    def test_far_rows_beyond_the_data_at_large_magnitude(self):
+        """|x| >> spread in float32: the far row still lies beyond the data."""
+        p = np.c_[np.full(41, 1e9), np.linspace(0, 0.5, 41)].astype(np.float32)
+        far = np.asarray(nb_src.far_rows(jnp.asarray(p), 7), np.float64)
+        gap = np.linalg.norm(p.astype(np.float64)[:, None] - far[None], axis=-1)
+        assert gap.min() > 0.5  # farther than the data's diameter
 
     def test_far_rows_large_magnitude_float32(self):
         """|x| >> spread in float32: far rows must not round onto real points."""

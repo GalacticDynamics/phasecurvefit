@@ -103,6 +103,15 @@ class TestSelect:
         np.testing.assert_array_equal(np.asarray(vals), [[0.0, 1.0]])
         np.testing.assert_array_equal(np.asarray(ids), [[w - 1, 0]])
 
+    @pytest.mark.parametrize("top_k", [False, True])
+    def test_large_ids_tie_to_the_lower_id(self, top_k):
+        """Ids near 2**24 still break ties by id (no float key rounding)."""
+        base = 2**24 - 100
+        a = jnp.asarray([[3.0, 1.0, 1.0, 1.0, 0.0]])
+        ids = jnp.asarray([[0, 9, 4, 7, 2]]) + base
+        _, out = ksmallest(a, ids, 3, top_k=top_k)
+        np.testing.assert_array_equal(np.asarray(out), [[base + 2, base + 4, base + 7]])
+
     def test_trace_size_flat_in_k(self):
         """k=64 traces to a small program (an unrolled O(k**2) sort was ~19k ops).
 
@@ -237,6 +246,17 @@ class TestAllKnn:
             idx, d2 = kd.all_knn(jnp.asarray(p), 10, frontier=2)
             assert d2.dtype == jnp.float64
             _assert_exact(p, idx, d2, 10)
+
+    @pytest.mark.parametrize("frontier", [16, 2])
+    def test_ties_lower_index_large_k(self, frontier):
+        """For k > 16 (the lax.sort path), ties still go to the lower index."""
+        g = np.stack(np.meshgrid(np.arange(9.0), np.arange(9.0)), -1).reshape(-1, 2)
+        g = g[np.random.default_rng(0).permutation(len(g))].astype(np.float32)
+        idx, _ = kd.all_knn(jnp.asarray(g), 24, frontier=frontier)
+        d2 = ((g[:, None].astype(np.float64) - g[None]) ** 2).sum(-1)
+        np.fill_diagonal(d2, np.inf)
+        want = np.argsort(d2, axis=1, kind="stable")[:, :24]  # ties: lower index
+        np.testing.assert_array_equal(np.asarray(idx), want)
 
     @pytest.mark.parametrize("frontier", [16, 2])
     def test_duplicates(self, frontier):

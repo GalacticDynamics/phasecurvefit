@@ -277,6 +277,21 @@ class TestMSTEdgeClip:
         )
         assert int(res.n_skipped) == 0
 
+    @pytest.mark.parametrize(
+        ("n_body", "n_pairs", "visited"),
+        [(400, 300, 1000), (600, 200, 600)],
+        ids=["60%-small-kept", "40%-small-clipped"],
+    )
+    def test_reject_fraction_is_one_half(self, n_body, n_pairs, visited):
+        """Small pieces holding over half the points are kept; under half, clipped."""
+        gaps = np.r_[np.ones(n_body - 1), 10.0, np.tile([1.0, 10.0], n_pairs)[:-1]]
+        x = np.concatenate([[0.0], np.cumsum(gaps)])
+        res = pcf.orderers.MSTOrderer(k=4, jump_cap=1e9, edge_clip_sigma=0.1).order(
+            {"x": jnp.asarray(x), "y": jnp.zeros(x.size)},
+            {"x": jnp.ones(x.size), "y": jnp.zeros(x.size)},
+        )
+        assert int(res.n_visited) == visited
+
     @pytest.mark.parametrize("extra", [0, 7], ids=["pairs", "pairs+7"])
     def test_fragmenting_cuts_keep_everything(self, extra):
         """Cuts that shatter the stream stop clipping instead of emptying it.
@@ -779,6 +794,16 @@ class TestMSTBackends:
             jax.block_until_ready(
                 pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(pos, vel).indices
             )
+
+    def test_vmap_over_velocities_only(self):
+        """Concrete positions, batched velocities: the traced path still runs."""
+        pos, vel, _ = _open_arc(n=120)
+        orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0, orient_by_velocity=True)
+        vx = jnp.stack([vel["x"], -vel["x"]])
+        got = jax.vmap(lambda v: orderer.order(pos, {**vel, "x": v}).indices)(vx)
+        for i in range(2):
+            want = orderer.order(pos, {**vel, "x": vx[i]}).indices
+            np.testing.assert_array_equal(np.asarray(got[i]), np.asarray(want))
 
     @pytest.mark.parametrize("make", _JAX_BACKENDS)
     def test_vmap_matches_loop(self, make):
