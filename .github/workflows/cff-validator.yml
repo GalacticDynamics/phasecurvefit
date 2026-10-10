@@ -11,7 +11,9 @@ on:
       - main
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # PR runs supersede each other; every push to main keeps its own run.
+  group:
+    ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
