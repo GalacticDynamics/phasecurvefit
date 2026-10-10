@@ -11,8 +11,9 @@ __all__: tuple[str, ...] = (
     "build_tree",
     "knn",
     "locate_leaves",
+    "node_labels",
 )
 
 from ._brute import brute_knn
 from ._build import Tree, build_tree
-from ._query import all_knn, knn, locate_leaves
+from ._query import all_knn, knn, locate_leaves, node_labels

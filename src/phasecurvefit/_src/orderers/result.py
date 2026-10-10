@@ -59,9 +59,9 @@ class OrderingResult(AbstractResult):
         ordered visited observations instead.
     backbone_size : Int[Array, ""] | None
         Number of valid leading vertices in ``backbone`` when it has been
-        padded to a static shape (e.g. by ``MSTOrderer`` under
-        ``jax.pure_callback``, where the true backbone length is data-dependent
-        and unknown at trace time). ``None`` (default) means every vertex in
+        padded to a static shape (e.g. by ``MSTOrderer``, whose backbone length
+        is data-dependent and so unknown at trace time under ``jit``/``vmap``).
+        ``None`` (default) means every vertex in
         ``backbone`` is valid.
     chord : Float[Array, " n_obs"] | None
         Arc length along the curve this result represents, per observation, in

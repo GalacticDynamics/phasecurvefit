@@ -7,8 +7,9 @@ autoencoder consumes unchanged.
 
 Contract
 --------
-``order()`` is a one-shot, **host-side** preprocessing step: it is *not* required
-to be jit/vmap-traceable (this lets ``MSTOrderer`` use plain NumPy/SciPy). It
+``order()`` is a one-shot preprocessing step: it is *not* required to be
+jit/vmap-traceable (e.g. ``MSTOrderer(neighbors=SciPy())`` runs on the host; the
+default ``MSTOrderer`` does trace). It
 returns arrays the AE consumes directly: plain ``jnp`` arrays for array inputs,
 or unit-aware ``unxt`` Quantities when given Quantity inputs (via the ``unxt``
 interop). ``indices`` stores visited observation indices in visit order as a

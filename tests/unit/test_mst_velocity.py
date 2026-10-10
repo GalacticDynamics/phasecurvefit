@@ -393,3 +393,126 @@ class TestDirectionExtremes:
         np.testing.assert_array_equal(
             np.asarray(huge.indices), np.asarray(unit.indices)
         )
+
+
+def _tie_free_hairpin(seed=0):
+    """Build the hairpin with a 1e-3 x-jitter, so no two candidate edges tie."""
+    pos, vel = _hairpin()
+    jitter = np.random.default_rng(seed).normal(0.0, 1e-3, pos["x"].shape)
+    return {"x": pos["x"] + jitter, "y": pos["y"]}, vel
+
+
+def _three_ways(make, pos, vel):
+    """Order with SciPy (host), the kd-tree eagerly, and the kd-tree under jit."""
+    scipy = make(pcf.neighbors.SciPy()).order(pos, vel).indices
+    bucket = make(pcf.neighbors.BucketKDTree())
+    eager = bucket.order(pos, vel).indices
+    jitted = jax.jit(lambda p, v: bucket.order(p, v).indices)(pos, vel)
+    return np.asarray(scipy), np.asarray(eager), np.asarray(jitted)
+
+
+class TestJaxGraphStageMatchesHost:
+    """The pure-JAX graph stage carries the host stage's velocity semantics."""
+
+    @pytest.mark.parametrize(
+        "mechanism", ["velocity_weight", "sever_cos_threshold", "orient_by_velocity"]
+    )
+    def test_directionless_tracers(self, mechanism):
+        """Stationary and (under omit) NaN tracers: leaves, same as the host."""
+        pos, vel = _tie_free_hairpin()
+        vel = {
+            "x": vel["x"].at[20].set(0.0).at[60].set(jnp.nan),
+            "y": vel["y"].at[20].set(0.0),
+        }
+
+        def make(nb):
+            return pcf.orderers.MSTOrderer(
+                k=6,
+                jump_cap=1.0,
+                on_disconnected="largest",
+                nan_policy="omit",
+                neighbors=nb,
+                **_MECHANISMS[mechanism],
+            )
+
+        want, eager, jitted = _three_ways(make, pos, vel)
+        np.testing.assert_array_equal(eager, want)
+        np.testing.assert_array_equal(jitted, want)
+
+    def test_tiny_float64_velocity_keeps_its_direction(self):
+        """|v| ~ 1e-200 under x64 is directed in the JAX stage too."""
+        with jax.enable_x64(new_val=True):
+            pos, vel = _tie_free_hairpin()
+            vel = {"x": vel["x"].at[20].set(1e-200), "y": vel["y"]}
+
+            def make(nb):
+                return pcf.orderers.MSTOrderer(
+                    k=6,
+                    jump_cap=1.0,
+                    sever_cos_threshold=0.0,
+                    on_disconnected="largest",
+                    neighbors=nb,
+                )
+
+            want, eager, jitted = _three_ways(make, pos, vel)
+        np.testing.assert_array_equal(eager, want)
+        np.testing.assert_array_equal(jitted, want)
+
+    @pytest.mark.parametrize("gap", [3e19, 2.5e36], ids=["kpc-in-m", "near-max"])
+    def test_huge_float32_coordinates(self, gap):
+        """Edge, arc and clip lengths do not overflow float32 in the JAX stage."""
+        x = np.random.default_rng(3).permutation(np.linspace(0.0, 40 * gap, 40))
+        pos = {"x": jnp.asarray(x, jnp.float32), "y": jnp.zeros(40, jnp.float32)}
+        vel = {"x": jnp.ones(40).at[20].set(0.0), "y": jnp.zeros(40)}
+
+        def make(nb):
+            return pcf.orderers.MSTOrderer(
+                k=5,
+                jump_cap=float(np.float32(3e38)),
+                velocity_weight=0.5,
+                edge_clip_sigma=3.0,
+                neighbors=nb,
+            )
+
+        want, eager, jitted = _three_ways(make, pos, vel)
+        np.testing.assert_array_equal(eager, want)
+        np.testing.assert_array_equal(jitted, want)
+
+    @pytest.mark.parametrize(
+        ("bad", "match"),
+        [(np.nan, "nan_policy='omit'"), (np.inf, "infinite")],
+        ids=["nan", "inf"],
+    )
+    def test_traced_velocity_errors(self, bad, match):
+        """Traced, the JAX stage raises the same checks at run time."""
+        pos, vel = _hairpin()
+        vel = {"x": vel["x"].at[20].set(bad), "y": vel["y"]}
+        orderer = pcf.orderers.MSTOrderer(
+            k=6,
+            jump_cap=1.0,
+            velocity_weight=5.0,
+            neighbors=pcf.neighbors.BucketKDTree(),
+        )
+        with pytest.raises(jax.errors.JaxRuntimeError, match=match):
+            jax.block_until_ready(
+                jax.jit(lambda p, v: orderer.order(p, v).indices)(pos, vel)
+            )
+
+    @pytest.mark.parametrize(
+        ("bad", "match"),
+        [(np.nan, "nan_policy='omit'"), (np.inf, "infinite")],
+        ids=["nan", "inf"],
+    )
+    def test_eager_velocity_errors(self, bad, match):
+        """Eager JAX-backend calls raise the host's ValueError and message."""
+        pos, vel = _hairpin()
+        vel = {"x": vel["x"].at[20].set(bad), "y": vel["y"]}
+        orderer = pcf.orderers.MSTOrderer(
+            k=6,
+            jump_cap=1.0,
+            velocity_weight=5.0,
+            neighbors=pcf.neighbors.BucketKDTree(),
+        )
+        with pytest.raises(ValueError, match=match) as err:
+            orderer.order(pos, vel)
+        assert "velocity_weight" in str(err.value)
