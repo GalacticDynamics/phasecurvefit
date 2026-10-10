@@ -497,7 +497,10 @@ def compute_decoder_loss(
     """
     # Get phase-space q,p separation index
     if ws.shape[1] % 2 != 0:
-        msg = "ord_w has the wrong shape"
+        msg = (
+            "ws must have an even number of columns (positions + velocities), "
+            f"got shape {ws.shape}"
+        )
         raise ValueError(msg)
     D = ws.shape[1] // 2
 
