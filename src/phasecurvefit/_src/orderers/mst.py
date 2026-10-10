@@ -201,10 +201,14 @@ def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarra
 
 
 def _knn_edges(
-    P: np.ndarray, k: int, /, *, workers: int
+    P: np.ndarray, k: int, /, *, workers: int, tree: cKDTree | None = None
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Directed kNN edges ``(rows, cols, length)``, self excluded."""
-    nn_d, nn_i = cKDTree(P).query(P, k=int(min(k, len(P) - 1)) + 1, workers=workers)
+    """Directed kNN edges ``(rows, cols, length)``, self excluded.
+
+    ``tree`` is ``cKDTree(P)``, if the caller already built it.
+    """
+    tree = cKDTree(P) if tree is None else tree
+    nn_d, nn_i = tree.query(P, k=int(min(k, len(P) - 1)) + 1, workers=workers)
     nn_d = np.atleast_2d(nn_d)
     nn_i = np.atleast_2d(nn_i)
     # Exclude self by index, not by dropping column 0: with coincident points
@@ -236,8 +240,9 @@ def _directionless_as_leaves(
     directed = np.flatnonzero(~dirless)
     if not dirless.any() or not directed.size:
         return None
-    r, c, d = _knn_edges(P[directed], k, workers=workers)
-    d_leaf, near = cKDTree(P[directed]).query(P[dirless], workers=workers)
+    tree = cKDTree(P[directed])
+    r, c, d = _knn_edges(P[directed], k, workers=workers, tree=tree)
+    d_leaf, near = tree.query(P[dirless], workers=workers)
     return (
         np.concatenate([directed[r], np.flatnonzero(dirless)]),
         np.concatenate([directed[c], directed[near]]),
