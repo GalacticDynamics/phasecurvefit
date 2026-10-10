@@ -23,7 +23,7 @@ from phasecurvefit._src.query_config import WalkConfig
 
 
 def _resolve_start_idx(
-    start_idx: int | None, init: AbstractResult | None
+    start_idx: int | None, init: AbstractResult | None, /
 ) -> int | Int[Array, ""]:
     """Pick where the walk starts, taking it from ``init`` when unset.
 
@@ -54,7 +54,7 @@ def _resolve_start_idx(
 
 
 def _finalize(
-    result: WalkLocalFlowResult, positions: VectorComponents
+    result: WalkLocalFlowResult, positions: VectorComponents, /
 ) -> WalkLocalFlowResult:
     """Attach the arc length along the walk path.
 

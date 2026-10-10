@@ -65,7 +65,7 @@ def eqx_step(
     key, subkey = jr.split(key)
 
     @eqx.filter_value_and_grad
-    def _loss(dynamic: eqx.Module) -> Array:
+    def _loss(dynamic: eqx.Module, /) -> Array:
         model = eqx.combine(dynamic, model_static)
         return loss_fn(model, *data, mask, key=subkey, **kw)
 

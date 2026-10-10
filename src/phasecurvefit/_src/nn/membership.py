@@ -505,7 +505,7 @@ def uniform_background_density(
     return 1.0 / jnp.prod(extent)
 
 
-def _log_foreground_density(r2: FSzN, sigma: FSzN, n_dims: int) -> FSzN:
+def _log_foreground_density(r2: FSzN, sigma: FSzN, n_dims: int, /) -> FSzN:
     r"""Log isotropic Gaussian stream density, $\log \mathcal{N}(r; 0, \sigma^2 I)$."""
     return (
         -0.5 * r2 / jnp.square(sigma)

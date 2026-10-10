@@ -602,7 +602,7 @@ DedupCarry: TypeAlias = tuple[  # noqa: UP040
 ]
 
 
-def _dedup_step(carry: DedupCarry, idx: Array) -> tuple[DedupCarry, None]:
+def _dedup_step(carry: DedupCarry, idx: Array, /) -> tuple[DedupCarry, None]:
     """Remove duplicate indices while preserving order (scan step function).
 
     Used by {func}`combine_results` to deduplicate the concatenated

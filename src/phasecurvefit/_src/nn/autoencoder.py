@@ -471,6 +471,7 @@ def _mixture_decoder_loss(
     model: PathAutoencoder,
     ws: Float[Array, " B TwoF"],
     mask: Bool[Array, " B"],
+    /,
     *,
     lambda_p: FLikeSz0,
     lambda_velocity: float,
@@ -664,6 +665,7 @@ def compute_decoder_loss(
 
 def _pad_to_multiple(
     mask: Bool[Array, " N"],
+    /,
     *args: Float[Array, "N ..."],
     batch_size: int,
     pad_value: float,
