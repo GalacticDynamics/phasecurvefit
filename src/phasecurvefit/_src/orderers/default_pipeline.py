@@ -102,8 +102,14 @@ def default_pipeline(
     Array([0, 1, 2], dtype=int32)
 
     """
+    # ``nan_policy="omit"``: this stage reads velocities only to orient the
+    # result, where skipping a missing one costs nothing, and the default entry
+    # point must not reject a catalogue for lacking some radial velocities.
     mst = MSTOrderer(
-        jump_cap=float("inf"), orient_by_velocity=True, on_disconnected="connect"
+        jump_cap=float("inf"),
+        orient_by_velocity=True,
+        on_disconnected="connect",
+        nan_policy="omit",
     )
     mst_result = mst.order(positions, velocities, metadata=metadata)
     try:
