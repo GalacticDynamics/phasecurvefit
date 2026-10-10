@@ -73,201 +73,29 @@ VectorQComponents: TypeAlias = Mapping[str, Real[AbcQ, " N"]]  # noqa: UP040
 # ==============================================================================
 
 
-def _scan_p_helper(
-    usys: u.AbstractUnitSystem,
-    q: tuple[AbcQ, ...],
-    p: tuple[AbcQ, ...],
-    terminate_arr: ArrayLike,
-    *args: Any,
-    kw: dict[str, Any],
-) -> tuple[Array, Array, Array, Array, Array]:
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-        _,  # metadata placeholder
-    ) = lax.scan_p.bind(  # type: ignore[no-untyped-call]
+@quax.register(lax.scan_p)
+def scan_p_statemetadata_quantity(
+    metadata: StateMetadata, terminate_arr: ArrayLike, /, *args: Any, **kw: Any
+) -> tuple[Array, Array, Array, Array, Array, StateMetadata]:
+    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
+
+    Quax flattens the bounded_while_loop carry into positional args, with the
+    metadata first. The remaining args (positions, velocities, consts, state)
+    vary in number with dimensionality and query strategy, so strip units from
+    all of them, call the primitive, and re-attach the metadata.
+    """
+    usys = metadata.get("usys")
+    if usys is None:
+        msg = "No unit system found in StateMetadata"
+        raise RuntimeError(msg)
+
+    *out, _ = lax.scan_p.bind(  # type: ignore[no-untyped-call]
         jnp.array(True),  # noqa: FBT003
         terminate_arr,
-        *[u.ustrip(usys, x) for x in q],
-        *[u.ustrip(usys, v) for v in p],
         *[u.ustrip(AllowValue, usys, arg) for arg in args],
         **kw,
     )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop)
-
-
-@quax.register(lax.scan_p)
-def scan_p_statemetadata_quantity(
-    metadata: StateMetadata,
-    terminate_arr: ArrayLike,
-    q_x: AbcQ,
-    p_x: AbcQ,
-    metric_scale: AbcQ,
-    max_dist: AbcQ,
-    ordered_arr: ArrayLike,
-    visited_mask: ArrayLike,
-    current_idx: int,
-    step: int,
-    should_stop: bool,  # noqa: FBT001
-    arg0: ArrayLike,  # what is this?
-    /,
-    **kw: Any,
-) -> list[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, StateMetadata]:
-    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
-
-    Quax flattens the bounded_while_loop carry into positional args. In the
-    current flattening order we observe the metadata as the first positional
-    argument, followed by ``xs`` (typically an empty array for our scan), any
-    const arguments, and finally the remaining state elements plus the ``done``
-    flag. We peel the state off the tail, strip Quantities, call the primitive
-    implementation, and rewrap.
-    """
-    usys = metadata.get("usys")
-    if usys is None:
-        msg = "No unit system found in StateMetadata"
-        raise RuntimeError(msg)
-
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-    ) = _scan_p_helper(
-        usys,
-        (q_x,),
-        (p_x,),
-        terminate_arr,
-        metric_scale,
-        max_dist,
-        ordered_arr,
-        visited_mask,
-        current_idx,
-        step,
-        should_stop,
-        arg0,
-        kw=kw,
-    )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop, metadata)
-
-
-@quax.register(lax.scan_p)
-def scan_p_statemetadata_quantity(
-    metadata: StateMetadata,
-    terminate_arr: ArrayLike,
-    q_x: AbcQ,
-    q_y: AbcQ,
-    p_x: AbcQ,
-    p_y: AbcQ,
-    metric_scale: AbcQ,
-    max_dist: AbcQ,
-    ordered_arr: ArrayLike,
-    visited_mask: ArrayLike,
-    current_idx: int,
-    step: int,
-    should_stop: bool,  # noqa: FBT001
-    arg0: ArrayLike,  # what is this?
-    /,
-    **kw: Any,
-) -> list[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, StateMetadata]:
-    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
-
-    Quax flattens the bounded_while_loop carry into positional args. In the
-    current flattening order we observe the metadata as the first positional
-    argument, followed by ``xs`` (typically an empty array for our scan), any
-    const arguments, and finally the remaining state elements plus the ``done``
-    flag. We peel the state off the tail, strip Quantities, call the primitive
-    implementation, and rewrap.
-    """
-    usys = metadata.get("usys")
-    if usys is None:
-        msg = "No unit system found in StateMetadata"
-        raise RuntimeError(msg)
-
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-    ) = _scan_p_helper(
-        usys,
-        (q_x, q_y),
-        (p_x, p_y),
-        terminate_arr,
-        metric_scale,
-        max_dist,
-        ordered_arr,
-        visited_mask,
-        current_idx,
-        step,
-        should_stop,
-        arg0,
-        kw=kw,
-    )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop, metadata)
-
-
-@quax.register(lax.scan_p)
-def scan_p_statemetadata_quantity(
-    metadata: StateMetadata,
-    terminate_arr: ArrayLike,
-    q_x: AbcQ,
-    q_y: AbcQ,
-    q_z: AbcQ,
-    p_x: AbcQ,
-    p_y: AbcQ,
-    p_z: AbcQ,
-    metric_scale: AbcQ,
-    max_dist: AbcQ,
-    ordered_arr: ArrayLike,
-    visited_mask: ArrayLike,
-    current_idx: int,
-    step: int,
-    should_stop: bool,  # noqa: FBT001
-    arg0: ArrayLike,  # what is this?
-    /,
-    **kw: Any,
-) -> list[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, StateMetadata]:
-    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
-
-    Quax flattens the bounded_while_loop carry into positional args. In the
-    current flattening order we observe the metadata as the first positional
-    argument, followed by ``xs`` (typically an empty array for our scan), any
-    const arguments, and finally the remaining state elements plus the ``done``
-    flag. We peel the state off the tail, strip Quantities, call the primitive
-    implementation, and rewrap.
-    """
-    usys = metadata.get("usys")
-    if usys is None:
-        msg = "No unit system found in StateMetadata"
-        raise RuntimeError(msg)
-
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-    ) = _scan_p_helper(
-        usys,
-        (q_x, q_y, q_z),
-        (p_x, p_y, p_z),
-        terminate_arr,
-        metric_scale,
-        max_dist,
-        ordered_arr,
-        visited_mask,
-        current_idx,
-        step,
-        should_stop,
-        arg0,
-        kw=kw,
-    )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop, metadata)
+    return (*out, metadata)
 
 
 # ------------------------------------------------------
@@ -287,134 +115,6 @@ def scan_p_qvvvvv(
 ) -> list:
     out_v = lax.scan_p.bind(u.ustrip(pos), arg1, arg2, arg3, arg4, arg5, **kw)
     return out_v  # noqa: RET504
-
-
-@quax.register(lax.scan_p)
-def scan_p_statemetadata_quantity(
-    metadata: StateMetadata,
-    terminate_arr: ArrayLike,
-    q_x: AbcQ,
-    q_y: AbcQ,
-    p_x: AbcQ,
-    p_y: AbcQ,
-    q_xy: AbcQ,
-    ordered_arr: ArrayLike,
-    visited_mask: ArrayLike,
-    metric_scale: AbcQ,
-    max_dist: AbcQ,
-    arg0: ArrayLike,
-    arg1: ArrayLike,
-    current_idx: int,
-    step: int,
-    should_stop: bool,  # noqa: FBT001
-    arg2: ArrayLike,  # what is this?
-    /,
-    **kw: Any,
-) -> list[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, StateMetadata]:
-    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
-
-    Quax flattens the bounded_while_loop carry into positional args. In the
-    current flattening order we observe the metadata as the first positional
-    argument, followed by ``xs`` (typically an empty array for our scan), any
-    const arguments, and finally the remaining state elements plus the ``done``
-    flag. We peel the state off the tail, strip Quantities, call the primitive
-    implementation, and rewrap.
-    """
-    usys = metadata.get("usys")
-    if usys is None:
-        msg = "No unit system found in StateMetadata"
-        raise RuntimeError(msg)
-
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-    ) = _scan_p_helper(
-        usys,
-        (q_x, q_y),
-        (p_x, p_y),
-        terminate_arr,
-        q_xy,
-        ordered_arr,
-        visited_mask,
-        metric_scale,
-        max_dist,
-        arg0,
-        arg1,
-        current_idx,
-        step,
-        should_stop,
-        arg2,
-        kw=kw,
-    )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop, metadata)
-
-
-@quax.register(lax.scan_p)
-def scan_p_statemetadata_quantity(
-    metadata: StateMetadata,
-    terminate_arr: ArrayLike,
-    q_x: AbcQ,
-    q_y: AbcQ,
-    q_z: AbcQ,
-    p_x: AbcQ,
-    p_y: AbcQ,
-    p_z: AbcQ,
-    q_xyz: AbcQ,
-    ordered_arr: ArrayLike,
-    visited_mask: ArrayLike,
-    metric_scale: AbcQ,
-    max_dist: AbcQ,
-    arg0: ArrayLike,
-    arg1: ArrayLike,
-    current_idx: int,
-    step: int,
-    should_stop: bool,  # noqa: FBT001
-    arg2: ArrayLike,  # what is this?
-    /,
-    **kw: Any,
-) -> list[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, StateMetadata]:
-    """Handle ``lax.scan`` when StateMetadata is the leading carry element.
-
-    Quax flattens the bounded_while_loop carry into positional args. In the
-    current flattening order we observe the metadata as the first positional
-    argument, followed by ``xs`` (typically an empty array for our scan), any
-    const arguments, and finally the remaining state elements plus the ``done``
-    flag. We peel the state off the tail, strip Quantities, call the primitive
-    implementation, and rewrap.
-    """
-    usys = metadata.get("usys")
-    if usys is None:
-        msg = "No unit system found in StateMetadata"
-        raise RuntimeError(msg)
-
-    (
-        out_ordered,
-        out_mask,
-        out_best_idx,
-        out_step,
-        out_should_stop,
-    ) = _scan_p_helper(
-        usys,
-        (q_x, q_y, q_z),
-        (p_x, p_y, p_z),
-        terminate_arr,
-        q_xyz,
-        ordered_arr,
-        visited_mask,
-        metric_scale,
-        max_dist,
-        arg0,
-        arg1,
-        current_idx,
-        step,
-        should_stop,
-        arg2,
-        kw=kw,
-    )
-    return (out_ordered, out_mask, out_best_idx, out_step, out_should_stop, metadata)
 
 
 # ------------------------------------------------------
