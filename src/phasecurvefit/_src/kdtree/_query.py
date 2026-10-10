@@ -20,7 +20,7 @@ so the answer depends only on the input, not on the tree layout or padding.
 Sentinels: tree positions use ``tree.n_pad``; original indices use ``tree.n``.
 """
 
-__all__: tuple[str, ...] = ("all_knn", "knn", "locate_leaves")
+__all__: tuple[str, ...] = ("all_knn", "knn", "locate_leaves", "node_labels")
 
 import math
 from collections.abc import Callable
@@ -47,7 +47,71 @@ def _box_d2(q: Array, lo: Array, hi: Array, /) -> Array:
     return jnp.sum(gap * gap, -1)
 
 
-def _descend(tree: Tree, xq: Array, r2: Array, cap: int, /) -> tuple[Array, Array]:
+def node_labels(
+    tree: Tree, labels: Int[Array, " n"], /
+) -> tuple[Array, tuple[Array, ...]]:
+    """Per-row labels and every node's homogeneous label, for ``exclude``.
+
+    Rows: ``labels`` in tree order, ``tree.n + 1`` (EMPTY) on padding. Nodes
+    (per level 0..depth): the label all their points share, ``tree.n`` (MIXED)
+    if they differ, EMPTY if they hold no points. Labels must be in ``[0, n)``.
+    """
+    mixed, empty = tree.n, tree.n + 1
+    rl = labels.astype(jnp.int32).at[tree.perm].get(mode="fill", fill_value=empty)
+    rl = jnp.where(tree.valid, rl, empty)
+    leaf = rl.reshape(tree.n_leaves, tree.leaf_size)
+    has = leaf != empty
+    mn = jnp.min(jnp.where(has, leaf, empty), 1)
+    mx = jnp.max(jnp.where(has, leaf, 0), 1)
+    h = jnp.where(~has.any(1), empty, jnp.where(mn == mx, mn, mixed))
+    levels = [h]
+    for _ in range(tree.depth):
+        c0, c1 = h[0::2], h[1::2]
+        h = jnp.where(c0 == empty, c1, jnp.where((c1 == empty) | (c0 == c1), c0, mixed))
+        levels.append(h)
+    return rl, tuple(levels[::-1])
+
+
+def _skip(tree: Tree, hl: tuple, lvl: int, cand: Array, ql: Array, /) -> Array:
+    """Nodes holding only the query's own label (or nothing): never candidates."""
+    h = hl[lvl].at[cand].get(mode="fill", fill_value=tree.n + 1)
+    return (h == ql) | (h == tree.n + 1)
+
+
+def _bound_exclude(
+    tree: Tree, xq: Array, ql: Array, rl: Array, hl: tuple, k: int, /
+) -> Array:
+    """Bound r2 for excluded queries by a greedy descent to an other-label leaf.
+
+    At each level step into the nearer child that holds some point with a
+    different label; the leaf reached has one (if any exists anywhere), so the
+    k-th distance to its other-label points bounds the true k-th (``inf`` if it
+    has fewer than k). Avoids an ``inf`` bound when the query's whole leaf block
+    shares its label (a point deep inside a large component).
+    """
+    node = jnp.zeros(xq.shape[0], jnp.int32)
+    for lvl in range(1, tree.depth + 1):
+        c0, c1 = 2 * node, 2 * node + 1
+        s0, s1 = _skip(tree, hl, lvl, c0, ql), _skip(tree, hl, lvl, c1, ql)
+        d0 = _box_d2(xq, tree.cell_lo[lvl][c0], tree.cell_hi[lvl][c0])
+        d1 = _box_d2(xq, tree.cell_lo[lvl][c1], tree.cell_hi[lvl][c1])
+        node = jnp.where(s0 | (~s1 & (d1 < d0)), c1, c0)
+    b = tree.leaf_size
+    pts = tree.points.reshape(tree.n_leaves, b, -1)[node]
+    lab = rl.reshape(tree.n_leaves, b)[node]
+    diff = xq[:, None] - pts
+    ok = (lab != ql[:, None]) & (lab != tree.n + 1)
+    return kth_smallest(jnp.where(ok, jnp.sum(diff * diff, -1), jnp.inf), k)
+
+
+def _descend(
+    tree: Tree,
+    xq: Array,
+    r2: Array,
+    cap: int,
+    /,
+    ex: tuple | None = None,
+) -> tuple[Array, Array]:
     """Leaves whose cell is within ``r2`` of each query, at most ``cap`` of them.
 
     Returns ``(front (Q, cap) leaf ids with sentinel n_leaves, overflow (Q,))``.
@@ -70,6 +134,8 @@ def _descend(tree: Tree, xq: Array, r2: Array, cap: int, /) -> tuple[Array, Arra
         lo = tree.cell_lo[lvl].at[cand].get(mode="fill", fill_value=0)
         hi = tree.cell_hi[lvl].at[cand].get(mode="fill", fill_value=0)
         ok = (cand < nn) & (_box_d2(xq[:, None], lo, hi) <= r2[:, None])
+        if ex is not None:
+            ok = ok & ~_skip(tree, ex[1], lvl, cand, ex[2][:, None])
         rank = jnp.where(ok, jnp.cumsum(ok, 1) - 1, cap)
         if cap <= _ONEHOT_MAX_CAP:  # (Q, cap, 2cap) one-hot beats a CPU scatter
             hit = rank[:, None, :] == slots[None, :, None]
@@ -88,7 +154,15 @@ def _descend(tree: Tree, xq: Array, r2: Array, cap: int, /) -> tuple[Array, Arra
 
 
 def _merge(
-    tree: Tree, xq: Array, qself: Array, cand: Array, k: int, /, *, top_k: bool
+    tree: Tree,
+    xq: Array,
+    qself: Array,
+    cand: Array,
+    k: int,
+    /,
+    *,
+    top_k: bool,
+    ex: tuple | None = None,
 ) -> tuple[Array, Array]:
     """K nearest valid points among the candidate leaves -> (sq_dist, original idx)."""
     nq, m = cand.shape
@@ -104,6 +178,10 @@ def _merge(
         pos_t = (cand.T[:, None] * b + jnp.arange(b)[:, None]).reshape(m * b, nq)
         orig = tree.perm.at[pos_t].get(mode="fill", fill_value=tree.n).T
     diff = xq[:, None] - xc
+    if ex is not None:
+        ok = ok & (
+            ex[0].at[pos].get(mode="fill", fill_value=tree.n + 1) != ex[2][:, None]
+        )
     d2 = jnp.where(ok & (pos != qself[:, None]), jnp.sum(diff * diff, -1), jnp.inf)
     dd, ii = ksmallest(d2, orig, k, top_k=top_k)  # pads width < k itself
     return dd, jnp.where(jnp.isinf(dd), tree.n, ii)
@@ -140,7 +218,7 @@ def _bound(tree: Tree, xq: Array, qself: Array, qleaf: Array, k: int, /) -> Arra
     return kth_smallest(d2, k)
 
 
-Handler = Callable[[Array, Array, Array], tuple[Array, Array, Array]]
+Handler = Callable[..., tuple[Array, Array, Array]]
 
 
 def _finish(
@@ -152,6 +230,7 @@ def _finish(
     r2: Array,
     chunk: int,
     handler: Handler,
+    qlab: Array | None = None,
     /,
 ) -> tuple[Array, Array, Array, Array]:
     """Rerun ``handler`` on the queries flagged in ``over`` (compacted, chunked)."""
@@ -171,7 +250,11 @@ def _finish(
         xs = xq.at[q].get(mode="fill", fill_value=0)
         ss = qself.at[q].get(mode="fill", fill_value=-1)
         rs = r2.at[q].get(mode="fill", fill_value=jnp.inf)
-        d_new, i_new, o_new = handler(xs, ss, rs)
+        if qlab is None:
+            d_new, i_new, o_new = handler(xs, ss, rs)
+        else:
+            qs = qlab.at[q].get(mode="fill", fill_value=0)
+            d_new, i_new, o_new = handler(xs, ss, rs, qs)
         r2 = r2.at[q].set(jnp.minimum(rs, d_new[:, -1]), mode="drop")
         return (
             j + 1,
@@ -197,8 +280,19 @@ def _query(
     k: int,
     frontier: int,
     /,
+    exclude: tuple[Array, tuple, Array] | None = None,
 ) -> tuple[Array, Array]:
-    """Exact kNN for queries ``xq`` -> ``(sq_dist (Q, k), original idx (Q, k))``."""
+    """Exact kNN for queries ``xq`` -> ``(sq_dist (Q, k), original idx (Q, k))``.
+
+    ``exclude = (row_labels, node_labels, query_labels)`` (see
+    :func:`node_labels`) skips every point sharing the query's label.
+    """
+    qlab = () if exclude is None else (exclude[2],)  # per-query labels, if any
+    rl, hl = (None, None) if exclude is None else exclude[:2]
+
+    def ex_of(ql: Array | None) -> tuple | None:
+        return None if exclude is None else (rl, hl, ql)
+
     nq, d = xq.shape
     qc = min(QUERY_CHUNK, nq)
     n_chunks = -(-nq // qc)
@@ -207,21 +301,24 @@ def _query(
     def pad(a: Array, fill: float) -> Array:
         return jnp.concat([a, jnp.full((padn, *a.shape[1:]), fill, a.dtype)])
 
-    def chunk(args: tuple[Array, Array, Array]) -> tuple[Array, ...]:
-        x, s, lf = args
-        r2 = _bound(tree, x, s, lf, k)
-        front, over = _descend(tree, x, r2, frontier)
-        dd, ii = _merge(tree, x, s, front, k, top_k=False)
+    def chunk(args: tuple[Array, ...]) -> tuple[Array, ...]:
+        x, s, lf, *ql = args
+        ql = next(iter(ql), None)
+        if exclude is None:
+            r2 = _bound(tree, x, s, lf, k)
+        else:
+            r2 = _bound_exclude(tree, x, ql, rl, hl, k)
+        front, over = _descend(tree, x, r2, frontier, ex_of(ql))
+        dd, ii = _merge(tree, x, s, front, k, top_k=False, ex=ex_of(ql))
         return dd, ii, over, r2
 
-    dd, ii, over, r2 = jax.lax.map(
-        chunk,
-        (
-            pad(xq, 0).reshape(n_chunks, qc, d),
-            pad(qself, -1).reshape(n_chunks, qc),
-            pad(qleaf, 0).reshape(n_chunks, qc),
-        ),
+    inputs = (
+        pad(xq, 0).reshape(n_chunks, qc, d),
+        pad(qself, -1).reshape(n_chunks, qc),
+        pad(qleaf, 0).reshape(n_chunks, qc),
+        *(pad(a, 0).reshape(n_chunks, qc) for a in qlab),
     )
+    dd, ii, over, r2 = jax.lax.map(chunk, inputs)
     dd, ii = dd.reshape(-1, k)[:nq], ii.reshape(-1, k)[:nq]
     over, r2 = over.reshape(-1)[:nq] & qvalid, r2.reshape(-1)[:nq]
     r2 = jnp.minimum(r2, dd[:, -1])  # even a truncated candidate set bounds the k-th
@@ -230,13 +327,15 @@ def _query(
         if cap <= frontier:
             continue
 
-        def tier(xs: Array, ss: Array, rs: Array, cap: int = cap) -> tuple[Array, ...]:
-            front, o = _descend(tree, xs, rs, cap)
-            d_new, i_new = _merge(tree, xs, ss, front, k, top_k=True)
+        def tier(
+            xs: Array, ss: Array, rs: Array, qs: Array | None = None, cap: int = cap
+        ) -> tuple[Array, ...]:
+            front, o = _descend(tree, xs, rs, cap, ex_of(qs))
+            d_new, i_new = _merge(tree, xs, ss, front, k, top_k=True, ex=ex_of(qs))
             return d_new, i_new, o
 
         tchunk = min(tchunk, max(32, nq // 128))  # noqa: PLW2901
-        dd, ii, over, r2 = _finish(xq, qself, over, dd, ii, r2, tchunk, tier)
+        dd, ii, over, r2 = _finish(xq, qself, over, dd, ii, r2, tchunk, tier, *qlab)
         over = over & qvalid
 
     pos_all = jnp.arange(tree.n_pad)
@@ -244,17 +343,22 @@ def _query(
     # n~1e6 when any query reaches brute force (rare, ~0.03% on interloper
     # data); upgrade = smaller BRUTE_CHUNK or loop over dimensions.
 
-    def brute(xs: Array, ss: Array, rs: Array) -> tuple[Array, ...]:
+    def brute(
+        xs: Array, ss: Array, rs: Array, qs: Array | None = None
+    ) -> tuple[Array, ...]:
         del rs
         diff = xs[:, None] - tree.points[None]
         d2 = jnp.sum(diff * diff, -1)
-        d2 = jnp.where(tree.valid[None] & (pos_all[None] != ss[:, None]), d2, jnp.inf)
+        ok = tree.valid[None] & (pos_all[None] != ss[:, None])
+        if exclude is not None:
+            ok = ok & (rl[None] != qs[:, None])
+        d2 = jnp.where(ok, d2, jnp.inf)
         perm = jnp.broadcast_to(tree.perm, d2.shape)
         d_new, i_new = ksmallest(d2, perm, k, top_k=True)
         i_new = jnp.where(jnp.isinf(d_new), tree.n, i_new)
         return d_new, i_new, jnp.zeros(xs.shape[0], bool)
 
-    dd, ii, _, _ = _finish(xq, qself, over, dd, ii, r2, BRUTE_CHUNK, brute)
+    dd, ii, _, _ = _finish(xq, qself, over, dd, ii, r2, BRUTE_CHUNK, brute, *qlab)
     return dd, ii
 
 
@@ -292,12 +396,21 @@ def all_knn(
 
 
 def knn(
-    tree: Tree, queries: Float[Array, "m d"], /, k: int, *, frontier: int = 16
+    tree: Tree,
+    queries: Float[Array, "m d"],
+    /,
+    k: int,
+    *,
+    frontier: int = 16,
+    exclude: tuple[Int[Array, " n"], Int[Array, " m"]] | None = None,
 ) -> tuple[Int[Array, "m k"], Float[Array, "m k"]]:
     """Exact k nearest tree points to each query (no self-exclusion).
 
-    Returns ``(indices into the tree's original points, sq_dist)``, rows sorted
-    by distance; missing neighbours are index ``tree.n`` with distance ``inf``.
+    ``exclude=(point_labels, query_labels)`` (integers in ``[0, n)``) skips
+    every point whose label equals the query's, exactly: subtrees holding only
+    that label are pruned whole. Returns ``(indices into the tree's original
+    points, sq_dist)``, rows sorted by distance; missing neighbours are index
+    ``tree.n`` with distance ``inf``.
     """
     m = queries.shape[0]
     if m == 0 or tree.n == 0:
@@ -307,6 +420,10 @@ def knn(
         )
     leaf = locate_leaves(tree, queries)
     order = jnp.argsort(leaf)  # process in tree order for locality
+    ex = None
+    if exclude is not None:
+        rl, hl = node_labels(tree, exclude[0])
+        ex = (rl, hl, exclude[1].astype(jnp.int32)[order])
     dd, ii = _query(
         tree,
         queries[order],
@@ -315,6 +432,7 @@ def knn(
         leaf[order],
         k,
         frontier,
+        ex,
     )
     out_i = jnp.zeros((m, k), jnp.int32).at[order].set(ii)
     out_d = jnp.zeros((m, k), queries.dtype).at[order].set(dd)
