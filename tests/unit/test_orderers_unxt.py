@@ -106,7 +106,7 @@ class TestLocalFlowUnxt:
     def test_quantity_nan_raises_by_default(self):
         """The Quantity dispatch reaches the same check as the plain one."""
         orderer, q, p, meta = self._nan_line("raise")
-        with pytest.raises(RuntimeError, match="nan_policy='omit'"):
+        with pytest.raises(ValueError, match="nan_policy='omit'"):
             orderer.order(q, p, metadata=meta)
 
     def test_quantity_forwards_omit(self):

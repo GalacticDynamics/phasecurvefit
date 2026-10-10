@@ -675,7 +675,7 @@ def test_som_orderer_rejects_init_indices_outside_the_contract(label, make):
     init = pcf.orderers.OrderingResult(
         positions=pos, velocities=vel, indices=make(n), velocity_aware=True
     )
-    with pytest.raises(eqx.EquinoxRuntimeError, match=r"outside \[-1, n_obs\)"):
+    with pytest.raises(ValueError, match=r"outside \[-1, n_obs\)"):
         pcf.orderers.SOMOrderer(n_prototypes=6).order(pos, vel, init=init)
 
 
@@ -697,7 +697,7 @@ def test_som_orderer_rejects_a_repeated_visited_index():
     init = pcf.orderers.OrderingResult(
         positions=pos, velocities=vel, indices=indices, velocity_aware=True
     )
-    with pytest.raises(eqx.EquinoxRuntimeError, match="repeated visited index"):
+    with pytest.raises(ValueError, match="repeated visited index"):
         pcf.orderers.SOMOrderer(n_prototypes=6).order(pos, vel, init=init)
 
 
@@ -1171,7 +1171,7 @@ class TestNonFiniteVelocities:
         """Silently skipping a missing velocity has to be asked for."""
         pos, vel, _ = straight()
         vel = self._spoil(vel, jnp.nan)
-        with pytest.raises(RuntimeError, match="nan_policy='omit'"):
+        with pytest.raises(ValueError, match="nan_policy='omit'"):
             pcf.orderers.SOMOrderer(**kw).order(pos, vel)
 
     def test_nan_is_fine_when_velocities_are_not_read(self, straight):
@@ -1188,7 +1188,7 @@ class TestNonFiniteVelocities:
         pos, vel, _ = straight()
         vel = self._spoil(vel, bad)
         orderer = pcf.orderers.SOMOrderer(orient_by_velocity=True, nan_policy=policy)
-        with pytest.raises(RuntimeError, match="infinite velocity"):
+        with pytest.raises(ValueError, match="infinite velocity"):
             orderer.order(pos, vel)
 
     def test_raises_under_jit(self, straight):

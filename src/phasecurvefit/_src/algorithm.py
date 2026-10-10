@@ -45,6 +45,7 @@ from .custom_types import ISz0, RLikeSz0, VectorComponents
 from .orderers.result import OrderingResult
 from .phasespace import euclidean_distance
 from .query_config import WalkConfig
+from phasecurvefit._src.checks import value_error_if
 
 vec_euclidean_distance = jax.jit(jax.vmap(euclidean_distance, in_axes=(None, 0)))
 
@@ -279,18 +280,18 @@ State: TypeAlias = tuple[  # noqa: UP040
 ]
 
 
-def _check_velocities(vs: VectorComponents, nan_policy: str, /) -> VectorComponents:
+def check_velocities(vs: VectorComponents, nan_policy: str, /) -> VectorComponents:
     """Raise on an infinite velocity, and on NaN unless ``nan_policy="omit"``.
 
     Called only when the metric reads velocities. Left alone, a non-finite
     velocity makes every distance it touches non-finite, and ``argmin`` then
     returns the first NaN -- the lowest-index unvisited tracer, wherever it
     is: one NaN on a shuffled line sent the walk back and forth 4 times
-    (103 times under ``FullPhaseSpaceDistanceMetric``). ``eqx.error_if`` so
-    the check survives ``jit`` and ``vmap``.
+    (103 times under ``FullPhaseSpaceDistanceMetric``). ``value_error_if``: a
+    ``ValueError`` on concrete input, and it survives ``jit`` and ``vmap``.
     """
     comps = [jnp.asarray(v) for v in vs.values()]
-    vs = eqx.error_if(
+    vs = value_error_if(
         vs,
         jnp.any(jnp.stack([jnp.any(jnp.isinf(v)) for v in comps])),
         "LocalFlowOrderer found an infinite velocity. inf is not a measurement "
@@ -299,7 +300,7 @@ def _check_velocities(vs: VectorComponents, nan_policy: str, /) -> VectorCompone
     )
     if nan_policy == "omit":
         return vs
-    return eqx.error_if(
+    return value_error_if(
         vs,
         jnp.any(jnp.stack([jnp.any(jnp.isnan(v)) for v in comps])),
         "LocalFlowOrderer's metric reads velocities and found a NaN. To treat "
@@ -494,7 +495,7 @@ def _local_flow_walk(
     terminate_indices = set() if terminate_indices is None else terminate_indices
 
     if config.metric.uses_velocity:
-        vs = _check_velocities(vs, nan_policy)
+        vs = check_velocities(vs, nan_policy)
 
     # Store original velocities for the result and optionally negate velocities
     # for backward walk (internal use only).
@@ -829,7 +830,7 @@ def combine_results(
     all_match = jtu.reduce(jnp.logical_and, matches)
 
     # Error if they don't match
-    _ = eqx.error_if(
+    _ = value_error_if(
         all_match,
         jnp.logical_not(all_match),
         "result_fwd and result_bwd must have the same positions and velocities",

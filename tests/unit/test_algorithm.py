@@ -1,6 +1,5 @@
 """Tests for the phase flow walking algorithm."""
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -705,7 +704,7 @@ class TestCombineFlowWalks:
         res2 = pcf.order(q2, p2, pcf.orderers.LocalFlowOrderer(direction="backward"))
 
         # Should raise an error when combining
-        with pytest.raises((eqx.EquinoxRuntimeError, ValueError)):
+        with pytest.raises(ValueError, match="same positions and velocities"):
             pcf.combine_results(res1, res2)
 
 

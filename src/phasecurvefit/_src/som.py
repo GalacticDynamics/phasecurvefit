@@ -44,6 +44,7 @@ from jaxtyping import Array, Bool, Float, PRNGKeyArray
 from jaxmore import bounded_while_loop
 from zeroth import zeroth
 
+from phasecurvefit._src.checks import value_error_if
 from phasecurvefit._src.custom_types import FSz0, ISzN, VectorComponents
 from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
@@ -208,7 +209,7 @@ def init_prototypes(
         )
         raise TypeError(msg)
     n_obs = len(zeroth(positions.values()))
-    ordering = eqx.error_if(
+    ordering = value_error_if(
         ordering,
         jnp.any(ordering < 0) | jnp.any(ordering >= n_obs),
         "ordering must contain only valid indices into the data, i.e. in "
@@ -225,7 +226,7 @@ def init_prototypes(
     # which `fit` then cannot repair. A strict *subset* is legitimate (a prior
     # stage's visited set), so this tests for repeats, not for covering
     # [0, n_obs).
-    ordering = eqx.error_if(
+    ordering = value_error_if(
         ordering,
         jnp.max(jnp.bincount(jnp.clip(ordering, 0, n_obs - 1), length=n_obs)) > 1,
         "ordering must not repeat an index: a repeat bins one observation into "

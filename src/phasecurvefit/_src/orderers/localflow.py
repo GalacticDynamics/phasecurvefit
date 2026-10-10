@@ -127,9 +127,10 @@ class LocalFlowOrderer(AbstractOrderer):
         default :class:`~phasecurvefit.metrics.AlignedMomentumDistanceMetric`
         does). A position-only metric never reads them, so never raises.
 
-        ``"raise"`` (default) raises -- under ``jit`` at run time, as a
-        :class:`RuntimeError`. ``"omit"`` treats NaN as a missing measurement
-        (catalogues often lack radial velocities): any step whose metric
+        ``"raise"`` (default) raises :class:`ValueError` (under ``jit``, at run
+        time, a JAX runtime error carrying the same message). ``"omit"``
+        treats NaN as a missing measurement (catalogues often lack radial
+        velocities): any step whose metric
         distance is not finite is scored by position alone, so from a tracer
         without a velocity the walk takes its nearest unvisited neighbour.
 

@@ -34,6 +34,7 @@ from .result import OrderingResult
 from phasecurvefit._src import som as _som
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
+from phasecurvefit._src.checks import value_error_if
 from phasecurvefit._src.custom_types import BSzN, FSz0, FSzN, ISzN, VectorComponents
 from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
@@ -61,8 +62,8 @@ def _train_and_project(
 
     Jitted so the metric's ``(N, M)`` intermediates fuse; run eagerly each is
     materialized separately, costing roughly 15x the memory at catalogue scale.
-    ``init_prototypes`` stays outside so its ``eqx.error_if`` guard raises as an
-    ordinary Python exception.
+    ``init_prototypes`` stays outside so its input guard raises as an ordinary
+    ``ValueError``.
 
     ``outlier_clip_sigma=None`` (the default) makes ``fit`` run exactly one
     batch-Kohonen pass, same as before this parameter existed.
@@ -102,14 +103,14 @@ def _check_velocities(
 ) -> VectorComponents:
     """Raise on an infinite velocity, and on NaN unless ``nan_policy="omit"``.
 
-    Called only when the stage reads velocities. ``eqx.error_if`` so the
-    check survives ``jit`` and ``vmap``.
+    Called only when the stage reads velocities. ``value_error_if``: a
+    ``ValueError`` on concrete input, and it survives ``jit`` and ``vmap``.
     """
     # Per component, then reduced: no (N * D) copy just to validate.
     comps = [jnp.asarray(v) for v in velocities.values()]
     has_inf = jnp.any(jnp.stack([jnp.any(jnp.isinf(v)) for v in comps]))
     has_nan = jnp.any(jnp.stack([jnp.any(jnp.isnan(v)) for v in comps]))
-    velocities = eqx.error_if(
+    velocities = value_error_if(
         velocities,
         has_inf,
         "SOMOrderer found an infinite velocity. inf is not a measurement -- it "
@@ -118,7 +119,7 @@ def _check_velocities(
     )
     if nan_policy == "omit":
         return velocities
-    return eqx.error_if(
+    return value_error_if(
         velocities,
         has_nan,
         "SOMOrderer reads velocities here (a velocity-aware metric or "
@@ -255,9 +256,10 @@ class SOMOrderer(AbstractOrderer):
         with a velocity-aware ``metric`` or ``orient_by_velocity``. A
         position-only stage never reads them, so never raises.
 
-        ``"raise"`` (default) raises -- under ``jit`` at run time, as a
-        :class:`RuntimeError`. ``"omit"`` treats NaN as a missing measurement
-        (catalogues often lack radial velocities): it is left out of the
+        ``"raise"`` (default) raises :class:`ValueError` (under ``jit``, at run
+        time, a JAX runtime error carrying the same message). ``"omit"``
+        treats NaN as a missing measurement (catalogues often lack radial
+        velocities): it is left out of the
         prototype velocity averages, a tracer whose ``metric`` distances are
         not all finite is matched by position alone, and it is skipped when
         orienting. More missing velocities move the ordering toward the
@@ -581,7 +583,7 @@ class SOMOrderer(AbstractOrderer):
             # larger dataset gathers out of bounds, which JAX silently clamps --
             # the result then reports every observation visited while several
             # carry a nan chord.
-            prior = eqx.error_if(
+            prior = value_error_if(
                 prior,
                 jnp.any(prior >= n_obs) | jnp.any(prior < -1),
                 "init.indices contains an index outside [-1, n_obs). Too large "
@@ -602,7 +604,7 @@ class SOMOrderer(AbstractOrderer):
             visited_counts = jnp.bincount(
                 jnp.where(prior >= 0, prior, n_obs), length=n_obs + 1
             )
-            prior = eqx.error_if(
+            prior = value_error_if(
                 prior,
                 jnp.any(visited_counts[:n_obs] > 1),
                 "init.indices contains a repeated visited index. A repeat "
