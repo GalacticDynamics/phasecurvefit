@@ -193,15 +193,10 @@ equinox                 = "eqx"
 phasecurvefit           = "pcf"
 
 [tool.ruff.lint.isort]
-combine-as-imports = true
+combine-as-imports     = true
 extra-standard-library = ["typing_extensions"]
-known-first-party = [
-  "is_annotated",
-  "jaxmore",
-  "quaxed",
-  "unxt",
-]
-known-local-folder = ["phasecurvefit"]
+known-first-party      = ["is_annotated", "jaxmore", "quaxed", "unxt"]
+known-local-folder     = ["phasecurvefit"]
 
 [tool.ruff.format]
 docstring-code-format = true
