@@ -344,5 +344,13 @@ PHASECURVEFIT_ENABLE_RUNTIME_TYPECHECKING = "beartype.beartype"
 [tool.repo-review]
 ignore = ["PC140"]
 
+[tool.uv]
+# `plum-dispatch` was renamed `plum` on PyPI. galax and coordinax (docs) require
+# `plum`, everything else `plum-dispatch`, and both distributions install the
+# same `plum/` package: installing or removing either one clobbers the other's
+# files. Drop `plum` and have `plum-dispatch` meet galax's `plum>=2.8.0` floor.
+constraint-dependencies = ["plum-dispatch>=2.8.0"]
+override-dependencies   = ["plum; sys_platform == 'never'"]
+
 [tool.uv.sources]
 galax = { git = "https://github.com/GalacticDynamics/galax" }
