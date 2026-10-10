@@ -340,6 +340,7 @@ xfail_strict = true
 
 
 [tool.pytest_env]
+JAX_PLATFORMS                             = { value = "cpu", skip_if_set = true }
 PHASECURVEFIT_ENABLE_RUNTIME_TYPECHECKING = "beartype.beartype"
 
 

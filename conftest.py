@@ -61,14 +61,6 @@ if not OptDeps.JAXKD.installed:
     collect_ignore_glob.append("tests/unit/test_kdtree.py")
 
 
-def pytest_configure(config):
-    """Configure pytest."""
-    # Suppress JAX warning about no GPU
-    import os
-
-    os.environ.setdefault("JAX_PLATFORMS", "cpu")
-
-
 @pytest.fixture
 def rng_key() -> PRNGKeyArray:
     """Provide a JAX random key for tests."""

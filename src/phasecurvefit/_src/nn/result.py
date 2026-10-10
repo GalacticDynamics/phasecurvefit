@@ -5,7 +5,6 @@ __all__: tuple[str, ...] = ("AutoencoderResult", "fill_ordering_gaps")
 from dataclasses import KW_ONLY
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jaxtyping import Array, PRNGKeyArray
 
@@ -77,17 +76,7 @@ class AutoencoderResult(AbstractResult):
             "gamma must be within the valid gamma_range",
         )
 
-        # Use the decoder to interpolate positions
-        qs_norm = jax.vmap(self.model.decoder, (0, None))(jnp.atleast_1d(gamma), key)
-
-        # Handle scalar gamma case
-        qs_norm = qs_norm.squeeze() if gamma.ndim == 0 else qs_norm
-
-        # Inverse transform to get original coordinates
-        qs, _ = self.model.normalizer.inverse_transform(
-            qs_norm, jnp.zeros_like(qs_norm)
-        )
-        return qs
+        return self.model.decode(gamma, key=key)
 
 
 def fill_ordering_gaps(
@@ -133,22 +122,32 @@ def fill_ordering_gaps(
     >>> result, *_ = pcf.nn.train_autoencoder(model, result, config=cfg, key=keys[1])
 
     """
-    q, p = result.positions, result.velocities
+    return _encode_to_result(
+        model,
+        result.positions,
+        result.velocities,
+        prob_threshold=prob_threshold,
+        gamma_range=result.gamma_range,
+    )
 
-    # Predict gamma and probability for all tracers
+
+def _encode_to_result(
+    model: AbstractAutoencoder,
+    q: VectorComponents,
+    p: VectorComponents,
+    /,
+    *,
+    prob_threshold: float,
+    gamma_range: tuple[float, float],
+) -> AutoencoderResult:
+    """Encode every tracer; order by gamma, keeping those with p >= threshold."""
     gamma, prob = model.encode(q, p)
-    # Sort by gamma to get ordering
-    sorted_indices = jnp.argsort(gamma)
-
-    # Filter by probability threshold
-    high_prob_mask = prob[sorted_indices] >= prob_threshold
-    filtered_indices = sorted_indices[high_prob_mask]
-
+    order = jnp.argsort(gamma)
     return AutoencoderResult(
         positions=q,
         velocities=p,
-        indices=filtered_indices,
-        gamma_range=result.gamma_range,
+        indices=order[prob[order] >= prob_threshold],
+        gamma_range=gamma_range,
         gamma=gamma,
         membership_prob=prob,
         model=model,

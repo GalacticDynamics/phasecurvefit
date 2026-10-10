@@ -2,9 +2,9 @@
 
 __all__: tuple[str, ...] = ("EncoderExternalDecoder",)
 
-from typing import TypeAlias
 
 import equinox as eqx
+import jax.numpy as jnp
 import plum
 from jaxtyping import Array, Float, Int, PRNGKeyArray, PyTree
 
@@ -14,9 +14,6 @@ from .externaldecoder import AbstractExternalDecoder
 from .normalize import AbstractNormalizer
 from .order_net import OrderingNet, OrderingTrainingConfig, train_ordering_net
 from .result import AutoencoderResult
-from phasecurvefit._src.custom_types import FSzN
-
-Gamma: TypeAlias = FSzN  # noqa: UP040
 
 
 class EncoderExternalDecoder(AbstractAutoencoder):
@@ -69,11 +66,6 @@ class EncoderExternalDecoder(AbstractAutoencoder):
     encoder: OrderingNet
     decoder: AbstractExternalDecoder
     normalizer: AbstractNormalizer
-
-    @property
-    def gamma_range(self) -> tuple[float, float]:
-        """Return the gamma range from the encoder."""
-        return self.encoder.gamma_range
 
 
 @plum.dispatch
@@ -183,11 +175,9 @@ def train_autoencoder(
     # Update decoder in model
     model = eqx.tree_at(lambda m: m.decoder, model, decoder)
 
-    # Convert all_ws back to VectorComponents for AutoencoderResult
-    D = all_ws.shape[1] // 2
-    qs_norm = all_ws[:, :D]
-    ps_norm = all_ws[:, D:]
-    positions, velocities = model.normalizer.inverse_transform(qs_norm, ps_norm)
+    positions, velocities = model.normalizer.inverse_transform(
+        *jnp.split(all_ws, 2, axis=1)
+    )
 
     # Encode to get gamma and membership_prob
     gamma, membership_prob = model.encode(positions, velocities)

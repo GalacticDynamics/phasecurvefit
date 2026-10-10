@@ -98,28 +98,6 @@ def scan_p_statemetadata_quantity(
     return (*out, metadata)
 
 
-# ------------------------------------------------------
-# for KDTree
-
-
-# TODO: determinet the details of this
-@quax.register(lax.scan_p)
-def scan_p_qvvvvv(
-    pos: AbcQ,
-    arg1: ArrayLike,
-    arg2: ArrayLike,
-    arg3: ArrayLike,
-    arg4: ArrayLike,
-    arg5: ArrayLike,
-    **kw: Any,
-) -> list:
-    out_v = lax.scan_p.bind(u.ustrip(pos), arg1, arg2, arg3, arg4, arg5, **kw)
-    return out_v  # noqa: RET504
-
-
-# ------------------------------------------------------
-
-
 @quax.register(lax.scatter_p)
 def scatter_p_quantity(
     operand: AbcQ, scatter_indices: Array, updates: AbcQ, /, **kw: Any
@@ -148,21 +126,7 @@ def scatter_p_array_quantity(
 
 @plum.dispatch
 def euclidean_distance(q_a: ScalarQComponents, q_b: ScalarQComponents, /) -> RQSz0:
-    """Euclidean distance between Quantity-valued component dictionaries.
-
-    Computes the distance between two phase-space positions represented as
-    dictionaries with unxt Quantity scalar values.
-
-    Parameters
-    ----------
-    q_a, q_b : Mapping[str, unxt.AbstractQuantity]
-        Position dictionaries with Quantity-valued components. Must have the
-        same keys. All values must have compatible length dimensions.
-
-    Returns
-    -------
-    unxt.Quantity
-        The Euclidean distance with the unit of the input components.
+    """Compute the distance between Quantity-valued positions, in their unit.
 
     Examples
     --------
@@ -181,23 +145,7 @@ def euclidean_distance(q_a: ScalarQComponents, q_b: ScalarQComponents, /) -> RQS
 def unit_direction(
     q_a: ScalarQComponents, q_b: ScalarQComponents, /
 ) -> ScalarQComponents:
-    """Compute unit direction vector from q_a to q_b for Quantity-valued components.
-
-    Computes the unit direction vector pointing from position `q_a` to `q_b`,
-    where both positions are represented as dictionaries with unxt Quantity
-    scalar values.
-
-    Parameters
-    ----------
-    q_a, q_b : Mapping[str, unxt.AbstractQuantity]
-        Position dictionaries with Quantity-valued components. Must have the
-        same keys. All values must have compatible length dimensions.
-
-    Returns
-    -------
-    Mapping[str, unxt.AbstractQuantity]
-        A dictionary representing the unit direction vector. The components
-        are dimensionless Quantities.
+    """Compute the unit direction from ``q_a`` to ``q_b`` (dimensionless).
 
     Examples
     --------
@@ -215,21 +163,7 @@ def unit_direction(
 
 @plum.dispatch
 def velocity_norm(velocity: ScalarQComponents, /) -> RQSz0:
-    """Compute the norm of a Quantity-valued velocity vector.
-
-    Computes the Euclidean norm of a velocity vector represented as a
-    dictionary with unxt Quantity scalar values.
-
-    Parameters
-    ----------
-    velocity : Mapping[str, unxt.AbstractQuantity]
-        Velocity dictionary with Quantity-valued components. All values must
-        have compatible velocity dimensions (length/time).
-
-    Returns
-    -------
-    unxt.Quantity
-        The Euclidean norm of the velocity with appropriate units.
+    """Compute the norm of a Quantity-valued velocity, in its unit.
 
     Examples
     --------
@@ -246,22 +180,7 @@ def velocity_norm(velocity: ScalarQComponents, /) -> RQSz0:
 
 @plum.dispatch
 def unit_velocity(velocity: ScalarQComponents, /) -> ScalarQComponents:
-    """Compute unit velocity vector for Quantity-valued components.
-
-    Computes the unit velocity vector from a velocity represented as a
-    dictionary with unxt Quantity scalar values.
-
-    Parameters
-    ----------
-    velocity : Mapping[str, unxt.AbstractQuantity]
-        Velocity dictionary with Quantity-valued components. All values must
-        have compatible velocity dimensions (length/time).
-
-    Returns
-    -------
-    Mapping[str, unxt.AbstractQuantity]
-        A dictionary representing the unit velocity vector. The components
-        are dimensionless Quantities.
+    """Compute the unit velocity vector (dimensionless).
 
     Examples
     --------
@@ -278,22 +197,7 @@ def unit_velocity(velocity: ScalarQComponents, /) -> ScalarQComponents:
 
 @plum.dispatch
 def cosine_similarity(vel_a: ScalarQComponents, vel_b: ScalarQComponents, /) -> RQSz0:
-    """Compute cosine similarity between Quantity-valued velocity components.
-
-    Computes the cosine similarity (dimensionless) between two vectors
-    represented as dictionaries with unxt Quantity scalar values.
-    The result is the cosine of the angle between the two vectors.
-
-    Parameters
-    ----------
-    vel_a, vel_b : Mapping[str, unxt.AbstractQuantity]
-        Velocity or direction dictionaries with Quantity-valued components.
-        Must have the same keys. All values must have compatible dimensions.
-
-    Returns
-    -------
-    unxt.Quantity
-        The dimensionless cosine similarity between the two vectors.
+    """Compute the cosine similarity of two Quantity-valued vectors.
 
     Examples
     --------

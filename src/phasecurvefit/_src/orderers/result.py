@@ -136,6 +136,16 @@ class OrderingResult(AbstractResult):
     >>> result_with_backbone(jnp.array(0.5))
     {'x': Array(1.5, dtype=float32), 'y': Array(0.75, dtype=float32)}
 
+    Interpolation works under ``jit``, ``vmap`` and ``grad``:
+
+    >>> import jax
+    >>> jax.jit(lambda g: result(g))(0.25)["x"]
+    Array(0.75, dtype=float32)
+    >>> jax.vmap(result)(jnp.linspace(0, 1, 5))["x"].shape
+    (5,)
+    >>> jax.grad(lambda g: result(g)["x"])(0.5)
+    Array(3., dtype=float32, weak_type=True)
+
     """
 
     positions: VectorComponents
