@@ -191,11 +191,25 @@ _knn_core_jit = jax.jit(_knn_core, static_argnums=(2, 3, 4))
 
 
 class BucketKDTree(AbstractNeighborSearch):
-    """JAX-native exact kd-tree, the default. Traceable under jit/vmap/grad.
+    """JAX-native exact kd-tree. Traceable under jit/vmap/grad.
+
+    ``MSTOrderer``'s default when its inputs are traced. ``SciPy`` is
+    eager-only, so under jit/vmap/grad this (or ``BruteForce``/``JaxKD``) is
+    the choice; eagerly, ``SciPy`` is faster and compiles nothing, which is
+    why the default uses it there.
 
     Eager calls pad ``n`` to a size bucket ({2**j, 1.5 * 2**j}) with far rows,
-    so differing stream lengths share compiled code (a new bucket compiles in
-    ~4-5 s); under ``jit`` the caller's shapes are used as-is.
+    so differing stream lengths share compiled code (each new bucket compiles
+    once: seconds, ~9 s at n = 100k, k = 8); under ``jit`` the caller's shapes
+    are used as-is.
+
+    Tuning, which matters only where ``SciPy`` cannot run (traced calls):
+
+    - Large ``k`` (``>= 32``): set ``frontier`` near ``k``; at ``k = 32``,
+      ``frontier=32`` measured 3-15% faster than the default 16.
+    - High dimension (``d >= 6``): every query overflows the default frontier,
+      and the tree is ~30-50x slower than ``SciPy``; ``leaf_size=32`` measured
+      ~1.45x faster. Eagerly, prefer ``SciPy``.
     """
 
     leaf_size: int = eqx.field(static=True, default=16)

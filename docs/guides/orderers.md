@@ -98,9 +98,19 @@ The MST's k-nearest-neighbour search runs through its `neighbors` backend. By
 default (`neighbors=None`) it picks per call: SciPy's `cKDTree` when the inputs
 are concrete (fastest on CPU, nothing to compile) and the JAX-native
 {class}`~phasecurvefit.neighbors.BucketKDTree` when they are traced; see
-{mod}`phasecurvefit.neighbors` to pin one. Its graph algorithms are
-**host-side** (NumPy/SciPy); `order()` runs them through `jax.pure_callback`
-when traced, so it works under `jit` and `vmap`. Pure-spatial is the default:
+{mod}`phasecurvefit.neighbors` to pin one. SciPy is **eager-only**: it raises
+`TypeError` on traced inputs, which is why traced calls use the kd-tree. Its
+graph algorithms are **host-side** (NumPy/SciPy); `order()` runs them through
+`jax.pure_callback` when traced, so it works under `jit` and `vmap`.
+
+Tuning the kd-tree matters only for traced calls, since eager ones use SciPy.
+For large `k` (≥ 32), set `frontier` near `k`:
+`neighbors=pcf.neighbors.BucketKDTree(frontier=32)` measured 3–15% faster at
+`k=32`. In high dimension (d ≥ 6) the kd-tree is roughly 30–50× slower than
+SciPy; `BucketKDTree(leaf_size=32)` recovers about 1.45×, and eagerly SciPy is
+the better choice.
+
+Pure-spatial is the default:
 
 ```{code-cell} python
 import jax.numpy as jnp
