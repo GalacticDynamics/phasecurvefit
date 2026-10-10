@@ -5,7 +5,7 @@ import abc
 __all__: tuple[str, ...] = ("AbstractExternalDecoder", "RunningMeanDecoder")
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Literal, TypeAlias
+from typing import TYPE_CHECKING, Literal
 
 import equinox as eqx
 import jax
@@ -14,12 +14,10 @@ from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from .normalize import AbstractNormalizer
 from .order_net import OrderingNet
-from phasecurvefit._src.custom_types import FSz0, FSzN, RSz0
+from phasecurvefit._src.custom_types import FSz0, RSz0
 
 if TYPE_CHECKING:
     import phasecurvefit  # noqa: ICN001
-
-Gamma: TypeAlias = FSzN  # noqa: UP040
 
 
 class AbstractExternalDecoder(eqx.Module):

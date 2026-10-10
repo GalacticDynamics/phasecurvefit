@@ -135,14 +135,7 @@ def unit_direction(q_a: ScalarComponents, q_b: ScalarComponents, /) -> ScalarCom
     (0.6..., 0.8...)
 
     """
-    diff = jtu.map(jnp.subtract, q_b, q_a)  # b - a = direction from a to b
-    norm = euclidean_distance(q_a, q_b)
-    # When norm is 0, division by 0 will give nan; use jnp.where to handle this
-    # by returning the zero vector when norm == 0
-    safe_division = jnp.where(norm != 0, norm, 1)  # Avoid division by zero
-    result = jtu.map(lambda d: d / safe_division, diff)
-    # If norm was 0, zero-out the result
-    return jtu.map(lambda r: jnp.where(norm != 0, r, r * 0), result)
+    return unit_velocity(jtu.map(jnp.subtract, q_b, q_a))
 
 
 # -----------------------------------------------------------------------------

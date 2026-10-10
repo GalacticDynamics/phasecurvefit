@@ -124,146 +124,50 @@ class StateMetadata(quax.Value):
 
 
 class WalkLocalFlowResult(OrderingResult):
-    r"""Result of the local flow walk algorithm.
+    r"""Result of the local-flow walk (`LocalFlowOrderer`).
 
-    This class represents the complete output of the phase-flow walk algorithm.
-    It contains the walk ordering, original phase-space data, and provides methods
-    for examining and interpolating along the discovered stream.
+    An `OrderingResult` with no extra fields; see it for the attributes, the
+    layout of ``indices``, the accessors and interpolation. The subclass exists
+    as a type marker, so code can tell a walk's result from other orderers':
 
-    Attributes
-    ----------
-    positions : dict[str, Array]
-        Position dictionary with keys (e.g., "x", "y", "z") and values as
-        1D arrays of shape (n_obs,). These are the original positions from
-        the input, not reordered.
-    velocities : dict[str, Array]
-        Velocity dictionary with same keys and shape as ``positions``.
-        These are the original velocities from the input, not reordered.
-    indices : Int[Array, " n_obs"]
-        Ordered indices of visited observations. Shape (n_obs,).
-        Unvisited observations are marked with -1.
+    - `combine_results` dispatches on it: only two walk results (a forward and
+      a backward walk, as ``direction="both"`` produces) can be merged.
+    - ``isinstance(result, WalkLocalFlowResult)`` distinguishes a walk from,
+      e.g., the default MST | SOM pipeline, which returns a plain
+      `OrderingResult`.
 
-        The walk order can be extracted by filtering: `indices[indices >= 0]`.
-        See :attr:`ordering` property for a convenience accessor.
-    gamma_range : tuple[float, float]
-        Valid range of the ordering parameter in `__call__`. Default is (0.0, 1.0).
-        This is a static field and cannot be changed after construction.
+    What is specific to the walk:
 
-    Notes
-    -----
-    The walk algorithm discovers a path through phase-space by following the
-    local flow defined by the velocity field. The ordering encodes which
-    observations form a coherent sequence along this path.
-
-    **Key distinction**: ``indices`` is an array of length ``n_obs`` where the
-    *position* in the array indicates the *order* in the walk, and the *value*
-    at that position is the original observation index. For example::
-
-        indices = [3, 7, 1, -1, 5, ...]
-        #          ^ 1st visited observation is index 3
-        #             ^ 2nd visited observation is index 7
-        #                ^ 3rd visited observation is index 1
-        #                   ^ 4th observation was not visited
-        #                      ^ 5th visited observation is index 5
-
-    Properties provide convenient access to:
-    - :attr:`visited`: Boolean mask of visited observations
-    - :attr:`ordering`: Indices in walk order (filtered non-negative)
-    - :attr:`ordered`: Positions/velocities reordered by walk
-    - :attr:`skipped_indices`: Indices of unvisited observations
-
-    The interpolation method
-    (:meth:`~phasecurvefit.orderers.OrderingResult.__call__`) enables smooth
-    spatial interpolation along the discovered path using a continuous ordering
-    parameter $\gamma \in [0, 1]$.
+    - It follows the local flow of the velocity field from a start tracer, one
+      step at a time, and can stop before visiting every tracer (e.g. when no
+      unvisited tracer is within ``max_dist``). Skipped tracers leave ``-1``
+      slots at the end of ``indices``; see `skipped_indices` and `n_skipped`.
+    - It has no ``backbone``, so ``result(gamma)`` interpolates linearly
+      between the visited tracers in walk order, over
+      ``gamma_range == (0.0, 1.0)``.
 
     Examples
     --------
-    **Basic Usage: Extract Ordering and Properties**
-
     >>> import jax.numpy as jnp
     >>> import phasecurvefit as pcf
-    >>> pos = {
-    ...     "x": jnp.linspace(0, 10, 20),
-    ...     "y": jnp.sin(jnp.linspace(0, 2 * 3.14159, 20)),
-    ... }
-    >>> vel = {"x": jnp.ones(20), "y": jnp.cos(jnp.linspace(0, 2 * 3.14159, 20))}
-    >>> result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
-    >>> result.indices
-    Array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16,
-           17, 18, 19], dtype=int32)
-    >>> result.n_visited
-    Array(20, dtype=int32)
-    >>> result.n_skipped
-    Array(0, dtype=int32)
+    >>> t = jnp.linspace(0, 2 * jnp.pi, 20)
+    >>> pos = {"x": jnp.linspace(0, 10, 20), "y": jnp.sin(t)}
+    >>> vel = {"x": jnp.ones(20), "y": jnp.cos(t)}
 
-    **Accessing Ordered Data**
-
-    >>> qs_ordered, vs_ordered = result.ordered
-    >>> qs_ordered["x"].shape
-    (20,)
-
-    **Spatial Interpolation with Gamma Parameter**
-
-    The walk result can be called as a function to interpolate spatial positions
-    from an ordering parameter $\gamma \in [0, 1]$:
-
-    >>> gamma = jnp.array([0.0, 0.5, 1.0])
-    >>> positions_interp = result(gamma)
-    >>> positions_interp["x"]
-    Array([ 0.,  5., 10.], dtype=float32)
-
-    **Scalar Interpolation**
-
-    >>> pos_at_midpoint = result(0.5)
-    >>> pos_at_midpoint["x"]
+    >>> walk = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
+    >>> isinstance(walk, pcf.WalkLocalFlowResult)
+    True
+    >>> walk.gamma_range
+    (0.0, 1.0)
+    >>> walk.n_visited, walk.n_skipped
+    (Array(20, dtype=int32), Array(0, dtype=int32))
+    >>> walk(0.5)["x"]
     Array(5., dtype=float32)
 
-    **JAX Transformations: JIT Compilation**
+    The default pipeline is not a walk:
 
-    The interpolator is JIT-compatible for efficient compilation:
-
-    >>> import jax
-    >>> @jax.jit
-    ... def get_position(gamma):
-    ...     return result(gamma)
-    >>> get_position(0.25)
-    {'x': Array(2.5, dtype=float32), 'y': Array(0.9897884, dtype=float32)}
-
-    **JAX Transformations: Vectorization with vmap**
-
-    Interpolate multiple gamma values efficiently:
-
-    >>> gamma_batch = jnp.linspace(0, 1, 100)
-    >>> @jax.jit
-    ... def interpolate_many(gammas):
-    ...     return jax.vmap(result)(gammas)
-    >>> positions_batch = interpolate_many(gamma_batch)
-    >>> positions_batch["x"].shape
-    (100,)
-
-    **JAX Transformations: Automatic Differentiation**
-
-    Compute gradients of positions with respect to the ordering parameter:
-
-    >>> def loss(gamma):
-    ...     pos = result(gamma)
-    ...     return jnp.sum(pos["x"] ** 2 + pos["y"] ** 2)
-    >>> grad_fn = jax.grad(loss)
-    >>> grad_at_half = grad_fn(0.5)
-
-    **Composition: JIT + vmap + grad**
-
-    Combine transformations for maximum efficiency:
-
-    >>> @jax.jit
-    ... def compute_gradients(gammas):
-    ...     return jax.vmap(jax.grad(loss))(gammas)
-    >>> compute_gradients(jnp.linspace(0, 1, 50))
-    Array([  0. , 5.6351056, 11.270211 , ...],  dtype=float32)
-
-    >>> result.visited.shape
-    (20,)
+    >>> isinstance(pcf.order(pos, vel), pcf.WalkLocalFlowResult)
+    False
 
     """
 

@@ -364,6 +364,34 @@ class TestTrainAutoencoder:
             for a, b in zip(arrays(trained.decoder), arrays(ae.decoder), strict=True)
         ), "decoder did not train"
 
+    @pytest.mark.parametrize("weight_by_density", [True, {"bandwidth": 0.05}])
+    def test_weight_by_density_changes_training(
+        self, rng_key: PRNGKeyArray, weight_by_density
+    ):
+        """Inverse-density weighting runs, stays finite, and differs from uniform."""
+        n = 64
+        t = jnp.linspace(0, 3, n) ** 2  # uneven spacing, so densities differ
+        pos = {"x": jnp.cos(t), "y": jnp.sin(t)}
+        vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
+        normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(-1.0, 1.0), key=rng_key
+        )
+        ws = jnp.concatenate(normalizer.transform(pos, vel), axis=1)
+
+        def train(wbd):
+            config = pcf.nn.TrainingConfig(
+                n_epochs_both=3, batch_size=32, show_pbar=False, weight_by_density=wbd
+            ).autoencoder_config()
+            mask = jnp.ones(n, dtype=bool)
+            return train_ordering_and_track_net(
+                ae, ws, mask=mask, config=config, key=rng_key
+            )[2]
+
+        weighted, uniform = train(weight_by_density), train(wbd=False)
+        assert jnp.all(jnp.isfinite(weighted))
+        assert not jnp.allclose(weighted, uniform)
+
     def test_loss_rejects_odd_column_count(self, rng_key: PRNGKeyArray):
         """`ws` must split evenly into positions and velocities."""
         normalizer = pcf.nn.StandardScalerNormalizer(

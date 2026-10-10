@@ -714,10 +714,9 @@ def mixture_membership_loss(
 class MixtureMembershipConfig:
     r"""Configuration for mixture-model membership (outlier rejection).
 
-    Pass an instance of this to
-    `phasecurvefit.nn.EncoderDecoderTrainingConfig.membership` (or
-    `TrainingConfig.membership`) to swap the classifier-style membership loss for
-    the generative mixture model of Hogg, Bovy & Lang (2010), §3.
+    Pass an instance of this to `phasecurvefit.nn.TrainingConfig.membership` to
+    swap the classifier-style membership loss for the generative mixture model
+    of Hogg, Bovy & Lang (2010), §3.
 
     Leaving ``membership=None`` (the default) preserves the existing behaviour
     exactly.

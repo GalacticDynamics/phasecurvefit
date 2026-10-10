@@ -6,10 +6,6 @@ This module defines common type aliases used throughout the library.
 __all__: tuple[str, ...] = (
     "FAny",
     "FLikeSz0",
-    "FLikeSzN",
-    "ILikeSzN",
-    "FSzD",
-    "FSzND",
     "ScalarComponents",
     "VectorComponents",
 )
@@ -29,13 +25,9 @@ FLikeSz0: TypeAlias = Float[ArrayLike, " "]  # noqa: UP040
 
 # 1D array of ints
 ISzN: TypeAlias = Int[Array, " N"]  # noqa: UP040
-ILikeSzN: TypeAlias = Int[ArrayLike, " N"]  # noqa: UP040
 
 # 1D array of floats
-FLikeSzN: TypeAlias = Float[ArrayLike, " N"]  # noqa: UP040
 FSzN: TypeAlias = Float[Array, " N"]  # noqa: UP040
-FSzD: TypeAlias = Float[Array, " D"]  # noqa: UP040
-FSzND: TypeAlias = Float[Array, " N D"]  # noqa: UP040
 
 RSz0: TypeAlias = Real[Array, ""]  # noqa: UP040
 RSzN: TypeAlias = Real[Array, " N"]  # noqa: UP040

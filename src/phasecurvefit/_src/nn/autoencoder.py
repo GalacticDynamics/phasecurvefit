@@ -11,7 +11,7 @@ __all__: tuple[str, ...] = (
 import functools as ft
 from collections.abc import Mapping
 from dataclasses import KW_ONLY, dataclass
-from typing import Any, ClassVar, TypeAlias, cast
+from typing import Any, ClassVar, cast
 
 import equinox as eqx
 import jax
@@ -42,7 +42,7 @@ from .order_net import (
     default_optimizer,
     train_ordering_net,
 )
-from .result import AutoencoderResult
+from .result import AutoencoderResult, _encode_to_result
 from .track_net import (
     AbstractTrackNet,
     TrackNet,
@@ -53,8 +53,6 @@ from .track_net import (
 from .trainer import EqxScanTrainer, eqx_step
 from phasecurvefit._src.custom_types import FLikeSz0, FSz0, FSzN
 from phasecurvefit._src.orderers.result import OrderingResult
-
-Gamma: TypeAlias = FSzN  # noqa: UP040
 
 
 class PathAutoencoder(AbstractAutoencoder):
@@ -88,11 +86,6 @@ class PathAutoencoder(AbstractAutoencoder):
     __citation__: ClassVar[str] = (
         "https://ui.adsabs.harvard.edu/abs/2022ApJ...940...22N/abstract"
     )
-
-    @property
-    def gamma_range(self) -> tuple[float, float]:
-        """Return the gamma range from the encoder."""
-        return self.encoder.gamma_range
 
     @classmethod
     def make(
@@ -205,7 +198,7 @@ def compute_weights(
 
 @dataclass
 class EncoderDecoderTrainingConfig:
-    r"""Configuration for Encoder + Decoder training."""
+    r"""Configuration for Phase 3: joint encoder + decoder training."""
 
     _: KW_ONLY
 
@@ -245,7 +238,7 @@ class EncoderDecoderTrainingConfig:
     """
 
     freeze_encoder: bool = False
-    """Whether to freeze the encoder during phase 2 training."""
+    """Whether to freeze the encoder during Phase 3 (joint) training."""
 
     weight_by_density: bool | Mapping[str, object] = False
     """Whether to inverse density weight the samples. USE WITH CARE."""
@@ -294,13 +287,13 @@ class TrainingConfig:
     # Encoder + Decoder training
 
     n_epochs_both: int = EncoderDecoderTrainingConfig.n_epochs
-    """Number of epochs for Phase 2 training (TrackNet)"""
+    """Number of epochs for Phase 3 training (encoder + decoder)"""
 
     lambda_q: float = EncoderDecoderTrainingConfig.lambda_q
-    """Weight for phase-2 spatial training."""
+    """Weight for Phase 3 (joint) spatial reconstruction."""
 
     lambda_p: tuple[float, float] = EncoderDecoderTrainingConfig.lambda_p
-    """Weight range for phase-2 velocity training."""
+    """Weight range ``(start, stop)`` for Phase 3 (joint) velocity alignment."""
 
     weight_by_density: bool | Mapping[str, object] = (
         EncoderDecoderTrainingConfig.weight_by_density
@@ -308,7 +301,7 @@ class TrainingConfig:
     """Whether to inverse density weight the samples. USE WITH CARE."""
 
     freeze_encoder_final_training: bool = EncoderDecoderTrainingConfig.freeze_encoder
-    """Whether to freeze the encoder during phase 2 training."""
+    """Whether to freeze the encoder during phase 3 training."""
 
     membership: MixtureMembershipConfig | None = None
     r"""Opt in to mixture-model membership (outlier rejection).
@@ -323,9 +316,6 @@ class TrainingConfig:
     """
 
     # =================================
-
-    def __post_init__(self) -> None:
-        pass
 
     @property
     def n_epochs(self) -> int:
@@ -449,6 +439,34 @@ def posterior_membership(
     )
 
 
+def _unit_rows(x: Float[Array, "N D"], /) -> Float[Array, "N D"]:
+    """Normalise each row to unit length; zero rows stay zero."""
+    norm = jnp.linalg.norm(x, axis=1, keepdims=True)
+    nonzero = norm > 0
+    # Divide by a safe denominator so zero rows never form x / 0 (NaN).
+    return jnp.where(nonzero, x / jnp.where(nonzero, norm, 1), jnp.zeros_like(x))
+
+
+def _velocity_and_tangent_hats(
+    model: PathAutoencoder,
+    ws: Float[Array, "N TwoF"],
+    gamma: Float[Array, " N"],
+    /,
+) -> tuple[Float[Array, "N D"], Float[Array, "N D"]]:
+    r"""Return the unit velocity $\hat{p}$ and unit decoder tangent $\hat{t}$.
+
+    $\hat{t}$ is $\partial q / \partial \gamma$ (forward-mode JVP through the
+    decoder), normalised and gradient-stopped: it is a fixed target direction.
+    """
+    D = ws.shape[1] // 2
+
+    def tangent(g: FSz0) -> Float[Array, " D"]:
+        return jax.jvp(model.decoder, (g,), (jnp.ones_like(g),))[1]
+
+    dq_dgamma = jax.vmap(tangent)(jax.lax.stop_gradient(gamma))
+    return _unit_rows(ws[:, D:]), _unit_rows(jax.lax.stop_gradient(dq_dgamma))
+
+
 def _mixture_decoder_loss(
     model: PathAutoencoder,
     ws: Float[Array, " B TwoF"],
@@ -505,17 +523,7 @@ def _mixture_decoder_loss(
         return nll
 
     # ---- velocity alignment, weighted by posterior membership ----
-    ps = ws[:, D:]
-    ps_norm = jnp.linalg.norm(ps, axis=1, keepdims=True)
-    ps_hat = jnp.where(ps_norm > 0, ps / ps_norm, jnp.zeros_like(ps))
-
-    def decoder_tangent(g: FSz0) -> Float[Array, " D"]:
-        return jax.jvp(model.decoder, (g,), (jnp.ones_like(g),))[1]
-
-    gamma_sg = jax.lax.stop_gradient(gamma)
-    dq_dgamma = jax.lax.stop_gradient(jax.vmap(decoder_tangent)(gamma_sg))
-    t_norm = jnp.linalg.norm(dq_dgamma, axis=1, keepdims=True)
-    t_hat = jnp.where(t_norm > 0, dq_dgamma / t_norm, jnp.zeros_like(dq_dgamma))
+    ps_hat, t_hat = _velocity_and_tangent_hats(model, ws, gamma)
 
     sq_tangent = jnp.sum(jnp.square(t_hat - ps_hat), axis=1)
 
@@ -544,10 +552,10 @@ def compute_decoder_loss(
     sigma_ceil: FSz0 | float = 1.0,
     rampup: FSz0 | float = 1.0,
 ) -> FSz0:
-    r"""Compute decoder loss for Phase 2 training.
+    r"""Compute the Phase 3 (joint encoder + decoder) loss.
 
     This function computes the combined loss for spatial reconstruction and
-    velocity alignment in the decoder training phase.
+    velocity alignment in the joint training phase.
 
     The loss combines two terms:
 
@@ -597,11 +605,6 @@ def compute_decoder_loss(
             key=key,
         )
 
-    # Unit velocity
-    ps = ws[:, D:]
-    ps_norm = jnp.linalg.norm(ps, axis=1, keepdims=True)
-    ps_hat = jnp.where(ps_norm > 0, ps / ps_norm, jnp.zeros_like(ps))
-
     # Compute q_predict by w -encoder-> gamma -decoder-> q
     key, skey1, skey2 = jr.split(key, 3)
     gamma_predict, member_prob = jax.vmap(model.encoder, (0, None))(ws, skey1)
@@ -630,20 +633,7 @@ def compute_decoder_loss(
     # on an empty mask -- which would poison the epoch loss. See `_path_loss`.
     member_mask = mask & is_member
 
-    # Compute dq/dgamma (Jacobian of decoder output w.r.t. gamma) elementwise
-    # jax.jacobian gives us the derivative of decoder output w.r.t. its input
-    # We vmap to compute this for each sample independently.
-    def decoder_tangent(gamma: FSz0) -> Float[Array, " 3"]:
-        # Use JVP (forward-mode AD) with basis vector
-        return jax.jvp(model.decoder, (gamma,), (jnp.ones_like(gamma),))[1]
-
-    gamma_sg = jax.lax.stop_gradient(gamma_predict)
-    dq_dgamma = jax.vmap(decoder_tangent)(gamma_sg)
-    dq_dgamma = jax.lax.stop_gradient(dq_dgamma)
-
-    # Compute $\hat{t}$ from dq/dgamma
-    t_norm = jnp.linalg.norm(dq_dgamma, axis=1, keepdims=True)
-    t_hat = jnp.where(t_norm > 0, dq_dgamma / t_norm, jnp.zeros_like(dq_dgamma))
+    ps_hat, t_hat = _velocity_and_tangent_hats(model, ws, gamma_predict)
 
     def _path_loss() -> FSz0:
         return decoder_loss(
@@ -774,11 +764,11 @@ def train_ordering_and_track_net(
     *,
     key: PRNGKeyArray,
 ) -> tuple[PathAutoencoder, optax.OptState, Float[Array, " {config.n_epochs}"]]:
-    r"""Train the decoder (TrackNet) in Phase 2 of autoencoder training.
+    r"""Train encoder and decoder jointly: Phase 3 of autoencoder training.
 
     This phase trains the decoder to reconstruct spatial positions from $\gamma$
-    values while aligning with velocity directions. The encoder can optionally be
-    frozen during this phase.
+    values while aligning with velocity directions, updating the encoder too
+    unless ``config.freeze_encoder`` is set.
 
     The training uses lax.scan for efficient batching and supports:
     - Linear ramping of lambda_p from min to max over epochs
@@ -795,7 +785,8 @@ def train_ordering_and_track_net(
     mask : Array, shape (N,)
         Binary mask where True = use for training (stream members).
     config : EncoderDecoderTrainingConfig
-        Training configuration including epochs, batch size, loss weights, etc.
+        Phase 3 configuration: epochs, batch size, loss weights, etc. Build it
+        from the full config with `TrainingConfig.autoencoder_config`.
     key : PRNGKeyArray
         Random key for shuffling and batching.
 
@@ -1037,12 +1028,8 @@ def train_autoencoder(
     # ===========================================
     # Train Encoder & Decoder together
 
-    # Extract the configuration from the total config
-    config_autoencoder = config.autoencoder_config()
-
-    # Train the decoder.
     model, autoencoder_opt_state, autoencoder_losses = train_ordering_and_track_net(
-        model, all_ws, mask=is_member, config=config_autoencoder, key=keys[4]
+        model, all_ws, mask=is_member, config=config.autoencoder_config(), key=keys[4]
     )
 
     # ===========================================
@@ -1055,27 +1042,14 @@ def train_autoencoder(
     }
     losses = jnp.concat([encoder_losses, decoder_losses, autoencoder_losses])
 
-    # Convert all_ws back to VectorComponents for AutoencoderResult
-    D = all_ws.shape[1] // 2
-    qs_norm = all_ws[:, :D]
-    ps_norm = all_ws[:, D:]
-    positions, velocities = model.normalizer.inverse_transform(qs_norm, ps_norm)
-
-    # Encode to get gamma and membership_prob
-    gamma, prob = model.encode(positions, velocities)
-    # Sort by gamma to get ordering
-    sorted_indices = jnp.argsort(gamma)
-    # Filter by probability threshold
-    high_prob_mask = prob[sorted_indices] >= config.member_threshold
-    filtered_indices = sorted_indices[high_prob_mask]
-
-    result = AutoencoderResult(
-        model=model,
-        positions=positions,
-        velocities=velocities,
-        indices=filtered_indices,
-        gamma=gamma,
-        membership_prob=prob,
+    positions, velocities = model.normalizer.inverse_transform(
+        *jnp.split(all_ws, 2, axis=1)
+    )
+    result = _encode_to_result(
+        model,
+        positions,
+        velocities,
+        prob_threshold=config.member_threshold,
         gamma_range=model.gamma_range,
     )
 

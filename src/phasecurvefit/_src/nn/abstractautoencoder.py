@@ -22,8 +22,8 @@ class AbstractAutoencoder(eqx.Module):
 
     @property
     def gamma_range(self) -> tuple[float, float]:
-        """Return the gamma range for this autoencoder."""
-        raise NotImplementedError  # pragma: no cover
+        """Return the gamma range from the encoder."""
+        return self.encoder.gamma_range
 
     def encode(
         self,
