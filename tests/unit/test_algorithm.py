@@ -1,8 +1,10 @@
 """Tests for the phase flow walking algorithm."""
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import jax.random as jr
+import numpy as np
 import pytest
 
 import phasecurvefit as pcf
@@ -225,6 +227,40 @@ class TestNearestNeighborsWithMomentum:
             q, p, pcf.orderers.LocalFlowOrderer(start_idx=4, direction="both")
         )
         assert result_right.all_visited  # Should still visit all points
+
+    @pytest.mark.parametrize("start", [0, 1, 5, 9, 10])
+    def test_direction_both_orders_a_line_end_to_end(self, start):
+        """Each half stops at the start instead of doubling back over the other.
+
+        Left to run out, each walk reached its end and turned back, and the
+        combined ordering of this line from 5 was [10 9 8 7 6 0 1 2 3 4 5].
+        From an end, the half with nothing on its side stops at once.
+        """
+        q = {"x": jnp.linspace(0.0, 10.0, 11)}
+        p = {"x": jnp.ones(11)}
+        result = pcf.orderers.LocalFlowOrderer(start_idx=start, direction="both").order(
+            q, p
+        )
+        assert jnp.array_equal(result.indices, jnp.arange(11))
+
+    def test_direction_both_orders_a_shuffled_arc(self, arc):
+        """Shuffled, and curved: storage order and a straight axis cannot help."""
+        pos, vel, t = arc()
+        start = int(np.argsort(t)[len(t) // 2])
+        result = pcf.orderers.LocalFlowOrderer(start_idx=start, direction="both").order(
+            pos, vel
+        )
+        t_along = np.asarray(t)[np.asarray(result.ordering)]
+        assert len(t_along) == len(t)
+        assert np.all(np.diff(t_along) > 0)
+
+    def test_direction_both_stops_at_start_under_jit(self):
+        """The stop is branchless, so it traces."""
+        q = {"x": jnp.linspace(0.0, 10.0, 11)}
+        p = {"x": jnp.ones(11)}
+        orderer = pcf.orderers.LocalFlowOrderer(start_idx=5, direction="both")
+        idx = jax.jit(lambda a, b: orderer.order(a, b).indices)(q, p)
+        assert jnp.array_equal(idx, jnp.arange(11))
 
     def test_2d_stream(self):
         """Test with a 2D stream of points."""

@@ -309,6 +309,27 @@ def _check_velocities(vs: VectorComponents, nan_policy: str, /) -> VectorCompone
     )
 
 
+def _turned_back(
+    start_x: VectorComponents,
+    start_v: VectorComponents,
+    next_x: VectorComponents,
+    step_length: Array,
+    /,
+    *,
+    at_start: Array,
+) -> Array:
+    """Whether a step heads back toward where the walk began.
+
+    On the first step (``at_start``), a step against the walk's own direction
+    at the start: nothing lies on this side, e.g. starting at an end. After
+    that, a next tracer nearer the start than to the current one. Strict, so
+    the first step -- from the start itself -- is never "nearer".
+    """
+    heading = sum((next_x[k] - start_x[k]) * start_v[k] for k in start_x)
+    nearer_start = euclidean_distance(start_x, next_x) < step_length
+    return jnp.where(at_start, heading < 0, nearer_start)
+
+
 @plum.dispatch
 def _local_flow_walk(
     xs: VectorComponents,
@@ -324,6 +345,7 @@ def _local_flow_walk(
     metadata: StateMetadata | None = None,
     direction: Direction = "forward",
     nan_policy: NanPolicy = "raise",
+    _stop_at_start: bool = False,
 ) -> WalkLocalFlowResult:
     r"""Find an ordered path through phase-space using the local flow.
 
@@ -366,7 +388,10 @@ def _local_flow_walk(
     direction
         Direction to walk the local flow. 'forward' walks along the velocity
         field, 'backward' walks against the velocity field, and 'both' walks in
-        both directions.  Default is 'forward'.
+        both directions.  Default is 'forward'. Under 'both', each half stops
+        where it would turn back toward ``start_idx`` (on its first step, a
+        step against its own direction; after that, a tracer nearer the start
+        than the current one), so it covers only its own side.
     nan_policy
         See :class:`~phasecurvefit.orderers.LocalFlowOrderer`.
 
@@ -433,8 +458,16 @@ def _local_flow_walk(
             "metadata": metadata,
             "nan_policy": nan_policy,
         }
-        result_forward = _local_flow_walk(xs, vs, **kwargs, direction="forward")
-        result_backward = _local_flow_walk(xs, vs, **kwargs, direction="backward")
+        # Each half stops where it would turn back toward the start, so it
+        # covers only its own side. Left to run out, each walk reaches its end
+        # and doubles back over the other's half: on a line 0..10 started at
+        # 5, the combined ordering came out [10 9 8 7 6 0 1 2 3 4 5].
+        result_forward = _local_flow_walk(
+            xs, vs, **kwargs, direction="forward", _stop_at_start=True
+        )
+        result_backward = _local_flow_walk(
+            xs, vs, **kwargs, direction="backward", _stop_at_start=True
+        )
         return combine_results(result_forward, result_backward)
 
     # ---------------------------------------------------------------
@@ -468,6 +501,11 @@ def _local_flow_walk(
     vs_original = vs
     if direction == "backward":
         vs = jtu.map(jnp.negative, vs)
+
+    # Where the walk began, and which way it set off (``vs`` is already negated
+    # for a backward walk), for ``_stop_at_start``.
+    start_x = jtu.map(lambda x: x[start_idx], xs)
+    start_v = jtu.map(lambda v: v[start_idx], vs)
 
     # Extract metric and strategy from config
     query_state = config.strategy.init(xs, metadata=metadata)
@@ -564,6 +602,16 @@ def _local_flow_walk(
             jnp.logical_or(min_dist > max_dist, jnp.isinf(best_dist)),
             spatial_ds[best] > max_dist,
         )
+        # One half of ``direction="both"`` also stops where it turns back.
+        # Always evaluated (a few scalar ops) and masked, rather than branched.
+        turned_back = _turned_back(
+            start_x,
+            start_v,
+            jtu.map(lambda x: x[best], cand_xs),
+            spatial_ds[best],
+            at_start=cur_idx == start_idx,
+        )
+        new_stop = jnp.logical_or(new_stop, _stop_at_start & turned_back)
 
         # Conditional update: only add if not terminating. Written as
         # single-element updates so a step doesn't touch all n entries.
