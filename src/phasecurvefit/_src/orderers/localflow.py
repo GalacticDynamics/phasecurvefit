@@ -113,7 +113,9 @@ class LocalFlowOrderer(AbstractOrderer):
 
         An explicit ``start_idx`` always wins, chained or not.
     direction
-        ``"forward"``, ``"backward"``, or ``"both"``.
+        ``"forward"``, ``"backward"``, or ``"both"``. Under ``"both"`` each
+        half stops where it would turn back toward the start, so it covers
+        only its own side of ``start_idx``.
     max_dist
         Maximum allowed neighbor distance.
     terminate_indices
