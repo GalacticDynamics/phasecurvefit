@@ -411,7 +411,7 @@ def _require_usys(metadata: StateMetadata | None, /) -> u.AbstractUnitSystem:
 
 
 def _chord_unit(
-    positions: VectorQComponents, usys: u.AbstractUnitSystem
+    positions: VectorQComponents, usys: u.AbstractUnitSystem, /
 ) -> u.AbstractUnit:
     """Pick the unit for ``chord``, which is one length for all components.
 
@@ -429,6 +429,7 @@ def _order_with_backbone_and_chord(
     orderer: MSTOrderer | SOMOrderer,
     positions: VectorQComponents,
     velocities: VectorQComponents,
+    /,
     *,
     metadata: StateMetadata | None,
     init: AbstractResult | None,
@@ -545,7 +546,7 @@ def order(
     """
     usys = _require_usys(metadata)
 
-    def _as_length_q(val: object) -> AbcQ:
+    def _as_length_q(val: object, /) -> AbcQ:
         return val if isinstance(val, u.AbstractQuantity) else u.Q(val, usys["length"])
 
     result = algorithm._local_flow_walk(  # noqa: SLF001

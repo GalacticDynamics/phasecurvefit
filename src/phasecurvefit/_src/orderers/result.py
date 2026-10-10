@@ -259,7 +259,7 @@ class OrderingResult(AbstractResult):
         return self._interp_ordered(gamma_normalized)
 
     @staticmethod
-    def _lerp_bracket(gamma_normalized: Array, n_control: Array) -> tuple:
+    def _lerp_bracket(gamma_normalized: Array, n_control: Array, /) -> tuple:
         """Bracketing indices and weights for linear interpolation over n points."""
         indices_float = gamma_normalized * (n_control - 1)
         floor = jnp.floor(indices_float)
@@ -268,7 +268,7 @@ class OrderingResult(AbstractResult):
         idx_upper = jnp.clip(ceil.astype(jnp.int32), 0, n_control - 1)
         return idx_lower, idx_upper, indices_float - floor
 
-    def _interp_backbone(self, gamma_normalized: Array) -> VectorComponents:
+    def _interp_backbone(self, gamma_normalized: Array, /) -> VectorComponents:
         """Interpolate along the backbone polyline vertices.
 
         Uses ``backbone_size`` as the valid vertex count when set (the backbone
@@ -288,7 +288,7 @@ class OrderingResult(AbstractResult):
 
         return jt.map(interpolate_component, self.backbone)
 
-    def _interp_ordered(self, gamma_normalized: Array) -> VectorComponents:
+    def _interp_ordered(self, gamma_normalized: Array, /) -> VectorComponents:
         """Interpolate along the ordered visited observations (legacy walk)."""
         visited_indices = jnp.where(self.indices >= 0, self.indices, 0)
         lo, hi, w = self._lerp_bracket(gamma_normalized, self.n_visited)

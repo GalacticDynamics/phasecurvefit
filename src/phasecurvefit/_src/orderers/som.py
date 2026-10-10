@@ -57,6 +57,7 @@ def _train_and_project(
     sigma_start: float | None,
     metric: AbstractDistanceMetric,
     metric_scale: float | FSz0,
+    /,
 ) -> tuple[VectorComponents, VectorComponents, FSzN, BSzN]:
     """Run fit -> densify -> chord as one XLA program.
 
@@ -399,6 +400,7 @@ class SOMOrderer(AbstractOrderer):
         sub_q: VectorComponents,
         sub_p: VectorComponents,
         init: AbstractResult | None,
+        /,
     ) -> tuple[AbstractDistanceMetric, float | FSz0]:
         """Pick the metric and scale, following ``init`` when unset.
 
@@ -487,6 +489,7 @@ class SOMOrderer(AbstractOrderer):
         kept: BSzN,
         sub_q: VectorComponents,
         init: AbstractResult | None,
+        /,
     ) -> None:
         """Warn when the refined ordering disagrees wholesale with its input.
 

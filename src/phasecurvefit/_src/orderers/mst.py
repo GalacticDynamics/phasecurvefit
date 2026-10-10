@@ -109,7 +109,7 @@ def _worker() -> None:
 threading.Thread(target=_worker, daemon=True, name="phasecurvefit-mst-host").start()
 
 
-def _run_in_thread[T](fn: Callable[[], T]) -> T:
+def _run_in_thread[T](fn: Callable[[], T], /) -> T:
     """Run ``fn`` on this module's persistent worker thread; re-raise there.
 
     Works around a segfault observed when scipy's ``cKDTree``/sparse-graph C
@@ -180,7 +180,7 @@ def _check_velocities(
         raise ValueError(msg)
 
 
-def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
+def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray, /) -> np.ndarray:
     """Cosine similarity of velocities across each candidate edge (i, j).
 
     An edge with an end that has no direction -- a stationary tracer, or a
@@ -251,7 +251,7 @@ def _directionless_as_leaves(
 
 
 def _backbone_on_component(
-    P: np.ndarray, tree: object, nodes: np.ndarray, *, workers: int
+    P: np.ndarray, tree: object, nodes: np.ndarray, /, *, workers: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Backbone/order within one connected component.
 
@@ -288,6 +288,7 @@ def _sigma_clip_edges(
     tree: csr_matrix,
     P: np.ndarray,
     nodes: np.ndarray,
+    /,
     *,
     sigma: float,
     max_iters: int,
@@ -355,7 +356,7 @@ def _sigma_clip_edges(
 
 
 def _connect_components(
-    P: np.ndarray, graph: csr_matrix, *, workers: int
+    P: np.ndarray, graph: csr_matrix, /, *, workers: int
 ) -> csr_matrix:
     """Join a graph's connected components along their shortest links.
 
@@ -390,7 +391,7 @@ def _connect_components(
 
 
 def _disconnected_message(
-    n_comp: int, k: int, jump_cap: float, sever_cos_threshold: float | None
+    n_comp: int, k: int, jump_cap: float, sever_cos_threshold: float | None, /
 ) -> str:
     """Explain a disconnected kNN graph, blaming only what could be the cause."""
     causes = [f"k={k} too low"]
@@ -408,7 +409,7 @@ def _disconnected_message(
 
 
 def _orient_along_velocity(
-    order_idx: np.ndarray, backbone_nodes: np.ndarray, Cb: np.ndarray, V: np.ndarray
+    order_idx: np.ndarray, backbone_nodes: np.ndarray, Cb: np.ndarray, V: np.ndarray, /
 ) -> tuple[np.ndarray, np.ndarray]:
     """Reverse the ordering if it runs against the mean velocity."""
     tang = np.diff(Cb, axis=0)
@@ -427,6 +428,7 @@ def _orient_along_velocity(
 def _mst_backbone(
     P: np.ndarray,
     V: np.ndarray,
+    /,
     *,
     k: int,
     jump_cap: float,
@@ -518,6 +520,7 @@ def _mst_backbone(
 def _mst_backbone_padded(
     P: np.ndarray,
     V: np.ndarray,
+    /,
     *,
     k: int,
     jump_cap: float,
@@ -778,7 +781,7 @@ class MSTOrderer(AbstractOrderer):
         V = jnp.stack([jnp.asarray(velocities[c]) for c in comps], axis=1)
         n, _d = P.shape
 
-        def _host(p: np.ndarray, v: np.ndarray) -> tuple:
+        def _host(p: np.ndarray, v: np.ndarray, /) -> tuple:
             return _mst_backbone_padded(
                 np.asarray(p),
                 np.asarray(v),
@@ -819,7 +822,7 @@ class MSTOrderer(AbstractOrderer):
                 jax.ShapeDtypeStruct((), jnp.int32),
             )
 
-            def _host_threaded(p: np.ndarray, v: np.ndarray) -> tuple:
+            def _host_threaded(p: np.ndarray, v: np.ndarray, /) -> tuple:
                 # _run_in_thread works around a segfault observed when the
                 # host computation runs directly on the native thread
                 # jax.pure_callback dispatches onto. See its docstring.
