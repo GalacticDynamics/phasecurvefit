@@ -185,8 +185,10 @@ def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarra
 
     An edge with an end that has no direction -- a stationary tracer, or a
     missing (NaN) velocity under ``nan_policy="omit"`` -- gets ``cos = 1``
-    (no ``velocity_weight`` penalty, not severed) -- only ever its single
-    leaf edge, from ``_directionless_as_leaves``.
+    (no ``velocity_weight`` penalty, not severed). That edge is its single
+    leaf edge from ``_directionless_as_leaves`` -- unless *no* tracer has a
+    direction, when there is no split and every edge gets ``cos = 1``, i.e.
+    the graph is purely spatial.
     Scale-free otherwise: an absolute floor on ``|v_i| |v_j|`` would read
     every small-unit velocity (``|v| <~ 1e-6``) as directionless.
     """
