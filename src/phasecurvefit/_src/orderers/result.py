@@ -41,7 +41,16 @@ class OrderingResult(AbstractResult):
     velocities : dict[str, Array]
         Original velocity components, same shape as ``positions``.
     indices : Int[Array, " n_obs"]
-        Ordered indices of visited observations; unvisited slots are ``-1``.
+        Observation indices in visit order, padded with ``-1`` for unvisited
+        observations. The *position* in the array is the step in the ordering
+        and the *value* is the original observation index::
+
+            indices = [3, 7, 1, 5, -1, -1]
+            #          ^ 1st is observation 3
+            #             ^ 2nd is observation 7, and so on
+            #                      ^ two observations were not visited
+
+        Use `ordering` for the visited indices alone.
     gamma_range : tuple[float, float]
         Static valid range of the ordering parameter for ``__call__``.
     backbone : dict[str, Array] | None
@@ -71,6 +80,20 @@ class OrderingResult(AbstractResult):
         zero scale makes a phase-space metric numerically position-only, but
         the orderer is still configured to use velocity. Orderers that order on
         position alone leave it ``False``.
+
+    Notes
+    -----
+    Accessors, all derived from ``indices``:
+
+    - `visited`: boolean mask over observations, in input order
+    - `n_visited`, `n_skipped`, `all_visited`: counts and a summary flag
+    - `ordering`: visited indices in order (``indices`` without the ``-1``)
+    - `skipped_indices`: indices of observations that were not visited
+    - `ordered`: positions and velocities reordered along the ordering
+
+    Calling the result, ``result(gamma)``, interpolates a position along the
+    ordering for any $\gamma$ in ``gamma_range``: along ``backbone`` when there
+    is one, otherwise between the visited observations in order.
 
     Examples
     --------

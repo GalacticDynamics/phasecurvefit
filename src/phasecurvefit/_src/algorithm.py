@@ -124,9 +124,51 @@ class StateMetadata(quax.Value):
 
 
 class WalkLocalFlowResult(OrderingResult):
-    """Result of the local-flow walk (`LocalFlowOrderer`).
+    r"""Result of the local-flow walk (`LocalFlowOrderer`).
 
-    Adds nothing to `OrderingResult`; see it for attributes and examples.
+    An `OrderingResult` with no extra fields; see it for the attributes, the
+    layout of ``indices``, the accessors and interpolation. The subclass exists
+    as a type marker, so code can tell a walk's result from other orderers':
+
+    - `combine_results` dispatches on it: only two walk results (a forward and
+      a backward walk, as ``direction="both"`` produces) can be merged.
+    - ``isinstance(result, WalkLocalFlowResult)`` distinguishes a walk from,
+      e.g., the default MST | SOM pipeline, which returns a plain
+      `OrderingResult`.
+
+    What is specific to the walk:
+
+    - It follows the local flow of the velocity field from a start tracer, one
+      step at a time, and can stop before visiting every tracer (e.g. when no
+      unvisited tracer is within ``max_dist``). Skipped tracers leave ``-1``
+      slots at the end of ``indices``; see `skipped_indices` and `n_skipped`.
+    - It has no ``backbone``, so ``result(gamma)`` interpolates linearly
+      between the visited tracers in walk order, over
+      ``gamma_range == (0.0, 1.0)``.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> import phasecurvefit as pcf
+    >>> t = jnp.linspace(0, 2 * jnp.pi, 20)
+    >>> pos = {"x": jnp.linspace(0, 10, 20), "y": jnp.sin(t)}
+    >>> vel = {"x": jnp.ones(20), "y": jnp.cos(t)}
+
+    >>> walk = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
+    >>> isinstance(walk, pcf.WalkLocalFlowResult)
+    True
+    >>> walk.gamma_range
+    (0.0, 1.0)
+    >>> walk.n_visited, walk.n_skipped
+    (Array(20, dtype=int32), Array(0, dtype=int32))
+    >>> walk(0.5)["x"]
+    Array(5., dtype=float32)
+
+    The default pipeline is not a walk:
+
+    >>> isinstance(pcf.order(pos, vel), pcf.WalkLocalFlowResult)
+    False
+
     """
 
 
