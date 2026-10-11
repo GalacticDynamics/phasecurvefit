@@ -6,7 +6,7 @@ import math
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float, Int
+from jaxtyping import Array, Bool, Int, Real
 
 
 def n_rounds(n: int, /) -> int:
@@ -15,8 +15,8 @@ def n_rounds(n: int, /) -> int:
 
 
 def accumulate(
-    parent: Int[Array, " n"], w: Float[Array, " n"], /
-) -> tuple[Int[Array, " n"], Float[Array, " n"]]:
+    parent: Int[Array, " n"], w: Real[Array, " n"], /
+) -> tuple[Int[Array, " n"], Real[Array, " n"]]:
     """Root of every node and the sum of ``w`` along its path to the root.
 
     ``w[i]`` is the weight of the edge from ``i`` to ``parent[i]``; roots must
