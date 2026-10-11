@@ -11,13 +11,11 @@ from jaxtyping import Array, Bool, Int
 from ._boruvka import boruvka
 from ._pointer import n_rounds
 
-Nearest = Callable[[Array], tuple[Array, Array]]
-
 
 def connect(
     labels: Int[Array, " n"],
     real: Bool[Array, " n"],
-    nearest: Nearest,
+    nearest: Callable[[Array], tuple[Array, Array]],
     /,
 ) -> tuple[Array, Array, Array, Array]:
     """Bridge edges ``(lo, hi, d, valid)`` (``2n`` slots) joining all real components.

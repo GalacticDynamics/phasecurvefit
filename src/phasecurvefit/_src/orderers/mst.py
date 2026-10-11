@@ -93,6 +93,21 @@ _EDGE_CLIP_SMALL_FRAC = 0.01
 _EDGE_CLIP_MAX_REJECT_FRAC = 0.5
 
 
+def _velocity_users(
+    *,
+    velocity_weight: float,
+    sever_cos_threshold: float | None,
+    orient_by_velocity: bool,
+) -> str:
+    """Name the enabled mechanisms that read velocities ("" if none)."""
+    on = (
+        ("velocity_weight", velocity_weight > 0.0),
+        ("sever_cos_threshold", sever_cos_threshold is not None),
+        ("orient_by_velocity", orient_by_velocity),
+    )
+    return " and ".join(name for name, enabled in on if enabled)
+
+
 def _check_velocities(
     V: np.ndarray,
     /,
@@ -115,18 +130,13 @@ def _check_velocities(
     ``"omit"`` opts into attaching it as a leaf anyway
     (``_directionless_as_leaves``).
     """
-    on = [
-        name
-        for name, enabled in (
-            ("velocity_weight", velocity_weight > 0.0),
-            ("sever_cos_threshold", sever_cos_threshold is not None),
-            ("orient_by_velocity", orient_by_velocity),
-        )
-        if enabled
-    ]
-    if not on:
+    used = _velocity_users(
+        velocity_weight=velocity_weight,
+        sever_cos_threshold=sever_cos_threshold,
+        orient_by_velocity=orient_by_velocity,
+    )
+    if not used:
         return
-    used = " and ".join(on)
     inf = np.isinf(V).any(axis=1)
     if inf.any():
         msg = (
@@ -171,18 +181,13 @@ def _check_velocities_traceable(
     if not _traced(V):
         _check_velocities(np.asarray(V), **kw)
         return V
-    on = [
-        name
-        for name, enabled in (
-            ("velocity_weight", velocity_weight > 0.0),
-            ("sever_cos_threshold", sever_cos_threshold is not None),
-            ("orient_by_velocity", orient_by_velocity),
-        )
-        if enabled
-    ]
-    if not on:
+    used = _velocity_users(
+        velocity_weight=velocity_weight,
+        sever_cos_threshold=sever_cos_threshold,
+        orient_by_velocity=orient_by_velocity,
+    )
+    if not used:
         return V
-    used = " and ".join(on)
     V = eqx.error_if(
         V,
         jnp.any(jnp.isinf(V)),

@@ -14,20 +14,6 @@ def n_rounds(n: int, /) -> int:
     return max(1, math.ceil(math.log2(max(n, 2)))) + 1
 
 
-def find_roots(parent: Int[Array, " n"], /) -> Int[Array, " n"]:
-    """Find the root of every node of a forest (roots point to themselves)."""
-
-    def cond(state: tuple) -> Array:
-        p, it = state
-        return (it < n_rounds(parent.shape[0])) & jnp.any(p != p[p])
-
-    def body(state: tuple) -> tuple:
-        p, it = state
-        return p[p], it + 1
-
-    return jax.lax.while_loop(cond, body, (parent, 0))[0]
-
-
 def accumulate(
     parent: Int[Array, " n"], w: Float[Array, " n"], /
 ) -> tuple[Int[Array, " n"], Float[Array, " n"]]:
@@ -49,6 +35,11 @@ def accumulate(
     return p, d
 
 
+def find_roots(parent: Int[Array, " n"], /) -> Int[Array, " n"]:
+    """Find the root of every node of a forest (roots point to themselves)."""
+    return accumulate(parent, jnp.zeros(parent.shape[0], jnp.int32))[0]
+
+
 def list_rank(succ: Int[Array, " m"], /) -> tuple[Int[Array, " m"], Bool[Array, " m"]]:
     """Count each element's steps to the end of its list (``succ == m`` ends it).
 
@@ -58,14 +49,5 @@ def list_rank(succ: Int[Array, " m"], /) -> tuple[Int[Array, " m"], Bool[Array, 
     m = succ.shape[0]
     s = jnp.concat([succ, jnp.array([m], succ.dtype)])  # row m: the end, fixed
     d = jnp.concat([(succ != m).astype(jnp.int32), jnp.zeros(1, jnp.int32)])
-
-    def cond(state: tuple) -> Array:
-        s, _, it = state
-        return (it < n_rounds(m)) & jnp.any(s[:m] != m)
-
-    def body(state: tuple) -> tuple:
-        s, d, it = state
-        return s[s], d + d[s], it + 1
-
-    s, d, _ = jax.lax.while_loop(cond, body, (s, d, 0))
+    s, d = accumulate(s, d)
     return d[:m], s[:m] == m
