@@ -172,6 +172,14 @@ class TestDiameterPath:
         assert int(blen) == 1
         np.testing.assert_array_equal(np.asarray(full), [1, 1, 1])
 
+    def test_no_edges(self):
+        """No edges at all (static): the path is the smallest alive node."""
+        z = jnp.zeros(0, jnp.int32)
+        alive = jnp.array([False, True, True])
+        full, blen = _diameter(3, z, z, jnp.zeros(0), jnp.zeros(0, bool), alive)
+        assert int(blen) == 1
+        np.testing.assert_array_equal(np.asarray(full), [1, 1, 1])
+
 
 class TestEdges:
     """The kNN edge list follows the host formulas."""
@@ -289,6 +297,16 @@ class TestSigmaClip:
         )
         np.testing.assert_array_equal(np.flatnonzero(got), want)
         assert got.sum() == n  # nothing rejected
+
+    @pytest.mark.parametrize("n", [1, 4])
+    def test_nothing_to_clip(self, n):
+        """No edges, or a single node: everyone alive survives (static)."""
+        z = jnp.zeros(0 if n > 1 else 1, jnp.int32)
+        alive = jnp.ones(n, bool)
+        got = gr.sigma_clip(
+            n, z, z, jnp.ones(z.shape), z.astype(bool), alive, sigma=3.0, max_iters=5
+        )
+        np.testing.assert_array_equal(np.asarray(got), np.ones(n, bool))
 
 
 def _brute_nearest(p):

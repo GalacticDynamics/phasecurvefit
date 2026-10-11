@@ -972,6 +972,9 @@ def _host_callbacks(jaxpr):
     return found
 
 
+_BKD = pcf.neighbors.BucketKDTree()
+
+
 def _two_segments():
     """Two separated, slightly jittered segments: disconnected for jump_cap=1.
 
@@ -1045,9 +1048,30 @@ class TestMSTPureJax:
     def test_eager_count_ignores_padding(self):
         """Eager calls pad n=60 to a 64-row bucket; padded rows never count."""
         pos, vel = _two_segments()
-        orderer = pcf.orderers.MSTOrderer(k=5, jump_cap=1.0, on_disconnected="warn")
+        orderer = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=1.0, on_disconnected="warn", neighbors=_BKD
+        )
         with pytest.warns(UserWarning, match="disconnected into 2 components"):
             orderer.order(pos, vel)
+
+    def test_eager_raise(self):
+        """Eager ``"raise"`` on a JAX backend is today's ValueError, with the count."""
+        pos, vel = _two_segments()
+        orderer = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=1.0, on_disconnected="raise", neighbors=_BKD
+        )
+        with pytest.raises(ValueError, match="disconnected into 2 components"):
+            orderer.order(pos, vel)
+
+    def test_warn_callback(self):
+        """The traced warn callback warns on several components, not on one.
+
+        Called directly: coverage cannot see ``jax.debug.callback``'s thread.
+        """
+        kw = {"k": 5, "jump_cap": 1.0, "sever_cos_threshold": None}
+        with pytest.warns(UserWarning, match="disconnected into 3 components"):
+            mst._warn_if_disconnected(jnp.int32(3), **kw)
+        mst._warn_if_disconnected(jnp.int32(1), **kw)  # `filterwarnings = error`
 
     def test_raise_under_jit(self):
         """``"raise"`` is a runtime error under jit, with a static message."""
@@ -1086,8 +1110,8 @@ class TestMSTPureJax:
     def test_jit_matches_eager(self, kw):
         """Every graph-stage option gives the same result traced and eager."""
         pos, vel = _two_segments()
-        orderer = pcf.orderers.MSTOrderer(k=5, **kw)
-        eager = orderer.order(pos, vel)
+        orderer = pcf.orderers.MSTOrderer(k=5, **kw, neighbors=_BKD)
+        eager = orderer.order(pos, vel)  # the padded eager JAX path, not SciPy
         jitted = jax.jit(orderer.order)(pos, vel)
         np.testing.assert_array_equal(
             np.asarray(jitted.indices), np.asarray(eager.indices)

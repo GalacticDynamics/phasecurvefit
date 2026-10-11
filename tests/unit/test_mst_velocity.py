@@ -260,8 +260,8 @@ class TestMissingVelocities:
     def test_split_uses_the_selected_backend(self, mechanism):
         """Directionless tracers split off through the backend, not a host tree.
 
-        SciPy, the kd-tree eagerly and the kd-tree under jit (a pure_callback
-        carrying the directed-only tables) give one ordering.
+        SciPy, the kd-tree eagerly and the kd-tree under jit (the pure-JAX
+        graph stage, given the directed-only tables) give one ordering.
         """
         pos, vel = _hairpin()
         vel = {

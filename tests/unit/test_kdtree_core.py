@@ -341,6 +341,14 @@ class TestKnn:
         q = rng.normal(size=(37, 3)).astype(np.float32)
         _assert_exact(p, *_bi(p, q, k=k, **kw), k, queries=q)
 
+    @pytest.mark.parametrize(("n", "m"), [(5, 0), (0, 3)])
+    def test_empty(self, n, m):
+        """No queries, or an empty tree: every slot is a missing neighbour."""
+        tree = build_tree(jnp.zeros((n, 2), jnp.float32))
+        ii, d2 = kd.knn(tree, jnp.zeros((m, 2), jnp.float32), 2)
+        np.testing.assert_array_equal(np.asarray(ii), np.full((m, 2), n))
+        assert np.all(np.isinf(np.asarray(d2)))
+
     def test_stream_projection_10k(self):
         """k=1 queries near a stream, as the MST projection uses it."""
         p = _stream(10_000)
