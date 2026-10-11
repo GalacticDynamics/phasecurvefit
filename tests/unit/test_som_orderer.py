@@ -568,7 +568,7 @@ def test_som_orderer_rejects_an_asymmetric_metric():
     travel", so every datum prefers what lies ahead of it and the lattice
     collapses toward the curve's head.
     """
-    with pytest.raises(ValueError, match="metric must be symmetric"):
+    with pytest.raises(ValueError, match="not symmetric"):
         pcf.orderers.SOMOrderer(metric=pcf.metrics.AlignedMomentumDistanceMetric())
 
 

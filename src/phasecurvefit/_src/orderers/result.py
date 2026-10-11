@@ -212,10 +212,7 @@ class OrderingResult(AbstractResult):
     @property
     def skipped_indices(self) -> Int[Array, " n_skipped"]:
         """Indices of skipped observations (marked as -1 in indices)."""
-        all_indices = jnp.arange(len(self.indices))
-        visited = self.indices[self.visited]
-        is_visited = jnp.isin(all_indices, visited)
-        return all_indices[~is_visited]
+        return jnp.setdiff1d(jnp.arange(len(self.indices)), self.ordering)
 
     @property
     def ordering(self) -> Int[Array, " n_visited"]:

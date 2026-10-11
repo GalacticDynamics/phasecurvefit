@@ -26,6 +26,7 @@ __all__: tuple[str, ...] = (
     "SOM1D",
     "FitResult",
     "bmu_distance",
+    "bootstrap_weights",
     "chord",
     "densify",
     "fit",
@@ -131,6 +132,22 @@ def _stack(
 ) -> Float[Array, "N D"]:
     """Stack selected dict components into a dense ``(N, D)`` array."""
     return jnp.stack([jnp.asarray(components[k]) for k in keys], axis=-1)
+
+
+def _pack(
+    q: VectorComponents, p: VectorComponents, keys: tuple[str, ...], /
+) -> Float[Array, "N TwoD"]:
+    """Stack positions, then velocities, each in ``keys`` order: ``(N, 2D)``."""
+    return jnp.concatenate([_stack(q, keys), _stack(p, keys)], axis=-1)
+
+
+def _unpack(
+    arr: Float[Array, "N TwoD"], keys: tuple[str, ...], /
+) -> tuple[VectorComponents, VectorComponents]:
+    """Split a `_pack`-ed array back into position and velocity dicts."""
+    d = len(keys)
+    q = {k: arr[:, i] for i, k in enumerate(keys)}
+    return q, {k: arr[:, d + i] for i, k in enumerate(keys)}
 
 
 def init_prototypes(
@@ -391,7 +408,6 @@ def _fit_core(
         msg = f"sigma_start must be positive, got {start}."
         raise ValueError(msg)
 
-    lattice = jnp.arange(n_prototypes)
     data_q = jt.map(jnp.asarray, positions)
     data_p = jt.map(jnp.asarray, velocities)
     ratio = sigma_end / start
@@ -402,16 +418,14 @@ def _fit_core(
     #     h[n, k] = hkk[bmu[n], k]   =>   sum_n h[n,k] w_n
     #                                   = sum_c hkk[c,k] (sum_{bmu(n)=c} w_n)
     # Exact, not an approximation, and combines K partial sums rather than N.
-    vel_keys = tuple(sorted(proto_velocities))
+    # `_check_matching_keys` made both dicts share ``keys``.
     n_pos = len(keys)
-    stacked = jnp.stack(
-        [data_q[k] for k in keys] + [data_p[k] for k in vel_keys], axis=-1
-    )
+    stacked = _pack(data_q, data_p, keys)
     # Cast before squaring, not after: the integer square would overflow int32
     # past K = 46342, and casting the (K,) lattice is cheaper than casting the
     # (K, K) result. Exact integers stop at 2**24, but those entries are far
     # off-diagonal and their Gaussian underflows to zero regardless.
-    lat = lattice.astype(stacked.dtype)
+    lat = jnp.arange(n_prototypes).astype(stacked.dtype)
     lattice_sq = (lat[:, None] - lat[None, :]) ** 2
     omega = (
         jnp.ones(stacked.shape[0], dtype=stacked.dtype)
@@ -453,12 +467,8 @@ def _fit_core(
         # lacks. Leave it where it is rather than dividing 0/0.
         live = weight > jnp.finfo(stacked.dtype).tiny
         means = (neighbourhood.T @ totals) / jnp.where(live, weight, 1.0)
-        current = jnp.stack([pq[k] for k in keys] + [pp[k] for k in vel_keys], axis=-1)
-        means = jnp.where(live, means, current)
-        return (
-            {k: means[:, i] for i, k in enumerate(keys)},
-            {k: means[:, n_pos + i] for i, k in enumerate(vel_keys)},
-        ), None
+        means = jnp.where(live, means, _pack(pq, pp, keys))
+        return _unpack(means, keys), None
 
     init = (jt.map(jnp.asarray, proto_positions), jt.map(jnp.asarray, proto_velocities))
     (trained_q, trained_p), _ = jax.lax.scan(epoch, init, jnp.arange(n_epochs))
@@ -724,12 +734,11 @@ def fit(
         cut = candidate & (loglen > threshold)
         return kept & ~cut, pq, pp, jnp.any(cut)
 
-    run_first_iteration = True
     init_state: State = (
         jnp.ones(n, dtype=bool),
         jt.map(jnp.asarray, proto_positions),
         jt.map(jnp.asarray, proto_velocities),
-        jnp.asarray(run_first_iteration),
+        jnp.asarray(True),  # noqa: FBT003  # always run the first iteration
     )
     kept, trained_q, trained_p, _ = bounded_while_loop(
         cond_fn,
@@ -819,8 +828,6 @@ def _catmull_rom(
     chain of six lerps and vectorizes over all segments at once.
     """
     n_proto, n_dim = P.shape
-    if n_proto < 2:
-        return P
     # Duplicate the end points to give the first and last segments a full
     # four-point stencil.
     padded = jnp.concatenate([P[:1], P, P[-1:]], axis=0)
@@ -964,19 +971,13 @@ def densify(
         )
         raise ValueError(msg)
 
-    q_keys = tuple(sorted(proto_positions))
-    p_keys = tuple(sorted(proto_velocities))
-    n_q = len(q_keys)
-
-    P = jnp.concatenate(
-        [_stack(proto_positions, q_keys), _stack(proto_velocities, p_keys)], axis=-1
-    )
+    keys = tuple(sorted(proto_positions))  # shared, per `_check_matching_keys`
+    n_q = len(keys)
+    P = _pack(proto_positions, proto_velocities, keys)
     curve = _resample_uniform(
         _catmull_rom(P, factor=factor, knot_cols=n_q), knot_cols=n_q
     )
-    backbone_q = {k: curve[:, i] for i, k in enumerate(q_keys)}
-    backbone_p = {k: curve[:, n_q + i] for i, k in enumerate(p_keys)}
-    return backbone_q, backbone_p
+    return _unpack(curve, keys)
 
 
 def _segment_projection(

@@ -22,9 +22,8 @@ class TestLayout:
     def test_padding_under_one_row_per_leaf(self, n, leaf_size):
         """n_pad covers n, padding is < one row per leaf, spread as 0/1 per leaf."""
         lay = layout(n, leaf_size)
-        assert lay.n_leaves == 2**lay.depth
-        assert lay.n_pad == lay.n_leaves * lay.leaf_size >= n
-        assert lay.n_pad - n < lay.n_leaves or n == 0
+        assert lay.n_pad == 2**lay.depth * lay.leaf_size >= n
+        assert lay.n_pad - n < 2**lay.depth or n == 0
         assert int(lay.leaf_valid.sum()) == max(n, 0) or n == 0
         assert set(np.unique(lay.leaf_size - lay.leaf_valid)) <= {0, 1}
         assert lay.leaf_size <= max(leaf_size, 1) or lay.depth == 0

@@ -34,7 +34,7 @@ from .result import OrderingResult
 from phasecurvefit._src import som as _som
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
-from phasecurvefit._src.checks import value_error_if
+from phasecurvefit._src.checks import check_nan_policy, check_velocities, value_error_if
 from phasecurvefit._src.custom_types import BSzN, FSz0, FSzN, ISzN, VectorComponents
 from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
@@ -91,43 +91,6 @@ def _train_and_project(
         backbone_q, backbone_p, sub_q, sub_p, metric=metric, metric_scale=metric_scale
     )
     return backbone_q, backbone_p, lam, result.kept
-
-
-def _check_nan_policy(nan_policy: str, /) -> None:
-    if nan_policy not in ("raise", "omit"):
-        msg = f"nan_policy must be 'raise' or 'omit', got {nan_policy!r}."
-        raise ValueError(msg)
-
-
-def _check_velocities(
-    velocities: VectorComponents, nan_policy: str, /
-) -> VectorComponents:
-    """Raise on an infinite velocity, and on NaN unless ``nan_policy="omit"``.
-
-    Called only when the stage reads velocities. ``value_error_if``: a
-    ``ValueError`` on concrete input, and it survives ``jit`` and ``vmap``.
-    """
-    # Per component, then reduced: no (N * D) copy just to validate.
-    comps = [jnp.asarray(v) for v in velocities.values()]
-    has_inf = jnp.any(jnp.stack([jnp.any(jnp.isinf(v)) for v in comps]))
-    has_nan = jnp.any(jnp.stack([jnp.any(jnp.isnan(v)) for v in comps]))
-    velocities = value_error_if(
-        velocities,
-        has_inf,
-        "SOMOrderer found an infinite velocity. inf is not a measurement -- it "
-        "comes from an overflow or a bug upstream -- so it raises under either "
-        "nan_policy. Fix or drop those tracers.",
-    )
-    if nan_policy == "omit":
-        return velocities
-    return value_error_if(
-        velocities,
-        has_nan,
-        "SOMOrderer reads velocities here (a velocity-aware metric or "
-        "orient_by_velocity) and found a NaN. To treat NaN as a missing "
-        "velocity pass nan_policy='omit'; or drop those tracers; or order on "
-        "position alone (metric=SpatialDistanceMetric(), no orient_by_velocity).",
-    )
 
 
 def _scale_is_nonzero(scale: float | FSz0, /, *, remedy: str) -> bool:
@@ -327,16 +290,11 @@ class SOMOrderer(AbstractOrderer):
 
     def __check_init__(self) -> None:
         """Reject invalid configuration early, at construction."""
-        _check_nan_policy(self.nan_policy)
-        if self.metric is not None and not self.metric.is_symmetric:
+        check_nan_policy(self.nan_policy)
+        if self.metric is not None:
             # Documented on ``metric`` above; enforced here so the failure lands
             # at construction rather than deep inside a jitted fit.
-            msg = (
-                f"metric must be symmetric for nearest-prototype assignment; "
-                f"{type(self.metric).__name__} is not. Passing it collapses the "
-                f"lattice toward the curve's head."
-            )
-            raise ValueError(msg)
+            _som._check_symmetric(self.metric)  # noqa: SLF001
         if self.n_prototypes < 2:
             msg = f"n_prototypes must be >= 2, got {self.n_prototypes}."
             raise ValueError(msg)
@@ -504,7 +462,7 @@ class SOMOrderer(AbstractOrderer):
         epitrochoid, a lattice that destroys the ordering scores 0.28 while
         every lattice that improves it scores 0.89 or above.
         """
-        if init is None or perm.shape[0] < 3:
+        if init is None:
             return
         # ``sub_q`` is in the prior stage's order, so the prior rank is just
         # position in the array. ``perm`` is the ordering ``order`` already
@@ -652,7 +610,16 @@ class SOMOrderer(AbstractOrderer):
         )
         metric, metric_scale = self._resolve_metric(sub_q, sub_p, init)
         if metric.uses_velocity or self.orient_by_velocity:
-            sub_p = _check_velocities(sub_p, self.nan_policy)
+            sub_p = check_velocities(
+                sub_p,
+                self.nan_policy,
+                name="SOMOrderer",
+                nan_msg="SOMOrderer reads velocities here (a velocity-aware metric "
+                "or orient_by_velocity) and found a NaN. To treat NaN as a missing "
+                "velocity pass nan_policy='omit'; or drop those tracers; or order "
+                "on position alone (metric=SpatialDistanceMetric(), no "
+                "orient_by_velocity).",
+            )
         backbone_q, backbone_p, lam, kept = _train_and_project(
             self, proto_q, proto_p, sub_q, sub_p, sigma_start, metric, metric_scale
         )
@@ -670,7 +637,7 @@ class SOMOrderer(AbstractOrderer):
             # outvote every other segment.
             dots = tangent * vel_mid
             flip = jnp.sum(jnp.where(jnp.isfinite(dots), dots, 0.0)) < 0.0
-            total = jnp.sum(jnp.linalg.norm(tangent, axis=-1))
+            total = _polyline_length(backbone_q)
             # ``total - lam`` also reverses the end-cap extrapolations, which
             # sit outside [0, total], symmetrically.
             lam = jnp.where(flip, total - lam, lam)

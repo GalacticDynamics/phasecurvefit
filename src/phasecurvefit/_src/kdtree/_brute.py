@@ -1,4 +1,4 @@
-"""Blocked brute-force kNN: the exactness oracle and the small-n path."""
+"""Blocked brute-force kNN: the exactness oracle and the BruteForce backend."""
 
 __all__: tuple[str, ...] = ("brute_knn",)
 
