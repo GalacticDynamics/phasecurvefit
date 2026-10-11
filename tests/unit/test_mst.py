@@ -712,6 +712,30 @@ class TestMSTBackends:
         want = jax.jit(lambda p, v: bucket.order(p, v).indices)(pos, vel)
         np.testing.assert_array_equal(np.asarray(jitted), np.asarray(want))
 
+    def test_custom_backend_takes_the_generic_path(self):
+        """A new ``AbstractNeighborSearch`` needs no change to ``MSTOrderer``.
+
+        The graph and ordering stages are dispatched on the backend type: a
+        subclass with no method of its own falls through to the generic JAX
+        path, eager and under ``jit``.
+        """
+
+        class Wrapped(pcf.neighbors.AbstractNeighborSearch):
+            def knn(self, points, /, k, *, queries=None):
+                return pcf.neighbors.BruteForce().knn(points, k, queries=queries)
+
+        pos, vel, _ = _open_arc(n=120)
+        kw = {"k": 8, "jump_cap": 2.0, "velocity_weight": 1.0}
+        custom = pcf.orderers.MSTOrderer(neighbors=Wrapped(), **kw)
+        brute = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.BruteForce(), **kw)
+        np.testing.assert_array_equal(
+            np.asarray(custom.order(pos, vel).indices),
+            np.asarray(brute.order(pos, vel).indices),
+        )
+        got = jax.jit(lambda p, v: custom.order(p, v).indices)(pos, vel)
+        want = jax.jit(lambda p, v: brute.order(p, v).indices)(pos, vel)
+        np.testing.assert_array_equal(np.asarray(got), np.asarray(want))
+
     def test_scipy_raises_under_jit(self):
         """The scipy backend is eager-only, with a pointer to BucketKDTree."""
         pos, vel, _ = _open_arc(n=60)

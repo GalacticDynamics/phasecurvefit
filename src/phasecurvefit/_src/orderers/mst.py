@@ -45,13 +45,14 @@ import queue
 import threading
 import warnings
 from collections.abc import Callable
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import plum
+from jaxtyping import Array
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import (
     connected_components,
@@ -590,6 +591,87 @@ def _finish_jax(P, full, blen, in_comp, flip, neighbors, /):  # noqa: ANN001, AN
     return idx, _orient_backbone(full, blen, flip, jnp)
 
 
+@plum.dispatch
+def _graph_and_order(
+    neighbors: SciPy,
+    P: Array,
+    V: Array,
+    nbr: Array,
+    nbr_dir: Array,
+    leaf: Array,
+    /,
+    *,
+    cfg: dict[str, Any],
+    traced: bool,
+) -> tuple[Array, Array, Array]:
+    """Stages (b)-(c) for the host SciPy backend: NumPy graph, NumPy ordering.
+
+    Eager only. Checks ``traced`` (P *or* V) rather than relying on
+    ``SciPy.knn``: under grad w.r.t. velocities alone, P is concrete and the
+    kNN would not notice.
+    """
+    if traced:
+        raise TypeError(SCIPY_TRACED)
+    Pn, Vn, *knn = map(np.asarray, (P, V, nbr, nbr_dir, leaf))
+    workers = neighbors.workers
+    full, blen, in_comp, flip = _host_graph(Pn, Vn, *knn, **cfg, workers=workers)
+    idx, bb = _finish_numpy(Pn, full, blen, in_comp, flip, workers)
+    return jnp.asarray(idx), jnp.asarray(bb), jnp.asarray(blen)
+
+
+@plum.dispatch
+def _graph_and_order(
+    neighbors: AbstractNeighborSearch,
+    P: Array,
+    V: Array,
+    nbr: Array,
+    nbr_dir: Array,
+    leaf: Array,
+    /,
+    *,
+    cfg: dict[str, Any],
+    traced: bool,
+) -> tuple[Array, Array, Array]:
+    """Stages (b)-(c) for a JAX backend: host graph, JAX ordering. Traceable.
+
+    The graph stage is scipy (csgraph) on the host, so under ``jit``/``vmap``
+    it runs through ``jax.pure_callback``; the ordering stage uses
+    ``neighbors`` itself.
+    """
+    n = P.shape[0]
+
+    def host(p, v, nb, nb_dir, lf, /) -> tuple:  # noqa: ANN001
+        return _host_graph(*map(np.asarray, (p, v, nb, nb_dir, lf)), **cfg, workers=-1)
+
+    if traced:
+        shapes = (
+            jax.ShapeDtypeStruct((n,), jnp.int32),
+            jax.ShapeDtypeStruct((), jnp.int32),
+            jax.ShapeDtypeStruct((n,), jnp.bool_),
+            jax.ShapeDtypeStruct((), jnp.bool_),
+        )
+        # _run_in_thread: the host stage still runs scipy (csgraph, and
+        # cKDTree when bridging for "connect"), which segfaulted on
+        # jax.pure_callback's own dispatch thread. Under jit/vmap the
+        # callback runs at execution time, so an on_disconnected="raise"
+        # failure surfaces as jax.errors.JaxRuntimeError rather than
+        # ValueError.
+        full, blen, in_comp, flip = jax.pure_callback(
+            lambda *a: _run_in_thread(lambda: host(*a)),
+            shapes,
+            P,
+            V,
+            nbr,
+            nbr_dir,
+            leaf,
+            vmap_method="sequential",
+        )
+    else:
+        full, blen, in_comp, flip = map(jnp.asarray, host(P, V, nbr, nbr_dir, leaf))
+    idx_full, backbone_idx = _finish_jax(P, full, blen, in_comp, flip, neighbors)
+    return idx_full, backbone_idx, blen
+
+
 class MSTOrderer(AbstractOrderer):
     """Order tracers along the MST longest-path backbone.
 
@@ -839,11 +921,6 @@ class MSTOrderer(AbstractOrderer):
             backbone_idx = jnp.arange(n, dtype=jnp.int32)
             backbone_len = jnp.asarray(n, jnp.int32)
         else:
-            scipy = isinstance(neighbors, SciPy)
-            if scipy and traced:
-                # Eager-only. Check V too: under grad w.r.t. velocities alone, P
-                # is concrete and knn would not notice.
-                raise TypeError(SCIPY_TRACED)
             # The selection is discrete, so the kNN and graph stages see only
             # stop-gradiented values; gradient flows through the backbone gather
             # below, from the original P.
@@ -854,53 +931,10 @@ class MSTOrderer(AbstractOrderer):
             nbr_dir, leaf = nbr, nbr[:, 0]  # placeholders: unused unless split
             if self._splits_directionless:
                 nbr_dir, leaf = _directed_knn(P_s, V_s, k_eff, neighbors)
-
-            if scipy:
-                Pn, Vn, *knn = map(np.asarray, (P, V, nbr, nbr_dir, leaf))
-                workers = neighbors.workers
-                full, blen, in_comp, flip = _host_graph(
-                    Pn, Vn, *knn, **cfg, workers=workers
-                )
-                idx, bb = _finish_numpy(Pn, full, blen, in_comp, flip, workers)
-                idx_full, backbone_idx = jnp.asarray(idx), jnp.asarray(bb)
-                backbone_len = jnp.asarray(blen)
-            else:
-
-                def host(p, v, nb, nb_dir, lf, /) -> tuple:  # noqa: ANN001
-                    arrs = map(np.asarray, (p, v, nb, nb_dir, lf))
-                    return _host_graph(*arrs, **cfg, workers=-1)
-
-                if traced:
-                    shapes = (
-                        jax.ShapeDtypeStruct((n,), jnp.int32),
-                        jax.ShapeDtypeStruct((), jnp.int32),
-                        jax.ShapeDtypeStruct((n,), jnp.bool_),
-                        jax.ShapeDtypeStruct((), jnp.bool_),
-                    )
-                    # _run_in_thread: the host stage still runs scipy (csgraph, and
-                    # cKDTree when bridging for "connect"), which segfaulted on
-                    # jax.pure_callback's own dispatch thread. Under jit/vmap the
-                    # callback runs at execution time, so an
-                    # on_disconnected="raise" failure surfaces as
-                    # jax.errors.JaxRuntimeError rather than ValueError.
-                    full, blen, in_comp, flip = jax.pure_callback(
-                        lambda *a: _run_in_thread(lambda: host(*a)),
-                        shapes,
-                        P_s,
-                        V_s,
-                        nbr,
-                        nbr_dir,
-                        leaf,
-                        vmap_method="sequential",
-                    )
-                else:
-                    full, blen, in_comp, flip = map(
-                        jnp.asarray, host(P_s, V_s, nbr, nbr_dir, leaf)
-                    )
-                idx_full, backbone_idx = _finish_jax(
-                    P_s, full, blen, in_comp, flip, neighbors
-                )
-                backbone_len = blen
+            # The graph and ordering stages depend on the backend: dispatched.
+            idx_full, backbone_idx, backbone_len = _graph_and_order(
+                neighbors, P_s, V_s, nbr, nbr_dir, leaf, cfg=cfg, traced=traced
+            )
 
         backbone_full = P[backbone_idx]  # JAX gather: gradient flows via P
         backbone = {c: backbone_full[:, i] for i, c in enumerate(comps)}
