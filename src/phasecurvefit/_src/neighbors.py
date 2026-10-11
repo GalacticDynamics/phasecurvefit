@@ -24,6 +24,7 @@ import numpy as np
 from jaxtyping import Array, Float, Int
 
 from phasecurvefit._src import kdtree as _kd
+from phasecurvefit._src.checks import value_error_if
 from phasecurvefit._src.optional_deps import OptDeps
 
 if OptDeps.JAXKD.installed:
@@ -116,11 +117,31 @@ def _check_finite(points: Array, queries: Array | None, /) -> Array:
     bad = ~jnp.all(jnp.isfinite(points))
     if queries is not None:
         bad = bad | ~jnp.all(jnp.isfinite(queries))
-    if not _traced(points, queries, bad):  # same error type as the SciPy backend
-        if bad:
-            raise ValueError(_NOT_FINITE)
-        return points
-    return eqx.error_if(points, bad, _NOT_FINITE)
+    return value_error_if(points, bad, _NOT_FINITE)  # same type as SciPy's check
+
+
+def _prep(
+    points: Array, k: int, queries: Array | None, /, *, dtype: object = None
+) -> tuple[Array, Array | None, Array]:
+    """Validate, cast and rescale inputs: ``(points, queries, scale)``.
+
+    Shared by the JAX backends. ``dtype=None`` casts with `_as_float`. Returns
+    coordinates already divided by `_pow2_scale`'s ``scale``.
+    """
+    _check_args(points, k, queries)
+
+    def cast(x: Array) -> Array:
+        return _as_float(x) if dtype is None else jnp.asarray(x).astype(dtype)
+
+    q = None if queries is None else cast(queries)
+    points = _check_finite(cast(points), q)
+    scale = _pow2_scale(points, q)
+    return points / scale, None if q is None else q / scale, scale
+
+
+def _no_neighbors(m: int, k: int, dtype: object, /) -> KnnOut:
+    """Return the empty-search result: index 0, distance inf, for every slot."""
+    return jnp.zeros((m, k), jnp.int32), jnp.full((m, k), jnp.inf, dtype)
 
 
 def _bucket(n: int, /) -> int:
@@ -225,21 +246,11 @@ class BucketKDTree(AbstractNeighborSearch):
             raise ValueError(msg)
 
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
-        _check_args(points, k, queries)
-        points = _as_float(points)
-        queries = None if queries is None else _as_float(queries)
-        points = _check_finite(points, queries)
+        points, queries, scale = _prep(points, k, queries)
         n = points.shape[0]
         m = n if queries is None else queries.shape[0]
-        if m == 0:
-            return jnp.zeros((0, k), jnp.int32), jnp.zeros((0, k), points.dtype)
-        if n == 0:
-            return jnp.full((m, k), 0, jnp.int32), jnp.full(
-                (m, k), jnp.inf, points.dtype
-            )
-        scale = _pow2_scale(points, queries)
-        points = points / scale
-        queries = None if queries is None else queries / scale
+        if m == 0 or n == 0:
+            return _no_neighbors(m, k, points.dtype)
         if _traced(points, queries):
             sq = None if queries is None else jax.lax.stop_gradient(queries)
             ii, _ = _knn_core_jit(
@@ -271,12 +282,8 @@ class BruteForce(AbstractNeighborSearch):
             raise ValueError(msg)
 
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
-        _check_args(points, k, queries)
-        q = None if queries is None else _as_float(queries)
-        points = _check_finite(_as_float(points), q)
-        scale = _pow2_scale(points, q)
-        q = None if q is None else q / scale
-        ii, d2 = _kd.brute_knn(points / scale, k, queries=q, chunk=self.chunk)
+        points, q, scale = _prep(points, k, queries)
+        ii, d2 = _kd.brute_knn(points, k, queries=q, chunk=self.chunk)
         return ii, _safe_sqrt(d2) * scale
 
 
@@ -307,19 +314,13 @@ class JaxKD(AbstractNeighborSearch):
             raise ImportError(msg)
 
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
-        _check_args(points, k, queries)
         # jaxkd fails on float32 under x64 ("cond branches must have equal
         # output types"), so use the default float dtype.
         fdt = jnp.promote_types(jnp.float32, jnp.result_type(float))
-        q = None if queries is None else jnp.asarray(queries).astype(fdt)
-        points = _check_finite(jnp.asarray(points).astype(fdt), q)
+        points, q, scale = _prep(points, k, queries, dtype=fdt)
         n = points.shape[0]
         if n == 0:  # jaxkd cannot build an empty tree
-            m = 0 if q is None else q.shape[0]
-            return jnp.zeros((m, k), jnp.int32), jnp.full((m, k), jnp.inf, points.dtype)
-        scale = _pow2_scale(points, q)
-        points = points / scale
-        q = None if q is None else q / scale
+            return _no_neighbors(0 if q is None else q.shape[0], k, points.dtype)
         ps = jax.lax.stop_gradient(points)  # jaxkd's traversal is a while_loop
         tree = jaxkd.build_tree(ps)
         if q is not None:
@@ -362,8 +363,7 @@ class SciPy(AbstractNeighborSearch):
             raise ValueError(_NOT_FINITE)
         n = p.shape[0]
         if n == 0:  # don't rely on cKDTree's behaviour for an empty tree
-            m = 0 if q is None else q.shape[0]
-            return jnp.zeros((m, k), jnp.int32), jnp.full((m, k), jnp.inf, p.dtype)
+            return _no_neighbors(0 if q is None else q.shape[0], k, p.dtype)
         tree = cKDTree(p)
         if q is not None:
             dd, ii = tree.query(q, k=k, workers=self.workers)

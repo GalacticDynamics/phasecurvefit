@@ -18,6 +18,7 @@ from phasecurvefit._src.algorithm import (
     WalkLocalFlowResult,
     _local_flow_walk,
 )
+from phasecurvefit._src.checks import check_nan_policy
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.query_config import WalkConfig
 
@@ -151,9 +152,7 @@ class LocalFlowOrderer(AbstractOrderer):
 
     def __check_init__(self) -> None:
         """Reject an unknown ``nan_policy`` at construction."""
-        if self.nan_policy not in ("raise", "omit"):
-            msg = f"nan_policy must be 'raise' or 'omit', got {self.nan_policy!r}."
-            raise ValueError(msg)
+        check_nan_policy(self.nan_policy)
 
     @plum.dispatch
     def order(
@@ -165,9 +164,6 @@ class LocalFlowOrderer(AbstractOrderer):
         init: AbstractResult | None = None,
     ) -> WalkLocalFlowResult:
         """Run the local-flow walk and return its result."""
-        kwargs: dict[str, object] = {}
-        if metadata is not None:
-            kwargs["metadata"] = metadata
         result = _local_flow_walk(
             positions,
             velocities,
@@ -179,6 +175,6 @@ class LocalFlowOrderer(AbstractOrderer):
             config=self.config,
             direction=self.direction,
             nan_policy=self.nan_policy,
-            **kwargs,
+            metadata=metadata,
         )
         return _finalize(result, result.positions)

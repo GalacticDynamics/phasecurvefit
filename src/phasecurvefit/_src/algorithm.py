@@ -45,7 +45,10 @@ from .custom_types import ISz0, RLikeSz0, VectorComponents
 from .orderers.result import OrderingResult
 from .phasespace import euclidean_distance
 from .query_config import WalkConfig
-from phasecurvefit._src.checks import value_error_if
+from phasecurvefit._src.checks import (
+    check_velocities as _check_velocities,
+    value_error_if,
+)
 
 vec_euclidean_distance = jax.jit(jax.vmap(euclidean_distance, in_axes=(None, 0)))
 
@@ -185,30 +188,19 @@ State: TypeAlias = tuple[  # noqa: UP040
 
 
 def check_velocities(vs: VectorComponents, nan_policy: str, /) -> VectorComponents:
-    """Raise on an infinite velocity, and on NaN unless ``nan_policy="omit"``.
+    """`checks.check_velocities` for the walk; only when the metric reads them.
 
-    Called only when the metric reads velocities. Left alone, a non-finite
-    velocity makes every distance it touches non-finite, and ``argmin`` then
-    returns the first NaN -- the lowest-index unvisited tracer, wherever it
-    is: one NaN on a shuffled line sent the walk back and forth 4 times
-    (103 times under ``FullPhaseSpaceDistanceMetric``). ``value_error_if``: a
-    ``ValueError`` on concrete input, and it survives ``jit`` and ``vmap``.
+    A NaN velocity is not just noise to the walk: ``argmin`` returns the first
+    NaN -- the lowest-index unvisited tracer, wherever it is. One NaN on a
+    shuffled line sent the walk back and forth 4 times (103 times under
+    ``FullPhaseSpaceDistanceMetric``).
     """
-    comps = [jnp.asarray(v) for v in vs.values()]
-    vs = value_error_if(
+    return _check_velocities(
         vs,
-        jnp.any(jnp.stack([jnp.any(jnp.isinf(v)) for v in comps])),
-        "LocalFlowOrderer found an infinite velocity. inf is not a measurement "
-        "-- it comes from an overflow or a bug upstream -- so it raises under "
-        "either nan_policy. Fix or drop those tracers.",
-    )
-    if nan_policy == "omit":
-        return vs
-    return value_error_if(
-        vs,
-        jnp.any(jnp.stack([jnp.any(jnp.isnan(v)) for v in comps])),
-        "LocalFlowOrderer's metric reads velocities and found a NaN. To treat "
-        "NaN as a missing velocity pass nan_policy='omit'; or drop those "
+        nan_policy,
+        name="LocalFlowOrderer",
+        nan_msg="LocalFlowOrderer's metric reads velocities and found a NaN. To "
+        "treat NaN as a missing velocity pass nan_policy='omit'; or drop those "
         "tracers; or walk on position alone "
         "(WalkConfig(metric=SpatialDistanceMetric())).",
     )
