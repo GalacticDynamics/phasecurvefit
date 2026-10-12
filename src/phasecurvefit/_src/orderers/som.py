@@ -29,7 +29,7 @@ import jax
 import jax.numpy as jnp
 import plum
 
-from .base import AbstractOrderer, _check_component_keys
+from .base import _NOT_CALLER, AbstractOrderer, _check_component_keys
 from .result import OrderingResult
 from phasecurvefit._src import som as _som
 from phasecurvefit._src.abstract_result import AbstractResult
@@ -512,7 +512,7 @@ class SOMOrderer(AbstractOrderer):
             f"raise n_prototypes if the curve turns or self-approaches more "
             f"tightly than the smoothing length.",
             UserWarning,
-            stacklevel=3,
+            skip_file_prefixes=_NOT_CALLER,
         )
 
     @plum.dispatch

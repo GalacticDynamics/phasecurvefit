@@ -496,6 +496,38 @@ def test_som_warns_when_it_overhauls_the_prior_ordering():
         som._warn_if_disagrees(perm, kept, sub, prior)
 
 
+@pytest.mark.parametrize("entry", ["method", "pcf.order", "chain"])
+def test_som_disagreement_warning_points_at_the_caller(entry, arc):
+    """The warning names the user's line, whichever entry point they used.
+
+    Plum dispatch, equinox's bound-method wrapper and (for the last two)
+    ``pcf.order`` / ``ChainOrderer`` sit between the caller and the warning, so
+    no fixed ``stacklevel`` is right for all of them.
+    """
+    pos, vel, _ = arc(n=100)
+    shuffled = jnp.asarray(np.random.default_rng(0).permutation(100), jnp.int32)
+    prior = pcf.orderers.OrderingResult(positions=pos, velocities=vel, indices=shuffled)
+
+    class Shuffled(pcf.orderers.AbstractOrderer):
+        def order(self, positions, velocities, *, metadata=None, init=None):  # noqa: ARG002
+            return prior
+
+    som = pcf.orderers.SOMOrderer(n_prototypes=10)
+    calls = {
+        "method": lambda: som.order(pos, vel, init=prior),
+        "pcf.order": lambda: pcf.order(pos, vel, som, init=prior),
+        "chain": lambda: pcf.order(pos, vel, Shuffled() | som),
+    }
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        calls[entry]()
+    hits = [
+        w for w in record if "disagrees with the one it was given" in str(w.message)
+    ]
+    assert hits
+    assert {w.filename for w in hits} == {__file__}
+
+
 def test_som_is_quiet_when_it_agrees_with_the_prior_ordering(arc):
     """The warning must not fire on the ordinary case of a small refinement."""
     pos, vel, _ = arc()

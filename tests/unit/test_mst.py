@@ -1,5 +1,7 @@
 """Tests for the MST-backbone orderer (``pcf.orderers.MSTOrderer``)."""
 
+import warnings
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -167,6 +169,23 @@ class TestMSTDisconnected:
             pcf.orderers.MSTOrderer(k=5, jump_cap=0.5, on_disconnected="warn").order(
                 pos, vel
             )
+
+    @pytest.mark.parametrize("entry", ["method", "pcf.order", "chain"])
+    def test_warning_points_at_the_caller(self, entry):
+        """The warning names the user's line, whichever entry point they used."""
+        pos, vel = _two_clusters()
+        mst = pcf.orderers.MSTOrderer(k=5, jump_cap=0.5, on_disconnected="warn")
+        calls = {
+            "method": lambda: mst.order(pos, vel),
+            "pcf.order": lambda: pcf.order(pos, vel, mst),
+            "chain": lambda: pcf.order(pos, vel, mst | mst),
+        }
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            calls[entry]()
+        hits = [w for w in record if "disconnected" in str(w.message)]
+        assert hits
+        assert {w.filename for w in hits} == {__file__}
 
     def test_connect_orders_every_component_without_warning(self):
         """``"connect"`` bridges the pieces: nothing is dropped, nothing warns."""
