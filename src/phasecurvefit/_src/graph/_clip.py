@@ -48,8 +48,8 @@ def sigma_clip(
     # Work on the forest's (at most n - 1) edges only: medians sort n, not e.
     m = n - 1
     slot = jnp.where(tree_mask, jnp.cumsum(tree_mask) - 1, m)
-    lo = jnp.full(m, n, jnp.int32).at[slot].set(lo, mode="drop")
-    hi = jnp.full(m, n, jnp.int32).at[slot].set(hi, mode="drop")
+    lo = jnp.full(m, n, jnp.int32).at[slot].set(lo.astype(jnp.int32), mode="drop")
+    hi = jnp.full(m, n, jnp.int32).at[slot].set(hi.astype(jnp.int32), mode="drop")
     d = jnp.zeros(m, d.dtype).at[slot].set(d, mode="drop")
     tree_mask = jnp.zeros(m, bool).at[slot].set(tree_mask, mode="drop")
     lo, hi = jnp.minimum(lo, n - 1), jnp.minimum(hi, n - 1)  # unused slots: masked

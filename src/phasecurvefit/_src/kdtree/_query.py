@@ -422,6 +422,13 @@ def knn(
     order = jnp.argsort(leaf)  # process in tree order for locality
     ex = None
     if exclude is not None:
+        exclude = tuple(map(jnp.asarray, exclude))
+        for lab in exclude:  # labels >= n would alias the MIXED/EMPTY sentinels
+            if not isinstance(lab, jax.core.Tracer) and (
+                jnp.any(lab < 0) | jnp.any(lab >= tree.n)
+            ):
+                msg = f"exclude labels must lie in [0, {tree.n}) (the tree's size)."
+                raise ValueError(msg)
         rl, hl = node_labels(tree, exclude[0])
         ex = (rl, hl, exclude[1].astype(jnp.int32)[order])
     dd, ii = _query(

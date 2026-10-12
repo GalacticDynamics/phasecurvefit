@@ -38,7 +38,10 @@ through them exactly as through any other data-dependent gather (e.g.
 __all__: tuple[str, ...] = ("MSTOrderer",)
 
 import functools
+import os
+import sys
 import warnings
+from pathlib import Path
 from typing import Any, Literal, get_args
 
 import equinox as eqx
@@ -80,6 +83,15 @@ from phasecurvefit._src.neighbors import (
 )
 
 OnDisconnected = Literal["raise", "warn", "largest", "connect"]
+
+# Warnings point at the first frame outside phasecurvefit, plum and equinox
+# (their dispatch and bound methods sit between the user and the warning),
+# whether the user called ``orderer.order(...)`` or ``pcf.order(...)``. A
+# traced warning runs on jax's callback thread: no user frame to point at.
+_NOT_CALLER = tuple(
+    str(Path(mod.__file__).parent) + os.sep
+    for mod in (sys.modules["phasecurvefit"], plum, eqx)
+)
 # An edge must be at least this multiple of the median length to be a clip
 # candidate. Floors the (multiplicative) threshold so a uniformly-sampled
 # backbone -- where the robust spread collapses to ~0 -- is not shredded by
@@ -247,7 +259,7 @@ def _directed_knn(P, V, k_eff, neighbors, /):  # noqa: ANN001, ANN202
     static shapes (so it traces): directionless tracers are moved onto one
     far row, which is never nearer than any real tracer, so each directed
     tracer's nearest neighbours are exactly its nearest directed ones (any
-    far row past them is dropped on the host). Returns ``(nbr_dir (n, k_eff),
+    far row past them is dropped by the graph stage). Returns ``(nbr_dir (n, k_eff),
     leaf (n,))``.
     """
     directed = _has_direction(V, jnp)
@@ -590,8 +602,10 @@ def _finish_jax(P, full, blen, in_comp, flip, neighbors, /):  # noqa: ANN001, AN
     """
     n = P.shape[0]
     cb = P[full]
-    scale = _pow2_scale(P, None)  # segment lengths without float32 overflow
-    seg = jnp.linalg.norm(jnp.diff(cb / scale, axis=0), axis=1) * scale
+    # Arc lengths in units of an exact power of two: the order keys only need
+    # their ratios, and neither the segments nor their sum can overflow.
+    scale = _pow2_scale(P, None)
+    seg = jnp.linalg.norm(jnp.diff(cb / scale, axis=0), axis=1)
     s_bb = jnp.concat([jnp.zeros(1, P.dtype), jnp.cumsum(seg)])
     near = neighbors.knn(cb, 1, queries=P)[0][:, 0]
     primary, secondary = _order_keys(s_bb[near], in_comp, flip, n, jnp)
@@ -631,8 +645,9 @@ def _jax_graph(
     ``_directionless_as_leaves``, the graph is the kNN among directed tracers
     plus one leaf edge from each directionless one. ``P`` arrives divided by
     ``scale``, an exact power of two (``_pow2_scale``, computed by the caller
-    before any padding), so squared lengths cannot overflow float32; lengths
-    are returned in the caller's units.
+    before any padding), so squared lengths cannot overflow float32. Every
+    length stays in those scaled units (``knn_edges``); ``jump_cap`` and
+    ``velocity_weight`` are in the caller's.
     """
     n = P.shape[0]
     if velocity_weight > 0.0 or sever_cos_threshold is not None:
@@ -661,7 +676,6 @@ def _jax_graph(
             return ii[:, 0], d2[:, 0]
 
         blo, bhi, bd, bv = _graph.connect(labels0, real, nearest)
-        bd = bd * scale  # back to the caller's units
         lo, hi = jnp.concat([lo, blo]), jnp.concat([hi, bhi])
         d, w, valid = jnp.concat([d, bd]), jnp.concat([w, bd]), jnp.concat([valid, bv])
     tree_mask, labels = _graph.boruvka(n, lo, hi, w, valid)
@@ -696,6 +710,7 @@ _GRAPH_STATIC = (
     "edge_clip_max_iters",
 )
 _jax_graph_jit = jax.jit(_jax_graph, static_argnames=_GRAPH_STATIC)
+_NOT_FLOAT = ("orient_by_velocity", "edge_clip_max_iters")
 
 
 def _warn_if_disconnected(
@@ -704,7 +719,7 @@ def _warn_if_disconnected(
     """``on_disconnected="warn"`` under tracing (a ``jax.debug.callback``)."""
     if int(n_comp) != 1:
         msg = _disconnected_message(int(n_comp), k, jump_cap, sever_cos_threshold)
-        warnings.warn(msg, stacklevel=2)
+        warnings.warn(msg, skip_file_prefixes=_NOT_CALLER)
 
 
 @plum.dispatch
@@ -761,7 +776,12 @@ def _graph_and_order(
         sever_cos_threshold=cfg["sever_cos_threshold"],
         orient_by_velocity=cfg["orient_by_velocity"],
     )
-    gcfg = {key: cfg[key] for key in _GRAPH_STATIC if key != "connect"}
+    # Static jit arguments must hash: plain floats (also, 3 and 3.0 share code).
+    gcfg = {
+        key: cfg[key] if cfg[key] is None or key in _NOT_FLOAT else float(cfg[key])
+        for key in _GRAPH_STATIC
+        if key != "connect"
+    }
     gcfg["connect"] = cfg["on_disconnected"] == "connect"
     why = (cfg["k"], cfg["jump_cap"], cfg["sever_cos_threshold"])
     # Exact power-of-two scaling before any padding, so neither the
@@ -814,7 +834,7 @@ def _graph_and_order(
             msg = _disconnected_message(int(n_comp), *why)
             if cfg["on_disconnected"] == "raise":
                 raise ValueError(msg)
-            warnings.warn(msg, stacklevel=4)
+            warnings.warn(msg, skip_file_prefixes=_NOT_CALLER)
     idx_full, backbone_idx = _finish_jax(P, full, blen, in_comp, flip, neighbors)
     return idx_full, backbone_idx, blen
 
@@ -890,8 +910,9 @@ class MSTOrderer(AbstractOrderer):
         ``orient_by_velocity``). The pure-spatial default never reads them, so
         never raises.
 
-        ``"raise"`` (default) raises ``ValueError`` (under ``jit``,
-        ``jax.errors.JaxRuntimeError`` carrying the same message). ``"omit"``
+        ``"raise"`` (default) raises ``ValueError`` (under ``jit``, a
+        ``jax.errors.JaxRuntimeError`` whose message omits the counts and the
+        first offending index, which are not known at trace time). ``"omit"``
         treats NaN as a missing measurement (catalogues often lack radial
         velocities): for mechanisms 1 and 2 it joins the graph as a leaf, like
         a stationary tracer, and mechanism 3 skips it. That is an opt-in, not a

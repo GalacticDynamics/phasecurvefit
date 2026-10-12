@@ -1,7 +1,7 @@
 """Tests for unxt (physical-units) support in the orderers.
 
-Mirrors the local-flow walk's Quantity-in / Quantity-out UX. Because MST is
-host-side, unit handling is a simple strip-in / reattach-out.
+Mirrors the local-flow walk's Quantity-in / Quantity-out UX. MST orders on
+bare magnitudes, so unit handling is a simple strip-in / reattach-out.
 """
 
 import dataclasses

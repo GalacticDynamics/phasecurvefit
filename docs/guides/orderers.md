@@ -51,7 +51,7 @@ greedy walk — the original `phasecurvefit` ordering algorithm, now behind the
 orderer interface. From `start_idx` it repeatedly steps to the nearest unvisited tracer
 under a pluggable phase-space **metric**, tracing the coherent flow of the
 velocity field. It is **fully JAX-traceable** (jit / vmap / grad); the MST is
-too with its default `neighbors` backend, though its graph stage runs on the host.
+too: when traced it uses the JAX kd-tree, and its graph stage runs in pure JAX.
 
 ```{code-cell} python
 import jax.numpy as jnp
