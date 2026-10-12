@@ -1119,9 +1119,12 @@ class TestMSTPureJax:
         assert int(jitted.backbone_size) == int(eager.backbone_size)
 
     def test_vmap_connect(self):
-        """Vmap over bridged graphs equals separate eager calls."""
-        a, b = _two_segments(), _open_arc(n=60, seed=2)[:2]
-        orderer = pcf.orderers.MSTOrderer(k=5, jump_cap=1.0, on_disconnected="connect")
+        """Vmap over bridged graphs equals separate eager (JAX) calls."""
+        a = _two_segments()
+        b = ({"x": a[0]["x"] * 1.1 + 3.0, "y": a[0]["y"][::-1]}, a[1])  # also split
+        orderer = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=1.0, on_disconnected="connect", neighbors=_BKD
+        )
         batch_p = {c: jnp.stack([a[0][c], b[0][c]]) for c in a[0]}
         batch_v = {c: jnp.stack([a[1][c], b[1][c]]) for c in a[1]}
         got = jax.vmap(lambda p, v: orderer.order(p, v).indices)(batch_p, batch_v)
@@ -1129,3 +1132,51 @@ class TestMSTPureJax:
             np.testing.assert_array_equal(
                 np.asarray(got[i]), np.asarray(orderer.order(p, v).indices)
             )
+
+    @pytest.mark.parametrize(
+        "kw",
+        [
+            {},
+            {"edge_clip_sigma": 3.0},
+            {"velocity_weight": 1.0, "sever_cos_threshold": 0.0},
+        ],
+        ids=["plain", "clip", "velocity"],
+    )
+    def test_connect_many_components(self, kw):
+        """A stream with 3% interlopers at a small jump_cap: dozens of pieces.
+
+        Bridging (and its kd-tree ``exclude`` queries) matches SciPy's host
+        stage, eager and under jit; bridges ignore velocity severing.
+        """
+        rng = np.random.default_rng(0)
+        n = 1000
+        t = np.sort(rng.random(n))
+        p = np.c_[10 * t, np.sin(3 * t)] + rng.normal(0, 0.01, (n, 2))
+        i = rng.choice(n, n * 3 // 100, replace=False)
+        p[i] = rng.uniform(p.min(0), p.max(0), (len(i), 2))
+        pos = {
+            "x": jnp.asarray(p[:, 0], jnp.float32),
+            "y": jnp.asarray(p[:, 1], jnp.float32),
+        }
+        vel = {"x": jnp.ones(n), "y": jnp.asarray(3 * np.cos(3 * t))}
+        cfg = {"k": 8, "jump_cap": 0.05, "on_disconnected": "connect", **kw}
+        want = pcf.orderers.MSTOrderer(**cfg, neighbors=pcf.neighbors.SciPy())
+        bkd = pcf.orderers.MSTOrderer(**cfg, neighbors=_BKD)
+        ref = want.order(pos, vel)
+        eager = bkd.order(pos, vel)
+        jitted = jax.jit(bkd.order)(pos, vel)
+        for got in (eager, jitted):
+            np.testing.assert_array_equal(
+                np.asarray(got.indices), np.asarray(ref.indices)
+            )
+            assert int(got.backbone_size) == int(ref.backbone_size)
+
+    def test_eager_bucket_reuses_compiled_graph(self):
+        """Eager calls of different n in one size bucket share the graph kernel."""
+        orderer = pcf.orderers.MSTOrderer(k=5, neighbors=_BKD)
+        pos, vel, _ = _open_arc(n=120)
+        orderer.order(pos, vel)
+        size = mst._jax_graph_jit._cache_size()
+        cut = {c: x[:-3] for c, x in pos.items()}, {c: x[:-3] for c, x in vel.items()}
+        orderer.order(*cut)
+        assert mst._jax_graph_jit._cache_size() == size

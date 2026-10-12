@@ -479,6 +479,71 @@ class TestJaxGraphStageMatchesHost:
         np.testing.assert_array_equal(jitted, want)
 
     @pytest.mark.parametrize(
+        "x",
+        [
+            np.linspace(-3e38, 3e38, 40),  # path sums would overflow float32
+            np.arange(12) * 1e-38,  # spacing below float32's normal range
+        ],
+        ids=["span-near-max", "subnormal-spacing"],
+    )
+    def test_float32_extremes(self, x):
+        """Lengths stay in scaled units: no overflow to inf, no flush to zero."""
+        x = np.random.default_rng(4).permutation(x)
+        pos = {"x": jnp.asarray(x, jnp.float32), "y": jnp.zeros(len(x), jnp.float32)}
+        vel = {"x": jnp.ones(len(x)), "y": jnp.zeros(len(x))}
+
+        def make(nb):
+            return pcf.orderers.MSTOrderer(k=3, jump_cap=float("inf"), neighbors=nb)
+
+        want, eager, jitted = _three_ways(make, pos, vel)
+        assert np.all(want >= 0)  # the whole line, tip to tip
+        np.testing.assert_array_equal(eager, want)
+        np.testing.assert_array_equal(jitted, want)
+
+    def test_tiny_float32_velocity_orients(self):
+        """Velocities below float32's normal range still pick the direction."""
+        x = np.random.default_rng(5).permutation(np.arange(12.0))
+        pos = {"x": jnp.asarray(x, jnp.float32), "y": jnp.zeros(12, jnp.float32)}
+        vel = {"x": jnp.full(12, 1e-38, jnp.float32), "y": jnp.zeros(12, jnp.float32)}
+
+        def make(nb):
+            return pcf.orderers.MSTOrderer(k=3, orient_by_velocity=True, neighbors=nb)
+
+        want, eager, jitted = _three_ways(make, pos, vel)
+        np.testing.assert_array_equal(np.asarray(x)[want], np.arange(12.0))  # +x
+        np.testing.assert_array_equal(eager, want)
+        np.testing.assert_array_equal(jitted, want)
+
+    def test_x64_edge_clip(self):
+        """Under x64 the clip stage is warning-free (``filterwarnings = error``)."""
+        with jax.enable_x64(new_val=True):
+            pos, vel = _tie_free_hairpin()
+            pos = {c: jnp.asarray(v, jnp.float64) for c, v in pos.items()}
+
+            def make(nb):
+                return pcf.orderers.MSTOrderer(k=8, edge_clip_sigma=3.0, neighbors=nb)
+
+            want, eager, jitted = _three_ways(make, pos, vel)
+        np.testing.assert_array_equal(eager, want)
+        np.testing.assert_array_equal(jitted, want)
+
+    @pytest.mark.filterwarnings("ignore:A JAX array is being set as static")
+    def test_jax_scalar_settings(self):
+        """Float settings given as JAX scalars work (static jit arguments must hash).
+
+        Equinox already warns about a JAX array in a static field; it still works.
+        """
+        pos, vel = _tie_free_hairpin()
+        cfg = {"jump_cap": 3.0, "velocity_weight": 0.5, "edge_clip_sigma": 3.0}
+        want = pcf.orderers.MSTOrderer(k=8, **cfg).order(pos, vel).indices
+        got = pcf.orderers.MSTOrderer(
+            k=8,
+            neighbors=pcf.neighbors.BucketKDTree(),
+            **{key: jnp.asarray(val) for key, val in cfg.items()},
+        ).order(pos, vel)
+        np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want))
+
+    @pytest.mark.parametrize(
         ("bad", "match"),
         [(np.nan, "nan_policy='omit'"), (np.inf, "infinite")],
         ids=["nan", "inf"],

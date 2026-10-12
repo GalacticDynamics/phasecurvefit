@@ -31,7 +31,7 @@ def _setup(case, n):
     rng = np.random.default_rng(0)
     t = np.sort(rng.random(n))
     p = np.c_[10 * t, np.sin(3 * t), 0.3 * np.cos(2 * t)] + rng.normal(0, 0.02, (n, 3))
-    if case == "clip":
+    if case in ("clip", "connect"):  # interlopers: connect bridges ~n/100 pieces
         i = rng.choice(n, n // 100, replace=False)
         p[i] = rng.uniform(p.min(0), p.max(0), (len(i), 3))
     v = np.c_[np.ones(n), 3 * np.cos(3 * t), -0.6 * np.sin(2 * t)]
