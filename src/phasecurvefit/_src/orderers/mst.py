@@ -38,10 +38,7 @@ through them exactly as through any other data-dependent gather (e.g.
 __all__: tuple[str, ...] = ("MSTOrderer",)
 
 import functools
-import os
-import sys
 import warnings
-from pathlib import Path
 from typing import Any, Literal, get_args
 
 import equinox as eqx
@@ -83,15 +80,6 @@ from phasecurvefit._src.neighbors import (
 )
 
 OnDisconnected = Literal["raise", "warn", "largest", "connect"]
-
-# Warnings point at the first frame outside phasecurvefit, plum and equinox
-# (their dispatch and bound methods sit between the user and the warning),
-# whether the user called ``orderer.order(...)`` or ``pcf.order(...)``. A
-# traced warning runs on jax's callback thread: no user frame to point at.
-_NOT_CALLER = tuple(
-    str(Path(mod.__file__).parent) + os.sep
-    for mod in (sys.modules["phasecurvefit"], plum, eqx)
-)
 # An edge must be at least this multiple of the median length to be a clip
 # candidate. Floors the (multiplicative) threshold so a uniformly-sampled
 # backbone -- where the robust spread collapses to ~0 -- is not shredded by
