@@ -519,5 +519,6 @@ what to cite for which component, with BibTeX entries, is on the
 ## AI Usage Disclosure
 
 Portions of this codebase (including tests and documentation) were refactored
-and generated with the assistance of Language Models. All AI contributions have
-been and will continue to be reviewed and verified by the human maintainers.
+and generated with the assistance of Language Models. Select algorithms are
+implemented by AI against well-tested oracles. All AI contributions have been
+and will continue to be reviewed and verified by the human maintainers.
