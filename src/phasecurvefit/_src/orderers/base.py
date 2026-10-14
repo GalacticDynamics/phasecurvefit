@@ -23,14 +23,30 @@ __all__: tuple[str, ...] = (
 )
 
 import abc
+import os
+from pathlib import Path
 
 import equinox as eqx
 import jax.numpy as jnp
+import plum
 from jaxtyping import Array, Float, Int
 
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
+
+# Frames a warning should skip to land on the user's line: this package, and the
+# plum dispatch and equinox bound-method wrappers between it and the caller. A
+# fixed ``stacklevel`` can't be right for every entry point (``orderer.order``,
+# ``pcf.order``, a ``ChainOrderer`` stage). Pass as ``skip_file_prefixes``.
+_NOT_CALLER: tuple[str, ...] = tuple(
+    str(d) + os.sep
+    for d in (
+        Path(__file__).parents[2],  # src/phasecurvefit
+        Path(plum.__file__).parent,
+        Path(eqx.__file__).parent,
+    )
+)
 
 
 def chord_along_ordering(

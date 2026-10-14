@@ -61,7 +61,12 @@ from scipy.sparse.csgraph import (
 )
 from scipy.spatial import cKDTree
 
-from .base import AbstractOrderer, _check_component_keys, chord_along_ordering
+from .base import (
+    _NOT_CALLER,
+    AbstractOrderer,
+    _check_component_keys,
+    chord_along_ordering,
+)
 from .result import OrderingResult
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import NanPolicy, StateMetadata
@@ -513,7 +518,7 @@ def _host_graph(
         if on_disconnected == "raise":
             raise ValueError(msg)
         if on_disconnected == "warn":
-            warnings.warn(msg, stacklevel=4)
+            warnings.warn(msg, skip_file_prefixes=_NOT_CALLER)
         nodes = np.flatnonzero(labels == int(np.argmax(np.bincount(labels))))
     else:
         nodes = np.arange(n)
