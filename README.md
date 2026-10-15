@@ -5,7 +5,6 @@
 [![CI](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/ci.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/GalacticDynamics/phasecurvefit/branch/main/graph/badge.svg)](https://codecov.io/gh/GalacticDynamics/phasecurvefit)
 [![Documentation Status](https://readthedocs.org/projects/phasecurvefit/badge/?version=latest)](https://phasecurvefit.readthedocs.io/en/latest/?badge=latest)
-[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
 [![CITATION.cff](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml)
 [![pyOpenSci Peer-Reviewed](https://pyopensci.org/badges/peer-reviewed.svg)](https://github.com/pyOpenSci/software-submission/issues/285)
 
@@ -496,7 +495,7 @@ result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 If you use `phasecurvefit` in published work, please cite the package via its
 DOI, together with the paper behind whichever component you used.
 
-[![DOI](https://zenodo.org/badge/1134484136.svg)](https://doi.org/10.5281/zenodo.18714340)
+[![CITATION.cff](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml)
 
 <details>
   <summary>component papers</summary>
