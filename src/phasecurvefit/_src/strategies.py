@@ -182,8 +182,8 @@ class KDTree(AbstractQueryStrategy):
     then looks up the current point's row and evaluates the metric on those
     candidates only, so a step's own work is O(k) rather than O(n). Building
     the table is one batched KD-tree query over all points; on CPU that
-    one-off cost dominates, so this is faster than `BruteForce` only for large
-    datasets (tens of thousands of points and up).
+    one-off cost dominates for small datasets, so this is faster than
+    `BruteForce` only from a few thousand points up (with ``k=50``).
 
     Because only spatial neighbors are candidates, the walk can pick a
     different point than `BruteForce` would: one that is nearer under the
