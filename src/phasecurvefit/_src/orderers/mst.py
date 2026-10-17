@@ -66,6 +66,33 @@ def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarra
     return np.where(den > _TINY, num / np.maximum(den, _TINY), 0.0)
 
 
+def _retree_survivors(
+    graph: csr_matrix, tree: csr_matrix, nodes: np.ndarray, /
+) -> tuple[csr_matrix, np.ndarray]:
+    """Keep the clipped survivors in one tree: ``(tree, nodes)``.
+
+    Clipping can reject an interloper the tree ran *through* (it was the only
+    short link across a gap), leaving the survivors in pieces of the old tree;
+    the backbone would then follow one piece and the rest be ordered by
+    projection onto a backbone that never reaches them (#223). Then the MST is
+    rebuilt on the kNN graph among the survivors, and the largest piece kept.
+    When the survivors stay connected nothing changes: the old tree, restricted
+    to them, is already their MST.
+    """
+    if connected_components(tree[nodes][:, nodes], directed=False)[0] == 1:
+        return tree, nodes
+    sub_tree = minimum_spanning_tree(graph[nodes][:, nodes])
+    sub_tree = sub_tree + sub_tree.T
+    _, labels = connected_components(sub_tree, directed=False)
+    keep = labels == int(np.argmax(np.bincount(labels)))
+    nodes = nodes[keep]
+    # Back to the full index space, which _backbone_on_component expects.
+    local = sub_tree[keep][:, keep].tocoo()
+    n = tree.shape[0]
+    tree = csr_matrix((local.data, (nodes[local.row], nodes[local.col])), shape=(n, n))
+    return tree, nodes
+
+
 def _backbone_on_component(
     P: np.ndarray, tree: object, nodes: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -122,8 +149,9 @@ def _sigma_clip_edges(
     2. split the tree at the cut edges and **reject only the small components**
        (< ``_EDGE_CLIP_SMALL_FRAC`` of the working points) -- the isolated
        interlopers. Larger pieces are retained and reconnect through the intact
-       ``tree``, so cutting a genuine sparse-region edge cannot discard half the
-       stream;
+       ``tree`` (or, if a rejected node was what joined them, through a rebuilt
+       one: ``_retree_survivors``), so cutting a genuine sparse-region edge
+       cannot discard half the stream;
     3. recompute the statistic on the survivors and repeat, until nothing small
        is split off (or ``max_iters``).
 
@@ -238,6 +266,7 @@ def _mst_backbone(
         nodes = _sigma_clip_edges(
             tree, P, nodes, sigma=edge_clip_sigma, max_iters=edge_clip_max_iters
         )
+        tree, nodes = _retree_survivors(graph, tree, nodes)
 
     order_idx, backbone_nodes, Cb = _backbone_on_component(P, tree, nodes)
 
@@ -284,8 +313,10 @@ class MSTOrderer(AbstractOrderer):
         (never shorter than twice the median), split off the small components
         this isolates, and repeat (see ``edge_clip_max_iters``). Interlopers the
         MST threads in along one long edge fall away and are left unvisited
-        (``indices == -1``); the rest of the stream is kept and reconnected, so a
-        sparse but continuous tail is not rejected. ``None`` (default) disables
+        (``indices == -1``); the rest of the stream is kept and reconnected
+        (if a rejected interloper was the only link between two pieces, the
+        largest piece is kept), so a sparse but continuous tail is not
+        rejected. ``None`` (default) disables
         clipping. Lower ``edge_clip_sigma`` clips more aggressively.
     edge_clip_max_iters
         Maximum sigma-clip iterations (default 5). Ignored when
