@@ -315,8 +315,9 @@ def _sigma_clip_edges(
     2. split the tree at the cut edges and **reject only the small components**
        (< ``_EDGE_CLIP_SMALL_FRAC`` of the working points) -- the isolated
        interlopers. Larger pieces are retained and reconnect through the intact
-       ``tree``, so cutting a genuine sparse-region edge cannot discard half the
-       stream;
+       ``tree`` (or, if a rejected node was what joined them, through a rebuilt
+       one: ``_retree_survivors``), so cutting a genuine sparse-region edge
+       cannot discard half the stream;
     3. recompute the statistic on the survivors and repeat, until nothing small
        is split off (or ``max_iters``). If the small pieces would hold more than
        ``_EDGE_CLIP_MAX_REJECT_FRAC`` of the working points, the cuts have
@@ -401,6 +402,44 @@ def _connect_components(
         graph = graph.maximum(bridges.maximum(bridges.T))
         n_comp, labels = connected_components(graph, directed=False)
     return graph
+
+
+def _retree_survivors(
+    graph: csr_matrix,
+    tree: csr_matrix,
+    P: np.ndarray,
+    nodes: np.ndarray,
+    /,
+    *,
+    connect: bool,
+    workers: int,
+) -> tuple[csr_matrix, np.ndarray]:
+    """Keep the clipped survivors in one tree: ``(tree, nodes)``.
+
+    Clipping can reject an interloper the tree ran *through* (it bridged a gap,
+    or ``connect`` routed a bridge via it), leaving the survivors in pieces of
+    the old tree; the diameter would then follow one piece and the rest be
+    ordered by projection onto a backbone that never reaches them (#223).
+    Then the MST is rebuilt on the kNN graph among the survivors, bridging the
+    pieces when ``connect`` and otherwise keeping the largest. When the
+    survivors stay connected nothing changes: the old tree, restricted to them,
+    is already their MST.
+    """
+    if connected_components(tree[nodes][:, nodes], directed=False)[0] == 1:
+        return tree, nodes
+    sub = graph[nodes][:, nodes]
+    if connect:
+        sub = _connect_components(P[nodes], sub, workers=workers)
+    sub_tree = minimum_spanning_tree(sub)
+    sub_tree = sub_tree + sub_tree.T
+    _, labels = connected_components(sub_tree, directed=False)
+    keep = labels == int(np.argmax(np.bincount(labels)))
+    nodes = nodes[keep]
+    # Back to the full index space, which _diameter_path expects.
+    local = sub_tree[keep][:, keep].tocoo()
+    n = tree.shape[0]
+    tree = csr_matrix((local.data, (nodes[local.row], nodes[local.col])), shape=(n, n))
+    return tree, nodes
 
 
 def _disconnected_message(
@@ -525,6 +564,9 @@ def _host_graph(
     if edge_clip_sigma is not None:  # optional: reject outliers by MST edge length
         nodes = _sigma_clip_edges(
             tree, P, nodes, sigma=edge_clip_sigma, max_iters=edge_clip_max_iters
+        )
+        tree, nodes = _retree_survivors(
+            graph, tree, P, nodes, connect=on_disconnected == "connect", workers=workers
         )
     bb = _diameter_path(tree, nodes)
     flip = False
@@ -722,7 +764,9 @@ class MSTOrderer(AbstractOrderer):
         (never shorter than twice the median), split off the small components
         this isolates, and repeat (see ``edge_clip_max_iters``). Interlopers the
         MST threads in along one long edge fall away and are left unvisited
-        (``indices == -1``); the rest of the stream is kept and reconnected, so a
+        (``indices == -1``); the rest of the stream is kept and reconnected
+        (bridged again under ``on_disconnected="connect"`` if a rejected
+        interloper was what joined two pieces; otherwise the largest is kept), so a
         sparse but continuous tail is not rejected. ``None`` (default) disables
         clipping. Lower ``edge_clip_sigma`` clips more aggressively.
     edge_clip_max_iters

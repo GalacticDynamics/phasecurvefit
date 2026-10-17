@@ -265,6 +265,40 @@ def _arc_with_interlopers(n_arc=200, n_out=15, seed=0):
     return pos, vel, is_outlier
 
 
+def _bridged_by_interloper(n_a=100, n_b=300):
+    """Two segments, 2 apart, whose only short link is one interloper midway.
+
+    The MST routes the gap through the interloper (two edges of 1 beat one of
+    2), so clipping it -- correctly, as an outlier -- splits the survivors in
+    two. Segment ``a`` holds the lowest indices.
+    """
+    rng = np.random.default_rng(3)
+    xa = np.linspace(0.0, 5.0, n_a)
+    xb = np.linspace(7.0, 22.0, n_b)
+    x = np.r_[xa, xb, 6.0]
+    y = np.r_[rng.normal(0, 0.01, n_a + n_b), 0.0]
+    n = x.size
+    pos = {"x": jnp.asarray(x, jnp.float32), "y": jnp.asarray(y, jnp.float32)}
+    vel = {"x": jnp.ones(n), "y": jnp.zeros(n)}
+    return pos, vel
+
+
+def _gapped_with_interlopers(seed=1, n=420):
+    """Make an S-stream with a gap and 4% uniform interlopers (issue #223)."""
+    rng = np.random.default_rng(seed)
+    t = np.sort(np.r_[rng.uniform(0, 0.45, n // 2), rng.uniform(0.55, 1, n - n // 2)])
+    x = 20 * t + rng.normal(0, 0.2, n)
+    y = 3 * np.sin(2 * np.pi * t) + rng.normal(0, 0.2, n)
+    vx, vy = np.full(n, 20.0), 6 * np.pi * np.cos(2 * np.pi * t)
+    m = int(0.04 * n)
+    out = rng.choice(n, m, replace=False)
+    x[out], y[out] = rng.uniform(-1, 21, m), rng.uniform(-6, 6, m)
+    vx[out], vy[out] = rng.normal(size=(2, m))
+    pos = {"x": jnp.asarray(x, jnp.float32), "y": jnp.asarray(y, jnp.float32)}
+    vel = {"x": jnp.asarray(vx, jnp.float32), "y": jnp.asarray(vy, jnp.float32)}
+    return pos, vel, out
+
+
 class TestMSTEdgeClip:
     """Optional sigma-clipping of MST edge lengths (``edge_clip_sigma``)."""
 
@@ -295,6 +329,53 @@ class TestMSTEdgeClip:
             pos, vel
         )
         assert int(res.n_skipped) == 0
+
+    def test_connect_rebridges_after_clipping(self):
+        """Clipping an interloper the tree ran through keeps the stream whole.
+
+        Regression for #223: with ``connect``, the tree bridged the gap through
+        interlopers; clipping them split the survivors in two, and the
+        backbone covered one half only (the other ordered almost at random).
+        """
+        pos, vel, out = _gapped_with_interlopers()
+        x = np.asarray(pos["x"])
+        res = pcf.orderers.MSTOrderer(
+            k=10,
+            jump_cap=float("inf"),
+            orient_by_velocity=True,
+            on_disconnected="connect",
+            edge_clip_sigma=3.0,
+        ).order(pos, vel)
+        bx = np.asarray(res.backbone["x"])[: int(res.backbone_size)]
+        assert bx.min() < 1.0  # the backbone spans both halves of the gap
+        assert bx.max() > 19.0
+        idx = np.asarray(res.indices)
+        idx = idx[idx >= 0]
+        stream = idx[~np.isin(idx, out)]
+        assert np.all(np.diff(x[stream]) > -1.0)  # ordered along the stream
+
+    def test_clipped_cut_vertex_keeps_largest_piece(self):
+        """Without ``connect``, a split left by clipping keeps the largest piece."""
+        pos, vel = _bridged_by_interloper(n_a=100, n_b=300)
+        res = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=float("inf"), edge_clip_sigma=3.0
+        ).order(pos, vel)
+        idx = np.asarray(res.indices)
+        visited = idx[idx >= 0]
+        np.testing.assert_array_equal(np.sort(visited), np.arange(100, 400))
+
+    def test_clipped_cut_vertex_rebridged_with_connect(self):
+        """With ``connect``, both pieces survive and are bridged directly."""
+        pos, vel = _bridged_by_interloper(n_a=100, n_b=300)
+        res = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=float("inf"), edge_clip_sigma=3.0, on_disconnected="connect"
+        ).order(pos, vel)
+        idx = np.asarray(res.indices)
+        visited = idx[idx >= 0]
+        # Everything but the interloper (index 400), in one monotone sweep.
+        np.testing.assert_array_equal(np.sort(visited), np.arange(400))
+        steps = np.sign(np.diff(np.asarray(pos["x"])[visited]))
+        assert np.all(steps == steps[0])
 
     @pytest.mark.parametrize(
         ("n_body", "n_pairs", "visited"),
