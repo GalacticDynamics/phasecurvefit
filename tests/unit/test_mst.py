@@ -268,6 +268,20 @@ def _arc_with_interlopers(n_arc=200, n_out=15, seed=0):
     return pos, vel, is_outlier
 
 
+_CLIP_PATHS = ["scipy", "jax-eager", "jax-jit"]
+
+
+def _order_on(path, pos, vel, **kw):
+    """Order on the host (SciPy), the eager JAX stage, or the JAX stage under jit."""
+    nb = pcf.neighbors.SciPy() if path == "scipy" else pcf.neighbors.BucketKDTree()
+    orderer = pcf.orderers.MSTOrderer(neighbors=nb, **kw)
+    return (
+        jax.jit(orderer.order)(pos, vel)
+        if path == "jax-jit"
+        else orderer.order(pos, vel)
+    )
+
+
 def _bridged_by_interloper(n_a=100, n_b=300):
     """Two segments, 2 apart, whose only short link is one interloper midway.
 
@@ -333,7 +347,8 @@ class TestMSTEdgeClip:
         )
         assert int(res.n_skipped) == 0
 
-    def test_connect_rebridges_after_clipping(self):
+    @pytest.mark.parametrize("path", _CLIP_PATHS)
+    def test_connect_rebridges_after_clipping(self, path):
         """Clipping an interloper the tree ran through keeps the stream whole.
 
         Regression for #223: with ``connect``, the tree bridged the gap through
@@ -342,13 +357,16 @@ class TestMSTEdgeClip:
         """
         pos, vel, out = _gapped_with_interlopers()
         x = np.asarray(pos["x"])
-        res = pcf.orderers.MSTOrderer(
+        res = _order_on(
+            path,
+            pos,
+            vel,
             k=10,
             jump_cap=float("inf"),
             orient_by_velocity=True,
             on_disconnected="connect",
             edge_clip_sigma=3.0,
-        ).order(pos, vel)
+        )
         bx = np.asarray(res.backbone["x"])[: int(res.backbone_size)]
         assert bx.min() < 1.0  # the backbone spans both halves of the gap
         assert bx.max() > 19.0
@@ -357,22 +375,28 @@ class TestMSTEdgeClip:
         stream = idx[~np.isin(idx, out)]
         assert np.all(np.diff(x[stream]) > -1.0)  # ordered along the stream
 
-    def test_clipped_cut_vertex_keeps_largest_piece(self):
+    @pytest.mark.parametrize("path", _CLIP_PATHS)
+    def test_clipped_cut_vertex_keeps_largest_piece(self, path):
         """Without ``connect``, a split left by clipping keeps the largest piece."""
         pos, vel = _bridged_by_interloper(n_a=100, n_b=300)
-        res = pcf.orderers.MSTOrderer(
-            k=5, jump_cap=float("inf"), edge_clip_sigma=3.0
-        ).order(pos, vel)
+        res = _order_on(path, pos, vel, k=5, jump_cap=float("inf"), edge_clip_sigma=3.0)
         idx = np.asarray(res.indices)
         visited = idx[idx >= 0]
         np.testing.assert_array_equal(np.sort(visited), np.arange(100, 400))
 
-    def test_clipped_cut_vertex_rebridged_with_connect(self):
+    @pytest.mark.parametrize("path", _CLIP_PATHS)
+    def test_clipped_cut_vertex_rebridged_with_connect(self, path):
         """With ``connect``, both pieces survive and are bridged directly."""
         pos, vel = _bridged_by_interloper(n_a=100, n_b=300)
-        res = pcf.orderers.MSTOrderer(
-            k=5, jump_cap=float("inf"), edge_clip_sigma=3.0, on_disconnected="connect"
-        ).order(pos, vel)
+        res = _order_on(
+            path,
+            pos,
+            vel,
+            k=5,
+            jump_cap=float("inf"),
+            edge_clip_sigma=3.0,
+            on_disconnected="connect",
+        )
         idx = np.asarray(res.indices)
         visited = idx[idx >= 0]
         # Everything but the interloper (index 400), in one monotone sweep.
