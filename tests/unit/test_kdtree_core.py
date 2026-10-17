@@ -341,6 +341,14 @@ class TestKnn:
         q = rng.normal(size=(37, 3)).astype(np.float32)
         _assert_exact(p, *_bi(p, q, k=k, **kw), k, queries=q)
 
+    @pytest.mark.parametrize(("n", "m"), [(5, 0), (0, 3)])
+    def test_empty(self, n, m):
+        """No queries, or an empty tree: every slot is a missing neighbour."""
+        tree = build_tree(jnp.zeros((n, 2), jnp.float32))
+        ii, d2 = kd.knn(tree, jnp.zeros((m, 2), jnp.float32), 2)
+        np.testing.assert_array_equal(np.asarray(ii), np.full((m, 2), n))
+        assert np.all(np.isinf(np.asarray(d2)))
+
     def test_stream_projection_10k(self):
         """k=1 queries near a stream, as the MST projection uses it."""
         p = _stream(10_000)
@@ -403,3 +411,152 @@ class TestBruteTier:
         assert 7 in chunks  # brute tier was traced
         assert 5 in chunks  # ... after an overflow tier
         jax.clear_caches()
+
+
+def _ref_exclude(points, labels, k, queries=None, qlabels=None):
+    """Brute force: the k nearest points with another label, ties to lower index.
+
+    Returns ``(idx, sq_dist)``; missing neighbours are index ``n``, distance inf.
+    """
+    q = points if queries is None else queries
+    ql = labels if qlabels is None else qlabels
+    n = len(points)
+    d2 = ((q[:, None].astype(np.float64) - points[None]) ** 2).sum(-1)
+    d2[ql[:, None] == labels[None]] = np.inf
+    d2 = np.concat([d2, np.full((len(q), k), np.inf)], axis=1)
+    idx = np.argsort(d2, axis=1, kind="stable")[:, :k]
+    dd = np.take_along_axis(d2, idx, 1)
+    return np.where(np.isinf(dd), n, idx), dd
+
+
+def _labels(kind, n, rng):
+    if kind == "few":
+        return rng.integers(0, 3, n) % n
+    if kind == "many":
+        return rng.integers(0, max(1, n // 3), n)
+    if kind == "big_and_small":  # one huge component, a few singletons
+        lab = np.zeros(n, int)
+        m = min(5, n)
+        lab[rng.choice(n, m, replace=False)] = np.arange(1, m + 1) % n
+        return lab
+    return (np.arange(n) >= n // 2).astype(int)  # two separated halves
+
+
+class TestExclude:
+    """``knn(..., exclude=(point_labels, query_labels))`` skips same-label points."""
+
+    def test_no_exclude_threads_no_labels(self):
+        """Unused ``exclude`` adds nothing: the query map maps (x, self, leaf) only."""
+        p = jnp.zeros((40, 2), jnp.float32)
+        jaxpr = jax.make_jaxpr(lambda p: kd.all_knn(p, 4))(p).jaxpr
+        (scan,) = [e for e in jaxpr.eqns if e.primitive.name == "scan"]
+        n_xs = len(scan.invars) - scan.params["num_consts"] - scan.params["num_carry"]
+        assert n_xs == 3
+
+    def _check(self, n, d, kind, k, frontier=16, seed=0, leaf_size=16, *, grid=False):
+        rng = np.random.default_rng(seed)
+        p = rng.normal(size=(n, d)).astype(np.float32)
+        if grid:  # integer coordinates: exact distance ties and duplicates
+            p = rng.integers(0, 4, size=(n, d)).astype(np.float32)
+        if kind == "halves":
+            p[n // 2 :, 0] += 30.0
+        lab = _labels(kind, n, rng)
+        f = jax.jit(
+            lambda p, lab: kd.knn(
+                kd.build_tree(p, leaf_size=leaf_size),
+                p,
+                k,
+                frontier=frontier,
+                exclude=(lab, lab),
+            )
+        )
+        idx, d2 = map(np.asarray, f(jnp.asarray(p), jnp.asarray(lab)))
+        ref_i, ref_d = _ref_exclude(p, lab, k)
+        np.testing.assert_array_equal(idx, ref_i)  # same points, same tie order
+        fin = np.isfinite(ref_d)
+        np.testing.assert_array_equal(np.isfinite(d2), fin)
+        np.testing.assert_allclose(d2[fin], ref_d[fin], rtol=1e-5, atol=1e-6)
+
+    @pytest.mark.parametrize("n", [1, 2, 17, 300, 2000])
+    @pytest.mark.parametrize("kind", ["few", "many", "big_and_small", "halves"])
+    @pytest.mark.parametrize("k", [1, 3])
+    def test_exact(self, n, kind, k):
+        """Equals brute force, never returns a same-label point."""
+        self._check(n, 2, kind, k)
+
+    @pytest.mark.parametrize("d", [1, 3])
+    def test_dimensions(self, d):
+        """1-D and 3-D."""
+        self._check(500, d, "many", 2)
+
+    def test_forced_tiers(self, monkeypatch):
+        """Exact through the overflow tiers and brute force."""
+        q_mod = importlib.import_module("phasecurvefit._src.kdtree._query")
+        monkeypatch.setattr(q_mod, "TIERS", (2, 4))
+        monkeypatch.setattr(q_mod, "TIER_CHUNK", (3, 5))
+        monkeypatch.setattr(q_mod, "BRUTE_CHUNK", 7)
+        jax.clear_caches()  # constants are read at trace time
+        for kind in ("few", "big_and_small", "halves"):
+            self._check(300, 2, kind, 3, frontier=1, seed=4)
+        jax.clear_caches()
+
+    @pytest.mark.parametrize("leaf_size", [1, 2, 16])
+    def test_ties_and_duplicates(self, leaf_size):
+        """On an integer grid (exact ties, duplicates) ties go to the lower index."""
+        for kind in ("many", "big_and_small", "halves"):
+            self._check(300, 2, kind, 3, leaf_size=leaf_size, grid=True, seed=5)
+
+    def test_queries_other_than_the_points(self):
+        """Queries need not be tree points; each brings its own label."""
+        rng = np.random.default_rng(6)
+        p = rng.normal(size=(400, 2)).astype(np.float32)
+        q = rng.normal(size=(50, 2)).astype(np.float32)
+        lab, qlab = rng.integers(0, 5, 400), rng.integers(0, 5, 50)
+        tree = kd.build_tree(jnp.asarray(p))
+        idx, d2 = kd.knn(tree, jnp.asarray(q), 4, exclude=(lab, qlab))
+        ref_i, ref_d = _ref_exclude(p, lab, 4, q, qlab)
+        np.testing.assert_array_equal(np.asarray(idx), ref_i)
+        np.testing.assert_allclose(np.asarray(d2), ref_d, rtol=1e-5, atol=1e-6)
+
+    def test_x64(self):
+        """Float64 points and int64 labels."""
+        with jax.enable_x64(new_val=True):
+            rng = np.random.default_rng(7)
+            p = rng.normal(size=(300, 3))
+            lab = rng.integers(0, 20, 300)
+            idx, _ = kd.knn(
+                kd.build_tree(jnp.asarray(p)),
+                jnp.asarray(p),
+                3,
+                exclude=(jnp.asarray(lab), jnp.asarray(lab)),
+            )
+            np.testing.assert_array_equal(np.asarray(idx), _ref_exclude(p, lab, 3)[0])
+
+    @pytest.mark.parametrize("bad", [-1, 40, 41])
+    def test_labels_out_of_range(self, bad):
+        """Labels outside [0, n) would alias the node sentinels: rejected eagerly."""
+        p = jnp.zeros((40, 2), jnp.float32)
+        lab = jnp.zeros(40, jnp.int32).at[3].set(bad)
+        with pytest.raises(ValueError, match="exclude labels"):
+            kd.knn(kd.build_tree(p), p, 2, exclude=(lab, jnp.zeros(40, jnp.int32)))
+
+    def test_node_labels(self):
+        """Every node's homogeneous label: shared label, MIXED (n) or EMPTY (n+1)."""
+        p = jnp.asarray(np.random.default_rng(2).normal(size=(40, 2)), jnp.float32)
+        tree = build_tree(p, leaf_size=4)
+        lab = jnp.where(p[:, 0] > 0, 1, 0)
+        rows, levels = kd.node_labels(tree, lab)
+        rows = np.asarray(rows)
+        valid, perm = np.asarray(tree.valid), np.asarray(tree.perm)
+        np.testing.assert_array_equal(rows[valid], np.asarray(lab)[perm[valid]])
+        assert np.all(rows[~np.asarray(tree.valid)] == 41)
+        for lvl, h in enumerate(levels):
+            per = rows.reshape(2**lvl, -1)
+            for node, got in enumerate(np.asarray(h)):
+                real = per[node][per[node] != 41]
+                want = (
+                    41
+                    if real.size == 0
+                    else (real[0] if np.all(real == real[0]) else 40)
+                )
+                assert got == want
