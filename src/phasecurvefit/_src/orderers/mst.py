@@ -698,16 +698,7 @@ def _jax_graph(
         scale=scale,
     )
     if connect:  # bridge the pieces along their shortest spatial links
-        _, labels0 = _graph.boruvka(n, lo, hi, w, valid)
-        tree = _kd.build_tree(P)
-
-        def nearest(labels: jax.Array) -> tuple[jax.Array, jax.Array]:
-            ii, d2 = _kd.knn(tree, P, 1, exclude=(labels, labels))
-            return ii[:, 0], d2[:, 0]
-
-        blo, bhi, bd, bv = _graph.connect(labels0, real, nearest)
-        lo, hi = jnp.concat([lo, blo]), jnp.concat([hi, bhi])
-        d, w, valid = jnp.concat([d, bd]), jnp.concat([w, bd]), jnp.concat([valid, bv])
+        lo, hi, d, w, valid = _bridge(P, lo, hi, d, w, valid, real)
     tree_mask, labels = _graph.boruvka(n, lo, hi, w, valid)
     in_comp, n_comp = _graph.largest_component(labels, real)
     if edge_clip_sigma is not None:
@@ -721,6 +712,16 @@ def _jax_graph(
             sigma=edge_clip_sigma,
             max_iters=edge_clip_max_iters,
         )
+        # Rebuild the tree on the survivors (``_retree_survivors``, #223): the
+        # old one may have run through a rejected node. The MST under a strict
+        # edge order is unique, so connected survivors get the same tree back.
+        valid = valid & in_comp[lo] & in_comp[hi]
+        if connect:  # bridge again, among the survivors only
+            far = far_rows(P, n)  # rejected rows: never anyone's nearest
+            P_alive = jnp.where(in_comp[:, None], P, far)
+            lo, hi, d, w, valid = _bridge(P_alive, lo, hi, d, w, valid, in_comp)
+        tree_mask, labels = _graph.boruvka(n, lo, hi, w, valid)
+        in_comp, _ = _graph.largest_component(labels, in_comp)
     full, blen = _graph.diameter_path(n, lo, hi, w, tree_mask, in_comp)
     flip = (
         _graph.orient_flip(P, V, full, blen)
@@ -728,6 +729,29 @@ def _jax_graph(
         else jnp.zeros((), bool)
     )
     return full, blen, in_comp, flip, n_comp
+
+
+def _bridge(
+    P: jax.Array,
+    lo: jax.Array,
+    hi: jax.Array,
+    d: jax.Array,
+    w: jax.Array,
+    valid: jax.Array,
+    real: jax.Array,
+    /,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
+    """Append ``connect``'s bridges joining the ``real`` components of the edges."""
+    _, labels = _graph.boruvka(P.shape[0], lo, hi, w, valid)
+    tree = _kd.build_tree(P)
+
+    def nearest(labels: jax.Array) -> tuple[jax.Array, jax.Array]:
+        ii, d2 = _kd.knn(tree, P, 1, exclude=(labels, labels))
+        return ii[:, 0], d2[:, 0]
+
+    blo, bhi, bd, bv = _graph.connect(labels, real, nearest)
+    cat = jnp.concat
+    return cat([lo, blo]), cat([hi, bhi]), cat([d, bd]), cat([w, bd]), cat([valid, bv])
 
 
 _GRAPH_STATIC = (
