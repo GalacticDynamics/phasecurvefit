@@ -414,9 +414,9 @@ in the walk.
 2. **KDTree**: Restrict each step's candidates to the `k` spatially nearest
    points, then select by the metric (requires optional `jaxkd` dependency).
    Each step costs O(k) instead of O(n), after a one-off batched KD-tree query
-   that builds every point's neighbor list. On CPU that setup dominates, so it
-   beats `BruteForce` only on large datasets (tens of thousands of points and
-   up).
+   that builds every point's neighbor list. On CPU that setup dominates for
+   small datasets, so it beats `BruteForce` only from a few thousand points up
+   (with `k=50`).
 
 ### Using Built-in Strategies
 
