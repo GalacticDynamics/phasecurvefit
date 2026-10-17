@@ -193,6 +193,24 @@ def _arc_with_interlopers(n_arc=200, n_out=15, seed=0):
     return pos, vel, is_outlier
 
 
+def _bridged_by_interloper(n_a=100, n_b=300):
+    """Two segments, 2 apart, whose only short link is one interloper midway.
+
+    The MST routes the gap through the interloper (two edges of 1 beat one of
+    2), so clipping it -- correctly, as an outlier -- splits the survivors in
+    two. Segment ``a`` holds the lowest indices.
+    """
+    rng = np.random.default_rng(3)
+    xa = np.linspace(0.0, 5.0, n_a)
+    xb = np.linspace(7.0, 22.0, n_b)
+    x = np.r_[xa, xb, 6.0]
+    y = np.r_[rng.normal(0, 0.01, n_a + n_b), 0.0]
+    n = x.size
+    pos = {"x": jnp.asarray(x, jnp.float32), "y": jnp.asarray(y, jnp.float32)}
+    vel = {"x": jnp.ones(n), "y": jnp.zeros(n)}
+    return pos, vel
+
+
 class TestMSTEdgeClip:
     """Optional sigma-clipping of MST edge lengths (``edge_clip_sigma``)."""
 
@@ -215,6 +233,23 @@ class TestMSTEdgeClip:
         n_in_rej = sum(1 for i in rej if not is_outlier[i])
         assert n_out_rej >= 0.6 * int(is_outlier.sum())  # most interlopers gone
         assert n_in_rej <= 0.05 * int((~is_outlier).sum())  # few genuine cut
+
+    def test_clipped_cut_vertex_keeps_largest_piece(self):
+        """A split left by clipping keeps the largest piece, ordered along it.
+
+        Regression for #223: the backbone followed the piece holding the lowest
+        index (here the 100-tracer one), and the other 300 were ordered by
+        projection onto a backbone that never reached them.
+        """
+        pos, vel = _bridged_by_interloper(n_a=100, n_b=300)
+        res = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=float("inf"), edge_clip_sigma=3.0
+        ).order(pos, vel)
+        idx = np.asarray(res.indices)
+        visited = idx[idx >= 0]
+        np.testing.assert_array_equal(np.sort(visited), np.arange(100, 400))
+        steps = np.sign(np.diff(np.asarray(pos["x"])[visited]))
+        assert np.all(steps == steps[0])  # one monotone sweep
 
     def test_clean_stream_not_clipped(self):
         """A clean arc with no interlopers loses no genuine points."""
