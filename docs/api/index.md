@@ -323,7 +323,9 @@ rather than takes as arguments. Under those transforms use
 (`neighbors=None`) makes that choice per call: `SciPy` for concrete inputs,
 `BucketKDTree` when traced.
 
-The kd-tree buys traceability, not CPU speed. Compiled under `jit`, it is
+`BucketKDTree` and `BruteForce` wrap
+[jaxknn](https://github.com/nstarman/jaxknn)'s `knn` and `brute_knn`. The
+kd-tree buys traceability, not CPU speed. Compiled under `jit`, it is
 slower than eager `SciPy`, and it compiles once per input shape. Measured on
 an Apple M2 Pro (10 cores, under load, so treat these as rough):
 

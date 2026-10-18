@@ -11,19 +11,17 @@ __all__: tuple[str, ...] = (
     "BucketKDTree",
     "JaxKD",
     "SciPy",
-    "far_rows",
 )
 
 import abc
-import math
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import jaxknn
 import numpy as np
 from jaxtyping import Array, Float, Int
 
-from phasecurvefit._src import kdtree as _kd
 from phasecurvefit._src.checks import value_error_if
 from phasecurvefit._src.optional_deps import OptDeps
 
@@ -86,33 +84,6 @@ def _check_args(points: Array, k: int, queries: Array | None, /) -> None:
         raise ValueError(msg)
 
 
-# Coordinates whose largest magnitude has binary exponent in this window are
-# left unscaled; outside it they are moved to its nearer edge. 2**60 keeps
-# float32 squared distances finite in up to 64 dimensions (d * 2**122 < 2**128);
-# 2**-20 keeps them well above float32's smallest normal (2**-126).
-_SCALE_WINDOW = (-20, 60)
-
-
-def _pow2_scale(points: Array, queries: Array | None, /) -> Array:
-    """Power of two to divide coordinates by so squared distances stay finite.
-
-    1 (no scaling) unless the largest coordinate magnitude falls outside
-    ``2**_SCALE_WINDOW``. Dividing by a power of two is exact, so neighbour
-    selection, ties included, is unchanged; it only keeps squared distances
-    from overflowing float32 (coordinate gaps above ~1.8e19, e.g. metres at
-    kpc scale) or underflowing to zero for tiny coordinates. Scaling only out
-    of range, rather than always normalising, keeps a tight cluster next to a
-    distant outlier from underflowing. Gradient-free.
-    """
-    m = jnp.max(jnp.abs(points), initial=0.0)
-    if queries is not None:
-        m = jnp.maximum(m, jnp.max(jnp.abs(queries), initial=0.0))
-    _, e = jnp.frexp(m)  # m = f * 2**e, f in [0.5, 1); e = 0 for m = 0
-    lo, hi = _SCALE_WINDOW
-    shift = e - jnp.clip(e, lo, hi)
-    return jax.lax.stop_gradient(jnp.ldexp(jnp.ones((), points.dtype), shift))
-
-
 def _check_finite(points: Array, queries: Array | None, /) -> Array:
     bad = ~jnp.all(jnp.isfinite(points))
     if queries is not None:
@@ -125,8 +96,9 @@ def _prep(
 ) -> tuple[Array, Array | None, Array]:
     """Validate, cast and rescale inputs: ``(points, queries, scale)``.
 
-    Shared by the JAX backends. ``dtype=None`` casts with `_as_float`. Returns
-    coordinates already divided by `_pow2_scale`'s ``scale``.
+    Used by ``JaxKD`` (``jaxknn`` validates its own inputs). ``dtype=None``
+    casts with `_as_float`. Returns coordinates already divided by
+    `jaxknn.pow2_scale`'s ``scale``.
     """
     _check_args(points, k, queries)
 
@@ -135,41 +107,13 @@ def _prep(
 
     q = None if queries is None else cast(queries)
     points = _check_finite(cast(points), q)
-    scale = _pow2_scale(points, q)
+    scale = jaxknn.pow2_scale(points, q)
     return points / scale, None if q is None else q / scale, scale
 
 
 def _no_neighbors(m: int, k: int, dtype: object, /) -> KnnOut:
     """Return the empty-search result: index 0, distance inf, for every slot."""
     return jnp.zeros((m, k), jnp.int32), jnp.full((m, k), jnp.inf, dtype)
-
-
-def _bucket(n: int, /) -> int:
-    """Smallest value in {2**j, 3 * 2**(j-1)} that is >= n (and >= 1)."""
-    if n <= 1:
-        return 1
-    p = 1 << (n - 1).bit_length()  # next power of two >= n
-    return p * 3 // 4 if p >= 4 and p * 3 // 4 >= n else p
-
-
-def far_rows(points: Float[Array, "n d"], count: int, /) -> Float[Array, "count d"]:
-    """``count`` distinct rows farther from every row of ``points`` than its diameter.
-
-    Padding a search with these never changes the k nearest real neighbours of
-    any query that was included in the array passed here (so pass the union of
-    points and queries), while at least k real points exist. Placed relative to
-    the data (no absolute offset, so tiny data is not swamped) and one ``span``
-    apart: identical rows made every padding query's own search overflow into
-    brute force (~20x slower eager ``BucketKDTree`` just above a bucket size).
-    """
-    d = points.shape[1]
-    lo, hi = points.min(0), points.max(0)
-    # Cover the magnitude too: in float32, hi + c * spread rounds back to hi
-    # once |hi| / spread >~ 1e7, which would put "far" rows on real points.
-    span = jnp.maximum(jnp.max(hi - lo), jnp.max(jnp.abs(jnp.stack([lo, hi]))))
-    span = jnp.where(span > 0, span, 1.0)  # all-zero data
-    offset = (2.0 * math.sqrt(d) + 1.0 + jnp.arange(count, dtype=points.dtype)) * span
-    return jnp.broadcast_to(lo, (count, d)).at[:, 0].set(hi[0] + offset)
 
 
 class AbstractNeighborSearch(eqx.Module):
@@ -199,20 +143,8 @@ class AbstractNeighborSearch(eqx.Module):
         """Exact k nearest neighbours."""
 
 
-def _knn_core(
-    points: Array, queries: Array | None, k: int, leaf_size: int, frontier: int, /
-) -> KnnOut:
-    if queries is None:
-        return _kd.all_knn(points, k, leaf_size=leaf_size, frontier=frontier)
-    tree = _kd.build_tree(points, leaf_size=leaf_size)
-    return _kd.knn(tree, queries, k, frontier=frontier)
-
-
-_knn_core_jit = jax.jit(_knn_core, static_argnums=(2, 3, 4))
-
-
 class BucketKDTree(AbstractNeighborSearch):
-    """JAX-native exact kd-tree. Traceable under jit/vmap/grad.
+    """JAX-native exact kd-tree (``jaxknn.knn``). Traceable under jit/vmap/grad.
 
     ``MSTOrderer``'s default when its inputs are traced. ``SciPy`` is
     eager-only, so under jit/vmap/grad this (or ``BruteForce``/``JaxKD``) is
@@ -246,32 +178,20 @@ class BucketKDTree(AbstractNeighborSearch):
             raise ValueError(msg)
 
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
-        points, queries, scale = _prep(points, k, queries)
-        n = points.shape[0]
-        m = n if queries is None else queries.shape[0]
-        if m == 0 or n == 0:
-            return _no_neighbors(m, k, points.dtype)
-        if _traced(points, queries):
-            sq = None if queries is None else jax.lax.stop_gradient(queries)
-            ii, _ = _knn_core_jit(
-                jax.lax.stop_gradient(points), sq, k, self.leaf_size, self.frontier
-            )
-            return ii, _gathered_distance(points, queries, ii) * scale
-        extent = points if queries is None else jnp.concat([points, queries])
-        padded = jnp.concat([points, far_rows(extent, _bucket(n) - n)])
-        qpad = None
-        if queries is not None:
-            filler = jnp.broadcast_to(queries[:1], (_bucket(m) - m, points.shape[1]))
-            qpad = jnp.concat([queries, filler])
-        ii, d2 = _knn_core_jit(padded, qpad, k, self.leaf_size, self.frontier)
-        ii, d2 = ii[:m], d2[:m]
-        fake = ii >= n  # only when fewer than k real candidates exist
-        dist = _safe_sqrt(jnp.where(fake, jnp.inf, d2)) * scale
-        return jnp.where(fake, n, ii), dist
+        return jaxknn.knn(
+            points,
+            k,
+            queries=queries,
+            leaf_size=self.leaf_size,
+            frontier=self.frontier,
+        )
 
 
 class BruteForce(AbstractNeighborSearch):
-    """Exact brute force, ``chunk`` queries at a time. Traceable."""
+    """Exact brute force (``jaxknn.brute_knn``), ``chunk`` queries at a time.
+
+    Traceable.
+    """
 
     chunk: int = eqx.field(static=True, default=1024)
 
@@ -282,9 +202,7 @@ class BruteForce(AbstractNeighborSearch):
             raise ValueError(msg)
 
     def knn(self, points: Array, /, k: int, *, queries: Array | None = None) -> KnnOut:
-        points, q, scale = _prep(points, k, queries)
-        ii, d2 = _kd.brute_knn(points, k, queries=q, chunk=self.chunk)
-        return ii, _safe_sqrt(d2) * scale
+        return jaxknn.brute_knn(points, k, queries=queries, chunk=self.chunk)
 
 
 def _pad_k(ii: Array, dd: Array, k: int, n: int, /) -> KnnOut:
