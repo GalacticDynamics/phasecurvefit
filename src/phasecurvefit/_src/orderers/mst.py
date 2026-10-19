@@ -46,6 +46,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import plum
+from jaxknn import bucket, far_rows, pow2_scale, tree as _kd
 from jaxtyping import Array
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import (
@@ -62,7 +63,7 @@ from .base import (
     chord_along_ordering,
 )
 from .result import OrderingResult
-from phasecurvefit._src import graph as _graph, kdtree as _kd
+from phasecurvefit._src import graph as _graph
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import NanPolicy, StateMetadata
 from phasecurvefit._src.checks import check_nan_policy
@@ -73,10 +74,7 @@ from phasecurvefit._src.neighbors import (
     BucketKDTree,
     SciPy,
     _as_float,
-    _bucket,
-    _pow2_scale,
     _traced,
-    far_rows,
 )
 
 OnDisconnected = Literal["raise", "warn", "largest", "connect"]
@@ -253,7 +251,7 @@ def _directed_knn(P, V, k_eff, neighbors, /):  # noqa: ANN001, ANN202
     directed = _has_direction(V, jnp)
     # Exact power-of-two scaling (neighbours unchanged) so the far row cannot
     # overflow: float32 coordinates near 1e38 would otherwise put it at inf.
-    P = P / _pow2_scale(P, None)
+    P = P / pow2_scale(P, None)
     P_dir = jnp.where(directed[:, None], P, far_rows(P, 1))
     nbr_dir = neighbors.knn(P_dir, k_eff)[0]
     leaf = neighbors.knn(P_dir, 1, queries=P)[0][:, 0]
@@ -634,7 +632,7 @@ def _finish_jax(P, full, blen, in_comp, flip, neighbors, /):  # noqa: ANN001, AN
     cb = P[full]
     # Arc lengths in units of an exact power of two: the order keys only need
     # their ratios, and neither the segments nor their sum can overflow.
-    scale = _pow2_scale(P, None)
+    scale = pow2_scale(P, None)
     seg = jnp.linalg.norm(jnp.diff(cb / scale, axis=0), axis=1)
     s_bb = jnp.concat([jnp.zeros(1, P.dtype), jnp.cumsum(seg)])
     near = neighbors.knn(cb, 1, queries=P)[0][:, 0]
@@ -674,7 +672,7 @@ def _jax_graph(
     mechanism is on and only some real tracers have a direction: then, as in
     ``_directionless_as_leaves``, the graph is the kNN among directed tracers
     plus one leaf edge from each directionless one. ``P`` arrives divided by
-    ``scale``, an exact power of two (``_pow2_scale``, computed by the caller
+    ``scale``, an exact power of two (``jaxknn.pow2_scale``, computed by the caller
     before any padding), so squared lengths cannot overflow float32. Every
     length stays in those scaled units (``knn_edges``); ``jump_cap`` and
     ``velocity_weight`` are in the caller's.
@@ -840,7 +838,7 @@ def _graph_and_order(
     why = (cfg["k"], cfg["jump_cap"], cfg["sever_cos_threshold"])
     # Exact power-of-two scaling before any padding, so neither the
     # geometry nor the far padding rows can overflow float32.
-    scale = _pow2_scale(P, None)
+    scale = pow2_scale(P, None)
     P_g = P / scale
     if traced or _traced(nbr):
         real = jnp.ones(n, bool)
@@ -863,7 +861,7 @@ def _graph_and_order(
     else:
         # Eager: pad to a size bucket so stream lengths share compiled
         # code; padded rows are far away, edgeless and not "real".
-        nb = _bucket(n)
+        nb = bucket(n)
         pad = nb - n
         Pp = jnp.concat([P_g, far_rows(P_g, pad)])
         Vp = jnp.concat([V, jnp.zeros((pad, V.shape[1]), V.dtype)])
