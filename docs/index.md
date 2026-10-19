@@ -75,7 +75,7 @@ step by step, is available as an alternative orderer.
 
 This is particularly useful for coherent trajectories in phase-space, such as stellar streams, but works well for many other ordering problems.
 
-## Why phasecurvefit?
+## Why phasecurvefit? [![pyOpenSci Peer-Reviewed](https://pyopensci.org/badges/peer-reviewed.svg)](https://github.com/pyOpenSci/software-submission/issues/285)
 
 Many datasets are samples along a curve in phase space whose order along the
 curve is unknown. Before fitting a model to such a curve you need two things: an
