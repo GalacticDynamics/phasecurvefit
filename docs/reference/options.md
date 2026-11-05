@@ -1,0 +1,108 @@
+# Options and defaults
+
+Every option of the orderers and of autoencoder training, with its default. All
+options are keyword arguments. The {doc}`api` has the full signatures and the
+{doc}`../how-to/index` show how to choose values.
+
+## `LocalFlowOrderer`
+
+{class}`~phasecurvefit.orderers.LocalFlowOrderer`: the local-flow walk
+({doc}`../how-to/local-flow-walk`).
+
+| Option | Default | Meaning |
+|---|---|---|
+| `metric_scale` | `1.0` | the metric's scale: a length for the default metric, a time for `FullPhaseSpaceDistanceMetric`, ignored by `SpatialDistanceMetric` ({doc}`../how-to/tune-metric`) |
+| `config` | `WalkConfig()` | the distance metric and neighbour-query strategy, see below |
+| `start_idx` | `None` | index of the first sample; `None` takes it from a previous chained stage, or else uses 0 |
+| `direction` | `"forward"` | `"forward"` follows the velocities, `"backward"` goes against them, `"both"` walks each way from `start_idx` and joins the two |
+| `max_dist` | `inf` | stop when the next step would be longer than this, in position |
+| `terminate_indices` | `None` | a `frozenset` of indices at which the walk stops |
+| `n_max` | `None` | the most samples the walk visits |
+| `nan_policy` | `"raise"` | what to do with NaN inputs |
+
+## `WalkConfig`
+
+{class}`~phasecurvefit.WalkConfig`: the walk's metric and query strategy.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `metric` | `AlignedMomentumDistanceMetric()` | how candidate points are scored ({doc}`../explanation/walk`) |
+| `strategy` | `BruteForce()` | which candidates are scored: all of them, or the `k` nearest with `KDTree(k=...)` ({doc}`../how-to/kdtree`) |
+
+## `MSTOrderer`
+
+{class}`~phasecurvefit.orderers.MSTOrderer`: the minimum-spanning-tree backbone
+({doc}`../how-to/choose-orderer`). The default pipeline uses `jump_cap=inf`,
+`orient_by_velocity=True`, `on_disconnected="connect"` and `nan_policy="omit"`
+instead of the defaults below.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `k` | `10` | neighbours each sample links to |
+| `jump_cap` | `3.0` | cut edges longer than this, in position (in the unit system's length unit for Quantities) |
+| `velocity_weight` | `0.0` | weight of the velocity-alignment penalty added to edge lengths |
+| `sever_cos_threshold` | `None` | drop edges whose velocity cosine is below this |
+| `orient_by_velocity` | `False` | flip the ordering so $\gamma$ increases along the mean velocity |
+| `on_disconnected` | `"raise"` | for a disconnected graph: `"raise"`, `"warn"`, `"largest"` or `"connect"` |
+| `edge_clip_sigma` | `None` | clip edges whose length is an outlier at this many sigma |
+| `edge_clip_max_iters` | `5` | most rounds of edge clipping |
+| `neighbors` | `None` | the nearest-neighbour backend; `None` picks SciPy for concrete inputs and `BucketKDTree` for traced ones ({doc}`../how-to/jax`) |
+| `nan_policy` | `"raise"` | what to do with NaN inputs |
+
+## `SOMOrderer`
+
+{class}`~phasecurvefit.orderers.SOMOrderer`: the self-organizing map
+({doc}`../how-to/som`). The default pipeline uses `n_prototypes=15`.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `n_prototypes` | `25` | lattice points |
+| `metric` | `None` | `None` follows the previous stage: phase space after a velocity-aware stage, position otherwise |
+| `metric_scale` | `None` | `None` derives it from the data when the metric uses velocity |
+| `n_epochs` | `10` | training epochs |
+| `sigma_start` | `None` | starting neighbourhood width in lattice units; `None` uses `max(n_prototypes / 4, sigma_end)` |
+| `sigma_end` | `0.7` | final neighbourhood width in lattice units |
+| `densify_factor` | `5` | backbone samples per lattice segment |
+| `orient_by_velocity` | `False` | flip the ordering so $\gamma$ increases along the mean velocity |
+| `outlier_clip_sigma` | `None` | reject samples whose distance to their prototype is an outlier at this many sigma |
+| `outlier_clip_max_iters` | `5` | most rounds of outlier clipping |
+| `nan_policy` | `"raise"` | `"raise"` or `"omit"` for NaN inputs |
+
+## `TrainingConfig`
+
+{class}`~phasecurvefit.nn.TrainingConfig`: autoencoder training
+({doc}`../how-to/autoencoder`). Phase 1 trains the encoder, phase 2 the decoder,
+phase 3 both ({doc}`../explanation/autoencoder`).
+
+| Option | Default | Meaning |
+|---|---|---|
+| `optimizer` | the library's default Optax optimizer | Optax optimizer for all phases |
+| `batch_size` | `100` | samples per batch |
+| `show_pbar` | `True` | show a progress bar |
+| `member_threshold` | `0.5` | membership probability above which a sample counts as a member |
+| `n_epochs_encoder` | `800` | phase 1 epochs |
+| `lambda_prob` | `1.0` | weight of the membership loss terms |
+| `n_epochs_decoder` | `100` | phase 2 epochs |
+| `n_epochs_both` | `200` | phase 3 epochs |
+| `lambda_q` | `1.0` | weight of position reconstruction in phase 3 |
+| `lambda_p` | `(1.0, 5.0)` | `(start, stop)` of the velocity-alignment weight, ramped over phase 3 |
+| `weight_by_density` | `False` | weight samples by inverse density; use with care |
+| `freeze_encoder_final_training` | `False` | freeze the encoder during phase 3 |
+| `membership` | `None` | a `MixtureMembershipConfig` to turn on outlier rejection, see below |
+
+## `MixtureMembershipConfig`
+
+{class}`~phasecurvefit.nn.MixtureMembershipConfig`: the stream-plus-background
+mixture model ({doc}`../how-to/outliers`).
+
+| Option | Default | Meaning |
+|---|---|---|
+| `sigma_init` | `0.1` | starting stream half-width, in the normalised coordinates the networks see |
+| `sigma_min` | `0.001` | floor on the width |
+| `sigma_ceiling` | `(0.5, 0.1)` | `(start, stop)` of the width ceiling, shrunk geometrically over training |
+| `warmup_frac` | `0.3` | fraction of training spent ramping the membership term in |
+| `background_density` | `None` | the background density $\rho_{\mathrm{bg}}$; `None` computes it from the extent of the training positions |
+| `background_inflate` | `1.0` | inflation of that extent when `background_density` is `None`; raise it if the stars do not fill the survey footprint |
+| `width_size` | `32` | width of the network that predicts the stream width |
+| `depth` | `2` | depth of that network |
+| `lambda_velocity` | `1.0` | weight of the velocity-alignment term, reweighted by membership; 0 turns it off |

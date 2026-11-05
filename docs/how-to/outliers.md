@@ -18,7 +18,7 @@ unchanged. Pass a {class}`~phasecurvefit.nn.MixtureMembershipConfig` in the
 import phasecurvefit as pcf
 
 membership = pcf.nn.MixtureMembershipConfig(
-    sigma_init=0.1,  # your guess at the stream width
+    sigma_init=0.1,  # your guess at the stream width, in normalised units
     sigma_ceiling=(0.5, 0.1),  # shrink the width ceiling during training
     warmup_frac=0.3,  # fit the track before rejecting anything
 )

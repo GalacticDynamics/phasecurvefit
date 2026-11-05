@@ -105,7 +105,7 @@ The local-flow walk, the MST backbone, the SOM, the autoencoder and the mixture 
 :::
 
 :::{grid-item-card} Reference
-:link: api/index
+:link: reference/index
 :link-type: doc
 
 Every public class and function, options and defaults, migration notes and citation.
@@ -189,26 +189,15 @@ guides/jax-integration
 ```{toctree}
 :maxdepth: 1
 :hidden:
-:caption: 🔌 API Reference
+:caption: Reference
 
-api/index
+reference/index
 ```
 
 ```{toctree}
 :maxdepth: 1
 :hidden:
-:caption: 🔀 Migration
-
-migration/v0.3-to-v0.4
-migration/v0.2-to-v0.3
-migration/v0.1-to-v0.2
-```
-
-```{toctree}
-:maxdepth: 2
-:hidden:
-:caption: More
+:caption: About
 
 contributing
-citation
 ```
