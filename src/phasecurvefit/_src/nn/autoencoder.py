@@ -794,9 +794,11 @@ def train_ordering_and_track_net(
         from the full config with `TrainingConfig.autoencoder_config`.
     weights : Array, shape (N,), optional
         Per-tracer weights, e.g. the density at each pixel of a density field.
-        Scaled to mean 1 over ``mask`` and multiplied into each tracer's loss
-        term, on top of any ``config.weight_by_density`` weights. Not supported
-        with ``config.membership``. ``None`` (default) weighs tracers equally.
+        Multiplied into each tracer's loss term, on top of any
+        ``config.weight_by_density`` weights, and the product is rescaled to
+        the masked mean those weights have alone (1 without them), so adding
+        per-tracer weights never changes the loss scale. Not supported with
+        ``config.membership``. ``None`` (default) weighs tracers equally.
     key : PRNGKeyArray
         Random key for shuffling and batching.
 
@@ -827,9 +829,13 @@ def train_ordering_and_track_net(
             # weights silently would fit an unweighted track.
             msg = "per-tracer weights are not supported with mixture membership."
             raise NotImplementedError(msg)
-        w = check_weights(weights, all_ws.shape[0])
-        w_mean = masked_mean(w, mask)
-        weights = density_w * w / jnp.where(w_mean > 0, w_mean, 1.0)
+        combined = density_w * check_weights(weights, all_ws.shape[0])
+        # Rescale *after* combining, to the masked mean the density weights
+        # have alone: correlated weights must not shift the loss scale.
+        c_mean = masked_mean(combined, mask)
+        weights = combined * (
+            masked_mean(density_w, mask) / jnp.where(c_mean > 0, c_mean, 1.0)
+        )
 
     # Mixture-model membership is opt-in. When enabled the model must carry a
     # `WidthNet`, and the background density is fixed once, from the

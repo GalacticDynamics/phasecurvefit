@@ -14,6 +14,7 @@ import pytest
 
 import phasecurvefit as pcf
 from phasecurvefit._src.checks import check_weights
+from phasecurvefit._src.nn import autoencoder as ae_mod
 from phasecurvefit._src.nn.order_net import _cumulative_weight_gamma
 
 pytest.importorskip("scipy")
@@ -249,6 +250,41 @@ class TestTrainAutoencoderWeights:
         )
         y = ae(jnp.linspace(-0.8, 0.8, 9))["y"]
         np.testing.assert_allclose(y, 0.5, atol=0.1)
+
+    def test_joint_weights_keep_density_scale(self, monkeypatch):
+        """Phase-3 weights keep the masked mean the density weights have alone.
+
+        Per-tracer weights correlated with the density weights must not shift
+        the overall loss scale, so the product is rescaled after combining.
+        """
+        pos, vel, w = _two_lines()
+        result = pcf.orderers.SOMOrderer(n_prototypes=10).order(pos, vel, weights=w)
+        model = self._model(pos, vel, result)
+        qs, ps = model.normalizer.transform(pos, vel)
+        ws = jnp.concatenate([qs, ps], axis=1)
+        mask = jnp.ones(200, dtype=bool)
+        density_w = jnp.where(jnp.arange(200) < 100, 4.0, 1.0)  # correlated with w
+        monkeypatch.setattr(ae_mod, "compute_weights", lambda *_, **__: density_w)
+
+        seen = {}
+
+        def _capture(*args, **kw):
+            seen["w"] = args[2][1]  # (self, model, (padded_ws, padded_w), mask)
+            msg = "stop"
+            raise RuntimeError(msg)
+
+        monkeypatch.setattr(ae_mod.PathAutoencoderTrainer, "init", _capture)
+        cfg = pcf.nn.TrainingConfig(
+            n_epochs_both=1, weight_by_density=True, show_pbar=False
+        ).autoencoder_config()
+        with pytest.raises(RuntimeError, match="stop"):
+            ae_mod.train_ordering_and_track_net(
+                model, ws, mask=mask, config=cfg, weights=w, key=jr.key(0)
+            )
+        got = np.asarray(seen["w"])[:200]
+        np.testing.assert_allclose(got.mean(), density_w.mean(), rtol=1e-6)
+        # Shape of the weighting is the product: 4*3 on line 0, 1*1 on line 1.
+        np.testing.assert_allclose(got[0] / got[-1], 12.0, rtol=1e-6)
 
     def test_mixture_membership_raises(self):
         """Mixture membership has no weight slot, so weights are refused."""
