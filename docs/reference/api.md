@@ -45,6 +45,10 @@ Pluggable ordering stages, composable with `|`. See the
    :members: order
    :show-inheritance:
 
+.. autoclass:: RidgeOrderer
+   :members: order
+   :show-inheritance:
+
 .. autoclass:: ChainOrderer
    :members: order
    :show-inheritance:

@@ -24,6 +24,7 @@ its mechanism fits your data better:
 | {class}`~phasecurvefit.orderers.LocalFlowOrderer` | open streams, and curves that cross themselves where the velocity field stays coherent through the crossings | a greedy walk that follows the velocity field from a start point |
 | {class}`~phasecurvefit.orderers.MSTOrderer` | near-closed loops, and streams with no known start point, for example where the velocity reverses at an unknown progenitor | k-nearest-neighbour graph, minimum spanning tree, its longest path as the backbone, then arc length along it |
 | {class}`~phasecurvefit.orderers.SOMOrderer` | refining any initial ordering, and a continuous along-track coordinate | a one-dimensional self-organizing map, a smooth backbone through its prototypes, then arc length along it |
+| {class}`~phasecurvefit.orderers.RidgeOrderer` | density fields, such as an image of a stream, and wide or weighted point clouds | a kernel density estimate of the weighted samples, the path along its ridge as the backbone, then arc length along it |
 
 The walk and the MST complement each other. The walk needs a start point and
 follows the flow. Where the velocity reverses at a progenitor it has to start at the
@@ -100,3 +101,28 @@ its own branch, and the local-flow walk is usually the better choice
 A {class}`~phasecurvefit.orderers.SOMOrderer` smooths an ordering it is handed.
 Chain it after another orderer ({doc}`chain-orderers`); {doc}`som` covers its
 options.
+
+## Order a density field
+
+For an image of a stream, make each pixel a sample weighted by its density
+({doc}`data`) and order with a {class}`~phasecurvefit.orderers.RidgeOrderer`. It
+follows the ridge of the weighted density, so it finds the middle of a wide or
+blurred stream where the MST's longest path wanders across it. Set `bandwidth` to
+about the stream's half-width, and chain a SOM to refine it:
+
+```python
+g = jnp.linspace(-1.5, 1.5, 61)
+X, Y = jnp.meshgrid(g, g)
+image = jnp.exp(-((jnp.hypot(X, Y) - 1.0) ** 2) / (2 * 0.1**2)) * (Y > 0)
+keep = image.ravel() > 0.05  # each bright pixel becomes a sample
+pix = {"x": X.ravel()[keep], "y": Y.ravel()[keep]}
+pix_vel = {"x": jnp.zeros_like(pix["x"]), "y": jnp.zeros_like(pix["y"])}
+
+ridge = pcf.orderers.RidgeOrderer(bandwidth=0.1) | pcf.orderers.SOMOrderer(
+    n_prototypes=20, metric=pcf.metrics.SpatialDistanceMetric()
+)
+res = pcf.order(pix, pix_vel, ridge, weights=image.ravel()[keep])
+```
+
+It doesn't use velocities, so the direction of the ordering is arbitrary. It finds
+the ends to within about one `bandwidth`.
