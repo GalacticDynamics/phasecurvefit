@@ -108,7 +108,7 @@ def test_som_orderer_rejects_bad_hyperparameters():
 def test_som_orderer_chained_below_default_n_prototypes_raises_clearly():
     """Chaining with fewer visited points than the default ``n_prototypes=25``.
 
-    ``docs/guides/som.md`` and the tutorials chain ``MSTOrderer() |
+    ``docs/how-to/som.md`` and the tutorials chain ``MSTOrderer() |
     SOMOrderer()`` with no override, so this is the exact path a reader would
     hit on a dataset small enough (or clipped enough) to drop the visited
     count below 25. Every other chained test in this file lowers

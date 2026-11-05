@@ -58,17 +58,10 @@ assert int(result.n_visited) == 60
 assert result.gamma_range == (-1.0, 1.0)
 ```
 
-The default pipeline differs from the same chain written by hand in three ways:
-
-- It falls back to the MST alone when the MST visited fewer samples than
-  `n_prototypes` (15 by default), instead of raising.
-- Its MST stage works at any data scale and loses no samples: `jump_cap=inf`,
-  `orient_by_velocity=True`, and `on_disconnected="connect"`, which joins the pieces
-  of a stream that a gap splits instead of keeping only the larger one.
-- It cannot run under `jit` or `vmap`, because whether the SOM stage runs depends
-  on how many samples the MST visited.
-
-A gap in a stream wider than the neighbours reach does not lose either side:
+It falls back to the MST alone when the MST visited fewer samples than
+`n_prototypes` (15 by default), instead of raising, and it cannot run under `jit` or
+`vmap`. Its MST stage uses different settings from `MSTOrderer()`'s defaults so that
+it works on any data without tuning ({doc}`../explanation/mst`). A gap in a stream wider than the neighbours reach does not lose either side:
 
 ```{code-cell} python
 t = jnp.concatenate([jnp.linspace(0.0, 1.0, 60), jnp.linspace(1.2, 2.2, 60)])

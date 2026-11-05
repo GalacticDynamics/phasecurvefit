@@ -1,7 +1,7 @@
 """Self-Organizing Map ordering, in JAX.
 
 The 1-D SOM of Starkman et al. (2023), re-implemented in JAX. See
-:doc:`/guides/som` for the full description.
+:doc:`/explanation/som` for the full description.
 
 References
 ----------

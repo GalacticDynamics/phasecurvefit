@@ -36,7 +36,7 @@ def default_pipeline(
     tip to tip, including near-closed loops whose velocity field reverses; the
     SOM's prototypes then average over many tracers, so the final backbone is
     far less sensitive to local noise than the MST's individual graph edges. See
-    :doc:`/guides/som`.
+    :doc:`/explanation/som`.
 
     The MST stage is configured to work on data of any scale and to lose
     nothing, not to be tuned: ``jump_cap=inf`` (the default ``jump_cap`` is an
@@ -60,7 +60,7 @@ def default_pipeline(
     fallback test and the SOM stage both need the concrete visited count, and
     a SOM stage chained after another cannot be traced. To trace an ordering,
     pass :func:`~phasecurvefit.order` an explicit orderer (``MSTOrderer()`` and
-    ``LocalFlowOrderer()`` both trace; see :doc:`/guides/jax-integration`).
+    ``LocalFlowOrderer()`` both trace; see :doc:`/how-to/jax`).
 
     Parameters
     ----------

@@ -174,21 +174,6 @@ explanation/index
 ```{toctree}
 :maxdepth: 1
 :hidden:
-:caption: 📚 Guides
-
-guides/quickstart
-guides/metrics
-guides/algorithm
-guides/orderers
-guides/som
-guides/nn
-guides/outliers
-guides/jax-integration
-```
-
-```{toctree}
-:maxdepth: 1
-:hidden:
 :caption: Reference
 
 reference/index
