@@ -3,8 +3,6 @@ version: 2
 # Set the version of Python and other tools you might need
 build:
   os: ubuntu-22.04
-  apt_packages:
-    - pandoc
   tools:
     python: "3.12"
   commands:
