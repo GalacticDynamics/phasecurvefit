@@ -214,8 +214,8 @@ def order(
 
     ``weights`` gives each tracer a weight, e.g. the density at each pixel of a
     density field. Orderers that can use them do (see
-    :meth:`AbstractOrderer.order`), and the result carries them on to
-    :func:`~phasecurvefit.nn.train_autoencoder`:
+    :meth:`~phasecurvefit.orderers.AbstractOrderer.order`), and the result
+    carries them on to :func:`~phasecurvefit.nn.train_autoencoder`:
 
     >>> pcf.order(q, p, weights=jnp.array([1.0, 2.0, 1.0])).weights
     Array([1., 2., 1.], dtype=float32)
