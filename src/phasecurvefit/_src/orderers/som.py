@@ -14,7 +14,7 @@ MNRAS 522(4), 5022-5036. https://arxiv.org/abs/2212.00949
 
 If you use this orderer in published work, please cite that paper. It
 deviates from the paper's method in nine places, listed in full in
-:doc:`/guides/som` -- they matter to anyone citing it for results
+:doc:`/explanation/som` -- they matter to anyone citing it for results
 produced here.
 
 """

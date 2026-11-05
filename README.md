@@ -314,9 +314,9 @@ print(result.gamma_range)  # (-1.0, 1.0)
 `MSTOrderer` also has opt-in velocity mechanisms (`velocity_weight`,
 `sever_cos_threshold`, `orient_by_velocity`) for self-overlapping streams. See
 the
-[Orderers Guide](https://phasecurvefit.readthedocs.io/en/latest/guides/orderers.html)
+[orderer guide](https://phasecurvefit.readthedocs.io/en/latest/how-to/choose-orderer.html)
 and the
-[v0.3 → v0.4 Migration Guide](https://phasecurvefit.readthedocs.io/en/latest/migration/v0.3-to-v0.4.html),
+[v0.3 → v0.4 Migration Guide](https://phasecurvefit.readthedocs.io/en/latest/reference/migration/v0.3-to-v0.4.html),
 which covers the change of default from the walk to MST | SOM.
 
 ## Distance Metrics
@@ -398,7 +398,7 @@ result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
 
 See the
-[Metrics Guide](https://phasecurvefit.readthedocs.io/en/latest/guides/metrics.html)
+[metric guide](https://phasecurvefit.readthedocs.io/en/latest/how-to/tune-metric.html)
 for more details and examples.
 
 ## Query Strategies
@@ -512,7 +512,7 @@ DOI, together with the paper behind whichever component you used.
 Machine-readable metadata for all of these is in
 [`CITATION.cff`](https://github.com/GalacticDynamics/phasecurvefit/blob/main/CITATION.cff);
 what to cite for which component, with BibTeX entries, is on the
-[Citation page](https://phasecurvefit.readthedocs.io/en/latest/citation.html).
+[Citation page](https://phasecurvefit.readthedocs.io/en/latest/reference/citation.html).
 
 </details>
 

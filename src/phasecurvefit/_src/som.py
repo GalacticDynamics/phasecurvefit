@@ -18,7 +18,7 @@ MNRAS 522(4), 5022-5036. https://arxiv.org/abs/2212.00949
 
 If you use this SOM stage in published work, please cite that paper. It
 deviates from the paper's method in nine places, listed in
-:doc:`/guides/som`.
+:doc:`/explanation/som`.
 
 """
 
@@ -554,7 +554,7 @@ def fit(
     lattice. The update replaces the paper's online form (A9)/(A10): there is no
     learning rate. This batch form is the fixed point of the conventional
     online Kohonen update, whose increment is proportional to ``w - p^(k)``
-    (:doc:`/guides/som` notes how that differs from (A9) as printed). ``omega_n``
+    (:doc:`/explanation/som` notes how that differs from (A9) as printed). ``omega_n``
     is ``weights``, defaulting to ``1`` for every datum -- the paper has no such
     term, so this is an addition, not a further deviation from (A9)/(A10): with
     the default, the sum above is exactly the un-weighted one. A non-finite
@@ -1063,7 +1063,7 @@ def chord(
     Whether that assignment is velocity-aware depends on ``metric`` and
     ``metric_scale``. At the default ``metric_scale=0.0`` the phase-space
     metric reduces to pure position distance, so anti-parallel arms of a
-    near-closed loop can capture each other; :doc:`/guides/som` gives the
+    near-closed loop can capture each other; :doc:`/explanation/som` gives the
     contamination rates and :class:`~phasecurvefit.orderers.SOMOrderer` covers
     choosing a scale.
 

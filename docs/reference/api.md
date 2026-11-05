@@ -24,7 +24,7 @@ MST backbone refined by a SOM; `fit_track` goes on to fit the autoencoder.
 ## Orderers
 
 Pluggable ordering stages, composable with `|`. See the
-[Orderers guide](../guides/orderers.md).
+[Orderers guide](../how-to/choose-orderer.md).
 
 ```{eval-rst}
 .. currentmodule:: phasecurvefit.orderers
@@ -79,7 +79,7 @@ Helper function to extract ordered data from results.
 ## Distance Metrics
 
 Pluggable distance metrics for controlling how the algorithm selects the next point.
-See the [Metrics Guide](../guides/metrics.md) for usage examples.
+See the [Metrics Guide](../how-to/tune-metric.md) for usage examples.
 
 ```{eval-rst}
 .. currentmodule:: phasecurvefit.metrics
@@ -190,7 +190,7 @@ Low-level functions for phase-space operations. Available in the `phasecurvefit.
 
 ## Autoencoder Module
 
-Neural network for interpolating skipped tracers. See [Autoencoder Guide](../guides/nn.md) for details.
+Neural network for interpolating skipped tracers. See [Autoencoder Guide](../how-to/autoencoder.md) for details.
 
 ### Classes
 
@@ -258,7 +258,7 @@ Neural network for interpolating skipped tracers. See [Autoencoder Guide](../gui
 ### Membership & Outlier Rejection
 
 Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
-{doc}`/guides/outliers`.
+{doc}`/explanation/outliers`.
 
 ```{eval-rst}
 .. autoclass:: phasecurvefit.nn.MixtureMembershipConfig
@@ -284,7 +284,7 @@ Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
 ## SOM Module
 
 Self-Organizing Map ordering, after Starkman et al. (2023). See
-{doc}`/guides/som`.
+{doc}`/explanation/som`.
 
 {class}`~phasecurvefit.orderers.SOMOrderer` is listed under [Orderers](#orderers).
 

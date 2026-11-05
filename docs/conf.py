@@ -51,6 +51,7 @@ extensions = [
     "sphinx-prompt",
     "sphinxext.opengraph",
     "sphinx_togglebutton",
+    "sphinx_reredirects",
 ]
 
 python_use_unqualified_type_names = True
@@ -64,7 +65,29 @@ nb_execution_timeout = -1  # tutorials train models; no per-cell timeout
 nb_execution_raise_on_error = True
 pygments_lexers = {"ipython3": PythonLexer()}
 
+# -- Redirects for pages moved in the Diataxis restructure ------------------
+
+# sphinx-reredirects makes an absolute target relative by prepending ".." per
+# directory level of the old page, so a top-level page needs a relative target
+# itself. Its redirect page carries the URL fragment across.
+redirects: Final[dict[str, str]] = {
+    "guides/quickstart": "/start/quickstart.html",
+    "guides/algorithm": "/explanation/walk.html",
+    "guides/metrics": "/how-to/tune-metric.html",
+    "guides/orderers": "/how-to/choose-orderer.html",
+    "guides/som": "/how-to/som.html",
+    "guides/nn": "/how-to/autoencoder.html",
+    "guides/outliers": "/how-to/outliers.html",
+    "guides/jax-integration": "/how-to/jax.html",
+    "api/index": "/reference/api.html",
+    "migration/v0.1-to-v0.2": "/reference/migration/v0.1-to-v0.2.html",
+    "migration/v0.2-to-v0.3": "/reference/migration/v0.2-to-v0.3.html",
+    "migration/v0.3-to-v0.4": "/reference/migration/v0.3-to-v0.4.html",
+    "citation": "reference/citation.html",  # top level: no ".." to prepend
+}
+
 exclude_patterns = [
+    "superpowers",  # local design notes, git-ignored
     "_build",
     "**.ipynb_checkpoints",
     "Thumbs.db",

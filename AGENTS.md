@@ -111,8 +111,11 @@ without it the orderers raise.
   - `phasespace.py`: Phase-space operations
 - `/src/phasecurvefit/_interop/`: Optional dependency integrations
   - `interop_unxt.py`: `unxt` Quantity support via Quax dispatch
-- `/docs/guides/`: User guides (quickstart, orderers, SOM, metrics, outliers,
-  JAX integration, etc.); `/docs/migration/` records API changes per version
+- `/docs/`: Diátaxis layout. `start/` (what it does, is it right, install,
+  quickstart), `tutorials/` (executed notebooks), `how-to/` (one task per page),
+  `explanation/` ("How it works"), `reference/` (API, options, result, citation;
+  `reference/migration/` records API changes per version). Old `guides/*` URLs
+  redirect via `redirects` in `docs/conf.py`
 - `/tests/`: `unit/`, `integration/`, `smoke/`, `static/` (source-sweep checks),
   `benchmarks/`, and `usage/`
 

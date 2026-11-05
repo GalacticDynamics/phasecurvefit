@@ -105,8 +105,9 @@ ones. Every comment should name the concrete input that breaks and what happens.
   errors in pytest, so new warnings need handling.
 - Docstring and `docs/` examples are executed by Sybil — check they would run
   and that their printed output matches.
-- New user-facing behaviour needs a docs update in `docs/guides/`; API breaks
-  need an entry in the matching `docs/migration/vX-to-vY.md`.
+- New user-facing behaviour needs a docs update in `docs/how-to/` (and
+  `docs/explanation/` or `docs/reference/` as fits); API breaks need an entry in
+  the matching `docs/reference/migration/vX-to-vY.md`.
 
 ## Don't comment on
 

@@ -3,7 +3,7 @@ r"""Autoencoder neural network for gap filling.
 This module implements the autoencoder from Appendix A.2 of Nibauer et al.
 (2022) for assigning $\gamma$ values to stream tracers that an orderer left
 unvisited. If you use it in published work, please cite that paper (see
-:doc:`/citation`).
+:doc:`/reference/citation`).
 
 The autoencoder consists of:
 1. **Interpolation Network** (Encoder): Maps $(x, v) \to (\gamma, p)$

@@ -66,6 +66,30 @@ jobs:
           uv run --isolated --no-project --with . --with pytest --with pytest-env \
             pytest tests/smoke --noconftest -o addopts= -p no:cacheprovider
 
+  docs:
+    # ReadTheDocs shows the tutorials' stored outputs without running them
+    # (docs/conf.py). Off ReadTheDocs the docs build executes every notebook and
+    # guide and fails on any cell error or Sphinx warning, so this job checks that
+    # every notebook still runs with the current code.
+    name: Docs build (executes notebooks)
+    runs-on: ubuntu-latest
+    needs: [pre-commit]
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5.5.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: uv sync --no-default-groups --group nox --locked
+
+      - name: Build the docs
+        run: uv run --frozen nox -s docs
+
   tests:
     name: Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
     runs-on: ${{ matrix.runs-on }}
@@ -177,7 +201,7 @@ jobs:
   status:
     name: CI Pass
     runs-on: ubuntu-latest
-    needs: [pre-commit, tests, test_oldest, benchmark_smoke]
+    needs: [pre-commit, tests, test_oldest, benchmark_smoke, docs]
     if: always()
     steps:
       - name: All required jobs passed

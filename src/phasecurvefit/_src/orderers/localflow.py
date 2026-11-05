@@ -88,7 +88,7 @@ class LocalFlowOrderer(AbstractOrderer):
 
     The walk, with its momentum-weighted metric, is the algorithm of Nibauer et
     al. (2022); if you use it in published work, please cite that paper (see
-    :doc:`/citation`).
+    :doc:`/reference/citation`).
 
     Parameters
     ----------
