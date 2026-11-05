@@ -77,7 +77,7 @@ simulated data to a result.
 :gutter: 2
 
 :::{grid-item-card} Start
-:link: guides/quickstart
+:link: start/what-it-does
 :link-type: doc
 
 What the library does, whether it suits your data, installation, and a first fit.
@@ -91,7 +91,7 @@ Complete analyses from simulated data to a result, grouped by the kind of data.
 :::
 
 :::{grid-item-card} How-to guides
-:link: guides/orderers
+:link: how-to/index
 :link-type: doc
 
 One task each: choose an orderer, tune the metric, fill gaps, reject outliers, use JAX.
@@ -139,6 +139,33 @@ data.
 ```{toctree}
 :maxdepth: 1
 :hidden:
+:caption: Start
+
+start/what-it-does
+start/is-it-right
+start/install
+start/quickstart
+```
+
+```{toctree}
+:maxdepth: 1
+:hidden:
+:caption: Tutorials
+
+tutorials/index
+```
+
+```{toctree}
+:maxdepth: 1
+:hidden:
+:caption: How-to guides
+
+how-to/index
+```
+
+```{toctree}
+:maxdepth: 1
+:hidden:
 :caption: 📚 Guides
 
 guides/quickstart
@@ -149,14 +176,6 @@ guides/som
 guides/nn
 guides/outliers
 guides/jax-integration
-```
-
-```{toctree}
-:maxdepth: 1
-:hidden:
-:caption: Tutorials
-
-tutorials/index
 ```
 
 ```{toctree}
