@@ -157,10 +157,9 @@ class RunningMeanDecoder(AbstractExternalDecoder):
             # For an empty window, fall back to the member(s) nearest in gamma.
             dist = jnp.where(member_train, jnp.abs(gamma_train - gamma), jnp.inf)
             nearest = (dist == jnp.min(dist)) & member_train
-            nearest_w = nearest.astype(q_train.dtype)
-            if self.weights_train is not None:
-                nearest_w = nearest_w * self.weights_train
-            weights = jnp.where(jnp.any(weights > 0), weights, nearest_w)
+            weights = jnp.where(
+                jnp.any(weights > 0), weights, nearest.astype(q_train.dtype)
+            )
 
         # Weighted mean position; NaN where there is no weight at all.
         total_weight = jnp.sum(weights)

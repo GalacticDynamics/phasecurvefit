@@ -299,20 +299,6 @@ def _weighted_compute_loss(
     )
 
 
-def _unit_mean_weights(
-    weights: Float[Array, " N"] | None, n_obs: int, /
-) -> Float[Array, " N"] | None:
-    """Validate per-tracer weights and scale them to mean 1, or pass ``None``.
-
-    Mean 1 keeps a weighted loss on the same scale as the unweighted one, so
-    learning rates and loss weights mean the same thing with or without them.
-    """
-    if weights is None:
-        return None
-    w = check_weights(weights, n_obs)
-    return w / jnp.mean(w)
-
-
 def _cumulative_weight_gamma(
     weights: Float[Array, " N"], gamma_range: tuple[float, float], /
 ) -> Float[Array, " N"]:
@@ -497,12 +483,12 @@ def train_ordering_net(
     # Initialize gamma targets.
     # Base target: uniform spacing in [gamma_min, gamma_max]
     gmin, gmax = model.gamma_range
-    w_all = _unit_mean_weights(weights, all_ws.shape[0])
-    if w_all is None:
+    if weights is None:
         gamma_lin = jnp.linspace(gmin, gmax, n_total)
         w_ord = jnp.ones(n_total, dtype=all_ws.dtype)
     else:
-        w_ord = w_all[ordering_indices][is_ordered]
+        w_ord = check_weights(weights, all_ws.shape[0])[ordering_indices][is_ordered]
+        # Mean 1 over the ordered tracers, so the loss keeps its scale.
         w_mean = jnp.mean(w_ord)
         w_ord = w_ord / jnp.where(w_mean > 0, w_mean, 1.0)
         gamma_lin = _cumulative_weight_gamma(w_ord, (gmin, gmax))

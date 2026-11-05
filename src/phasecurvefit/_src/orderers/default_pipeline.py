@@ -116,8 +116,7 @@ def default_pipeline(
         on_disconnected="connect",
         nan_policy="omit",
     )
-    kw: dict[str, object] = {} if weights is None else {"weights": weights}
-    mst_result = mst.order(positions, velocities, metadata=metadata, **kw)
+    mst_result = mst.order(positions, velocities, metadata=metadata, weights=weights)
     try:
         n_visited = int(mst_result.n_visited)
     except jax.errors.ConcretizationTypeError as exc:
@@ -132,4 +131,6 @@ def default_pipeline(
     if n_visited < n_prototypes:
         return mst_result
     som = SOMOrderer(n_prototypes=n_prototypes, **som_kwargs)
-    return som.order(positions, velocities, metadata=metadata, init=mst_result, **kw)
+    return som.order(
+        positions, velocities, metadata=metadata, init=mst_result, weights=weights
+    )
