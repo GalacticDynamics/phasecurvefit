@@ -13,7 +13,7 @@ local-flow walk returns `WalkLocalFlowResult`, a subclass with the same fields.
 | `gamma_range` | the range of $\gamma$ that calling the result accepts; `(-1.0, 1.0)` for the MST, the SOM and the default pipeline |
 | `backbone` | an ordered polyline that calling the result interpolates along, or `None` for the walk, which interpolates between the visited samples |
 | `backbone_size` | the number of valid leading vertices when `backbone` is padded to a fixed shape, as the MST does under `jit`; `None` when every vertex is valid |
-| `chord` | arc length along the curve for each sample, in input order, with `nan` for unvisited samples; `None` when the orderer does not provide one (the SOM does) |
+| `chord` | arc length along the curve for each sample, in input order, with `nan` for unvisited samples; all built-in orderers set it, and `None` means an orderer did not |
 | `velocity_aware` | whether the orderer's metric uses velocity |
 
 In `indices`, the position in the array is the step along the ordering and the value
@@ -48,7 +48,7 @@ return an {class}`~phasecurvefit.nn.AutoencoderResult`. It has `positions`,
 
 | Field | Contents |
 |---|---|
-| `indices` | the sample indices sorted by $\gamma$ (no `-1` padding) |
+| `indices` | the indices of the samples whose membership probability is at least `member_threshold`, sorted by $\gamma$; shorter than the number of samples when any are rejected, and never padded with `-1` |
 | `gamma` | $\gamma$ for every sample |
 | `membership_prob` | the encoder's membership probability for every sample |
 | `model` | the trained network |

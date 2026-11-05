@@ -97,7 +97,8 @@ assert result.chord.shape == (120,)
   epitrochoid is ordered perfectly at `n_prototypes=90` and not at all at 25.
 - **`sigma_start`, `sigma_end`**: the neighbourhood width in lattice units, shrunk
   geometrically during training. `sigma_start=None` uses
-  `max(n_prototypes / 4, sigma_end)`.
+  `max(n_prototypes / 4, sigma_end)` on its own, and `sigma_end` when chained, so a
+  chained SOM refines locally.
 - **`n_epochs`**: tens, not thousands; each epoch is one pass over all the data.
 - **`densify_factor`**: backbone samples per lattice segment. It has little effect
   above about 2 and its cost grows linearly, so raise it only for a strongly curved

@@ -11,9 +11,10 @@ sd_hide_title: true
 You have positions and velocities for many samples that lie along a curve, such as
 the stars of a stellar stream, but not the order they come in along it.
 phasecurvefit finds that order, gives every sample an ordering coordinate
-$\gamma$, and fits a smooth mean track $x(\gamma)$. It uses the velocities as well as
-the positions, needs no known start point, and is built on JAX, so it works with
-`jit`, `vmap` and `grad` and runs on CPU or GPU.
+$\gamma$, and fits a smooth mean track $x(\gamma)$. Its default needs no known start
+point, and velocity-aware orderers keep the ordering on the right strand where a
+curve crosses itself. It is built on JAX: its orderers and networks work with
+`jit`, `vmap` and `grad`, and everything runs on CPU or GPU.
 
 ```{image} _static/hero.png
 ---
@@ -64,7 +65,8 @@ simulated data to a result.
 - **A stream with a known progenitor or start point.** Walk along the flow from it
   and fit the track: [the stream autoencoder tutorial](tutorials/stream_autoencoder.ipynb),
   the best first tutorial.
-- **A curve that crosses itself.** Velocities keep the ordering on the right strand:
+- **A curve that crosses itself.** The default pipeline orders by position and cuts
+  across the crossings, so use a velocity-aware orderer instead:
   [the epitrochoid autoencoder tutorial](tutorials/epitrochoid_autoencoder.ipynb).
 - **Contaminated data.** A stream-plus-background mixture model gives each sample
   a membership probability: [the outlier-rejection tutorial](tutorials/outlier_rejection.ipynb).
@@ -121,8 +123,9 @@ position-only nearest-neighbour or clustering method, breaks down in the cases t
 matter:
 
 - **Curves that cross or fold back on themselves.** Where two strands meet, the
-  nearest point is often on the wrong strand. phasecurvefit uses velocities as well
-  as positions, so the ordering stays on the right strand.
+  nearest point is often on the wrong strand. phasecurvefit's velocity-aware
+  orderers use velocities as well as positions, so the ordering stays on the right
+  strand.
 - **No known starting point.** The default pipeline finds the two ends of the curve
   itself, so no progenitor position or hand-picked start index is needed.
 - **Incomplete orderings.** An orderer may order only a reliable subset. An

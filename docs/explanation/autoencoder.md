@@ -19,14 +19,15 @@ autoencoder, from Appendix A.2 of Nibauer et al. (2022), fills both gaps.
 
 ## Training
 
-1. **Initialization.** The orderer assigns $\gamma$ over its `gamma_range`
-   ($[-1, 1]$ for the default pipeline) to the samples it ordered.
-2. **Encoder.** The encoder learns to predict $\gamma$ from phase-space coordinates,
-   and a membership probability $p$ that separates the stream from a background.
-3. **Decoder.** With the encoder frozen, the decoder is fitted to a running mean of
+1. The orderer assigns $\gamma$ over its `gamma_range` ($[-1, 1]$ for the default
+   pipeline) to the samples it ordered.
+2. In the first training phase, the encoder learns to predict $\gamma$ from
+   phase-space coordinates, and a membership probability $p$ that separates the
+   stream from a background.
+3. In the second, with the encoder frozen, the decoder is fitted to a running mean of
    the ordered member samples' positions, as a warm start for the track.
-4. **Both.** Both networks train together on reconstructing positions plus aligning
-   the track with the velocities. The alignment weight ramps linearly from
+4. In the third, both networks train together on reconstructing positions plus
+   aligning the track with the velocities. The alignment weight ramps linearly from
    `lambda_p[0]` to `lambda_p[1]` over this phase, which keeps the track's direction
    consistent with the samples' motion.
 

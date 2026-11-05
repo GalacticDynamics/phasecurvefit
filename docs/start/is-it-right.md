@@ -30,11 +30,10 @@ you have and what you want to the call to use and the page to read.
 
 ## What phasecurvefit does not do
 
-- **Order several curves at once.** Each call orders one curve. The default pipeline
-  joins disconnected pieces into one ordering, so separate distinct streams in a
-  catalogue before you order them.
-- **Model the dynamics.** The track is a smooth curve through the data in phase
-  space. phasecurvefit fits no orbit, potential or progenitor.
-- **Choose a start point for the local-flow walk on its own.** The walk needs one.
-  Chaining an {class}`~phasecurvefit.orderers.MSTOrderer` in front of it supplies an
-  end of the curve ({doc}`../how-to/chain-orderers`).
+- Each call orders one curve. The default pipeline joins disconnected pieces into
+  one ordering, so separate distinct streams in a catalogue before you order them.
+- It does not model the dynamics. The track is a smooth curve through the data in
+  phase space, and phasecurvefit fits no orbit, potential or progenitor.
+- The local-flow walk does not choose its own start point. Chaining an
+  {class}`~phasecurvefit.orderers.MSTOrderer` in front of it supplies an end of the
+  curve ({doc}`../how-to/chain-orderers`).

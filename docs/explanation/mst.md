@@ -6,15 +6,14 @@ start point. {doc}`../how-to/choose-orderer` shows how to set it up.
 
 ## From a graph to an ordering
 
-1. **Link neighbours.** Each sample is joined to its `k` nearest neighbours in
-   position, and edges longer than `jump_cap` are cut.
-2. **Build the tree.** The minimum spanning tree keeps the shortest set of edges that
-   connects every sample without loops.
-3. **Find the backbone.** The longest path through the tree, its diameter, runs from
-   one end of the curve to the other. This is what finds the ends without a start
-   point.
-4. **Order along it.** Each sample is placed by its arc length along the backbone,
-   which becomes the ordering coordinate $\gamma \in [-1, 1]$.
+1. Each sample is joined to its `k` nearest neighbours in position, and edges longer
+   than `jump_cap` are cut.
+2. The minimum spanning tree keeps the shortest set of edges that connects every
+   sample without loops.
+3. The longest path through the tree, its diameter, runs from one end of the curve to
+   the other. This backbone is what finds the ends without a start point.
+4. Each sample is placed by its arc length along the backbone, which becomes the
+   ordering coordinate $\gamma \in [-1, 1]$.
 
 The backbone is kept on the result as `result.backbone`, and calling the result
 interpolates along it.

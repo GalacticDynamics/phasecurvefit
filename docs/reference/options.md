@@ -1,7 +1,7 @@
 # Options and defaults
 
-Every option of the orderers and of autoencoder training, with its default. All
-options are keyword arguments. The {doc}`api` has the full signatures and the
+Every option of the orderers and of autoencoder training, with its default. Pass
+options as keywords. The {doc}`api` has the full signatures and the
 {doc}`../how-to/index` show how to choose values.
 
 ## `LocalFlowOrderer`
@@ -60,7 +60,7 @@ instead of the defaults below.
 | `metric` | `None` | `None` follows the previous stage: phase space after a velocity-aware stage, position otherwise |
 | `metric_scale` | `None` | `None` derives it from the data when the metric uses velocity |
 | `n_epochs` | `10` | training epochs |
-| `sigma_start` | `None` | starting neighbourhood width in lattice units; `None` uses `max(n_prototypes / 4, sigma_end)` |
+| `sigma_start` | `None` | starting neighbourhood width in lattice units; `None` uses `max(n_prototypes / 4, sigma_end)` on its own and `sigma_end` when chained |
 | `sigma_end` | `0.7` | final neighbourhood width in lattice units |
 | `densify_factor` | `5` | backbone samples per lattice segment |
 | `orient_by_velocity` | `False` | flip the ordering so $\gamma$ increases along the mean velocity |

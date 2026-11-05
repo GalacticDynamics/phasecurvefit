@@ -7,7 +7,7 @@ stream autoencoder tutorial.
 
 The notebooks need the `tutorials` extra, which adds `matplotlib` and `galax`
 ({doc}`../start/install`). Continuous integration runs every notebook on each
-change, so the outputs shown are what the code produces.
+change, so each one is checked to run with the current code.
 
 ## A stream with velocities
 

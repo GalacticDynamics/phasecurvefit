@@ -11,31 +11,65 @@ on a mock stream with injected interlopers.
 
 Membership modelling is opt-in: with `membership=None`, the default, training is
 unchanged. Pass a {class}`~phasecurvefit.nn.MixtureMembershipConfig` in the
-{class}`~phasecurvefit.nn.TrainingConfig`:
+{class}`~phasecurvefit.nn.TrainingConfig`. Here the data are 200 points on an arc
+with 10 interlopers scattered around it. The epoch counts are small to keep the
+example fast; use the defaults, or more, on real data.
 
-<!-- skip: next -->
 ```python
+import jax
+import jax.numpy as jnp
 import phasecurvefit as pcf
+
+ang = jnp.linspace(0.0, jnp.pi, 200)
+k_bg, k_model, k_train = jax.random.split(jax.random.key(0), 3)
+bg = jax.random.uniform(k_bg, (2, 10), minval=-6.0, maxval=6.0)
+pos = {
+    "x": jnp.concatenate([5 * jnp.cos(ang), bg[0]]),
+    "y": jnp.concatenate([5 * jnp.sin(ang), jnp.abs(bg[1])]),
+}
+vel = {
+    "x": jnp.concatenate([-jnp.sin(ang), jnp.zeros(10)]),
+    "y": jnp.concatenate([jnp.cos(ang), jnp.ones(10)]),
+}
+
+ordering = pcf.order(pos, vel)
+model = pcf.nn.PathAutoencoder.make(
+    pcf.nn.StandardScalerNormalizer(pos, vel),
+    gamma_range=ordering.gamma_range,
+    key=k_model,
+)
 
 membership = pcf.nn.MixtureMembershipConfig(
     sigma_init=0.1,  # your guess at the stream width, in normalised units
     sigma_ceiling=(0.5, 0.1),  # shrink the width ceiling during training
     warmup_frac=0.3,  # fit the track before rejecting anything
 )
-
-config = pcf.nn.TrainingConfig(n_epochs_both=2000, membership=membership)
-result, model, *_ = pcf.nn.train_autoencoder(model, ordering, config=config, key=key)
+config = pcf.nn.TrainingConfig(
+    n_epochs_encoder=100,
+    n_epochs_decoder=50,
+    n_epochs_both=200,
+    membership=membership,
+    show_pbar=False,
+)
+result, _, losses = pcf.nn.train_autoencoder(
+    model, ordering, config=config, key=k_train
+)
 ```
 
 ## Read the membership
 
-Use {func}`~phasecurvefit.nn.posterior_membership`, not the encoder's raw
-probability:
+Use {func}`~phasecurvefit.nn.posterior_membership` on the trained network,
+`result.model`, not the encoder's raw probability. It takes the samples as one array
+of positions and velocities in the normalised coordinates the network was trained
+in:
 
-<!-- skip: next -->
 ```python
-q = pcf.nn.posterior_membership(model, ws)  # posterior probability, in [0, 1]
+qn, pn = result.model.normalizer.transform(pos, vel)
+ws = jnp.concatenate([qn, pn], axis=1)
+
+q = pcf.nn.posterior_membership(result.model, ws)  # posterior, in [0, 1]
 members = q > 0.5
+print(q.shape)
 ```
 
 The encoder's probability is only the prior: what it believes from a sample's
