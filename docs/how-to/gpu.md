@@ -1,3 +1,11 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+  language: python
+---
+
 # Run on a GPU
 
 This guide shows how to check that phasecurvefit runs on your GPU.
@@ -8,7 +16,7 @@ runs on the CPU and warns that a CUDA-enabled `jaxlib` is not installed.
 Your code needs no changes. JAX places arrays and computations on the first
 available accelerator:
 
-```python
+```{code-cell} python
 import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf

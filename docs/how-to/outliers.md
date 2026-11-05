@@ -1,3 +1,11 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+  language: python
+---
+
 # Reject outliers with the mixture model
 
 This guide shows how to train the autoencoder with a stream-plus-background mixture
@@ -15,7 +23,7 @@ unchanged. Pass a {class}`~phasecurvefit.nn.MixtureMembershipConfig` in the
 with 10 interlopers scattered around it. The epoch counts are small to keep the
 example fast; use the defaults, or more, on real data.
 
-```python
+```{code-cell} python
 import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
@@ -63,7 +71,7 @@ Use {func}`~phasecurvefit.nn.posterior_membership` on the trained network,
 of positions and velocities in the normalised coordinates the network was trained
 in:
 
-```python
+```{code-cell} python
 qn, pn = result.model.normalizer.transform(pos, vel)
 ws = jnp.concatenate([qn, pn], axis=1)
 

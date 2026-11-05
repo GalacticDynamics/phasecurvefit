@@ -86,7 +86,7 @@ phase 3 both ({doc}`../explanation/autoencoder`).
 | `n_epochs_both` | `200` | phase 3 epochs |
 | `lambda_q` | `1.0` | weight of position reconstruction in phase 3 |
 | `lambda_p` | `(1.0, 5.0)` | `(start, stop)` of the velocity-alignment weight, ramped over phase 3 |
-| `weight_by_density` | `False` | weight samples by inverse density; use with care |
+| `weight_by_density` | `False` | weight samples by inverse density: `True`, or a mapping of keyword arguments passed to the density estimate; use with care |
 | `freeze_encoder_final_training` | `False` | freeze the encoder during phase 3 |
 | `membership` | `None` | a `MixtureMembershipConfig` to turn on outlier rejection, see below |
 
