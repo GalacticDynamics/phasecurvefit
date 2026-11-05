@@ -181,7 +181,9 @@ def train_autoencoder(
     # Update Decoder
 
     # Update running-mean decoder using trained encoder and training data
-    decoder = model.decoder.update(model, all_ws, weights=weights)
+    # Omit ``weights`` when unset, so decoders predating it still work.
+    kw = {} if weights is None else {"weights": weights}
+    decoder = model.decoder.update(model, all_ws, **kw)
 
     # Update decoder in model
     model = eqx.tree_at(lambda m: m.decoder, model, decoder)

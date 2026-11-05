@@ -189,6 +189,11 @@ class TestCumulativeWeightGamma:
         # Copies at ranks 0, 1, 2, 3 of 4: the middle tracer is ranks 1-2.
         np.testing.assert_allclose(g, [0.0, 0.5, 1.0], atol=1e-6)
 
+    def test_zero_spread_falls_back_to_uniform(self):
+        """All-zero ordered weights give uniform spacing, not a constant."""
+        g = _cumulative_weight_gamma(jnp.zeros(5), (-1.0, 1.0))
+        np.testing.assert_allclose(g, jnp.linspace(-1.0, 1.0, 5), atol=1e-6)
+
 
 class TestRunningMeanDecoderWeights:
     """Tests for the weighted running mean."""
@@ -203,6 +208,30 @@ class TestRunningMeanDecoderWeights:
             weights_train=jnp.array([3.0, 1.0]),
         )
         np.testing.assert_allclose(dec(jnp.array(0.05)), [0.25])
+
+
+class _NoWeightsDecoder(pcf.nn.RunningMeanDecoder):
+    """A decoder whose ``update`` predates the ``weights`` keyword."""
+
+    def update(self, model, all_ws):  # type: ignore[override]
+        return pcf.nn.RunningMeanDecoder.update(self, model, all_ws)
+
+
+class TestExternalDecoderWithoutWeights:
+    """An external decoder without ``weights`` still trains unweighted."""
+
+    def test_update_without_weights_kwarg(self):
+        """``update`` is called without ``weights=`` when none are given."""
+        pos, vel = _arc()
+        model = pcf.nn.EncoderExternalDecoder(
+            pcf.nn.OrderingNet(in_size=4, width_size=16, depth=1, key=jr.key(1)),
+            _NoWeightsDecoder(window_size=0.2),
+            pcf.nn.StandardScalerNormalizer(pos, vel),
+        )
+        result = pcf.order(pos, vel, pcf.orderers.MSTOrderer())
+        cfg = pcf.nn.OrderingTrainingConfig(n_epochs=2, show_pbar=False)
+        ae, _, _ = pcf.nn.train_autoencoder(model, result, config=cfg, key=jr.key(2))
+        assert ae.gamma.shape == (60,)
 
 
 def _fast_config(**kw):

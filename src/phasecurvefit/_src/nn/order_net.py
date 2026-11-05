@@ -320,13 +320,16 @@ def _cumulative_weight_gamma(
 
     Each tracer sits at the midpoint of its share of the cumulative weight, so a
     tracer of weight 2 takes the room of two tracers of weight 1. With equal
-    weights this is ``linspace(*gamma_range, N)``.
+    weights this is ``linspace(*gamma_range, N)``, and it falls back to that
+    when the weights give no spread (e.g. every ordered tracer has weight 0
+    while some unvisited one does not), rather than collapsing to a constant.
     """
     gmin, gmax = gamma_range
     c = jnp.cumsum(weights) - 0.5 * weights
     span = c[-1] - c[0]
-    frac = jnp.where(span > 0, (c - c[0]) / jnp.where(span > 0, span, 1.0), 0.0)
-    return gmin + (gmax - gmin) * frac
+    frac = (c - c[0]) / jnp.where(span > 0, span, 1.0)
+    uniform = jnp.linspace(0.0, 1.0, weights.shape[0], dtype=frac.dtype)
+    return gmin + (gmax - gmin) * jnp.where(span > 0, frac, uniform)
 
 
 default_optimizer = optax.adamw(learning_rate=1e-3, weight_decay=1e-7)
