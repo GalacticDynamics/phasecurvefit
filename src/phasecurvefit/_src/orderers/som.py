@@ -34,7 +34,12 @@ from .result import OrderingResult
 from phasecurvefit._src import som as _som
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
-from phasecurvefit._src.checks import check_nan_policy, check_velocities, value_error_if
+from phasecurvefit._src.checks import (
+    check_nan_policy,
+    check_velocities,
+    check_weights,
+    value_error_if,
+)
 from phasecurvefit._src.custom_types import BSzN, FSz0, FSzN, ISzN, VectorComponents
 from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
@@ -57,6 +62,7 @@ def _train_and_project(
     sigma_start: float | None,
     metric: AbstractDistanceMetric,
     metric_scale: float | FSz0,
+    sub_w: FSzN | None,
     /,
 ) -> tuple[VectorComponents, VectorComponents, FSzN, BSzN]:
     """Run fit -> densify -> chord as one XLA program.
@@ -79,6 +85,7 @@ def _train_and_project(
         n_epochs=orderer.n_epochs,
         sigma_start=sigma_start,
         sigma_end=orderer.sigma_end,
+        weights=sub_w,
         outlier_clip_sigma=orderer.outlier_clip_sigma,
         outlier_clip_max_iters=orderer.outlier_clip_max_iters,
     )
@@ -523,13 +530,28 @@ class SOMOrderer(AbstractOrderer):
         *,
         metadata: StateMetadata | None = None,  # noqa: ARG002
         init: AbstractResult | None = None,
+        weights: FSzN | None = None,
     ) -> OrderingResult:
-        """Train a SOM and order the tracers by their chord parameter."""
+        """Train a SOM and order the tracers by their chord parameter.
+
+        ``weights`` weigh each tracer in the batch-Kohonen update (``omega_n``
+        in :func:`~phasecurvefit.som.fit`), so the prototypes follow the
+        weighted density. They cannot be combined with ``outlier_clip_sigma``,
+        which sets its own weights.
+        """
         _check_component_keys(positions, velocities)
 
         full_q = {k: jnp.asarray(v) for k, v in positions.items()}
         full_p = {k: jnp.asarray(v) for k, v in velocities.items()}
         n_obs = int(next(iter(full_q.values())).shape[0])
+        if weights is not None:
+            weights = check_weights(weights, n_obs)
+            if self.outlier_clip_sigma is not None:
+                msg = (
+                    "SOMOrderer: weights and outlier_clip_sigma are mutually "
+                    "exclusive; outlier clipping sets its own per-tracer weights."
+                )
+                raise ValueError(msg)
 
         # Working set: everything, or exactly what a prior stage visited.
         # Points a prior stage rejected as outliers stay rejected.
@@ -590,6 +612,7 @@ class SOMOrderer(AbstractOrderer):
             work = prior[prior >= 0]
         sub_q = {k: v[work] for k, v in full_q.items()}
         sub_p = {k: v[work] for k, v in full_p.items()}
+        sub_w = None if weights is None else weights[work]
 
         # With a prior stage, the subset is already in that stage's order, so
         # equi-frequency binning along it is binning along the identity.
@@ -621,7 +644,15 @@ class SOMOrderer(AbstractOrderer):
                 "orient_by_velocity).",
             )
         backbone_q, backbone_p, lam, kept = _train_and_project(
-            self, proto_q, proto_p, sub_q, sub_p, sigma_start, metric, metric_scale
+            self,
+            proto_q,
+            proto_p,
+            sub_q,
+            sub_p,
+            sigma_start,
+            metric,
+            metric_scale,
+            sub_w,
         )
         if self.orient_by_velocity:
             # Flip so the chord runs along the mean velocity rather than
@@ -675,6 +706,7 @@ class SOMOrderer(AbstractOrderer):
             gamma_range=(-1.0, 1.0),
             backbone=backbone_q,
             chord=chord_full,
+            weights=weights,
             # The *resolved* metric, not ``self.metric``: standalone it is
             # position-only, but chained after a velocity-aware stage it is
             # derived from ``init``. A stage after this one reads the flag off

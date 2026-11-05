@@ -11,6 +11,7 @@ top level instead of needing ``base``'s lazy, ``noqa: PLC0415`` imports.
 __all__: tuple[str, ...] = ("default_pipeline",)
 
 import jax
+from jaxtyping import Array, Float
 
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
@@ -24,6 +25,7 @@ def default_pipeline(
     velocities: VectorComponents,
     *,
     metadata: StateMetadata | None = None,
+    weights: Float[Array, " n_obs"] | None = None,
     n_prototypes: int = 15,
     **som_kwargs: object,
 ) -> AbstractResult:
@@ -68,6 +70,9 @@ def default_pipeline(
         Phase-space tracers, as for :func:`~phasecurvefit.order`.
     metadata
         Passed through to both stages.
+    weights
+        Per-tracer weights, passed through to both stages: the SOM fits with
+        them and the MST carries them on its result.
     n_prototypes
         Passed to :class:`~phasecurvefit.orderers.SOMOrderer`; also the
         threshold below which the SOM stage is skipped.
@@ -111,7 +116,8 @@ def default_pipeline(
         on_disconnected="connect",
         nan_policy="omit",
     )
-    mst_result = mst.order(positions, velocities, metadata=metadata)
+    kw: dict[str, object] = {} if weights is None else {"weights": weights}
+    mst_result = mst.order(positions, velocities, metadata=metadata, **kw)
     try:
         n_visited = int(mst_result.n_visited)
     except jax.errors.ConcretizationTypeError as exc:
@@ -126,4 +132,4 @@ def default_pipeline(
     if n_visited < n_prototypes:
         return mst_result
     som = SOMOrderer(n_prototypes=n_prototypes, **som_kwargs)
-    return som.order(positions, velocities, metadata=metadata, init=mst_result)
+    return som.order(positions, velocities, metadata=metadata, init=mst_result, **kw)

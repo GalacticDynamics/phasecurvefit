@@ -55,6 +55,7 @@ from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
 from phasecurvefit._src.orderers.localflow import (
     LocalFlowOrderer,
+    _check_walk_weights,
     _finalize,
     _resolve_start_idx,
 )
@@ -433,6 +434,7 @@ def _order_with_backbone_and_chord(
     *,
     metadata: StateMetadata | None,
     init: AbstractResult | None,
+    weights: Float[Array, " n_obs"] | None,
 ) -> OrderingResult:
     """Shared body for orderers whose Quantity dispatch returns a backbone and chord.
 
@@ -447,7 +449,9 @@ def _order_with_backbone_and_chord(
     q_plain = {k: u.ustrip(usys, v) for k, v in positions.items()}
     p_plain = {k: u.ustrip(usys, v) for k, v in velocities.items()}
 
-    result = orderer.order(q_plain, p_plain, metadata=metadata, init=init)
+    result = orderer.order(
+        q_plain, p_plain, metadata=metadata, init=init, weights=weights
+    )
 
     length_unit = usys["length"]
     chord_unit = _chord_unit(positions, usys)
@@ -472,6 +476,7 @@ def order(
     *,
     metadata: StateMetadata | None = None,
     init: AbstractResult | None = None,
+    weights: Float[Array, " n_obs"] | None = None,
 ) -> OrderingResult:
     """Order Quantity-valued tracers with the MST backbone.
 
@@ -479,7 +484,7 @@ def order(
     shared with :class:`SOMOrderer`'s dispatch below.
     """
     return _order_with_backbone_and_chord(
-        self, positions, velocities, metadata=metadata, init=init
+        self, positions, velocities, metadata=metadata, init=init, weights=weights
     )
 
 
@@ -491,6 +496,7 @@ def order(
     *,
     metadata: StateMetadata | None = None,
     init: AbstractResult | None = None,
+    weights: Float[Array, " n_obs"] | None = None,
 ) -> OrderingResult:
     """Order Quantity-valued tracers with the SOM.
 
@@ -513,7 +519,7 @@ def order(
         stripped = u.ustrip(usys, self.metric_scale)
         self = dataclasses.replace(self, metric_scale=stripped)
     return _order_with_backbone_and_chord(
-        self, positions, velocities, metadata=metadata, init=init
+        self, positions, velocities, metadata=metadata, init=init, weights=weights
     )
 
 
@@ -525,6 +531,7 @@ def order(
     *,
     metadata: StateMetadata | None = None,
     init: AbstractResult | None = None,
+    weights: Float[Array, " n_obs"] | None = None,
 ) -> WalkLocalFlowResult:
     """Order Quantity-valued tracers with the local-flow walk.
 
@@ -545,6 +552,7 @@ def order(
     non-``quax`` plain-array core.
     """
     usys = _require_usys(metadata)
+    weights = _check_walk_weights(weights, positions)
 
     def _as_length_q(val: object, /) -> AbcQ:
         return val if isinstance(val, u.AbstractQuantity) else u.Q(val, usys["length"])
@@ -574,4 +582,5 @@ def order(
     return dataclasses.replace(
         result,
         chord=u.uconvert(chord_unit, u.Q(result.chord, usys["length"])),
+        weights=weights,
     )

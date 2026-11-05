@@ -135,8 +135,16 @@ class AbstractOrderer(eqx.Module):
         *,
         metadata: StateMetadata | None = None,
         init: AbstractResult | None = None,
+        weights: Float[Array, " n_obs"] | None = None,
     ) -> AbstractResult:
         """Order the tracers and return a result the autoencoder can consume.
+
+        ``weights`` are optional per-observation weights, shape ``(n_obs,)``,
+        finite and non-negative. An orderer that can use them (``SOMOrderer``)
+        does; one that cannot (``MSTOrderer``, ``LocalFlowOrderer``) orders as
+        if they were absent. Every built-in orderer carries them through on the
+        result's ``weights``, so a later chain stage and
+        :func:`~phasecurvefit.nn.train_autoencoder` see them too.
 
         ``init`` is an optional result from a previous ordering stage. An
         orderer that can refine a prior ordering uses it --
@@ -169,6 +177,7 @@ def order(
     *,
     metadata: StateMetadata | None = None,
     init: AbstractResult | None = None,
+    weights: Float[Array, " n_obs"] | None = None,
 ) -> AbstractResult:
     """Order tracers with ``orderer`` -- the primary ordering entry point.
 
@@ -203,6 +212,14 @@ def order(
     >>> res.indices
     Array([0, 1, 2], dtype=int32)
 
+    ``weights`` gives each tracer a weight, e.g. the density at each pixel of a
+    density field. Orderers that can use them do (see
+    :meth:`AbstractOrderer.order`), and the result carries them on to
+    :func:`~phasecurvefit.nn.train_autoencoder`:
+
+    >>> pcf.order(q, p, weights=jnp.array([1.0, 2.0, 1.0])).weights
+    Array([1., 2., 1.], dtype=float32)
+
     """
     msg = "positions and velocities cannot both be empty; there is nothing to order."
     if (isinstance(positions, dict) and not positions) and (
@@ -236,8 +253,13 @@ def order(
                 "`pcf.orderers.LocalFlowOrderer()`."
             )
             raise ValueError(msg)
-        return default_pipeline(positions, velocities, metadata=metadata)
-    if init is None:
-        # Omit ``init`` entirely so orderers predating it still work.
-        return orderer.order(positions, velocities, metadata=metadata)
-    return orderer.order(positions, velocities, metadata=metadata, init=init)
+        return default_pipeline(
+            positions, velocities, metadata=metadata, weights=weights
+        )
+    # Omit ``init`` and ``weights`` when unset, so orderers predating them work.
+    kw: dict[str, object] = {}
+    if init is not None:
+        kw["init"] = init
+    if weights is not None:
+        kw["weights"] = weights
+    return orderer.order(positions, velocities, metadata=metadata, **kw)

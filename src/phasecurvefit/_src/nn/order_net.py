@@ -26,6 +26,7 @@ from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 from jaxmore.nn import masked_mean
 
 from .trainer import EqxScanTrainer, EqxTrainCarry, eqx_step
+from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import FSz0, FSzN
 
 
@@ -158,6 +159,7 @@ def encoder_loss(
     mask: Bool[Array, " N"],
     *,
     lambda_prob: float = 1.0,
+    weights: FSzN | None = None,
 ) -> FSz0:
     r"""Compute loss for interpolation network training.
 
@@ -178,6 +180,13 @@ def encoder_loss(
         Only masked positions contribute to the loss.
     lambda_prob : float, optional
         Weight for probability penalties. Default: 1.0.
+    weights : Array, shape (N,), optional
+        Per-tracer weights on the $\gamma$ term, normalized to mean 1 over the
+        training set. ``None`` (default) weighs every tracer equally. The
+        membership terms are not weighted: a weight says how much a tracer
+        counts in the track, not how sure we are that it belongs, and a
+        weighted membership term would let faint tracers (the tails of a
+        density field) fall below the membership threshold and drop out.
 
     Returns
     -------
@@ -185,8 +194,9 @@ def encoder_loss(
         Scalar loss value.
 
     """
+    w = 1.0 if weights is None else weights
     # Compute per-element losses
-    gamma_sq_error = jnp.square(gamma_true - gamma_pred)
+    gamma_sq_error = w * jnp.square(gamma_true - gamma_pred)
     prob_ordered_sq_error = jnp.square(1.0 - prob_pred_ordered)
     prob_random_sq_error = jnp.square(prob_pred_random)
 
@@ -207,6 +217,7 @@ def compute_loss(
     lambda_prob: float = 1.0,
     *,
     key: PRNGKeyArray | None = None,
+    weights: FSzN | None = None,
 ) -> FSz0:
     r"""Compute interpolation network loss.
 
@@ -227,6 +238,8 @@ def compute_loss(
         Weight for probability loss terms. Default: 1.0.
     key : PRNGKeyArray | None
         Random key.
+    weights : Array, shape (B,), optional
+        Per-tracer weights; see `encoder_loss`.
 
     Returns
     -------
@@ -264,7 +277,56 @@ def compute_loss(
         prob_pred_random=prob_pred_random,
         mask=mask,
         lambda_prob=lambda_prob,
+        weights=weights,
     )
+
+
+def _weighted_compute_loss(
+    model: OrderingNet,
+    ws: Float[Array, " B TwoF"],
+    gamma: Float[Array, " B"],
+    weights: FSzN,
+    rand_ws: Float[Array, "B TwoF"],
+    mask: Bool[Array, " B"],
+    /,
+    lambda_prob: float = 1.0,
+    *,
+    key: PRNGKeyArray | None = None,
+) -> FSz0:
+    """`compute_loss` with the weights as a batched data argument, for the trainer."""
+    return compute_loss(
+        model, ws, gamma, rand_ws, mask, lambda_prob, key=key, weights=weights
+    )
+
+
+def _unit_mean_weights(
+    weights: Float[Array, " N"] | None, n_obs: int, /
+) -> Float[Array, " N"] | None:
+    """Validate per-tracer weights and scale them to mean 1, or pass ``None``.
+
+    Mean 1 keeps a weighted loss on the same scale as the unweighted one, so
+    learning rates and loss weights mean the same thing with or without them.
+    """
+    if weights is None:
+        return None
+    w = check_weights(weights, n_obs)
+    return w / jnp.mean(w)
+
+
+def _cumulative_weight_gamma(
+    weights: Float[Array, " N"], gamma_range: tuple[float, float], /
+) -> Float[Array, " N"]:
+    r"""Spread ``gamma_range`` over tracers in order, by weight rather than count.
+
+    Each tracer sits at the midpoint of its share of the cumulative weight, so a
+    tracer of weight 2 takes the room of two tracers of weight 1. With equal
+    weights this is ``linspace(*gamma_range, N)``.
+    """
+    gmin, gmax = gamma_range
+    c = jnp.cumsum(weights) - 0.5 * weights
+    span = c[-1] - c[0]
+    frac = jnp.where(span > 0, (c - c[0]) / jnp.where(span > 0, span, 1.0), 0.0)
+    return gmin + (gmax - gmin) * frac
 
 
 default_optimizer = optax.adamw(learning_rate=1e-3, weight_decay=1e-7)
@@ -334,14 +396,14 @@ class OrderingNetTrainer(EqxScanTrainer):
     ) -> tuple[Array, ...]:
         """Draw fresh random negatives for this epoch."""
         del carry, epoch_idx, num_epochs
-        ordered_ws, gamma_target, _ = data_args
+        ordered_ws, gamma_target, weights, _ = data_args
         random_ws = jr.uniform(
             epoch_key,
             shape=self.random_ws_shape,
             minval=self.ws_min,
             maxval=self.ws_max,
         )
-        return (ordered_ws, gamma_target, random_ws)
+        return (ordered_ws, gamma_target, weights, random_ws)
 
 
 def train_ordering_net(
@@ -352,6 +414,7 @@ def train_ordering_net(
     config: OrderingTrainingConfig | None = None,
     *,
     chord: Float[Array, " N"] | None = None,
+    weights: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[OrderingNet, optax.OptState, Float[Array, "E"]]:
     r"""Train the interpolation network on ordered stream tracers.
@@ -372,6 +435,13 @@ def train_ordering_net(
         that ``arclength_alpha`` blends toward; when ``None`` that target is
         approximated by summing straight-line steps between consecutive ordered
         observations, which is noisier and lives in normalized space.
+    weights : Array, shape (N,) | None, keyword-only
+        Per-tracer weights, in input order, e.g. the density at each pixel of
+        a density field. They weight each tracer's terms in the loss, and the
+        uniform-spacing part of the $\gamma$ target spreads tracers by
+        cumulative weight rather than by count, so a tracer of weight 2 is
+        treated like two coincident tracers of weight 1. ``None`` (default)
+        weighs every tracer equally.
     ordering_indices : Array, shape (N,)
         Indices representing the ordering of tracers.  Unvisited tracers have
         indices of -1.
@@ -424,7 +494,15 @@ def train_ordering_net(
     # Initialize gamma targets.
     # Base target: uniform spacing in [gamma_min, gamma_max]
     gmin, gmax = model.gamma_range
-    gamma_lin = jnp.linspace(gmin, gmax, n_total)
+    w_all = _unit_mean_weights(weights, all_ws.shape[0])
+    if w_all is None:
+        gamma_lin = jnp.linspace(gmin, gmax, n_total)
+        w_ord = jnp.ones(n_total, dtype=all_ws.dtype)
+    else:
+        w_ord = w_all[ordering_indices][is_ordered]
+        w_mean = jnp.mean(w_ord)
+        w_ord = w_ord / jnp.where(w_mean > 0, w_mean, 1.0)
+        gamma_lin = _cumulative_weight_gamma(w_ord, (gmin, gmax))
 
     # Arclength-like target. This mitigates tanh-compression in gamma by
     # encouraging gamma to track cumulative arclength rather than index.
@@ -464,7 +542,7 @@ def train_ordering_net(
     trainer = OrderingNetTrainer(
         make_step=ft.partial(
             eqx_step,
-            loss_fn=compute_loss,
+            loss_fn=_weighted_compute_loss,
             optimizer=optimizer,
             lambda_prob=config.lambda_prob,
         ),
@@ -478,7 +556,7 @@ def train_ordering_net(
     placeholder_rand_ws = jnp.zeros(shape, dtype=ordered_ws.dtype)
     initial_carry, epoch_data = trainer.init(
         model,
-        (ordered_ws, gamma_target, placeholder_rand_ws),
+        (ordered_ws, gamma_target, w_ord, placeholder_rand_ws),
         ordered_mask,
         optimizer=optimizer,
         key=key,

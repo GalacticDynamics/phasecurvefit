@@ -22,6 +22,7 @@ from jaxmore.nn import masked_mean
 
 from .order_net import default_optimizer
 from .trainer import EqxScanTrainer, eqx_step
+from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import FSz0, RSz0, RSzN
 
 
@@ -354,14 +355,19 @@ def compute_loss(
     mask: Bool[Array, " B"],
     *,
     key: PRNGKeyArray | None = None,
+    weights: RSzN | None = None,
 ) -> FSz0:
-    """Compute the loss for a batch of data."""
+    """Compute the loss for a batch of data.
+
+    ``weights`` are per-tracer weights, normalized to mean 1 over the training
+    set; ``None`` (default) weighs every tracer equally.
+    """
     # Predict positions from model
     qs_pred = jax.vmap(model, (0, None))(gamma, key)
 
     return decoder_loss(
         qs_meas=qs_mean,
-        weights=jnp.ones_like(gamma),
+        weights=jnp.ones_like(gamma) if weights is None else weights,
         qs_pred=qs_pred,
         t_hat=jnp.zeros_like(qs_pred),  # Not used in current loss
         p_hat=jnp.zeros_like(qs_pred),  # Not used in current loss
@@ -369,6 +375,20 @@ def compute_loss(
         lambda_q=1,
         lambda_p=0.1,  # set to small value in loss
     )
+
+
+def _weighted_compute_loss(
+    model: TrackNet,
+    gamma: Float[Array, " B"],
+    qs_mean: Real[Array, " B D"],
+    weights: RSzN,
+    mask: Bool[Array, " B"],
+    /,
+    *,
+    key: PRNGKeyArray | None = None,
+) -> FSz0:
+    """`compute_loss` with the weights as a batched data argument, for the trainer."""
+    return compute_loss(model, gamma, qs_mean, mask, key=key, weights=weights)
 
 
 @dataclass
@@ -397,9 +417,14 @@ def train_track_net(
     mask: Bool[Array, " N"],
     *,
     config: TrackTrainingConfig | None = None,
+    weights: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[TrackNet, optax.OptState, Float[Array, " n_epochs"]]:
     """Train the TrackNet decoder using the provided data.
+
+    ``weights`` are optional per-tracer weights, in the same order as
+    ``gamma``. They are scaled to mean 1 over the masked tracers and weight
+    each tracer's term in the loss. ``None`` (default) weighs them equally.
 
     Notes
     -----
@@ -415,12 +440,22 @@ def train_track_net(
 
     optimizer = config.optimizer
 
+    if weights is None:
+        w = jnp.ones_like(gamma)
+    else:
+        w = check_weights(weights, gamma.shape[0])
+        # Mean 1 over the tracers that train, so the loss keeps its scale.
+        w_mean = masked_mean(w, mask)
+        w = w / jnp.where(w_mean > 0, w_mean, 1.0)
+
     trainer = EqxScanTrainer(
-        make_step=ft.partial(eqx_step, loss_fn=compute_loss, optimizer=optimizer),
+        make_step=ft.partial(
+            eqx_step, loss_fn=_weighted_compute_loss, optimizer=optimizer
+        ),
         loss_agg_fn=masked_mean,
     )
     initial_carry, epoch_data = trainer.init(
-        model, (gamma, qs_mean), mask, optimizer=optimizer, key=key
+        model, (gamma, qs_mean, w), mask, optimizer=optimizer, key=key
     )
     (model, opt_state, _), epoch_losses = trainer.run(
         initial_carry,

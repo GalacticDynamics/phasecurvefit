@@ -73,6 +73,13 @@ class OrderingResult(AbstractResult):
         it is the natural affine parameter for a downstream fit. ``None`` when
         the orderer does not provide one, in which case consumers fall back to
         index-uniform spacing.
+    weights : Float[Array, " n_obs"] | None
+        Per-observation weights, in **input order**, as passed to ``order()``.
+        ``None`` (default) means every observation counts equally. Orderers
+        carry them through unchanged so that
+        :func:`~phasecurvefit.nn.train_autoencoder` picks them up from the
+        result. A density field enters as one observation per pixel, weighted
+        by the density there.
     velocity_aware : bool
         Inherited from :class:`~phasecurvefit._src.abstract_result.AbstractResult`.
         For an orderer, it reflects the *metric* it was configured with -- see
@@ -179,6 +186,7 @@ class OrderingResult(AbstractResult):
     backbone: VectorComponents | None = None
     backbone_size: ISz0 | None = None
     chord: FSzN | None = None
+    weights: FSzN | None = None
 
     def __check_init__(self) -> None:
         """Reject a degenerate ``gamma_range`` (its width divides in ``__call__``)."""

@@ -30,6 +30,7 @@ def fit_track(
     *,
     key: PRNGKeyArray,
     metadata: StateMetadata | None = None,
+    weights: Float[Array, " N"] | None = None,
     n_prototypes: int = 15,
     training_config: TrainingConfig | None = None,
 ) -> tuple[AbstractResult, AutoencoderResult, Float[Array, " n_epochs"]]:
@@ -53,6 +54,10 @@ def fit_track(
         Split once for model initialization and once for training.
     metadata
         Passed through to :func:`~phasecurvefit.orderers.default_pipeline`.
+    weights
+        Per-tracer weights, e.g. the density at each pixel of a density field.
+        Passed to :func:`~phasecurvefit.orderers.default_pipeline`, whose result
+        carries them on to :func:`~phasecurvefit.nn.train_autoencoder`.
     n_prototypes
         Passed to :func:`~phasecurvefit.orderers.default_pipeline`.
     training_config
@@ -93,7 +98,11 @@ def fit_track(
     """
     key_model, key_train = jr.split(key)
     ordering_result = default_pipeline(
-        positions, velocities, metadata=metadata, n_prototypes=n_prototypes
+        positions,
+        velocities,
+        metadata=metadata,
+        weights=weights,
+        n_prototypes=n_prototypes,
     )
     normalizer = StandardScalerNormalizer(positions, velocities)
     model = PathAutoencoder.make(

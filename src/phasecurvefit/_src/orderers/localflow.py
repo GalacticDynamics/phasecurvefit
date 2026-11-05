@@ -7,7 +7,7 @@ import dataclasses
 import equinox as eqx
 import jax.numpy as jnp
 import plum
-from jaxtyping import Array, Int
+from jaxtyping import Array, Float, Int
 
 from .base import AbstractOrderer, chord_along_ordering
 from phasecurvefit._src.abstract_result import AbstractResult
@@ -18,7 +18,7 @@ from phasecurvefit._src.algorithm import (
     WalkLocalFlowResult,
     _local_flow_walk,
 )
-from phasecurvefit._src.checks import check_nan_policy
+from phasecurvefit._src.checks import check_nan_policy, check_weights
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.query_config import WalkConfig
 
@@ -52,6 +52,15 @@ def _resolve_start_idx(
     # indices are traced, and concretizing here would make a chain unjittable.
     # The walk accepts a traced start index.
     return jnp.where(jnp.any(visited), first, 0)
+
+
+def _check_walk_weights(
+    weights: Float[Array, " n_obs"] | None, positions: VectorComponents, /
+) -> Float[Array, " n_obs"] | None:
+    """Validate ``weights`` against the number of tracers, if given."""
+    if weights is None:
+        return None
+    return check_weights(weights, next(iter(positions.values())).shape[0])
 
 
 def _finalize(
@@ -162,8 +171,14 @@ class LocalFlowOrderer(AbstractOrderer):
         *,
         metadata: StateMetadata | None = None,
         init: AbstractResult | None = None,
+        weights: Float[Array, " n_obs"] | None = None,
     ) -> WalkLocalFlowResult:
-        """Run the local-flow walk and return its result."""
+        """Run the local-flow walk and return its result.
+
+        ``weights`` do not change the walk; they are validated and carried
+        through on the result.
+        """
+        weights = _check_walk_weights(weights, positions)
         result = _local_flow_walk(
             positions,
             velocities,
@@ -177,4 +192,4 @@ class LocalFlowOrderer(AbstractOrderer):
             nan_policy=self.nan_policy,
             metadata=metadata,
         )
-        return _finalize(result, result.positions)
+        return dataclasses.replace(_finalize(result, result.positions), weights=weights)
