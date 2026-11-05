@@ -14,12 +14,17 @@ sd_hide_title: true
 **Order phase-space data along a curve, then fit a smooth track through it.**
 
 You have positions and velocities for many samples that lie along a curve, such as
-the stars of a stellar stream, but not the order they come in along it.
-phasecurvefit finds that order, gives every sample an ordering coordinate
-$\gamma$, and fits a smooth mean track $x(\gamma)$. Its default needs no known start
-point, and velocity-aware orderers keep the ordering on the right strand where a
-curve crosses itself. It is built on JAX: its orderers and networks work with
-`jit`, `vmap` and `grad`, and everything runs on CPU or GPU.
+the stars of a stellar stream, but not the order they come in along it. Or you have
+an image of the curve, such as a density map of a stream, and each pixel becomes a
+sample weighted by its density. phasecurvefit finds the order, gives every sample an
+ordering coordinate $\gamma$, and fits a smooth mean track $x(\gamma)$. Its default
+needs no known start point, and velocity-aware orderers keep the ordering on the
+right strand where a curve crosses itself. It is built on JAX: its orderers and
+networks work with `jit`, `vmap` and `grad`, and everything runs on CPU or GPU.
+
+::::{tab-set}
+
+:::{tab-item} Point cloud
 
 ```{image} _static/hero.png
 ---
@@ -57,7 +62,57 @@ track = fitted(jnp.linspace(*fitted.gamma_range, 300))  # the smooth mean track
 print(fitted.gamma.shape)  # an ordering coordinate for every sample: (400,)
 ```
 
-The script that draws the figure above runs this same code
+:::
+
+:::{tab-item} Density field
+
+```{image} _static/hero-field.png
+---
+alt: >-
+  Two panels. Left, "Input: a density image": a grey image of the same spiral,
+  dark along the curve and fading out to either side. Right, "pcf.fit_track with
+  weights": the bright pixels of the image coloured from purple at the outer end to
+  yellow at the inner end by the ordering coordinate gamma, fainter where the
+  density is lower, with an orange fitted track running along the middle of the
+  spiral.
+---
+```
+
+```python
+import jax
+import jax.numpy as jnp
+import phasecurvefit as pcf
+
+# A stand-in for your data: the same spiral as an image, blurred across the curve
+t = jnp.linspace(0.5, 0.5 + 3 * jnp.pi, 400)
+r = 1 + 0.6 * t
+grid = jnp.linspace(-7.5, 7.5, 120)
+X, Y = jnp.meshgrid(grid, grid)
+cx, cy = r * jnp.cos(t), r * jnp.sin(t)
+d2 = jnp.min((X[..., None] - cx) ** 2 + (Y[..., None] - cy) ** 2, axis=-1)
+image = jnp.exp(-d2 / (2 * 0.3**2))
+
+keep = image.ravel() > 0.05  # each bright pixel becomes a sample
+pos = {"x": X.ravel()[keep], "y": Y.ravel()[keep]}
+vel = jax.tree.map(jnp.zeros_like, pos)  # an image has no velocities
+weights = image.ravel()[keep]  # weighted by the density there
+
+config = pcf.nn.TrainingConfig(show_pbar=False)
+ordering, fitted, losses = pcf.fit_track(
+    pos, vel, key=jax.random.key(1), weights=weights, training_config=config
+)
+track = fitted(jnp.linspace(*fitted.gamma_range, 300))  # the smooth mean track
+print(fitted.gamma.shape == weights.shape)  # a gamma for every pixel: True
+```
+
+An image has no velocities, so nothing sets which end of the curve $\gamma$ starts
+from.
+
+:::
+
+::::
+
+The script that draws these figures runs this same code
 ([`docs/_static/generate_hero.py`](https://github.com/GalacticDynamics/phasecurvefit/blob/main/docs/_static/generate_hero.py)).
 
 ## Where to start
