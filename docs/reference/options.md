@@ -1,8 +1,8 @@
 # Options and defaults
 
 Every option of the orderers and of autoencoder training, with its default. Pass
-options as keywords. The {doc}`api` has the full signatures and the
-{doc}`../how-to/index` show how to choose values.
+options as keywords. The {doc}`api` has the full signatures, and the how-to guides
+({doc}`../how-to/index`) show how to choose values.
 
 ## `LocalFlowOrderer`
 
