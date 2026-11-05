@@ -98,7 +98,7 @@ One task each: choose an orderer, tune the metric, fill gaps, reject outliers, u
 :::
 
 :::{grid-item-card} How it works
-:link: guides/algorithm
+:link: explanation/index
 :link-type: doc
 
 The local-flow walk, the MST backbone, the SOM, the autoencoder and the mixture model.
@@ -161,6 +161,14 @@ tutorials/index
 :caption: How-to guides
 
 how-to/index
+```
+
+```{toctree}
+:maxdepth: 1
+:hidden:
+:caption: How it works
+
+explanation/index
 ```
 
 ```{toctree}
