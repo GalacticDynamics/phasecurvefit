@@ -1861,6 +1861,7 @@ dev = [
     { name = "sphinx-copybutton" },
     { name = "sphinx-design" },
     { name = "sphinx-prompt" },
+    { name = "sphinx-reredirects" },
     { name = "sphinx-togglebutton" },
     { name = "sphinxext-opengraph" },
     { name = "sybil", extra = ["pytest"] },
@@ -1880,6 +1881,7 @@ docs = [
     { name = "sphinx-copybutton" },
     { name = "sphinx-design" },
     { name = "sphinx-prompt" },
+    { name = "sphinx-reredirects" },
     { name = "sphinx-togglebutton" },
     { name = "sphinxext-opengraph" },
 ]
@@ -1968,6 +1970,7 @@ dev = [
     { name = "sphinx-copybutton", specifier = ">=0.5.2" },
     { name = "sphinx-design", specifier = ">=0.6.1" },
     { name = "sphinx-prompt", specifier = ">=1.9.0" },
+    { name = "sphinx-reredirects", specifier = ">=1.1.0" },
     { name = "sphinx-togglebutton", specifier = ">=0.3.2" },
     { name = "sphinxext-opengraph", specifier = ">=0.9.2" },
     { name = "sybil", extras = ["pytest"], specifier = ">=8.0.0" },
@@ -1987,6 +1990,7 @@ docs = [
     { name = "sphinx-copybutton", specifier = ">=0.5.2" },
     { name = "sphinx-design", specifier = ">=0.6.1" },
     { name = "sphinx-prompt", specifier = ">=1.9.0" },
+    { name = "sphinx-reredirects", specifier = ">=1.1.0" },
     { name = "sphinx-togglebutton", specifier = ">=0.3.2" },
     { name = "sphinxext-opengraph", specifier = ">=0.9.2" },
 ]
@@ -3020,6 +3024,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d0/a3/91293c0e0f0b76d0697ba7a41541929ca3f5457671d008bd84a9bde17e21/sphinx_prompt-1.10.2.tar.gz", hash = "sha256:47b592ba75caebd044b0eddf7a5a1b6e0aef6df587b034377cd101a999b686ba", size = 5566, upload-time = "2025-11-28T09:23:18.057Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a9/f4/44ce4d0179fb4e9cfe181a8aa281bba23e40158a609fb3680774529acaaa/sphinx_prompt-1.10.2-py3-none-any.whl", hash = "sha256:6594337962c4b1498602e6984634bed4a0dc7955852e3cfc255eb0af766ed859", size = 7474, upload-time = "2025-11-28T09:23:17.154Z" },
+]
+
+[[package]]
+name = "sphinx-reredirects"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "sphinx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1b/8d/0e39fe2740d7d71417edf9a6424aa80ca2c27c17fc21282cdc39f90d5a40/sphinx_reredirects-1.1.0.tar.gz", hash = "sha256:fb9b195335ab14b43f8273287d0c7eeb637ba6c56c66581c11b47202f6718b29", size = 614624, upload-time = "2025-12-22T08:28:02.792Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/81/b5dd07067f3daac6d23687ec737b2d593740671ebcd145830c8f92d381c5/sphinx_reredirects-1.1.0-py3-none-any.whl", hash = "sha256:4b5692273c72cd2d4d917f4c6f87d5919e4d6114a752d4be033f7f5f6310efd9", size = 6351, upload-time = "2025-12-22T08:27:59.724Z" },
 ]
 
 [[package]]

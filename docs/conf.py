@@ -51,6 +51,7 @@ extensions = [
     "sphinx-prompt",
     "sphinxext.opengraph",
     "sphinx_togglebutton",
+    "sphinx_reredirects",
 ]
 
 python_use_unqualified_type_names = True
@@ -65,6 +66,7 @@ nb_execution_raise_on_error = True
 pygments_lexers = {"ipython3": PythonLexer()}
 
 exclude_patterns = [
+    "superpowers",  # local design notes, git-ignored
     "_build",
     "**.ipynb_checkpoints",
     "Thumbs.db",
