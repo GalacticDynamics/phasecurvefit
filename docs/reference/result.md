@@ -14,6 +14,7 @@ local-flow walk returns `WalkLocalFlowResult`, a subclass with the same fields.
 | `backbone` | an ordered polyline that calling the result interpolates along, or `None` for the walk, which interpolates between the visited samples |
 | `backbone_size` | the number of valid leading vertices when `backbone` is padded to a fixed shape, as the MST does under `jit`; `None` when every vertex is valid |
 | `chord` | arc length along the curve for each sample, in input order, with `nan` for unvisited samples; all built-in orderers set it, and `None` means an orderer did not |
+| `weights` | the per-sample weights passed to `order()`, in input order, or `None` when none were passed; {func}`~phasecurvefit.nn.train_autoencoder` reads them from here |
 | `velocity_aware` | whether the orderer's metric uses velocity |
 
 In `indices`, the position in the array is the step along the ordering and the value
