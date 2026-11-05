@@ -51,11 +51,11 @@ from phasecurvefit._src.algorithm import (
     StateMetadata,
     WalkLocalFlowResult,
 )
+from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
 from phasecurvefit._src.orderers.localflow import (
     LocalFlowOrderer,
-    _check_walk_weights,
     _finalize,
     _resolve_start_idx,
 )
@@ -552,7 +552,8 @@ def order(
     non-``quax`` plain-array core.
     """
     usys = _require_usys(metadata)
-    weights = _check_walk_weights(weights, positions)
+    if weights is not None:
+        weights = check_weights(weights, next(iter(positions.values())).shape[0])
 
     def _as_length_q(val: object, /) -> AbcQ:
         return val if isinstance(val, u.AbstractQuantity) else u.Q(val, usys["length"])

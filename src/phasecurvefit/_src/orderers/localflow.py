@@ -54,15 +54,6 @@ def _resolve_start_idx(
     return jnp.where(jnp.any(visited), first, 0)
 
 
-def _check_walk_weights(
-    weights: Float[Array, " n_obs"] | None, positions: VectorComponents, /
-) -> Float[Array, " n_obs"] | None:
-    """Validate ``weights`` against the number of tracers, if given."""
-    if weights is None:
-        return None
-    return check_weights(weights, next(iter(positions.values())).shape[0])
-
-
 def _finalize(
     result: WalkLocalFlowResult, positions: VectorComponents, /
 ) -> WalkLocalFlowResult:
@@ -178,7 +169,8 @@ class LocalFlowOrderer(AbstractOrderer):
         ``weights`` do not change the walk; they are validated and carried
         through on the result.
         """
-        weights = _check_walk_weights(weights, positions)
+        if weights is not None:
+            weights = check_weights(weights, next(iter(positions.values())).shape[0])
         result = _local_flow_walk(
             positions,
             velocities,

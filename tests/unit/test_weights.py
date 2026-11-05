@@ -297,8 +297,8 @@ class TestTrainAutoencoderWeights:
 
         seen = {}
 
-        def _capture(*args, **kw):
-            seen["w"] = args[2][1]  # (self, model, (padded_ws, padded_w), mask)
+        def _capture(self, model, data, mask, /, **kw):
+            _padded_ws, seen["w"] = data
             msg = "stop"
             raise RuntimeError(msg)
 
