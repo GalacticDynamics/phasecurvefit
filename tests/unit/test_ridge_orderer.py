@@ -237,6 +237,29 @@ class TestBandwidthEstimate:
         )
         assert bool(jnp.all(jnp.isfinite(result.chord)))
 
+    def test_stride_misses_every_weighted_sample(self):
+        """If the subsample holds no weight, the estimate uses every sample."""
+        n = 4002  # stride 2 for the 2000-sample subsample
+        x = np.linspace(0.0, 10.0, n)
+        pts = np.stack([x, 0.05 * np.sin(37.0 * x)], axis=1)
+        w = np.tile([0.0, 1.0], n // 2)  # weight only where the stride doesn't land
+        h = _estimate_bandwidth(pts, w, k=8, core=0.2, trim=0.5)
+        assert np.isfinite(h)
+        assert h > 0
+
+    def test_stops_after_max_iter(self):
+        """An estimate cut off before converging still returns a positive width."""
+        pos, _, w = _arc_image()
+        pts = np.stack([np.asarray(pos[c]) for c in sorted(pos)], axis=1)
+        h = _estimate_bandwidth(pts, np.asarray(w), k=8, core=0.2, trim=0.5, max_iter=1)
+        assert h > _estimate(pos, w)  # one round from the wide start: still wide
+
+    def test_every_sample_duplicated(self):
+        """With every gap between neighbours 0, the floor comes from the extent."""
+        x = np.repeat(np.linspace(0.0, 1.0, 10), 2)  # each sample twice
+        pos = {"x": jnp.asarray(x), "y": jnp.zeros(20)}
+        assert _estimate(pos, jnp.ones(20)) > 0
+
     def test_soft_mask(self):
         """A widening, noisy probability map still finds the arc by default."""
         pos, vel, w = _soft_arc()
