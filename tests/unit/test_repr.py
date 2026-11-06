@@ -37,3 +37,11 @@ def test_format_width() -> None:
 def test_value_spec_is_refused(result: pcf.orderers.OrderingResult) -> None:
     with pytest.raises(TypeError, match="value format spec"):
         format(result, ".2f")
+
+
+def test_repr_html_escapes_and_matches_repr() -> None:
+    meta = pcf.StateMetadata(usys="<si>")
+    html = meta._repr_html_()
+    assert html.startswith("<pre>")
+    assert "&lt;si&gt;" in html
+    assert "<si>" not in html

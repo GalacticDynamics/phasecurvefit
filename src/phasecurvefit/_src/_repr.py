@@ -64,7 +64,8 @@ class ReprMixin:
     ``format`` takes a `wadler_lindig_parts` spec: ``call`` for the
     constructor form, ``array`` / ``values`` / ``type`` for how much of each
     array to show, ``width=<n>`` / ``indent=<n>`` for line breaking, and
-    ``html`` / ``latex`` for markup. An empty spec is ``str``.
+    ``html`` / ``latex`` for markup. An empty spec is ``str``. Jupyter shows
+    the ``html`` form, in a ``<pre>`` block.
     """
 
     __slots__ = ()
@@ -79,6 +80,10 @@ class ReprMixin:
         if not spec:
             return str(self)
         return _render(self, wlp.parse_spec(spec, obj=self))
+
+    def _repr_html_(self) -> str:
+        """Show the repr in Jupyter, HTML-escaped and with its line breaks."""
+        return f"<pre>{format(self, 'html-type')}</pre>"
 
 
 @wlp.pparts.dispatch
@@ -101,7 +106,10 @@ def _pparts_repr_mixin(
         raise TypeError(msg)
     extra = {} if custom is None else {"custom": custom}
     doc = wl.pdoc(obj, indent=2, short_arrays=short_arrays, **extra)
-    return (wlp.doc_part("value", doc),)
+    # A plain-text fragment, so the engine escapes it for the markup. A
+    # `doc_part` would be inserted unescaped and nested one level deeper.
+    # ponytail: laid out at 80 columns, so ``width=`` has no effect here.
+    return (wlp.PPart("value", wlp.doc_to_str(doc, 80)),)
 
 
 def attrs_pdoc(
