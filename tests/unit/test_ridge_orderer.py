@@ -272,6 +272,14 @@ class TestRidgeOrdererValidation:
         assert result.chord.dtype == jnp.float32
         assert result.backbone["x"].dtype == jnp.float32
 
+    def test_integer_positions(self):
+        """Integer pixel indices give a float, fractional chord."""
+        pos, vel, w = _arc_image()
+        idx = {k: jnp.round((v + 1.5) / 0.05).astype(jnp.int32) for k, v in pos.items()}
+        result = pcf.orderers.RidgeOrderer(bandwidth=2.0).order(idx, vel, weights=w)
+        assert jnp.issubdtype(result.chord.dtype, jnp.floating)
+        assert bool(jnp.any(result.chord != jnp.round(result.chord)))
+
     def test_traced_inputs(self):
         """Under jit it raises a clear TypeError, not a tracer conversion error."""
         pos, vel, w = _arc_image()

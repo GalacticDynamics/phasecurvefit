@@ -172,9 +172,11 @@ class RidgeOrderer(AbstractOrderer):
             )
             backbone, chord = _backbone(pts, w, h, **opts)
         indices = np.argsort(chord, kind="stable").astype(np.int32)
-        # Back in the positions' dtype: the host pipeline runs in float64, which
-        # must not upcast a float32 caller's arrays under 64-bit JAX.
-        dtype = jnp.result_type(*(jnp.asarray(v) for v in positions.values()))
+        # Back in the positions' float dtype: the host pipeline runs in float64,
+        # which must not upcast a float32 caller's arrays under 64-bit JAX, and
+        # integer positions (pixel indices) must not truncate the chord. The
+        # Python float is weakly typed, so float32 stays float32.
+        dtype = jnp.result_type(*(jnp.asarray(v) for v in positions.values()), float)
         backbone, chord = backbone.astype(dtype), chord.astype(dtype)
         return OrderingResult(
             positions={c: jnp.asarray(v) for c, v in positions.items()},
