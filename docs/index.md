@@ -37,7 +37,7 @@ alt: >-
 ---
 ```
 
-```{code-cell} python
+```python
 import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf

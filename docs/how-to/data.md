@@ -75,7 +75,7 @@ A sample can stand for more than one star, or for the density at one pixel when 
 data is an image. Pass one weight per sample as `weights`. The result keeps them,
 and the autoencoder reads them from there:
 
-```python
+```{code-cell} python
 w = jnp.array([1.0, 2.0, 1.0])
 result = pcf.order(position, velocity, weights=w)
 print(result.weights)  # [1. 2. 1.]
