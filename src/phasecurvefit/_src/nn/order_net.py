@@ -21,7 +21,8 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 import optax
-from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
+import plum
+from jaxtyping import Array, ArrayLike, Bool, Float, Int, PRNGKeyArray
 
 from jaxmore.nn import masked_mean
 
@@ -281,6 +282,12 @@ def compute_loss(
     )
 
 
+@plum.dispatch
+def _chord_values(chord: ArrayLike, /) -> Float[Array, " N"]:
+    """Return the chord as a plain array. The unxt interop adds Quantities."""
+    return jnp.asarray(chord)
+
+
 def _weighted_compute_loss(
     model: OrderingNet,
     ws: Float[Array, " B TwoF"],
@@ -504,7 +511,7 @@ def train_ordering_net(
     # normalized space, so it carries their scatter and weights each component
     # by its spread.
     if chord is not None:
-        s = jnp.asarray(chord)[ordering_indices[ordering_indices >= 0]]
+        s = _chord_values(chord)[ordering_indices[ordering_indices >= 0]]
         s = s - s[0]
     else:
         D = ordered_ws.shape[1] // 2

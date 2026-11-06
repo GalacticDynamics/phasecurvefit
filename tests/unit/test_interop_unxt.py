@@ -8,6 +8,7 @@ import quaxed.numpy as jnp
 import unxt as u
 
 import phasecurvefit as pcf
+from phasecurvefit._src.nn.order_net import _chord_values
 
 
 class TestEuclideanDistanceQuantity:
@@ -211,3 +212,10 @@ class TestUsysGuidance:
             metadata=pcf.StateMetadata(note="carried", usys=u.unitsystems.si),
         )
         assert result.indices.shape == (3,)
+
+
+def test_chord_values_strips_a_quantity_in_its_own_unit():
+    """The chord is stripped in its own unit, since unxt 2 refuses ``asarray``."""
+    chord = u.Q([0.0, 1.5, 3.0], "kpc")
+    assert jnp.array_equal(_chord_values(chord), jnp.array([0.0, 1.5, 3.0]))
+    assert jnp.array_equal(_chord_values(jnp.array([1.0, 2.0])), jnp.array([1.0, 2.0]))
