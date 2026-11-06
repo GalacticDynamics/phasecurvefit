@@ -106,7 +106,9 @@ print(fitted.gamma.shape == weights.shape)  # a gamma for every pixel: True
 ```
 
 An image has no velocities, so nothing sets which end of the curve $\gamma$ starts
-from.
+from. `fit_track` orders with the default pipeline, which is fine for a thin
+stream like this one. For a wide or uniform field, order with a
+{class}`~phasecurvefit.orderers.RidgeOrderer` first ({doc}`how-to/choose-orderer`).
 
 :::
 

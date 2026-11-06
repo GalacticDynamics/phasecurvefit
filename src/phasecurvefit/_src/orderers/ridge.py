@@ -223,6 +223,8 @@ def _smooth_and_project(
     arc length to its nearest vertex plus its offset along the tangent there.
     """
     raw = pts[path]
+    if len(raw) < 2:  # a single vertex: no length to smooth over or project onto
+        return raw, np.zeros(len(pts))
     step = np.linalg.norm(np.diff(raw, axis=0), axis=1)
     sigma = 0.5 * h / max(float(np.median(step)), np.finfo(float).eps)
     backbone = ndimage.gaussian_filter1d(raw, sigma, axis=0, mode="nearest")

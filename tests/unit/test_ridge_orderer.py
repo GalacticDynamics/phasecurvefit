@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 import phasecurvefit as pcf
+from phasecurvefit._src.orderers.ridge import _smooth_and_project
 
 pytest.importorskip("scipy")
 
@@ -94,6 +95,13 @@ class TestRidgeOrderer:
         result = pcf.orderers.RidgeOrderer(bandwidth=0.1).order(pos, vel)
         np.testing.assert_array_equal(result.indices, np.arange(n))
         np.testing.assert_array_equal(result.chord, np.zeros(n))
+
+    def test_single_vertex_path(self):
+        """A path of one vertex is returned as is, with every chord 0."""
+        pts = np.array([[0.0, 0.0], [0.1, 0.0], [0.2, 0.0]])
+        backbone, chord = _smooth_and_project(pts, np.array([1]), 0.1)
+        np.testing.assert_array_equal(backbone, pts[[1]])
+        np.testing.assert_array_equal(chord, np.zeros(3))
 
     def test_result_contract(self):
         """Every sample is ordered, by its chord, and the weights are carried."""
