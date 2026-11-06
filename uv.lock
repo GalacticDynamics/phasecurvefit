@@ -435,7 +435,7 @@ wheels = [
 
 [[package]]
 name = "coordinax"
-version = "0.23.3"
+version = "0.24.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "astropy" },
@@ -446,19 +446,20 @@ dependencies = [
     { name = "jaxlib" },
     { name = "jaxtyping" },
     { name = "optional-dependencies" },
+    { name = "optype" },
     { name = "plum", marker = "sys_platform == 'never'" },
     { name = "quax" },
-    { name = "quax-blocks", version = "0.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
-    { name = "quax-blocks", version = "0.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
+    { name = "quax-blocks" },
     { name = "quaxed" },
     { name = "typing-extensions" },
     { name = "unxt" },
     { name = "wadler-lindig" },
     { name = "xmmutablemap" },
+    { name = "zeroth" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/00/99c32e07b37624384d5515f2d4cbdf9f1ff46ee6746cd402f6883fb2df94/coordinax-0.23.3.tar.gz", hash = "sha256:48eb3f63a5bd7475039e9562c22c51318435e4a8e3c0d29192137f00e66f94e5", size = 757498, upload-time = "2026-05-09T20:21:02.189Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/e9/368bb23a25fc71a45dbab647abb94abe2fd1ea1cf75b5e1a7b84ed658e99/coordinax-0.24.3.tar.gz", hash = "sha256:b0e3b4815904a3ac49e8e79b8a77d9f8fcbbb2ad551715ced216ab2e1a326b9b", size = 729911, upload-time = "2026-10-16T01:20:56.963Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/b2/6e655239636458e9ff363e0c1a3caddefaddea2990ed8f32f82e156bd664/coordinax-0.23.3-py3-none-any.whl", hash = "sha256:115d411963f907728ae25528c69e490937657aa9e787e130c0c97458df5ab8dd", size = 195043, upload-time = "2026-05-09T20:21:00.35Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/37/3c5f0e03c0ef69cbea3245c17cde4466328193ba9f8a32c58839c4fc7a26/coordinax-0.24.3-py3-none-any.whl", hash = "sha256:b458f0b14d709dc9f14224bfeca80f35fbd247d08079449fe0f65e603b6b0bc1", size = 195403, upload-time = "2026-10-16T01:20:55.275Z" },
 ]
 
 [[package]]
@@ -780,8 +781,8 @@ wheels = [
 
 [[package]]
 name = "galax"
-version = "0.0.4.dev43+g7f848fdcd"
-source = { git = "https://github.com/GalacticDynamics/galax#7f848fdcd5c5ef9d0bf2dfc7c21486f4178cc29a" }
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "astropy" },
     { name = "beartype" },
@@ -804,12 +805,16 @@ dependencies = [
     { name = "plum", marker = "sys_platform == 'never'" },
     { name = "quax" },
     { name = "quaxed" },
-    { name = "spexial" },
     { name = "typing-extensions" },
     { name = "unxt" },
+    { name = "unxts-parametric" },
     { name = "wadler-lindig" },
     { name = "xmmutablemap" },
     { name = "zeroth" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ce/b6/db2dd1aca753957d22cf8d1f8cb24c906238b2842a4fe9322733be30968d/galax-0.1.0.tar.gz", hash = "sha256:730e8e06c949fdcce19a4483b7262f6da7f4113d0ff089fabe22320a344504bb", size = 380689, upload-time = "2026-10-09T18:10:37.733Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0f/3f/0522114cb634f10b90ce4ece0fcfd38cdc54751cb1269d7cb48cd6c1fb8e/galax-0.1.0-py3-none-any.whl", hash = "sha256:47f10d3d7d1512d8331fdffdfc13c39593f8b35a147327e848903f0e0deefeef", size = 274185, upload-time = "2026-10-09T18:10:36.227Z" },
 ]
 
 [[package]]
@@ -1865,7 +1870,7 @@ dev = [
     { name = "sphinx-togglebutton" },
     { name = "sphinxext-opengraph" },
     { name = "sybil", extra = ["pytest"] },
-    { name = "unxt" },
+    { name = "unxt", extra = ["interop-mpl"] },
 ]
 docs = [
     { name = "galax" },
@@ -1884,6 +1889,7 @@ docs = [
     { name = "sphinx-reredirects" },
     { name = "sphinx-togglebutton" },
     { name = "sphinxext-opengraph" },
+    { name = "unxt", extra = ["interop-mpl"] },
 ]
 lint = [
     { name = "cz-conventional-gitmoji" },
@@ -1915,7 +1921,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "equinox", specifier = ">=0.13.5" },
-    { name = "galax", marker = "extra == 'tutorials'", git = "https://github.com/GalacticDynamics/galax" },
+    { name = "galax", marker = "extra == 'tutorials'", specifier = ">=0.1.0" },
     { name = "jax", specifier = ">=0.7.2" },
     { name = "jaxkd", marker = "extra == 'all'", specifier = ">=0.0.5" },
     { name = "jaxkd", marker = "extra == 'kdtree'", specifier = ">=0.0.5" },
@@ -1929,9 +1935,9 @@ requires-dist = [
     { name = "plum-dispatch", specifier = ">=2.6.1" },
     { name = "quax", specifier = ">=0.4.6" },
     { name = "scipy", specifier = ">=1.11" },
-    { name = "unxt", marker = "extra == 'all'", specifier = ">=1.10.4" },
-    { name = "unxt", marker = "extra == 'interop'", specifier = ">=1.10.4" },
-    { name = "unxt", marker = "extra == 'tutorials'", specifier = ">=1.10.4" },
+    { name = "unxt", marker = "extra == 'all'", specifier = ">=2.0" },
+    { name = "unxt", marker = "extra == 'interop'", specifier = ">=2.0" },
+    { name = "unxt", marker = "extra == 'tutorials'", specifier = ">=2.0" },
     { name = "unxt", extras = ["interop-mpl"], marker = "extra == 'tutorials'" },
     { name = "zeroth", specifier = ">=1.0.1" },
 ]
@@ -1943,7 +1949,7 @@ dev = [
     { name = "commitizen", specifier = ">=4.11.3" },
     { name = "cz-conventional-gitmoji", specifier = ">=0.6.1" },
     { name = "cz-conventional-gitmoji", specifier = ">=0.7.0" },
-    { name = "galax", git = "https://github.com/GalacticDynamics/galax" },
+    { name = "galax" },
     { name = "hypothesis", extras = ["numpy"], specifier = ">=6.138.14" },
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "ipywidgets", specifier = ">=8.1.8" },
@@ -1975,10 +1981,11 @@ dev = [
     { name = "sphinx-togglebutton", specifier = ">=0.3.2" },
     { name = "sphinxext-opengraph", specifier = ">=0.9.2" },
     { name = "sybil", extras = ["pytest"], specifier = ">=8.0.0" },
-    { name = "unxt", specifier = ">=1.10.4" },
+    { name = "unxt", specifier = ">=2.0" },
+    { name = "unxt", extras = ["interop-mpl"] },
 ]
 docs = [
-    { name = "galax", git = "https://github.com/GalacticDynamics/galax" },
+    { name = "galax" },
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "ipywidgets", specifier = ">=8.1.8" },
     { name = "jaxkd", specifier = ">=0.0.5" },
@@ -1994,6 +2001,7 @@ docs = [
     { name = "sphinx-reredirects", specifier = ">=1.1.0" },
     { name = "sphinx-togglebutton", specifier = ">=0.3.2" },
     { name = "sphinxext-opengraph", specifier = ">=0.9.2" },
+    { name = "unxt", extras = ["interop-mpl"] },
 ]
 lint = [
     { name = "cz-conventional-gitmoji", specifier = ">=0.6.1" },
@@ -2019,7 +2027,7 @@ test = [
     { name = "pytest-randomly", specifier = ">=3.16.0" },
     { name = "pytest-timeout", specifier = ">=2.3.1" },
     { name = "sybil", extras = ["pytest"], specifier = ">=8.0.0" },
-    { name = "unxt", specifier = ">=1.10.4" },
+    { name = "unxt", specifier = ">=2.0" },
 ]
 
 [[package]]
@@ -2577,34 +2585,8 @@ wheels = [
 
 [[package]]
 name = "quax-blocks"
-version = "0.4.2"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version == '3.13.*'",
-    "python_full_version < '3.13'",
-]
-dependencies = [
-    { name = "jax" },
-    { name = "jaxlib" },
-    { name = "jaxtyping" },
-    { name = "optype" },
-    { name = "packaging" },
-    { name = "plum-dispatch" },
-    { name = "quax" },
-    { name = "quaxed" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/08/0f/ed55bfc71310dd7d6a13f7a0bc2585a57212c2317730168a423920d0169f/quax_blocks-0.4.2.tar.gz", hash = "sha256:b4991f3fa39c89623ddfc1ea48b718f02f2ab29cf2966b11be2cea06df7e5087", size = 82246, upload-time = "2026-07-21T15:26:05.374Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/44/29/a7d1a7bbdf14c4acde43649fc905d8002b4ef46bdfe06a218decc2fb9240/quax_blocks-0.4.2-py3-none-any.whl", hash = "sha256:41dd3649c0fe6a28fd8539c92ce67cf0592a29acae438e07ac707d57df3561ba", size = 18960, upload-time = "2026-07-21T15:26:04.261Z" },
-]
-
-[[package]]
-name = "quax-blocks"
 version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.14'",
-]
 dependencies = [
     { name = "jax" },
     { name = "jaxlib" },
@@ -2897,21 +2879,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/80/f1/93422647dd7e461f23d254e6b2bfa687a85b53aeb4903fcdbb74474d4584/soupsieve-2.9.tar.gz", hash = "sha256:acee8417325c5653e1377dc31eccad59eb82cbc65942afe6174c53b3aaad63fc", size = 122122, upload-time = "2026-07-19T01:35:18.425Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/d6/3185ab5ad1280319b31986898f3206dd7227cd75e293d4dba2a5e6bf27a0/soupsieve-2.9-py3-none-any.whl", hash = "sha256:a2b2c76d67df2382d245409fd71e321a571717e58463efa32ace87dcadac2c12", size = 37387, upload-time = "2026-07-19T01:35:17.106Z" },
-]
-
-[[package]]
-name = "spexial"
-version = "0.2.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "jax" },
-    { name = "jaxlib" },
-    { name = "jaxtyping" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b7/bd/d2b65409d29c709d2dd792cef3620e15acd2ab6ab34ae7050df2c3a87b41/spexial-0.2.1.tar.gz", hash = "sha256:1a1ad8dac67b3d1084b047096d7f2b4b053f4273b6e09f0bd6705092134a7842", size = 205963, upload-time = "2026-09-14T03:03:39.186Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/4e/cf3db03dabaaa5b8f096986e004fb1c4f7933307b40a0d7ee0258d095aba/spexial-0.2.1-py3-none-any.whl", hash = "sha256:cf1f43846788f65f196e529216f02897886578b518804158029bd65c518f488c", size = 81306, upload-time = "2026-09-14T03:03:37.983Z" },
 ]
 
 [[package]]
@@ -3351,7 +3318,7 @@ wheels = [
 
 [[package]]
 name = "unxt"
-version = "1.11.4"
+version = "2.0.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "astropy" },
@@ -3362,37 +3329,77 @@ dependencies = [
     { name = "jaxlib" },
     { name = "jaxtyping" },
     { name = "optional-dependencies" },
+    { name = "packaging" },
     { name = "plum-dispatch" },
     { name = "quax" },
-    { name = "quax-blocks", version = "0.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
-    { name = "quax-blocks", version = "0.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
+    { name = "quax-blocks" },
     { name = "quaxed" },
     { name = "traitlets" },
     { name = "unxt-api" },
+    { name = "unxts-api" },
     { name = "wadler-lindig" },
-    { name = "xmmutablemap" },
-    { name = "zeroth" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7b/74/5c7e1172257b8882d3bee17ca5ff18d61f6d4beafe85f79df46118f6edc6/unxt-1.11.4.tar.gz", hash = "sha256:118af7a495d813b5de13d677bcbd3336dbccc28838492d7b65bb7d836f55dbf9", size = 1066483, upload-time = "2026-06-29T13:17:32.485Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/81/93/c80d393d42e810bdc1aedd8a58392afdfff746338c61d3e885b978aac76b/unxt-2.0.6.tar.gz", hash = "sha256:7c79c64c74bdfae6cb9e003c648bcd9b0ce6479f09de0ad6504c222917ed8838", size = 734571, upload-time = "2026-10-10T17:47:49.876Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/52/f4215ba3879bbc540762f3b5ad07763a28887c1659e1be232cca3dc3bebc/unxt-1.11.4-py3-none-any.whl", hash = "sha256:66c43508919fecd43aff0e328d42bcae6871f5fbdd4499e1e6b2a7a83759ec5e", size = 94210, upload-time = "2026-06-29T13:17:31.072Z" },
+    { url = "https://files.pythonhosted.org/packages/89/c3/b09a2388d82dfd22ff55ec0e260a1d267e7042e01360fac5c7d150c56d5b/unxt-2.0.6-py3-none-any.whl", hash = "sha256:f1e54e686c5888593bb6688a6ab2d89cdca6bf59c7ad4cf31f4490e038a7a8dc", size = 122638, upload-time = "2026-10-10T17:47:48.155Z" },
 ]
 
 [package.optional-dependencies]
 interop-mpl = [
-    { name = "matplotlib" },
+    { name = "unxts-interop-matplotlib" },
 ]
 
 [[package]]
 name = "unxt-api"
-version = "1.10.1"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "unxts-api" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dd/05/4fdcf04277ca3237d19388ee0c4902f5c52061f713316a9a7d0808b30ebe/unxt_api-2.0.0.tar.gz", hash = "sha256:164ae14673bde98c7358fba12e3e94080a26c979c72e2e8ad1298fd1531026fb", size = 5462, upload-time = "2026-07-24T18:00:06.468Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/ac/b1faf16701501fde6241ab5df42f12a339d069b9d84b607f607d897fd1a9/unxt_api-2.0.0-py3-none-any.whl", hash = "sha256:10e19f7c31b29a8be6e54f266b0dd0bd8c861482ac1f46d0fecaddf5a29be160", size = 2946, upload-time = "2026-07-24T18:00:05.367Z" },
+]
+
+[[package]]
+name = "unxts-api"
+version = "2.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "plum-dispatch" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/59/55/a9e4f226a3d2f26a8bafc55868b8b8ec290cdf3766d9dc378b3b2dd0eb0c/unxt_api-1.10.1.tar.gz", hash = "sha256:dae10d19edc0b96b225dfa122d0ed5999ad8523d3b0e63f33a3acc2ccdff0cbc", size = 21341, upload-time = "2026-01-24T22:28:06.289Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/99/662e918a29eb35d43617c53ad6f555468c20cb908e1ab76f049ef7373e73/unxts_api-2.0.2.tar.gz", hash = "sha256:514d631cd03dc9328ed710ac872bceda1e5cfc381ab7e6c6e76f42400052fefe", size = 13097, upload-time = "2026-10-10T17:16:09.179Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/63/64/4f4fb51ee7558784a566fb30d8e0d04c689501f7856aa47d279bf6d745cf/unxt_api-1.10.1-py3-none-any.whl", hash = "sha256:7cc4ed4b4d22a9a93fe185add206861a5931f45e892d68d86c8034c445e28ba6", size = 6266, upload-time = "2026-01-24T22:28:05.087Z" },
+    { url = "https://files.pythonhosted.org/packages/83/9d/02a9a98731ae6539ed8d436825a8a7a5c5f9171e6363f4a17658c7192567/unxts_api-2.0.2-py3-none-any.whl", hash = "sha256:e0944f9c380d7664395742e1ee9e0b39cce95d8d0f23db7d0dca0244eef1b4d3", size = 6348, upload-time = "2026-10-10T17:16:08.015Z" },
+]
+
+[[package]]
+name = "unxts-interop-matplotlib"
+version = "2.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "unxt" },
+    { name = "zeroth" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2e/0b/6fd951a76d21bd457510b402e138fe4e35f2a1e73274a32ac8d77307ffd1/unxts_interop_matplotlib-2.0.1.tar.gz", hash = "sha256:39b71795231f9f2ea1aefc89361cd15ecabbdb0ea5ecac060ac54aecf064068e", size = 7153, upload-time = "2026-10-10T17:40:31.605Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6f/cd/8fbeeb44a404cd3d7f038a789bb845092e3b7e8ee403835ded8974026acc/unxts_interop_matplotlib-2.0.1-py3-none-any.whl", hash = "sha256:88a85d5e758acc1bff3c0a05757c3f5a6cbc88ce1d4c6b13fcb52eb32610f0d7", size = 5228, upload-time = "2026-10-10T17:40:30.46Z" },
+]
+
+[[package]]
+name = "unxts-parametric"
+version = "2.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "astropy" },
+    { name = "plum-dispatch" },
+    { name = "unxt" },
+    { name = "unxts-api" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/00/9fb274ca41d7e93845245ec27679ecd29b261552eee6260d64cb8afbfd16/unxts_parametric-2.0.1.tar.gz", hash = "sha256:f54c62a89f8e17cd025f616aa7f0f631c6f080813125820aa781c9321bace9b2", size = 23071, upload-time = "2026-10-10T17:33:03.733Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/c7/2b7995933dc349d74e2d5f7e19761979c98d98196a1c15a3087180f030e2/unxts_parametric-2.0.1-py3-none-any.whl", hash = "sha256:efe76bb12d4701ebd057c937e2a69b47a1a11ded30ad67bbbb74d1ef38962011", size = 15773, upload-time = "2026-10-10T17:33:02.308Z" },
 ]
 
 [[package]]
