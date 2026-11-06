@@ -45,3 +45,9 @@ def test_repr_html_escapes_and_matches_repr() -> None:
     assert html.startswith("<pre>")
     assert "&lt;si&gt;" in html
     assert "<si>" not in html
+
+
+def test_markup_honours_width() -> None:
+    cfg = pcf.WalkConfig()
+    assert "\n" not in f"{cfg:html-width=200}"
+    assert "\n" in f"{cfg:html-width=20}"

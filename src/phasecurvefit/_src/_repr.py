@@ -49,7 +49,14 @@ def _short_jax_array(obj: object, /) -> wl.AbstractDoc | None:
 
 def _render(obj: object, spec: wlp.Spec, /) -> str:
     """Render ``obj``; under ``type``, JAX arrays drop wadler-lindig's ``(jax)``."""
-    extra = {"custom": _short_jax_array} if spec["value"] == "type" else {}
+    extra: dict[str, Any] = {}
+    if spec["value"] == "type":
+        extra["custom"] = _short_jax_array
+    if spec["layout"] == "product":
+        # The fragment is laid out before the engine sees it, so it needs the
+        # spec's width and indent itself.
+        extra["fragment_width"] = spec["width"] or 80
+        extra["fragment_indent"] = spec["indent"] or 2
     return wlp.render(obj, spec, **extra)
 
 
@@ -95,6 +102,8 @@ def _pparts_repr_mixin(
     short_arrays: Any = "compact",
     value_spec: str | None = None,
     custom: Any = None,
+    fragment_width: int = 80,
+    fragment_indent: int = 2,
     **kw: Any,  # axes these objects do not act on
 ) -> tuple[Any, ...]:
     """Show the whole object as one fragment: its constructor form."""
@@ -105,11 +114,10 @@ def _pparts_repr_mixin(
         )
         raise TypeError(msg)
     extra = {} if custom is None else {"custom": custom}
-    doc = wl.pdoc(obj, indent=2, short_arrays=short_arrays, **extra)
+    doc = wl.pdoc(obj, indent=fragment_indent, short_arrays=short_arrays, **extra)
     # A plain-text fragment, so the engine escapes it for the markup. A
     # `doc_part` would be inserted unescaped and nested one level deeper.
-    # ponytail: laid out at 80 columns, so ``width=`` has no effect here.
-    return (wlp.PPart("value", wlp.doc_to_str(doc, 80)),)
+    return (wlp.PPart("value", wlp.doc_to_str(doc, fragment_width)),)
 
 
 def attrs_pdoc(
