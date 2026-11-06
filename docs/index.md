@@ -1,4 +1,9 @@
 ---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+  language: python
 sd_hide_title: true
 ---
 
@@ -27,7 +32,7 @@ alt: >-
 ---
 ```
 
-```python
+```{code-cell} python
 import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf

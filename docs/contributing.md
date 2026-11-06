@@ -1,3 +1,11 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+  language: python
+---
+
 # Contributing to phasecurvefit
 
 Thank you for your interest in contributing! This guide covers the essentials.
@@ -78,7 +86,7 @@ Tests must:
 
 Example:
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 import phasecurvefit as pcf
 

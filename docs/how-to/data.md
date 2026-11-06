@@ -1,3 +1,11 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+  language: python
+---
+
 # Prepare your data
 
 This guide shows how to pass positions and velocities to phasecurvefit.
@@ -8,7 +16,7 @@ Positions and velocities are two plain Python dictionaries. Each maps a coordina
 name to a one-dimensional array with one entry per sample, and both dictionaries
 use the same keys. Any number of coordinates works.
 
-```python
+```{code-cell} python
 import jax.numpy as jnp
 import phasecurvefit as pcf
 
@@ -35,7 +43,7 @@ to every coordinate at once, and the orderers work under `jit` and `vmap`
 
 Convert NumPy arrays to JAX arrays before ordering:
 
-```python
+```{code-cell} python
 import jax
 import numpy as np
 
@@ -55,7 +63,7 @@ For a pandas DataFrame `df`, build each dictionary from its columns, for example
 The default pipeline accepts samples whose velocities are missing (NaN): it uses the
 velocities only to orient the ordering, and skips the missing ones.
 
-```python
+```{code-cell} python
 vel_missing = {k: v.at[1].set(jnp.nan) for k, v in velocity.items()}
 result = pcf.order(position, vel_missing)
 print(int(result.n_visited))  # all 3 samples are ordered
@@ -65,7 +73,7 @@ print(int(result.n_visited))  # all 3 samples are ordered
 
 Every array in both dictionaries must have the same length:
 
-```python
+```{code-cell} python
 print(jax.tree.map(lambda a: a.shape, position))
 ```
 

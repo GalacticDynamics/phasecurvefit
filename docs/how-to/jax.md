@@ -1,3 +1,11 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+  language: python
+---
+
 # Compile, batch and differentiate with JAX
 
 This guide shows how to use the orderers under `jit`, `vmap` and `grad`.
@@ -18,7 +26,7 @@ The examples below use the local-flow walk.
 
 ## Compile with `jit`
 
-```python
+```{code-cell} python
 import jax
 import jax.numpy as jnp
 import phasecurvefit as pcf
@@ -41,7 +49,7 @@ result = order_stream(position, velocity)
 `start_idx` is a static field of the orderer, so to pass it as an argument, mark it
 static. Each new value then compiles again:
 
-```python
+```{code-cell} python
 from functools import partial
 
 
@@ -62,7 +70,7 @@ result = order_from(position, velocity, start_idx=0)
 Stack streams of the same length along a leading axis and map over it. `jaxmore.vmap`
 takes the orderer as a static keyword:
 
-```python
+```{code-cell} python
 from jaxmore import vmap
 
 streams_pos = [
@@ -90,7 +98,7 @@ print(f"Ordered {results.indices.shape[0]} streams")
 
 Wrap the batched call in `jit` when you run it repeatedly:
 
-```python
+```{code-cell} python
 @jax.jit
 def batch_order(stacked_pos, stacked_vel):
     return batched_fn(stacked_pos, stacked_vel)
@@ -101,7 +109,7 @@ results = batch_order(stacked_pos, stacked_vel)
 
 For streams of different lengths, map over a list with `jax.tree.map` instead:
 
-```python
+```{code-cell} python
 streams = [
     {"q": {"x": jnp.array([0.0, 1.0])}, "p": {"x": jnp.array([1.0, 1.1])}},
     {"q": {"x": jnp.array([3.0, 4.0, 5.0])}, "p": {"x": jnp.array([1.3, 1.4, 1.5])}},
@@ -124,7 +132,7 @@ with real numbers, such as positions interpolated along it or the autoencoder's
 outputs. Here the loss depends on the interpolated track, and the gradient reaches
 the input positions with the ordering held fixed:
 
-```python
+```{code-cell} python
 orderer = pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
 
 
@@ -160,7 +168,7 @@ Tuning the kd-tree matters only for traced calls:
 
 Turn compilation off to step through the code with ordinary Python tools:
 
-```python
+```{code-cell} python
 with jax.disable_jit():
     result = pcf.order(
         position, velocity, pcf.orderers.LocalFlowOrderer(start_idx=0, metric_scale=1.0)
