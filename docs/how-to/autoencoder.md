@@ -107,6 +107,20 @@ result, _, losses = pcf.nn.train_autoencoder(
 
 {doc}`../reference/options` lists every setting with its default.
 
+### Train on an image or a wide curve
+
+When the samples spread wide across the track, as the pixels of an image do, freeze
+the encoder in the joint phase and use large batches ({doc}`../explanation/density-fields`
+explains why):
+
+```{code-cell} python
+config = pcf.nn.TrainingConfig(
+    freeze_encoder_final_training=True,
+    batch_size=1000,
+    show_pbar=False,
+)
+```
+
 ## Use a faster, training-free track
 
 If speed matters more than accuracy, for example inside a likelihood evaluated at

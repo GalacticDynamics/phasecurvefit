@@ -42,6 +42,12 @@ change, so each one is checked to run with the current code.
   model, and see why the orderers alone can't.
   [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/outlier_rejection.ipynb)
 
+## An image or density map
+
+- {doc}`density_fields`: fit a track through an image of a wide, diffuse curve, with
+  each pixel a sample weighted by its value.
+  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/density_fields.ipynb)
+
 ```{toctree}
 :maxdepth: 1
 :hidden:
@@ -53,4 +59,5 @@ epitrochoid_mst
 epitrochoid_autoencoder
 epitrochoid_runningmean
 outlier_rejection
+density_fields
 ```

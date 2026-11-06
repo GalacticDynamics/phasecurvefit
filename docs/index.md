@@ -134,6 +134,8 @@ simulated data to a result.
   a membership probability: [the outlier-rejection tutorial](tutorials/outlier_rejection.ipynb).
 - **A track that must be fast**, for example inside a likelihood evaluated at every
   step of an MCMC: [the training-free running-mean track](tutorials/stream_runningmean.ipynb).
+- **An image or density map, not a list of samples.** Each pixel becomes a sample
+  weighted by its value: [the density-field tutorial](tutorials/density_fields.ipynb).
 
 ## The documentation
 
