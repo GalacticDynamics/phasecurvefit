@@ -204,7 +204,9 @@ def train_autoencoder(
         membership_prob=membership_prob,
         gamma_range=model.gamma_range,
         # Members as the running-mean decoder counts them (its default threshold).
-        track_range=_track_range(gamma, membership_prob >= 0.5, weights),
+        track_range=_track_range(
+            model, positions, gamma, membership_prob >= 0.5, weights
+        ),
     )
 
     # Wrap opt_state in dict for consistency with other dispatches

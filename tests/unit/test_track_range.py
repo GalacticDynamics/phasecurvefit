@@ -11,48 +11,80 @@ import numpy as np
 import pytest
 
 import phasecurvefit as pcf
-from phasecurvefit._src.nn.result import _track_range
+from phasecurvefit._src.nn.result import _track_range, _trim_ends
 
 pytest.importorskip("scipy")
 
 
-class TestTrackRangeRule:
-    """The half-median rule on hand-made gamma values."""
+class TestTrimEnds:
+    """The local half-maximum rule on hand-made distances along a track."""
 
-    def test_trims_faint_tail(self):
-        """A faint tail past the end of a full-weight stretch is cut off."""
-        gamma = jnp.linspace(-0.8, 1.0, 400)
-        weights = jnp.where(gamma <= 0.8, 1.0, 0.05)
-        lo, hi = _track_range(gamma, jnp.ones(400, dtype=bool), weights)
-        assert lo == pytest.approx(-0.8)
-        assert hi == pytest.approx(0.8, abs=0.05)
+    def test_trims_faint_cap(self):
+        """A short faint stretch past the end, like a cap, is cut off."""
+        along = jnp.linspace(0.0, 10.0, 400)
+        weights = jnp.where(along <= 9.5, 1.0, 0.05)
+        lo, hi = _trim_ends(along, weights)
+        assert lo == pytest.approx(0.0)
+        assert hi == pytest.approx(9.5, abs=0.3)
+
+    def test_long_faint_tail_is_stream(self):
+        """A faint stretch longer than the local window counts as stream."""
+        along = jnp.linspace(0.0, 10.0, 400)
+        weights = jnp.where(along <= 8.0, 1.0, 0.05)
+        assert _trim_ends(along, weights)[1] == pytest.approx(10.0)
 
     def test_even_sampling_keeps_span(self):
         """Evenly spread, unweighted samples keep their whole span."""
-        gamma = jnp.linspace(-0.9, 0.9, 400)
-        lo, hi = _track_range(gamma, jnp.ones(400, dtype=bool), None)
-        assert lo == pytest.approx(-0.9)
-        assert hi == pytest.approx(0.9)
+        lo, hi = _trim_ends(jnp.linspace(0.0, 10.0, 400), jnp.ones(400))
+        assert (lo, hi) == pytest.approx((0.0, 10.0))
 
-    def test_only_members_count(self):
-        """Non-members don't widen the range."""
-        gamma = jnp.linspace(-1.0, 1.0, 400)
-        member = jnp.abs(gamma) <= 0.5
-        lo, hi = _track_range(gamma, member, None)
-        assert lo >= -0.5
-        assert hi <= 0.5
+    def test_fading_stream_is_not_cut(self):
+        """A stream fading slowly to 30% at one end keeps that end."""
+        along = jnp.linspace(0.0, 10.0, 400)
+        lo, hi = _trim_ends(along, 1.0 - 0.07 * along)
+        assert (lo, hi) == pytest.approx((0.0, 10.0))
 
-    def test_zero_weight_members(self):
-        """Members of total weight 0 fall back to their span, without crashing."""
-        gamma = jnp.linspace(-0.3, 0.6, 20)
-        lo, hi = _track_range(gamma, jnp.ones(20, dtype=bool), jnp.zeros(20))
-        assert (lo, hi) == pytest.approx((-0.3, 0.6))
+    def test_narrow_stretch_at_an_end_is_kept(self):
+        """A stretch at 40% of the median near an end isn't mistaken for a cap."""
+        along = jnp.linspace(0.0, 10.0, 400)
+        weights = jnp.where(along < 3.0, 0.4, 1.0)
+        lo, _ = _trim_ends(along, weights)
+        assert lo == pytest.approx(0.0)
 
-    def test_no_members(self):
+
+class TestTrackRangeFallbacks:
+    """``_track_range`` falls back to the members' span when it can't trim."""
+
+    @pytest.fixture(scope="class")
+    def model(self):
+        """Build an untrained model: the fallbacks return before decoding."""
+        pos = {"x": jnp.linspace(0.0, 1.0, 20), "y": jnp.zeros(20)}
+        vel = jax.tree.map(jnp.ones_like, pos)
+        normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+        model = pcf.nn.PathAutoencoder.make(
+            normalizer=normalizer, gamma_range=(-1.0, 1.0), key=jax.random.key(0)
+        )
+        return model, pos, vel
+
+    def test_no_members(self, model):
         """With no members, the range is the span of all gamma."""
+        m, pos, vel = model
         gamma = jnp.linspace(-0.3, 0.6, 20)
-        lo, hi = _track_range(gamma, jnp.zeros(20, dtype=bool), None)
-        assert (lo, hi) == pytest.approx((-0.3, 0.6))
+        rng = _track_range(m, pos, gamma, jnp.zeros(20, dtype=bool), None)
+        assert rng == pytest.approx((-0.3, 0.6))
+
+    def test_zero_weight_members(self, model):
+        """Members of total weight 0 fall back to their span, without crashing."""
+        m, pos, vel = model
+        gamma = jnp.linspace(-0.3, 0.6, 20)
+        rng = _track_range(m, pos, gamma, jnp.ones(20, dtype=bool), jnp.zeros(20))
+        assert rng == pytest.approx((-0.3, 0.6))
+
+    def test_equal_gamma(self, model):
+        """Every member at one gamma gives that single point."""
+        m, pos, vel = model
+        rng = _track_range(m, pos, jnp.full(20, 0.3), jnp.ones(20, dtype=bool), None)
+        assert rng == pytest.approx((0.3, 0.3))
 
 
 def _blurred_segment():
