@@ -51,3 +51,22 @@ def test_markup_honours_width() -> None:
     cfg = pcf.WalkConfig()
     assert "\n" not in f"{cfg:html-width=200}"
     assert "\n" in f"{cfg:html-width=20}"
+
+
+def test_weak_typed_array_is_marked() -> None:
+    meta = pcf.StateMetadata(scale=jnp.asarray(1.0))
+    assert repr(meta) == "StateMetadata(scale=weak_f32[])"
+
+
+def test_empty_spec_is_str() -> None:
+    cfg = pcf.WalkConfig()
+    assert f"{cfg}" == str(cfg)
+
+
+def test_normalizer_shows_attributes() -> None:
+    qs = {"x": jnp.array([0.0, 1.0])}
+    ps = {"vx": jnp.array([1.0, 2.0])}
+    text = repr(pcf.nn.StandardScalerNormalizer(qs, ps))
+    assert text.startswith("StandardScalerNormalizer(\n")
+    assert "q_comps=['x']," in text
+    assert "q_mean=f32[1]," in text
