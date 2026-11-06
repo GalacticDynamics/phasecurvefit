@@ -42,6 +42,12 @@ class TestTrackRangeRule:
         assert lo >= -0.5
         assert hi <= 0.5
 
+    def test_zero_weight_members(self):
+        """Members of total weight 0 fall back to their span, without crashing."""
+        gamma = jnp.linspace(-0.3, 0.6, 20)
+        lo, hi = _track_range(gamma, jnp.ones(20, dtype=bool), jnp.zeros(20))
+        assert (lo, hi) == pytest.approx((-0.3, 0.6))
+
     def test_no_members(self):
         """With no members, the range is the span of all gamma."""
         gamma = jnp.linspace(-0.3, 0.6, 20)

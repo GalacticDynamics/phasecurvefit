@@ -178,6 +178,10 @@ def _track_range(
     symmetric kernel the along-track count is half its interior value at the
     true end, so this is the half-maximum end. Evenly sampled point clouds lose
     at most a bin at each end.
+
+    Eager: it runs in NumPy when a trained result is built, which happens
+    outside ``jit``. With no members, or members of total weight 0, it falls
+    back to the span of the gamma it was given.
     """
     g = np.asarray(gamma, dtype=float)
     keep = np.asarray(member, dtype=bool)
@@ -188,5 +192,7 @@ def _track_range(
     n_bins = int(np.clip(g.size // 10, 1, 40))
     edges = np.linspace(g.min(), g.max(), n_bins + 1)
     count, _ = np.histogram(g, edges, weights=w)
+    if not (count > 0).any():  # every member has weight 0: nothing to trim by
+        return float(g.min()), float(g.max())
     ok = np.flatnonzero(count >= 0.5 * np.median(count[count > 0]))
     return float(edges[ok[0]]), float(edges[ok[-1] + 1])
