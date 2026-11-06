@@ -316,6 +316,25 @@ class TestRidgeOrdererValidation:
         with pytest.raises(TypeError, match="cannot be traced"):
             jax.jit(lambda q: pcf.order(q, vel, orderer, weights=w).chord)(pos)
 
+    def test_grad_inputs(self):
+        """Under grad, whose tracers carry concrete values, it also raises."""
+        pos, vel, w = _arc_image()
+        orderer = pcf.orderers.RidgeOrderer(bandwidth=0.1)
+
+        def total_chord(x):
+            q = {"x": x, "y": pos["y"]}
+            return jnp.sum(pcf.order(q, vel, orderer, weights=w).chord)
+
+        with pytest.raises(TypeError, match="cannot be traced"):
+            jax.grad(total_chord)(pos["x"])
+
+    def test_traced_velocities(self):
+        """Tracing only the velocities is rejected too."""
+        pos, vel, w = _arc_image()
+        orderer = pcf.orderers.RidgeOrderer(bandwidth=0.1)
+        with pytest.raises(TypeError, match="cannot be traced"):
+            jax.jit(lambda p: pcf.order(pos, p, orderer, weights=w).chord)(vel)
+
     def test_bad_weights(self):
         """Weights of the wrong length raise."""
         pos, vel, w = _arc_image()

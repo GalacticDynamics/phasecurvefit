@@ -146,8 +146,15 @@ class RidgeOrderer(AbstractOrderer):
     ) -> OrderingResult:
         """Order samples along the ridge of their weighted density."""
         _check_component_keys(positions, velocities)
-        arrays = [*positions.values(), *([] if weights is None else [weights])]
-        if not all(jax.core.is_concrete(jnp.asarray(a)) for a in arrays):
+        # Any tracer, not only abstract ones: a grad tracer has a concrete value
+        # yet still fails in NumPy, and velocities are checked too so the
+        # contract is simply "not under a transform".
+        arrays = [
+            *positions.values(),
+            *velocities.values(),
+            *([] if weights is None else [weights]),
+        ]
+        if any(isinstance(a, jax.core.Tracer) for a in arrays):
             msg = (
                 "RidgeOrderer runs on the host with SciPy and cannot be traced "
                 "under jit, vmap or grad. Call it outside the transform, or use "
