@@ -319,7 +319,9 @@ class RunningMeanDecoder(AbstractExternalDecoder):
             positions_train=qs_norm,
             member_train=is_member,
             weights_train=(
-                None if weights is None else check_weights(weights, gamma.shape[0])
+                None
+                if weights is None
+                else check_weights(weights, gamma.shape[0]).astype(qs_norm.dtype)
             ),
             window_size=window_size,
             empty_window=empty_window,

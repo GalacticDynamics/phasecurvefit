@@ -429,7 +429,7 @@ def train_track_net(
     if weights is None:
         w = jnp.ones_like(gamma)
     else:
-        w = check_weights(weights, gamma.shape[0])
+        w = check_weights(weights, gamma.shape[0]).astype(qs_mean.dtype)
         # Mean 1 over the tracers that train, so the loss keeps its scale.
         w_mean = masked_mean(w, mask)
         w = w / jnp.where(w_mean > 0, w_mean, 1.0)

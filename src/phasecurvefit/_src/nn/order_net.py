@@ -487,7 +487,9 @@ def train_ordering_net(
         gamma_lin = jnp.linspace(gmin, gmax, n_total)
         w_ord = jnp.ones(n_total, dtype=all_ws.dtype)
     else:
-        w_ord = check_weights(weights, all_ws.shape[0])[ordering_indices][is_ordered]
+        # Cast to the data's dtype: float64 weights must not upcast the training.
+        w_all = check_weights(weights, all_ws.shape[0]).astype(all_ws.dtype)
+        w_ord = w_all[ordering_indices][is_ordered]
         # Mean 1 over the ordered tracers, so the loss keeps its scale.
         w_mean = jnp.mean(w_ord)
         w_ord = w_ord / jnp.where(w_mean > 0, w_mean, 1.0)

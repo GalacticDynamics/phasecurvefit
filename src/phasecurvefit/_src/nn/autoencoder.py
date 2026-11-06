@@ -829,7 +829,8 @@ def train_ordering_and_track_net(
             # weights silently would fit an unweighted track.
             msg = "per-tracer weights are not supported with mixture membership."
             raise NotImplementedError(msg)
-        combined = density_w * check_weights(weights, all_ws.shape[0])
+        w = check_weights(weights, all_ws.shape[0]).astype(all_ws.dtype)
+        combined = density_w * w
         # Rescale *after* combining, to the masked mean the density weights
         # have alone: correlated weights must not shift the loss scale.
         c_mean = masked_mean(combined, mask)
@@ -1037,7 +1038,8 @@ def train_autoencoder(
     if weights is None:
         gamma_seq = jnp.linspace(gmin, gmax, ordering.shape[0], dtype=prob.dtype)
     else:
-        weights = check_weights(weights, all_ws.shape[0])
+        # In the data's dtype, so float64 weights don't upcast float32 training.
+        weights = check_weights(weights, all_ws.shape[0]).astype(all_ws.dtype)
         gamma_seq = _cumulative_weight_gamma(weights[ordering], (gmin, gmax))
     gamma_ord = gamma_ord.at[ordering].set(gamma_seq.astype(prob.dtype))
     # Only ordered members train the decoder; unvisited tracers are gaps to fill.
