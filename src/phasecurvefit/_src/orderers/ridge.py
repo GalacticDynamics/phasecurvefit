@@ -138,13 +138,15 @@ class RidgeOrderer(AbstractOrderer):
         w = np.ones(n) if weights is None else np.asarray(weights, dtype=float)
         h = float(self.bandwidth)
 
-        depth = _density(pts, w, h)
-        path = _ridge_path(pts, depth, k=min(self.k, n - 1), core=self.core)
-        d_path = depth[path]
-        inside = np.flatnonzero(d_path >= self.trim * np.median(d_path))
-        path = path[inside[0] : inside[-1] + 1]
-
-        backbone, chord = _smooth_and_project(pts, path, h)
+        if n < 2:  # nothing to connect: identity ordering, as MSTOrderer
+            backbone, chord = pts, np.zeros(n)
+        else:
+            depth = _density(pts, w, h)
+            path = _ridge_path(pts, depth, k=min(self.k, n - 1), core=self.core)
+            d_path = depth[path]
+            inside = np.flatnonzero(d_path >= self.trim * np.median(d_path))
+            path = path[inside[0] : inside[-1] + 1]
+            backbone, chord = _smooth_and_project(pts, path, h)
         indices = np.argsort(chord, kind="stable").astype(np.int32)
         return OrderingResult(
             positions={c: jnp.asarray(v) for c, v in positions.items()},

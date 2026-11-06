@@ -86,6 +86,15 @@ class TestRidgeOrderer:
         assert float(np.median(_radius_err(result.backbone))) < 0.03
         assert result.weights is None
 
+    @pytest.mark.parametrize("n", [0, 1])
+    def test_too_few_samples(self, n):
+        """With fewer than 2 samples the ordering is the identity, as for the MST."""
+        pos = {"x": jnp.arange(n, dtype=float), "y": jnp.zeros(n)}
+        vel = jax.tree.map(jnp.zeros_like, pos)
+        result = pcf.orderers.RidgeOrderer(bandwidth=0.1).order(pos, vel)
+        np.testing.assert_array_equal(result.indices, np.arange(n))
+        np.testing.assert_array_equal(result.chord, np.zeros(n))
+
     def test_result_contract(self):
         """Every sample is ordered, by its chord, and the weights are carried."""
         pos, vel, w = _arc_image()
