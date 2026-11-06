@@ -118,6 +118,7 @@ class TestRidgeOrdererValidation:
         "kwargs",
         [
             {"bandwidth": 0.0},
+            {"bandwidth": jnp.array(-0.1)},
             {"bandwidth": 0.1, "k": 0},
             {"bandwidth": 0.1, "core": 0.0},
             {"bandwidth": 0.1, "trim": 1.5},

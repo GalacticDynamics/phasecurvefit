@@ -104,7 +104,10 @@ class RidgeOrderer(AbstractOrderer):
 
     def __check_init__(self) -> None:
         """Reject invalid configuration at construction."""
-        if isinstance(self.bandwidth, (int, float)) and not self.bandwidth > 0:
+        # A Quantity is checked once its unit is stripped (the unxt dispatch
+        # rebuilds the orderer with the bare number); anything else must be a
+        # positive scalar, including a 0-d array.
+        if not hasattr(self.bandwidth, "unit") and not float(self.bandwidth) > 0:
             msg = f"bandwidth must be positive, got {self.bandwidth}."
             raise ValueError(msg)
         if self.k < 1:
