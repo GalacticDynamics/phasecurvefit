@@ -100,6 +100,16 @@ def _train_and_project(
     return backbone_q, backbone_p, lam, result.kept
 
 
+def _is_concrete(x: object, /) -> bool:
+    """Whether ``x`` has a value here, i.e. it is not an abstract tracer.
+
+    The same test as ``jax.core.is_concrete``, which jax 0.12 removed. A
+    ``grad`` tracer carries its primal value and counts as concrete; a ``jit``
+    tracer has none.
+    """
+    return not isinstance(x, jax.core.Tracer) or x.to_concrete_value() is not None
+
+
 def _scale_is_nonzero(scale: float | FSz0, /, *, remedy: str) -> bool:
     """Whether ``scale`` asks for velocity to participate.
 
@@ -111,12 +121,12 @@ def _scale_is_nonzero(scale: float | FSz0, /, *, remedy: str) -> bool:
     names neither the field nor the way out. Raise one that does.
 
     The rule is "the value has to be knowable here", not "we are inside a
-    transform": ``jax.core.is_concrete`` is false only when there is genuinely
+    transform": ``_is_concrete`` is false only when there is genuinely
     no value yet. A ``grad`` trace carries a concrete primal and passes; an
     abstract ``jit`` trace does not. A Python ``float`` handed to
     ``filter_jit`` stays static, so the ordinary path never reaches this.
     """
-    if not jax.core.is_concrete(scale):
+    if not _is_concrete(scale):
         msg = (
             "metric_scale has no value while tracing, so whether it is zero "
             "cannot be answered here. That choice is static -- it selects a "
@@ -595,7 +605,7 @@ class SOMOrderer(AbstractOrderer):
                 "drops another silently; each visited index must appear at "
                 "most once.",
             )
-            if not jax.core.is_concrete(prior):
+            if not _is_concrete(prior):
                 # Without values the visited subset has no size, and no shape
                 # fixed at trace time can hold it. Not fixable here: the mask
                 # would have to travel through the whole core so rejected

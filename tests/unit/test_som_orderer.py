@@ -1299,3 +1299,22 @@ class TestNonFiniteVelocities:
         batched_vel = {k: jnp.stack([v, v]) for k, v in vel.items()}
         out = jax.vmap(lambda q, p: orderer.order(q, p).chord)(batched_pos, batched_vel)
         assert out.shape == (2, 200)
+
+
+def test_is_concrete_matches_jax_semantics():
+    """Concrete outside transforms and under ``grad``; abstract under ``jit``."""
+    seen = {}
+
+    def probe(name):
+        def f(x):
+            seen[name] = som_orderer._is_concrete(x)
+            return x
+
+        return f
+
+    jax.jit(probe("jit"))(1.0)
+    jax.grad(probe("grad"))(1.0)
+    assert som_orderer._is_concrete(1.0)
+    assert som_orderer._is_concrete(jnp.asarray(1.0))
+    assert seen["grad"]
+    assert not seen["jit"]
