@@ -39,6 +39,7 @@ from .normalize import AbstractNormalizer
 from .order_net import (
     OrderingNet,
     OrderingTrainingConfig,
+    _cumulative_weight_gamma,
     default_optimizer,
     train_ordering_net,
 )
@@ -51,6 +52,7 @@ from .track_net import (
     train_track_net,
 )
 from .trainer import EqxScanTrainer, eqx_step
+from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import FLikeSz0, FSz0, FSzN
 from phasecurvefit._src.orderers.result import OrderingResult
 
@@ -764,6 +766,7 @@ def train_ordering_and_track_net(
     mask: Bool[Array, " N"],
     config: EncoderDecoderTrainingConfig,
     *,
+    weights: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[PathAutoencoder, optax.OptState, Float[Array, " {config.n_epochs}"]]:
     r"""Train encoder and decoder jointly: Phase 3 of autoencoder training.
@@ -789,6 +792,13 @@ def train_ordering_and_track_net(
     config : EncoderDecoderTrainingConfig
         Phase 3 configuration: epochs, batch size, loss weights, etc. Build it
         from the full config with `TrainingConfig.autoencoder_config`.
+    weights : Array, shape (N,), optional
+        Per-tracer weights, e.g. the density at each pixel of a density field.
+        Multiplied into each tracer's loss term, on top of any
+        ``config.weight_by_density`` weights, and the product is rescaled to
+        the masked mean those weights have alone (1 without them), so adding
+        per-tracer weights never changes the loss scale. Not supported with
+        ``config.membership``. ``None`` (default) weighs tracers equally.
     key : PRNGKeyArray
         Random key for shuffling and batching.
 
@@ -808,9 +818,25 @@ def train_ordering_and_track_net(
     if config.weight_by_density:
         kde_kw = config.weight_by_density
         kde_kw = kde_kw if isinstance(kde_kw, Mapping) else {}
-        weights = compute_weights(model.encoder, all_ws, key=subkey, **kde_kw)
+        density_w = compute_weights(model.encoder, all_ws, key=subkey, **kde_kw)
     else:
-        weights = jnp.ones(all_ws.shape[0], dtype=all_ws.dtype)
+        density_w = jnp.ones(all_ws.shape[0], dtype=all_ws.dtype)
+    if weights is None:
+        weights = density_w
+    else:
+        if config.membership is not None:
+            # The mixture loss has no per-tracer weight slot; dropping the
+            # weights silently would fit an unweighted track.
+            msg = "per-tracer weights are not supported with mixture membership."
+            raise NotImplementedError(msg)
+        w = check_weights(weights, all_ws.shape[0]).astype(all_ws.dtype)
+        combined = density_w * w
+        # Rescale *after* combining, to the masked mean the density weights
+        # have alone: correlated weights must not shift the loss scale.
+        c_mean = masked_mean(combined, mask)
+        weights = combined * (
+            masked_mean(density_w, mask) / jnp.where(c_mean > 0, c_mean, 1.0)
+        )
 
     # Mixture-model membership is opt-in. When enabled the model must carry a
     # `WidthNet`, and the background density is fixed once, from the
@@ -894,6 +920,7 @@ def train_autoencoder(
     *,
     config: TrainingConfig | None = None,
     chord: Float[Array, " N"] | None = None,
+    weights: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[AutoencoderResult, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
     r"""Train the PathAutoencoder in three phases.
@@ -931,6 +958,15 @@ def train_autoencoder(
         The orderer's arc-length parameter (``OrderingResult.chord``), passed
         through to the encoder's arclength target. The ``OrderingResult``
         overload supplies this automatically.
+    weights : Array, shape (N,) | None, keyword-only
+        Per-tracer weights, in input order, e.g. the density at each pixel of
+        a density field; the ``OrderingResult`` overload takes them from the
+        result's ``weights``. All three phases use them: the encoder's
+        $\gamma$ targets spread tracers by cumulative weight and its loss is
+        weighted (see `train_ordering_net`), the decoder is trained on a
+        weighted running mean with a weighted loss, and the joint loss is
+        weighted. A tracer of weight 2 then counts like two coincident tracers
+        of weight 1. ``None`` (default) weighs every tracer equally.
     config : TrainingConfig | None, optional
         Complete training configuration for all three phases.
         If `None` (default), uses default configuration.
@@ -950,6 +986,10 @@ def train_autoencoder(
     # Build default config if none provided
     if config is None:
         config = TrainingConfig()
+    if weights is not None and config.membership is not None:
+        # Checked here too, not only in phase 3, so it fails before training.
+        msg = "per-tracer weights are not supported with mixture membership."
+        raise NotImplementedError(msg)
 
     # Split the keys
     keys: Key[Array, " 5"] = jr.split(key, 5)
@@ -967,6 +1007,7 @@ def train_autoencoder(
         ordering_indices,
         config=config_encoder,
         chord=chord,
+        weights=weights,
         key=keys[0],
     )
 
@@ -994,9 +1035,13 @@ def train_autoencoder(
     visited = ordering_indices >= 0
     ordering = ordering_indices[visited]  # point indices, in visit order
     gamma_ord = jnp.full(ordering_indices.shape, gmin, dtype=prob.dtype)
-    gamma_ord = gamma_ord.at[ordering].set(
-        jnp.linspace(gmin, gmax, ordering.shape[0], dtype=prob.dtype)
-    )
+    if weights is None:
+        gamma_seq = jnp.linspace(gmin, gmax, ordering.shape[0], dtype=prob.dtype)
+    else:
+        # In the data's dtype, so float64 weights don't upcast float32 training.
+        weights = check_weights(weights, all_ws.shape[0]).astype(all_ws.dtype)
+        gamma_seq = _cumulative_weight_gamma(weights[ordering], (gmin, gmax))
+    gamma_ord = gamma_ord.at[ordering].set(gamma_seq.astype(prob.dtype))
     # Only ordered members train the decoder; unvisited tracers are gaps to fill.
     decoder_mask = is_member & visited
 
@@ -1007,6 +1052,7 @@ def train_autoencoder(
         gamma_train=gamma_ord,
         positions_train=all_qs,
         member_train=decoder_mask,
+        weights_train=weights,
     )
     mean_qs = jax.vmap(mean_fn, (0, None))(gamma_ord, keys[2])
     # Masked-out points can have empty windows (NaN targets). They don't enter
@@ -1021,6 +1067,7 @@ def train_autoencoder(
         qs_mean=mean_qs,
         mask=decoder_mask,
         config=config_decoder,
+        weights=weights,
         key=keys[3],
     )
 
@@ -1031,7 +1078,12 @@ def train_autoencoder(
     # Train Encoder & Decoder together
 
     model, autoencoder_opt_state, autoencoder_losses = train_ordering_and_track_net(
-        model, all_ws, mask=is_member, config=config.autoencoder_config(), key=keys[4]
+        model,
+        all_ws,
+        mask=is_member,
+        config=config.autoencoder_config(),
+        weights=weights,
+        key=keys[4],
     )
 
     # ===========================================
@@ -1065,8 +1117,12 @@ def train_autoencoder(
     /,
     *,
     config: TrainingConfig | None = None,
+    weights: Float[Array, " N"] | None = None,
     key: PRNGKeyArray,
 ) -> tuple[AutoencoderResult, dict[str, PyTree], Float[Array, " {config.n_epochs}"]]:
+    # ``weights`` overrides the result's own; see the array overloads.
+    if weights is None:
+        weights = walk_results.weights
     # Transform walk results using the model's normalizer
     qs, ps = model.normalizer.transform(walk_results.positions, walk_results.velocities)
     ws = jnp.concatenate([qs, ps], axis=1)
@@ -1078,6 +1134,7 @@ def train_autoencoder(
         walk_results.indices,
         config=config,
         chord=walk_results.chord,
+        weights=weights,
         key=key,
     )
 

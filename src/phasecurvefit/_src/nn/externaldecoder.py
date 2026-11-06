@@ -14,6 +14,7 @@ from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from .normalize import AbstractNormalizer
 from .order_net import OrderingNet
+from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import FSz0, RSz0
 
 if TYPE_CHECKING:
@@ -44,6 +45,8 @@ class AbstractExternalDecoder(eqx.Module):
         self,
         model: "phasecurvefit.nn.EncoderExternalDecoder",
         all_ws: Float[Array, " N TwoF"],
+        *,
+        weights: Float[Array, " N"] | None = None,
     ) -> "AbstractExternalDecoder":
         """Update decoder parameters.
 
@@ -55,7 +58,9 @@ class AbstractExternalDecoder(eqx.Module):
         model : EncoderExternalDecoder
             The encoder-external decoder model instance.
         all_ws : Float[Array, " N TwoF"]
-            Array of all weights or other relevant data for updating.
+            Normalized phase-space coordinates of the training tracers.
+        weights : Float[Array, " N"] | None
+            Optional per-tracer weights, in the same order as ``all_ws``.
 
         Returns
         -------
@@ -86,6 +91,9 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         ``"nearest"`` returns the mean position of the member star(s) whose
         gamma is closest to the query. If there are no members at all, NaN is
         returned in either mode.
+    weights_train : Array | None
+        Per-sample weights in the running mean. ``None`` (default) weighs
+        every member equally.
 
     """
 
@@ -93,6 +101,7 @@ class RunningMeanDecoder(AbstractExternalDecoder):
     gamma_train: Float[Array, " N"] | None = None
     positions_train: Float[Array, " N D"] | None = None
     member_train: Bool[Array, " N"] | None = None
+    weights_train: Float[Array, " N"] | None = None
     empty_window: Literal["nan", "nearest"] = eqx.field(default="nan", static=True)
 
     def __call__(self, gamma: RSz0, /, key: PRNGKeyArray | None = None) -> FSz0:
@@ -141,6 +150,8 @@ class RunningMeanDecoder(AbstractExternalDecoder):
 
         # Uniform weights for member stars within the window
         weights = (in_window & member_train).astype(q_train.dtype)
+        if self.weights_train is not None:
+            weights = weights * self.weights_train
 
         if self.empty_window == "nearest":
             # For an empty window, fall back to the member(s) nearest in gamma.
@@ -169,6 +180,7 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         window_size: float = 0.05,
         member_threshold: float = 0.5,
         empty_window: Literal["nan", "nearest"] = "nan",
+        weights: Float[Array, " N"] | None = None,
     ) -> "RunningMeanDecoder":
         r"""Create a running-mean decoder for non-parametric position reconstruction.
 
@@ -213,6 +225,10 @@ class RunningMeanDecoder(AbstractExternalDecoder):
             returns NaN (so plots show gaps and downstream code can detect
             them); ``"nearest"`` returns the mean position of the member(s)
             closest in $\gamma$.
+        weights : Array, shape (N,), optional
+            Per-sample weights, e.g. the density at each pixel of a density
+            field. The running mean becomes a weighted mean. ``None`` (default)
+            weighs every member equally.
 
         Returns
         -------
@@ -302,6 +318,11 @@ class RunningMeanDecoder(AbstractExternalDecoder):
             gamma_train=gamma,
             positions_train=qs_norm,
             member_train=is_member,
+            weights_train=(
+                None
+                if weights is None
+                else check_weights(weights, gamma.shape[0]).astype(qs_norm.dtype)
+            ),
             window_size=window_size,
             empty_window=empty_window,
         )
@@ -310,6 +331,8 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         self,
         model: "phasecurvefit.nn.EncoderExternalDecoder",
         all_ws: Float[Array, " N TwoF"],
+        *,
+        weights: Float[Array, " N"] | None = None,
     ) -> "RunningMeanDecoder":
         """Update decoder parameters.
 
@@ -321,7 +344,9 @@ class RunningMeanDecoder(AbstractExternalDecoder):
         model : EncoderExternalDecoder
             The encoder-external decoder model instance.
         all_ws : Float[Array, " N TwoF"]
-            Array of all weights or other relevant data for updating.
+            Normalized phase-space coordinates of the training tracers.
+        weights : Float[Array, " N"] | None
+            Optional per-tracer weights for the running mean; see `make`.
 
         Returns
         -------
@@ -343,5 +368,6 @@ class RunningMeanDecoder(AbstractExternalDecoder):
             ps_norm,
             window_size=self.window_size,
             empty_window=self.empty_window,
+            weights=weights,
         )
         return decoder  # noqa: RET504

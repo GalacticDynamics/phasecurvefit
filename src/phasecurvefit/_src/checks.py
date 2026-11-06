@@ -1,6 +1,11 @@
 """Input checks: ``ValueError`` on concrete inputs, ``eqx.error_if`` when traced."""
 
-__all__: tuple[str, ...] = ("check_nan_policy", "check_velocities", "value_error_if")
+__all__: tuple[str, ...] = (
+    "check_nan_policy",
+    "check_velocities",
+    "check_weights",
+    "value_error_if",
+)
 
 from collections.abc import Mapping
 
@@ -57,4 +62,26 @@ def check_velocities[T: Mapping](
         return velocities
     return value_error_if(
         velocities, jnp.any(jnp.stack([jnp.any(jnp.isnan(v)) for v in comps])), nan_msg
+    )
+
+
+def check_weights(weights: object, n_obs: int, /) -> jax.Array:
+    """Validate per-observation weights and return them as a float array.
+
+    ``weights`` must have shape ``(n_obs,)``, be finite and non-negative, and
+    have at least one positive entry. A zero weight is allowed: it switches an
+    observation off without changing any array's shape.
+    """
+    w = jnp.asarray(weights)
+    if w.shape != (n_obs,):
+        msg = f"weights must have shape ({n_obs},), one per observation; got {w.shape}."
+        raise ValueError(msg)
+    w = w.astype(jnp.result_type(w.dtype, float))
+    w = value_error_if(
+        w,
+        ~jnp.all(jnp.isfinite(w) & (w >= 0)),
+        "weights must be finite and non-negative.",
+    )
+    return value_error_if(
+        w, ~jnp.any(w > 0), "weights must have at least one positive entry."
     )

@@ -69,6 +69,34 @@ result = pcf.order(position, vel_missing)
 print(int(result.n_visited))  # all 3 samples are ordered
 ```
 
+## Weight your samples
+
+A sample can stand for more than one star, or for the density at one pixel when your
+data is an image. Pass one weight per sample as `weights`. The result keeps them,
+and the autoencoder reads them from there:
+
+```{code-cell} python
+w = jnp.array([1.0, 2.0, 1.0])
+result = pcf.order(position, velocity, weights=w)
+print(result.weights)  # [1. 2. 1.]
+```
+
+`pcf.fit_track` and every orderer take `weights` too. A weight of 2 counts like
+two copies of that sample:
+
+- The self-organizing map fits the weighted density. The MST and the local-flow
+  walk order by geometry alone and pass the weights through unchanged.
+- The autoencoder weights its ordering targets and its fit to the track, but not
+  its membership probability. A low-weight sample counts less in the track and is
+  still a member.
+- A sample with weight 0 is still ordered, but it doesn't count in the
+  self-organizing map or the track fit.
+
+Weights must be finite and non-negative, with at least one positive. They don't
+yet work with the mixture-model outlier rejection
+(`TrainingConfig(membership=...)`, {doc}`outliers`), which raises
+`NotImplementedError`.
+
 ## Check the shapes
 
 Every array in both dictionaries must have the same length:

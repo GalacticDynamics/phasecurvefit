@@ -16,6 +16,8 @@ its arguments untouched so each stage's own dispatch selects itself.
 
 __all__: tuple[str, ...] = ("ChainOrderer",)
 
+from jaxtyping import Array, Float
+
 from .base import AbstractOrderer
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
@@ -73,16 +75,22 @@ class ChainOrderer(AbstractOrderer):
         *,
         metadata: StateMetadata | None = None,
         init: AbstractResult | None = None,
+        weights: Float[Array, " n_obs"] | None = None,
     ) -> AbstractResult:
-        """Run each stage in turn, feeding its result to the next as ``init``."""
+        """Run each stage in turn, feeding its result to the next as ``init``.
+
+        ``weights`` go to every stage.
+        """
+        # Omit ``weights`` when unset, so stages predating it still work.
+        kw: dict[str, object] = {} if weights is None else {"weights": weights}
         result = init
         for stage in self.stages:
             if result is None:
                 # Omit ``init`` entirely so a stage written against v0.3.1's
                 # ``order()`` still works as the head of a chain.
-                result = stage.order(positions, velocities, metadata=metadata)
+                result = stage.order(positions, velocities, metadata=metadata, **kw)
             else:
                 result = stage.order(
-                    positions, velocities, metadata=metadata, init=result
+                    positions, velocities, metadata=metadata, init=result, **kw
                 )
         return result

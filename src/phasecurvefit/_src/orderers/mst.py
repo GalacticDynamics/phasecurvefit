@@ -47,7 +47,7 @@ import jax.numpy as jnp
 import numpy as np
 import plum
 from jaxknn import bucket, far_rows, pow2_scale, tree as _kd
-from jaxtyping import Array
+from jaxtyping import Array, Float
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import (
     connected_components,
@@ -66,7 +66,7 @@ from .result import OrderingResult
 from phasecurvefit._src import graph as _graph
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import NanPolicy, StateMetadata
-from phasecurvefit._src.checks import check_nan_policy
+from phasecurvefit._src.checks import check_nan_policy, check_weights
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.neighbors import (
     SCIPY_TRACED,
@@ -1099,8 +1099,12 @@ class MSTOrderer(AbstractOrderer):
         *,
         metadata: StateMetadata | None = None,  # noqa: ARG002
         init: AbstractResult | None = None,  # noqa: ARG002
+        weights: Float[Array, " n_obs"] | None = None,
     ) -> OrderingResult:
         """Order tracers along the MST backbone.
+
+        ``weights`` do not change the tree, which is built from geometry alone;
+        they are validated and carried through on the result.
 
         Three stages. (a) The kNN runs in the ``neighbors`` backend (by
         default SciPy when the inputs are concrete, ``BucketKDTree`` when
@@ -1123,6 +1127,8 @@ class MSTOrderer(AbstractOrderer):
         P = _as_float(jnp.stack([jnp.asarray(positions[c]) for c in comps], axis=1))
         V = _as_float(jnp.stack([jnp.asarray(velocities[c]) for c in comps], axis=1))
         n = P.shape[0]
+        if weights is not None:
+            weights = check_weights(weights, n)
         cfg = {
             "k": self.k,
             "jump_cap": self.jump_cap,
@@ -1170,6 +1176,7 @@ class MSTOrderer(AbstractOrderer):
             backbone=backbone,
             backbone_size=backbone_len,
             chord=chord_along_ordering(qs, idx_full),
+            weights=weights,
             # ``orient_by_velocity`` only picks a direction; it does not make
             # the ordering itself velocity-aware.
             velocity_aware=self._splits_directionless,
