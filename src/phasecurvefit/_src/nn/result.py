@@ -195,8 +195,9 @@ def _track_range(
     so the cut falls partway into the cap.
 
     Eager: it runs in NumPy when a trained result is built, which happens
-    outside ``jit``. With no members, members of total weight 0, or a track
-    that can't be decoded, it falls back to the members' span of gamma.
+    outside ``jit``. With no members it falls back to the span of all the
+    gamma; with members of total weight 0, or a track that can't be decoded,
+    to the members' span.
     """
     g = np.asarray(gamma, dtype=float)
     keep = np.asarray(member, dtype=bool)
