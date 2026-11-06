@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 import phasecurvefit as pcf
-from phasecurvefit._src.orderers.ridge import _smooth_and_project
+from phasecurvefit._src.orderers.ridge import _density, _smooth_and_project
 
 pytest.importorskip("scipy")
 
@@ -86,6 +86,32 @@ class TestRidgeOrderer:
         result = pcf.order(pos, vel, pcf.orderers.RidgeOrderer(bandwidth=0.1))
         assert float(np.median(_radius_err(result.backbone))) < 0.03
         assert result.weights is None
+
+    def test_duplicates_count_like_weight(self):
+        """In the density, a sample given twice counts like one of double weight."""
+        pts = np.array([[0.0, 0.0], [0.05, 0.0], [0.1, 0.0], [0.15, 0.0]])
+        w = np.array([1.0, 2.0, 1.0, 1.0])
+        dup = np.vstack([pts, pts[[1]]])  # sample 1 twice, each of weight 1
+        np.testing.assert_allclose(
+            _density(dup, np.ones(5), 0.05)[:4], _density(pts, w, 0.05)
+        )
+
+    def test_duplicated_samples(self):
+        """An image with every third pixel given twice still finds the arc."""
+        pos, vel, w = _arc_image()
+        dup = np.arange(0, w.shape[0], 3)
+
+        def cat(a):
+            return jnp.concatenate([a, a[dup]])
+
+        result = pcf.order(
+            jax.tree.map(cat, pos),
+            jax.tree.map(cat, vel),
+            pcf.orderers.RidgeOrderer(bandwidth=0.1),
+            weights=cat(w),
+        )
+        assert float(np.median(_radius_err(result.backbone))) < 0.03
+        assert _angle_span(result.backbone) > 0.9 * np.pi
 
     @pytest.mark.parametrize("n", [0, 1])
     def test_too_few_samples(self, n):

@@ -166,13 +166,17 @@ def _density(pts: np.ndarray, w: np.ndarray, h: float, /) -> np.ndarray:
     Normalized to a peak of 1. Floored above 0 so a zero-weight sample far from
     the rest gives a finite, if huge, ridge cost rather than a division by 0.
     """
-    tree = cKDTree(pts)
+    n = len(pts)
     # ponytail: all pairs within 3h are held at once, O(N * (3h/spacing)^D)
     # memory; chunk the query if images get much larger than ~1e5 pixels.
-    pairs = tree.sparse_distance_matrix(tree, 3 * h, output_type="coo_matrix")
-    kern = w[pairs.col] * np.exp(-0.5 * (pairs.data / h) ** 2)
-    # The sparse matrix drops zero distances, so add each sample's own term.
-    depth = np.bincount(pairs.row, weights=kern, minlength=len(pts)) + w
+    # query_pairs keeps coincident samples (distance 0), each pair once (i < j).
+    i, j = cKDTree(pts).query_pairs(3 * h, output_type="ndarray").T
+    kern = np.exp(-0.5 * (np.linalg.norm(pts[i] - pts[j], axis=1) / h) ** 2)
+    depth = (
+        w  # each sample's own term
+        + np.bincount(i, weights=w[j] * kern, minlength=n)
+        + np.bincount(j, weights=w[i] * kern, minlength=n)
+    )
     depth = depth / depth.max()
     return np.maximum(depth, np.finfo(float).tiny ** 0.25)
 
@@ -183,11 +187,14 @@ def _ridge_path(
     """Sample indices of the ridge path between the two ends of the core."""
     n = len(pts)
     dist, nbr = cKDTree(pts).query(pts, k + 1)
-    rows = np.repeat(np.arange(n), k)
-    cols = nbr[:, 1:].ravel()
+    # Drop each sample's link to itself by index, not by position: with a
+    # coincident duplicate, the sample need not come first in its own list.
+    rows = np.repeat(np.arange(n), k + 1)
+    not_self = nbr.ravel() != rows
+    rows, cols = rows[not_self], nbr.ravel()[not_self]
     # Coincident samples would give zero-length edges, which a sparse graph
     # reads as no edge at all.
-    ell = np.maximum(dist[:, 1:].ravel(), np.finfo(float).eps)
+    ell = np.maximum(dist.ravel()[not_self], np.finfo(float).eps)
 
     def graph(data: np.ndarray, keep: np.ndarray) -> sparse.csr_matrix:
         return sparse.coo_matrix((data[keep], (rows[keep], cols[keep])), (n, n)).tocsr()
