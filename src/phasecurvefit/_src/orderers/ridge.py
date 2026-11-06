@@ -123,8 +123,10 @@ class RidgeOrderer(AbstractOrderer):
         if bw is not None and not hasattr(bw, "unit") and np.ndim(bw) != 0:
             msg = f"bandwidth must be a scalar, got shape {np.shape(bw)}."
             raise ValueError(msg)
-        if bw is not None and not hasattr(bw, "unit") and not float(bw) > 0:
-            msg = f"bandwidth must be positive, got {self.bandwidth}."
+        # Finite too: an infinite bandwidth would pair every sample with every
+        # other in the density step.
+        if bw is not None and not hasattr(bw, "unit") and not 0 < float(bw) < np.inf:
+            msg = f"bandwidth must be positive and finite, got {self.bandwidth}."
             raise ValueError(msg)
         if self.k < 1:
             msg = f"k must be at least 1, got {self.k}."

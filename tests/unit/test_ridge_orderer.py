@@ -282,6 +282,8 @@ class TestRidgeOrdererValidation:
         [
             {"bandwidth": 0.0},
             {"bandwidth": jnp.array(-0.1)},
+            {"bandwidth": np.inf},
+            {"bandwidth": np.nan},
             {"bandwidth": jnp.array([0.1, 0.2])},
             {"bandwidth": 0.1, "k": 0},
             {"bandwidth": 0.1, "core": 0.0},
