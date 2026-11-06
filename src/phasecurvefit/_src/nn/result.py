@@ -6,11 +6,12 @@ from dataclasses import KW_ONLY
 
 import equinox as eqx
 import jax.numpy as jnp
+import numpy as np
 from jaxtyping import Array, PRNGKeyArray
 
 from .abstractautoencoder import AbstractAutoencoder
 from phasecurvefit._src.abstract_result import AbstractResult
-from phasecurvefit._src.custom_types import FSzN, ISzN, VectorComponents
+from phasecurvefit._src.custom_types import BSzN, FSzN, ISzN, VectorComponents
 
 
 class AutoencoderResult(AbstractResult):
@@ -28,7 +29,15 @@ class AutoencoderResult(AbstractResult):
     indices : ISzN
         Indices sorted by gamma value.
     gamma_range : tuple[float, float]
-        Valid range for the ordering parameter. Default: (0.0, 1.0).
+        Valid range for the ordering parameter: calling the result accepts any
+        $\gamma$ in it, including every tracer's own.
+    track_range : tuple[float, float] | None
+        The range of $\gamma$ the track covers, for drawing it:
+        ``result(jnp.linspace(*result.track_range, n))``. It ends where the
+        weighted number of member tracers per unit $\gamma$ falls below half
+        its median, so faint tracers past the end of a stream -- the blurred
+        tail of a density field -- don't carry the track past the end. Within
+        ``gamma_range``. ``None`` for a result built by hand; training sets it.
     gamma : FSzN
         Ordering parameters for all tracers.
     membership_prob : Array
@@ -46,6 +55,7 @@ class AutoencoderResult(AbstractResult):
     model: AbstractAutoencoder
     _: KW_ONLY
     gamma_range: tuple[float, float]
+    track_range: tuple[float, float] | None = None
 
     def __call__(
         self, gamma: Array, /, *, key: PRNGKeyArray | None = None
@@ -128,6 +138,7 @@ def fill_ordering_gaps(
         result.velocities,
         prob_threshold=prob_threshold,
         gamma_range=result.gamma_range,
+        weights=getattr(result, "weights", None),
     )
 
 
@@ -139,6 +150,7 @@ def _encode_to_result(
     *,
     prob_threshold: float,
     gamma_range: tuple[float, float],
+    weights: FSzN | None = None,
 ) -> AutoencoderResult:
     """Encode every tracer; order by gamma, keeping those with p >= threshold."""
     gamma, prob = model.encode(q, p)
@@ -148,7 +160,33 @@ def _encode_to_result(
         velocities=p,
         indices=order[prob[order] >= prob_threshold],
         gamma_range=gamma_range,
+        track_range=_track_range(gamma, prob >= prob_threshold, weights),
         gamma=gamma,
         membership_prob=prob,
         model=model,
     )
+
+
+def _track_range(
+    gamma: FSzN, member: BSzN, weights: FSzN | None, /
+) -> tuple[float, float]:
+    """Find the span of gamma where the weighted member count is at least half typical.
+
+    Bins the members' gamma over their own span, with one bin per 10 members up
+    to 40, and keeps everything from the first to the last bin holding at least
+    half the median weight of the non-empty bins. For a curve blurred by any
+    symmetric kernel the along-track count is half its interior value at the
+    true end, so this is the half-maximum end. Evenly sampled point clouds lose
+    at most a bin at each end.
+    """
+    g = np.asarray(gamma, dtype=float)
+    keep = np.asarray(member, dtype=bool)
+    if not keep.any():  # nothing to trim against
+        return float(g.min()), float(g.max())
+    w = np.ones_like(g) if weights is None else np.asarray(weights, dtype=float)
+    g, w = g[keep], w[keep]
+    n_bins = int(np.clip(g.size // 10, 1, 40))
+    edges = np.linspace(g.min(), g.max(), n_bins + 1)
+    count, _ = np.histogram(g, edges, weights=w)
+    ok = np.flatnonzero(count >= 0.5 * np.median(count[count > 0]))
+    return float(edges[ok[0]]), float(edges[ok[-1] + 1])

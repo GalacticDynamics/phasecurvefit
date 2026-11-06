@@ -13,7 +13,7 @@ from .autoencoder import TrainingConfig
 from .externaldecoder import AbstractExternalDecoder
 from .normalize import AbstractNormalizer
 from .order_net import OrderingNet, OrderingTrainingConfig, train_ordering_net
-from .result import AutoencoderResult
+from .result import AutoencoderResult, _track_range
 
 
 class EncoderExternalDecoder(AbstractAutoencoder):
@@ -203,6 +203,8 @@ def train_autoencoder(
         gamma=gamma,
         membership_prob=membership_prob,
         gamma_range=model.gamma_range,
+        # Members as the running-mean decoder counts them (its default threshold).
+        track_range=_track_range(gamma, membership_prob >= 0.5, weights),
     )
 
     # Wrap opt_state in dict for consistency with other dispatches

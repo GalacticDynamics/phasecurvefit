@@ -1105,6 +1105,7 @@ def train_autoencoder(
         velocities,
         prob_threshold=config.member_threshold,
         gamma_range=model.gamma_range,
+        weights=weights,
     )
 
     return result, opt_states, losses

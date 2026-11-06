@@ -58,7 +58,7 @@ config = pcf.nn.TrainingConfig(show_pbar=False)
 ordering, fitted, losses = pcf.fit_track(
     pos, vel, key=jax.random.key(1), training_config=config
 )
-track = fitted(jnp.linspace(*fitted.gamma_range, 300))  # the smooth mean track
+track = fitted(jnp.linspace(*fitted.track_range, 300))  # the smooth mean track
 print(fitted.gamma.shape)  # an ordering coordinate for every sample: (400,)
 ```
 
@@ -101,7 +101,7 @@ config = pcf.nn.TrainingConfig(show_pbar=False)
 ordering, fitted, losses = pcf.fit_track(
     pos, vel, key=jax.random.key(1), weights=weights, training_config=config
 )
-track = fitted(jnp.linspace(*fitted.gamma_range, 300))  # the smooth mean track
+track = fitted(jnp.linspace(*fitted.track_range, 300))  # the smooth mean track
 print(fitted.gamma.shape == weights.shape)  # a gamma for every pixel: True
 ```
 

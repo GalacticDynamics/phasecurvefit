@@ -53,5 +53,6 @@ return an {class}`~phasecurvefit.nn.AutoencoderResult`. It has `positions`,
 | `gamma` | $\gamma$ for every sample |
 | `membership_prob` | the encoder's membership probability for every sample |
 | `model` | the trained network |
+| `track_range` | the range of $\gamma$ the track covers, for drawing it; it ends where the weighted number of members per unit $\gamma$ falls below half its median, so the faint tail of a blurred stream doesn't carry the track past the end. Inside `gamma_range`, which still accepts every sample's $\gamma$ |
 
 Calling it, `result(gamma)`, evaluates the fitted track ({doc}`../how-to/autoencoder`).
