@@ -249,6 +249,13 @@ class TestRidgeOrdererValidation:
         with pytest.raises(ValueError, match="must be"):
             pcf.orderers.RidgeOrderer(**kwargs)
 
+    def test_traced_inputs(self):
+        """Under jit it raises a clear TypeError, not a tracer conversion error."""
+        pos, vel, w = _arc_image()
+        orderer = pcf.orderers.RidgeOrderer(bandwidth=0.1)
+        with pytest.raises(TypeError, match="cannot be traced"):
+            jax.jit(lambda q: pcf.order(q, vel, orderer, weights=w).chord)(pos)
+
     def test_bad_weights(self):
         """Weights of the wrong length raise."""
         pos, vel, w = _arc_image()

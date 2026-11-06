@@ -32,6 +32,7 @@ The neighbour searches and graph run on the host with SciPy, like
 __all__: tuple[str, ...] = ("RidgeOrderer",)
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import plum
@@ -142,6 +143,14 @@ class RidgeOrderer(AbstractOrderer):
     ) -> OrderingResult:
         """Order samples along the ridge of their weighted density."""
         _check_component_keys(positions, velocities)
+        arrays = [*positions.values(), *([] if weights is None else [weights])]
+        if not all(jax.core.is_concrete(jnp.asarray(a)) for a in arrays):
+            msg = (
+                "RidgeOrderer runs on the host with SciPy and cannot be traced "
+                "under jit, vmap or grad. Call it outside the transform, or use "
+                "MSTOrderer, which traces."
+            )
+            raise TypeError(msg)
         comps = sorted(positions)
         pts = np.stack([np.asarray(positions[c], dtype=float) for c in comps], axis=1)
         n = pts.shape[0]

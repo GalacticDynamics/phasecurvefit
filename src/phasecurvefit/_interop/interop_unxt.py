@@ -439,10 +439,10 @@ def _order_with_backbone_and_chord(
 ) -> OrderingResult:
     """Shared body for orderers whose Quantity dispatch returns a backbone and chord.
 
-    Currently ``MSTOrderer`` and ``SOMOrderer``. Strips units into ``usys``
-    (host-side), runs the orderer's plain-array pipeline, and reattaches units:
-    ``positions``/``velocities`` keep their input units, and ``backbone`` keeps
-    each component's own unit. ``chord`` is a single length for all
+    Currently ``MSTOrderer``, ``SOMOrderer`` and ``RidgeOrderer``. Strips units
+    into ``usys`` (host-side), runs the orderer's plain-array pipeline, and
+    reattaches units: ``positions``/``velocities`` keep their input units, and
+    ``backbone`` keeps each component's own unit. ``chord`` is a single length for all
     components, so it comes back in the shared position unit when the
     components agree, and in ``usys["length"]`` when they do not.
     """
