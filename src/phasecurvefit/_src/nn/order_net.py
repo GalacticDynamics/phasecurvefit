@@ -425,12 +425,13 @@ def train_ordering_net(
         The interpolation network to train.
     all_ws : Array, shape (N, 2*n_dims)
         Phase-space coordinates from the walk algorithm.
-    chord : Array, shape (N,) | None, keyword-only
+    chord : Array or Quantity, shape (N,) | None, keyword-only
         The orderer's arc-length parameter per observation, in input order
         (``OrderingResult.chord``). When given it supplies the arclength target
         that ``arclength_alpha`` blends toward; when ``None`` that target is
         approximated by summing straight-line steps between consecutive ordered
-        observations, which is noisier and lives in normalized space.
+        observations, which is noisier and lives in normalized space. A
+        Quantity chord is stripped in its own unit; only ratios of it are used.
     weights : Array, shape (N,) | None, keyword-only
         Per-tracer weights, in input order, e.g. the density at each pixel of
         a density field. They weight each tracer's terms in the loss, and the
