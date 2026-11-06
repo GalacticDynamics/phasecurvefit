@@ -325,6 +325,25 @@ class TestTrainAutoencoderWeights:
                 self._model(pos, vel, result), result, config=cfg, key=jr.key(1)
             )
 
+    def test_joint_phase_mixture_raises(self):
+        """Called on its own, the joint phase also refuses weights with mixtures."""
+        pos, vel, w = _two_lines()
+        result = pcf.orderers.SOMOrderer(n_prototypes=10).order(pos, vel, weights=w)
+        model = self._model(pos, vel, result)
+        qs, ps = model.normalizer.transform(pos, vel)
+        cfg = pcf.nn.TrainingConfig(
+            membership=pcf.nn.MixtureMembershipConfig(), show_pbar=False
+        ).autoencoder_config()
+        with pytest.raises(NotImplementedError, match="mixture membership"):
+            ae_mod.train_ordering_and_track_net(
+                model,
+                jnp.concatenate([qs, ps], axis=1),
+                mask=jnp.ones(200, dtype=bool),
+                config=cfg,
+                weights=w,
+                key=jr.key(0),
+            )
+
     def test_fit_track_passes_weights(self):
         """fit_track threads weights through to the ordering it trains on."""
         pos, vel = _arc()
