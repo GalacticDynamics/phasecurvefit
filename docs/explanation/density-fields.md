@@ -1,8 +1,9 @@
 # Density fields
 
-A density field is data given as an image: a density map of a stream from a
-simulation, or a probability map from a segmentation. phasecurvefit fits a track
-through it by treating each pixel as a sample weighted by its value. This page
+A density field is data given as an image of a wide, diffuse curve, such as a
+density map of a stellar stream from a simulation or a probability map from a
+segmentation. phasecurvefit fits a track through it by treating each pixel as a
+sample weighted by its value. This page
 explains why that needs a different orderer, two training settings, and care at the
 ends of the track. The [density-field tutorial](../tutorials/density_fields.ipynb)
 runs the whole fit.
@@ -12,16 +13,16 @@ runs the whole fit.
 A weight of 2 counts like two coincident samples, so the SOM fits the weighted
 density and the autoencoder weights its fit to the track. The autoencoder's
 membership probability is left unweighted, because a weight sets how much a sample
-counts and says nothing about whether it belongs to the stream. Weighting it would
+counts and says nothing about whether it belongs to the curve. Weighting it would
 push low-weight samples below the membership threshold and out of the fit, and in an
 image those are the faint pixels at the edges and tails.
 
 ## Why order along the ridge
 
 The default pipeline's MST orders samples along the longest path of a tree linking
-near neighbours. A thin stream of stars has one long path through it. A wide, evenly
+near neighbours. A thin curve of samples has one long path through it. A wide, evenly
 filled region has many paths of about the same length, and the longest one zigzags
-across the stream and ends in a corner. On a uniform mask of radius 0.5 and a line
+across the curve and ends in a corner. On a uniform mask of radius 0.5 and a line
 blurred with $\sigma = 0.25$, its backbone cuts inside the bends and ends 0.3 to 1.1
 from the true ends.
 
@@ -34,7 +35,7 @@ middle.
 
 How wide to smooth is estimated from the data. Starting from a deliberately wide
 width, each round sets it to the RMS distance of the samples from the ridge it just
-found, and it settles on the stream's own scatter: 0.104 for a blur of
+found, and it settles on the curve's own scatter: 0.104 for a blur of
 $\sigma = 0.1$. It starts wide because a wide kernel gives a smooth ridge that the
 iteration then tightens, while a narrow one could lock onto noise.
 
@@ -53,16 +54,16 @@ $$
 For $r = 0.5$ and $R = 1.85$ that offset is 0.045, and the SOM's largest error on such
 a mask is 0.045.
 
-## Why a wide stream trains differently
+## Why a wide curve trains differently
 
-In a thin stream every sample sits close to the track, so there is little room for
+Along a thin curve every sample sits close to the track, so there is little room for
 $\gamma$ to vary across it. A wide field leaves that room, and two things go wrong:
 
 - In the joint training phase, the reconstruction loss can lower itself by letting
-  $\gamma$ encode position across the stream as well as along it, and the track bends
+  $\gamma$ encode position across the curve as well as along it, and the track bends
   into loops on the curves. Freezing the encoder in that phase keeps $\gamma$ an
   along-track coordinate.
-- The samples' spread across the stream, with variance about $r^2/3$, is much larger
+- The samples' spread across the curve, with variance about $r^2/3$, is much larger
   than the error the decoder has left to fix, so small batches keep the optimizer
   jittering around the track. On a uniform tube of half-width 0.5, batches of 1000
   brought the track's largest error from 0.39 to 0.06.
@@ -71,12 +72,12 @@ $\gamma$ to vary across it. A wide field leaves that room, and two things go wro
 
 ## Where the track ends
 
-The faint samples past each end of a stream get the most extreme $\gamma$, so the
+The faint samples past each end of a curve get the most extreme $\gamma$, so the
 whole of `gamma_range` runs past the ends. `track_range` stops each end where the
 weighted number of samples per unit length along the track falls below half its
 value just inside. It counts per unit length because near an end the encoder squeezes
 many samples into little $\gamma$, which would make a faint tail look dense, and it
-compares with the value just inside so that a stream that narrows or fades keeps its
+compares with the value just inside so that a curve that narrows or fades keeps its
 ends.
 
 For a curve blurred by a symmetric kernel, the line density at the true end is half

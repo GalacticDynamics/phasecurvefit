@@ -107,7 +107,7 @@ result, _, losses = pcf.nn.train_autoencoder(
 
 {doc}`../reference/options` lists every setting with its default.
 
-### Train on an image or a wide stream
+### Train on an image or a wide curve
 
 When the samples spread wide across the track, as the pixels of an image do, freeze
 the encoder in the joint phase and use large batches ({doc}`../explanation/density-fields`
