@@ -1040,7 +1040,7 @@ wheels = [
 
 [[package]]
 name = "jaxknn"
-version = "0.1.0"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "equinox" },
@@ -1048,9 +1048,9 @@ dependencies = [
     { name = "jaxtyping" },
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e8/d7/06ba705be17413b16e16bc6101434a4f4297662036657f3a0238711995d3/jaxknn-0.1.0.tar.gz", hash = "sha256:eb18f09160654471cb4a7bdf3127ef2ad8360defe7cf7fa9e674dad5760328d9", size = 113247, upload-time = "2026-10-18T21:53:26.435Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/76/b0/80f11d4c00d3fc1b8e80ccd1d3617471c9330b440955fdb84947d8c2540d/jaxknn-0.1.1.tar.gz", hash = "sha256:15f11a539c7ce969aedcc4064b6d20c813084451e4e97246932d8b2562b9b1ff", size = 113763, upload-time = "2026-10-19T16:40:31.35Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b0/42/56b95a4b42f1868572b482972f6f649d30a721c339e4393bf87817190510/jaxknn-0.1.0-py3-none-any.whl", hash = "sha256:9eb0a1ab1e9e5b09c52b1295eab8e1fa8ee9bf78d92c2817bb505f91728a5f6e", size = 21590, upload-time = "2026-10-18T21:53:24.891Z" },
+    { url = "https://files.pythonhosted.org/packages/62/d1/cfa7560bd492bd4b156dffbfb240a34057bb33e446ddcc456744f27d3251/jaxknn-0.1.1-py3-none-any.whl", hash = "sha256:7a90f64407cf97407d87868569491d095704898e2713ad23d5ad3cd14f4bb76f", size = 22095, upload-time = "2026-10-19T16:40:29.975Z" },
 ]
 
 [[package]]
@@ -1920,7 +1920,7 @@ requires-dist = [
     { name = "jaxkd", marker = "extra == 'all'", specifier = ">=0.0.5" },
     { name = "jaxkd", marker = "extra == 'kdtree'", specifier = ">=0.0.5" },
     { name = "jaxkd", marker = "extra == 'tutorials'", specifier = ">=0.0.5" },
-    { name = "jaxknn", specifier = ">=0.1.0" },
+    { name = "jaxknn", specifier = ">=0.1.1" },
     { name = "jaxmore", extras = ["tqdm"], specifier = ">=0.4.0" },
     { name = "jaxtyping", specifier = ">=0.3.5" },
     { name = "matplotlib", marker = "extra == 'tutorials'", specifier = ">=3.10.8" },
