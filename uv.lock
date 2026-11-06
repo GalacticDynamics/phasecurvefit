@@ -1949,7 +1949,7 @@ dev = [
     { name = "commitizen", specifier = ">=4.11.3" },
     { name = "cz-conventional-gitmoji", specifier = ">=0.6.1" },
     { name = "cz-conventional-gitmoji", specifier = ">=0.7.0" },
-    { name = "galax" },
+    { name = "galax", specifier = ">=0.1.0" },
     { name = "hypothesis", extras = ["numpy"], specifier = ">=6.138.14" },
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "ipywidgets", specifier = ">=8.1.8" },
@@ -1982,10 +1982,10 @@ dev = [
     { name = "sphinxext-opengraph", specifier = ">=0.9.2" },
     { name = "sybil", extras = ["pytest"], specifier = ">=8.0.0" },
     { name = "unxt", specifier = ">=2.0" },
-    { name = "unxt", extras = ["interop-mpl"] },
+    { name = "unxt", extras = ["interop-mpl"], specifier = ">=2.0" },
 ]
 docs = [
-    { name = "galax" },
+    { name = "galax", specifier = ">=0.1.0" },
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "ipywidgets", specifier = ">=8.1.8" },
     { name = "jaxkd", specifier = ">=0.0.5" },
@@ -2001,7 +2001,7 @@ docs = [
     { name = "sphinx-reredirects", specifier = ">=1.1.0" },
     { name = "sphinx-togglebutton", specifier = ">=0.3.2" },
     { name = "sphinxext-opengraph", specifier = ">=0.9.2" },
-    { name = "unxt", extras = ["interop-mpl"] },
+    { name = "unxt", extras = ["interop-mpl"], specifier = ">=2.0" },
 ]
 lint = [
     { name = "cz-conventional-gitmoji", specifier = ">=0.6.1" },
