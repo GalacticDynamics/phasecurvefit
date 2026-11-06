@@ -253,6 +253,7 @@ class TestRidgeOrdererValidation:
         [
             {"bandwidth": 0.0},
             {"bandwidth": jnp.array(-0.1)},
+            {"bandwidth": jnp.array([0.1, 0.2])},
             {"bandwidth": 0.1, "k": 0},
             {"bandwidth": 0.1, "core": 0.0},
             {"bandwidth": 0.1, "trim": 1.5},
@@ -262,6 +263,14 @@ class TestRidgeOrdererValidation:
         """Non-positive bandwidth, k < 1, and fractions outside (0, 1] raise."""
         with pytest.raises(ValueError, match="must be"):
             pcf.orderers.RidgeOrderer(**kwargs)
+
+    def test_output_dtype_follows_positions(self):
+        """Under 64-bit JAX, float32 positions still give float32 outputs."""
+        pos, vel, w = _arc_image()
+        with jax.enable_x64(new_val=True):
+            result = pcf.orderers.RidgeOrderer(bandwidth=0.1).order(pos, vel, weights=w)
+        assert result.chord.dtype == jnp.float32
+        assert result.backbone["x"].dtype == jnp.float32
 
     def test_traced_inputs(self):
         """Under jit it raises a clear TypeError, not a tracer conversion error."""
