@@ -59,12 +59,13 @@ result, _, losses = pcf.nn.train_autoencoder(
 
 `result.gamma` holds $\gamma$ for every sample, and `result.membership_prob` the
 encoder's membership probability. Calling the result with values of $\gamma$
-evaluates the track:
+evaluates the track. Draw it over `result.track_range`, which stops where the
+samples thin out at each end:
 
 ```{code-cell} python
 import matplotlib.pyplot as plt
 
-track = result(jnp.linspace(*result.gamma_range, 200))
+track = result(jnp.linspace(*result.track_range, 200))
 
 fig, ax = plt.subplots(figsize=(6, 3))
 im = ax.scatter(pos["x"], pos["y"], c=result.gamma, s=15)

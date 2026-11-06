@@ -45,7 +45,7 @@ config = pcf.nn.TrainingConfig(show_pbar=False)
 ordering, fitted, losses = pcf.fit_track(
     pos, vel, key=jax.random.key(1), training_config=config
 )
-track = fitted(jnp.linspace(*fitted.gamma_range, 300))
+track = fitted(jnp.linspace(*fitted.track_range, 300))
 # ------------------------------------------------------------------------------
 
 # --- the landing-page example: density field ---------------------------------
@@ -65,7 +65,7 @@ weights = image.ravel()[keep]  # weighted by the density there
 fordering, ffitted, flosses = pcf.fit_track(
     fpos, fvel, key=jax.random.key(1), weights=weights, training_config=config
 )
-ftrack = ffitted(jnp.linspace(*ffitted.gamma_range, 300))
+ftrack = ffitted(jnp.linspace(*ffitted.track_range, 300))
 # ------------------------------------------------------------------------------
 
 

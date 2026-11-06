@@ -92,10 +92,11 @@ ordering, fitted, losses = pcf.fit_track(
 )
 ```
 
-Calling the fitted result with values of $\gamma$ evaluates the track:
+Calling the fitted result with values of $\gamma$ evaluates the track.
+`fitted.track_range` is the range of $\gamma$ the track covers:
 
 ```{code-cell} python
-gamma = jnp.linspace(*fitted.gamma_range, 300)
+gamma = jnp.linspace(*fitted.track_range, 300)
 track = fitted(gamma)
 
 fig, ax = plt.subplots(figsize=(5, 4))

@@ -6,11 +6,13 @@ from dataclasses import KW_ONLY
 
 import equinox as eqx
 import jax.numpy as jnp
+import numpy as np
 from jaxtyping import Array, PRNGKeyArray
+from scipy.spatial import cKDTree
 
 from .abstractautoencoder import AbstractAutoencoder
 from phasecurvefit._src.abstract_result import AbstractResult
-from phasecurvefit._src.custom_types import FSzN, ISzN, VectorComponents
+from phasecurvefit._src.custom_types import BSzN, FSzN, ISzN, VectorComponents
 
 
 class AutoencoderResult(AbstractResult):
@@ -28,7 +30,17 @@ class AutoencoderResult(AbstractResult):
     indices : ISzN
         Indices sorted by gamma value.
     gamma_range : tuple[float, float]
-        Valid range for the ordering parameter. Default: (0.0, 1.0).
+        Valid range for the ordering parameter: calling the result accepts any
+        $\gamma$ in it, including every tracer's own.
+    track_range : tuple[float, float] | None
+        The range of $\gamma$ the track covers, for drawing it:
+        ``result(jnp.linspace(*result.track_range, n))``. Each end is where
+        the weighted number of member tracers per unit length along the track
+        falls below half its value just inside, so faint tracers past the end
+        of a stream -- the blurred tail of a density field -- don't carry the
+        track past the end, while a stream that narrows or fades keeps its
+        ends. Within ``gamma_range``. ``None`` for a result built by hand;
+        training sets it.
     gamma : FSzN
         Ordering parameters for all tracers.
     membership_prob : Array
@@ -46,6 +58,7 @@ class AutoencoderResult(AbstractResult):
     model: AbstractAutoencoder
     _: KW_ONLY
     gamma_range: tuple[float, float]
+    track_range: tuple[float, float] | None = None
 
     def __call__(
         self, gamma: Array, /, *, key: PRNGKeyArray | None = None
@@ -128,6 +141,7 @@ def fill_ordering_gaps(
         result.velocities,
         prob_threshold=prob_threshold,
         gamma_range=result.gamma_range,
+        weights=getattr(result, "weights", None),
     )
 
 
@@ -139,6 +153,7 @@ def _encode_to_result(
     *,
     prob_threshold: float,
     gamma_range: tuple[float, float],
+    weights: FSzN | None = None,
 ) -> AutoencoderResult:
     """Encode every tracer; order by gamma, keeping those with p >= threshold."""
     gamma, prob = model.encode(q, p)
@@ -148,7 +163,120 @@ def _encode_to_result(
         velocities=p,
         indices=order[prob[order] >= prob_threshold],
         gamma_range=gamma_range,
+        track_range=_track_range(model, q, gamma, prob >= prob_threshold, weights),
         gamma=gamma,
         membership_prob=prob,
         model=model,
     )
+
+
+def _track_range(
+    model: AbstractAutoencoder,
+    q: VectorComponents,
+    gamma: FSzN,
+    member: BSzN,
+    weights: FSzN | None,
+    /,
+) -> tuple[float, float]:
+    """Find the span of gamma between the stream's half-maximum ends.
+
+    Works in physical length: decode the track over the members' span of
+    gamma, project every member onto it
+    (extending past each end along the tangent there), and cut each end where
+    the weighted number of members per unit length falls below half its local
+    value (`_trim_ends`). Physical length, because near an end the encoder
+    squeezes many samples into little gamma, so counting per unit gamma makes a
+    faint tail look dense. Local, because a non-uniform stream's line density
+    varies along it: a narrow or faint stretch near an end is not an end.
+
+    For a curve blurred by any symmetric kernel the line density at the true end
+    is half its value just inside, so this is the half-maximum end. A mask
+    built by thickening a curve has a cap past each end that holds more weight,
+    so the cut falls partway into the cap.
+
+    Eager: it runs in NumPy when a trained result is built, which happens
+    outside ``jit``. With no members it falls back to the span of all the
+    gamma; with members of total weight 0, or a track that can't be decoded,
+    to the members' span.
+    """
+    g = np.asarray(gamma, dtype=float)
+    keep = np.asarray(member, dtype=bool)
+    if not keep.any():  # nothing to trim against
+        return float(g.min()), float(g.max())
+    w = np.ones_like(g) if weights is None else np.asarray(weights, dtype=float)
+    g, w = g[keep], w[keep]
+    lo, hi = float(g.min()), float(g.max())
+    if not (w > 0).any() or hi <= lo:  # nothing to trim by
+        return lo, hi
+
+    grid = np.linspace(lo, hi, 400)
+    keys = list(q)
+    track = _magnitudes(model.decode(jnp.asarray(grid)), keys)
+    finite = np.isfinite(track).all(axis=1)  # a running mean can leave gaps
+    grid, track = grid[finite], track[finite]
+    if len(grid) < 2:
+        return lo, hi
+    s = np.concatenate(
+        [[0.0], np.cumsum(np.linalg.norm(np.diff(track, axis=0), axis=1))]
+    )
+    tangent = np.gradient(track, axis=0)
+    tangent /= np.maximum(np.linalg.norm(tangent, axis=1, keepdims=True), 1e-300)
+    pts = _magnitudes(q, keys)[keep]
+    _, near = cKDTree(track).query(pts)
+    along = s[near] + np.einsum("ij,ij->i", pts - track[near], tangent[near])
+
+    s_lo, s_hi = _trim_ends(along, w)
+    s_lo, s_hi = np.clip([s_lo, s_hi], 0.0, s[-1])
+    # np.interp needs strictly increasing lengths; repeated vertices (a running
+    # mean's plateaus) give equal ones, and all their gamma decode to one point.
+    s, first = np.unique(s, return_index=True)
+    grid = grid[first]
+    return float(np.interp(s_lo, s, grid)), float(np.interp(s_hi, s, grid))
+
+
+def _magnitudes(comps: VectorComponents, keys: list[str], /) -> np.ndarray:
+    """Stack position components as float64 magnitudes, shape ``(N, D)``.
+
+    Quantities are taken in the first component's unit, so lengths along the
+    track are physical whatever units the components carry. Float64 because the
+    tangent's 1e-300 guard underflows to 0 in float32.
+    """
+    unit = getattr(comps[keys[0]], "unit", None)
+    return np.stack(
+        [
+            np.asarray(comps[k] if unit is None else comps[k].ustrip(unit), dtype=float)
+            for k in keys
+        ],
+        axis=1,
+    )
+
+
+def _trim_ends(
+    along: FSzN, weights: FSzN, /, *, frac: float = 0.5, window: int = 3
+) -> tuple[float, float]:
+    """Cut each end where the line density falls below ``frac`` of its local value.
+
+    Bins ``along`` (distance along the track), one bin per 10 samples up to 40.
+    From each end, the end is the first bin holding at least ``frac`` times the
+    median weight of the next ``window`` bins inward. A cap falls off within a
+    bin or two, while widening, brightening and fading vary over many bins, so
+    only the cap is cut. A faint stretch longer than ``window`` bins counts as
+    part of the stream: it is too long to be a cap.
+    """
+    a = np.asarray(along, dtype=float)
+    w = np.asarray(weights, dtype=float)
+    n_bins = int(np.clip(a.size // 10, 1, 40))
+    edges = np.linspace(a.min(), a.max(), n_bins + 1)
+    count, _ = np.histogram(a, edges, weights=w)
+
+    def first(c: np.ndarray, /) -> int:
+        for j in range(len(c) - 1):
+            if c[j] > 0 and c[j] >= frac * np.median(c[j + 1 : j + 1 + window]):
+                return j
+        return len(c) - 1
+
+    # The fullest bin passes from both sides (its inward median is at most
+    # itself), so the scan from the left stops at or before it, the scan from
+    # the right at or after it, and lo <= hi.
+    lo, hi = first(count), len(count) - 1 - first(count[::-1])
+    return float(edges[lo]), float(edges[hi + 1])
