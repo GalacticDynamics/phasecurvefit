@@ -14,6 +14,7 @@ from phasecurvefit._src.orderers.ridge import (
     _density,
     _estimate_bandwidth,
     _smooth_and_project,
+    _subsample,
 )
 
 pytest.importorskip("scipy")
@@ -129,7 +130,7 @@ class TestRidgeOrderer:
     def test_single_vertex_path(self):
         """A path of one vertex is returned as is, with every chord 0."""
         pts = np.array([[0.0, 0.0], [0.1, 0.0], [0.2, 0.0]])
-        backbone, chord = _smooth_and_project(pts, np.array([1]), 0.1)
+        backbone, chord = _smooth_and_project(pts[[1]], 0.1, pts)
         np.testing.assert_array_equal(backbone, pts[[1]])
         np.testing.assert_array_equal(chord, np.zeros(3))
 
@@ -243,12 +244,12 @@ class TestBandwidthEstimate:
         )
         assert bool(jnp.all(jnp.isfinite(result.chord)))
 
-    def test_stride_misses_every_weighted_sample(self):
-        """If the subsample holds no weight, the estimate uses every sample."""
+    def test_half_the_samples_weightless(self):
+        """Only samples with weight are drawn for the subsample."""
         n = 4002  # stride 2 for the 2000-sample subsample
         x = np.linspace(0.0, 10.0, n)
         pts = np.stack([x, 0.05 * np.sin(37.0 * x)], axis=1)
-        w = np.tile([0.0, 1.0], n // 2)  # weight only where the stride doesn't land
+        w = np.tile([0.0, 1.0], n // 2)  # every other sample weightless
         h = _estimate_bandwidth(pts, w, k=8, core=0.2, trim=0.5)
         assert np.isfinite(h)
         assert h > 0
@@ -265,6 +266,28 @@ class TestBandwidthEstimate:
         x = np.repeat(np.linspace(0.0, 1.0, 10), 2)  # each sample twice
         pos = {"x": jnp.asarray(x), "y": jnp.zeros(20)}
         assert _estimate(pos, jnp.ones(20)) > 0
+
+    def test_subsample_keeps_weighted_samples(self):
+        """With fewer weighted samples than the cap, all of them are kept."""
+        pts = np.arange(20.0).reshape(10, 2)
+        w = np.array([0.0, 1.0, 0.0, 2.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0])
+        sub_pts, sub_w = _subsample(pts, w, 5)
+        np.testing.assert_array_equal(sub_pts, pts[[1, 3, 6]])
+        np.testing.assert_array_equal(sub_w, [1.0, 2.0, 3.0])
+
+    def test_large_image_is_subsampled(self):
+        """Past 10 000 pixels the backbone uses a subsample; every pixel is ordered."""
+        g = jnp.linspace(-1.5, 1.5, 301)
+        X, Y = jnp.meshgrid(g, g)
+        R = jnp.hypot(X, Y)
+        image = (jnp.exp(-((R - 1.0) ** 2) / (2 * 0.1**2)) * (Y > 0)).ravel()
+        keep = image > 0.05
+        assert int(keep.sum()) > 10_000
+        pos = {"x": X.ravel()[keep], "y": Y.ravel()[keep]}
+        vel = jax.tree.map(jnp.zeros_like, pos)
+        result = pcf.orderers.RidgeOrderer().order(pos, vel, weights=image[keep])
+        assert result.chord.shape == (int(keep.sum()),)
+        assert float(np.median(_radius_err(result.backbone))) < 0.03
 
     def test_soft_mask(self):
         """A widening, noisy probability map still finds the arc by default."""

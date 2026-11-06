@@ -47,8 +47,14 @@ from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import FSz0, FSzN, VectorComponents
 
-# ponytail: the bandwidth is estimated on a strided subsample of at most this
-# many samples, so a wide first guess can't pair every pixel with every other.
+# The density step pairs every sample with all within 3 bandwidths, which on a
+# fine image is tens of thousands each. Pixels much finer than the bandwidth
+# add nothing to the density, so the backbone is found on a subsample and every
+# sample is projected onto it. The bandwidth estimate, whose first guess is
+# wide, uses a smaller one.
+# ponytail: fixed caps; scale them with the number of samples per bandwidth if
+# very wide streams need a finer backbone.
+_N_RIDGE = 10_000
 _N_ESTIMATE = 2000
 
 
@@ -64,7 +70,7 @@ class RidgeOrderer(AbstractOrderer):
         ``None`` (default) estimates it from the data. It starts at a tenth of
         the data's extent, finds the backbone, sets the bandwidth to the
         weighted RMS distance of the samples from the backbone, and repeats
-        until that changes by less than 2%. The estimate runs on a strided
+        until that changes by less than 2%. The estimate runs on a random
         subsample of at most 2000 samples, and is never below their median
         nearest-neighbour spacing.
     k
@@ -83,6 +89,11 @@ class RidgeOrderer(AbstractOrderer):
     a little past them. A higher ``core`` narrows the core around the ridge,
     but too high a value splits it at any gap in the stream, and then the
     backbone covers only one side of the gap.
+
+    Past 10 000 samples the backbone is found on a random subsample of 10 000
+    with positive weight (fixed seed), and every sample is then projected
+    onto it. Pixels much finer than the bandwidth add nothing to the density,
+    and the full set would pair every pixel with tens of thousands of others.
 
     Examples
     --------
@@ -179,7 +190,8 @@ class RidgeOrderer(AbstractOrderer):
                 if self.bandwidth is None
                 else float(self.bandwidth)
             )
-            backbone, chord = _backbone(pts, w, h, **opts)
+            sub_pts, sub_w = _subsample(pts, w, _N_RIDGE)
+            backbone, chord = _backbone(sub_pts, sub_w, h, pts, **opts)
         indices = np.argsort(chord, kind="stable").astype(np.int32)
         # Back in the positions' float dtype: the host pipeline runs in float64,
         # which must not upcast a float32 caller's arrays under 64-bit JAX, and
@@ -199,15 +211,42 @@ class RidgeOrderer(AbstractOrderer):
         )
 
 
-def _backbone(
-    pts: np.ndarray, w: np.ndarray, h: float, /, *, k: int, core: float, trim: float
+def _subsample(
+    pts: np.ndarray, w: np.ndarray, m: int, /
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Density, ridge path, trim and smoothing: steps 1-5 of the module docstring."""
+    """At most ``m`` samples, drawn uniformly from those with positive weight.
+
+    Random with a fixed seed, so the result is reproducible and doesn't alias
+    with an image's rows the way a stride can. Returns the input when it has
+    ``m`` samples or fewer.
+    """
+    if len(pts) <= m:
+        return pts, w
+    candidates = np.flatnonzero(w > 0)
+    if len(candidates) > m:
+        candidates = np.sort(
+            np.random.default_rng(0).choice(candidates, m, replace=False)
+        )
+    return pts[candidates], w[candidates]
+
+
+def _backbone(
+    pts: np.ndarray,
+    w: np.ndarray,
+    h: float,
+    targets: np.ndarray,
+    /,
+    *,
+    k: int,
+    core: float,
+    trim: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Run steps 1-5 of the module docstring on ``pts``, projecting ``targets``."""
     depth = _density(pts, w, h)
     path = _ridge_path(pts, depth, k=min(k, len(pts) - 1), core=core)
     d_path = depth[path]
     inside = np.flatnonzero(d_path >= trim * np.median(d_path))
-    return _smooth_and_project(pts, path[inside[0] : inside[-1] + 1], h)
+    return _smooth_and_project(pts[path[inside[0] : inside[-1] + 1]], h, targets)
 
 
 def _estimate_bandwidth(
@@ -228,10 +267,7 @@ def _estimate_bandwidth(
     then shrinks towards the scatter about the ridge it defines. Starting
     narrow instead could lock onto noise or pixel structure.
     """
-    step = max(1, len(pts) // _N_ESTIMATE)
-    sub, ws = pts[::step], w[::step]
-    if not ws.any():  # the stride missed every weighted sample
-        sub, ws = pts, w
+    sub, ws = _subsample(pts, w, _N_ESTIMATE)
     extent = float(np.ptp(pts, axis=0).max())
     if extent == 0:  # every sample at one point: any positive width orders them
         return 1.0
@@ -241,7 +277,7 @@ def _estimate_bandwidth(
     spacing = float(np.median(nn[nn > 0])) if (nn > 0).any() else 1e-3 * extent
     h = 0.1 * extent
     for _ in range(max_iter):
-        backbone, _ = _backbone(sub, ws, h, k=k, core=core, trim=trim)
+        backbone, _ = _backbone(sub, ws, h, sub, k=k, core=core, trim=trim)
         dist, _ = cKDTree(backbone).query(sub)
         h_new = max(float(np.sqrt(np.sum(ws * dist**2) / np.sum(ws))), spacing)
         if abs(h_new - h) <= rtol * h:
@@ -312,16 +348,15 @@ def _ridge_path(
 
 
 def _smooth_and_project(
-    pts: np.ndarray, path: np.ndarray, h: float, /
+    raw: np.ndarray, h: float, targets: np.ndarray, /
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Smooth the path into a backbone, and project every sample onto it.
+    """Smooth the path vertices ``raw`` into a backbone, and project ``targets``.
 
-    Returns the backbone vertices and each sample's arc length along it: the
+    Returns the backbone vertices and each target's arc length along it: the
     arc length to its nearest vertex plus its offset along the tangent there.
     """
-    raw = pts[path]
     if len(raw) < 2:  # a single vertex: no length to smooth over or project onto
-        return raw, np.zeros(len(pts))
+        return raw, np.zeros(len(targets))
     step = np.linalg.norm(np.diff(raw, axis=0), axis=1)
     # Capped at the path's own length: wider means nothing, and coincident
     # vertices (step 0) would otherwise ask for an astronomically wide kernel.
@@ -332,6 +367,6 @@ def _smooth_and_project(
     s = np.concatenate(
         [[0.0], np.cumsum(np.linalg.norm(np.diff(backbone, axis=0), axis=1))]
     )
-    _, nearest = cKDTree(backbone).query(pts)
-    along = np.einsum("ij,ij->i", pts - backbone[nearest], tangent[nearest])
+    _, nearest = cKDTree(backbone).query(targets)
+    along = np.einsum("ij,ij->i", targets - backbone[nearest], tangent[nearest])
     return backbone, s[nearest] + along
