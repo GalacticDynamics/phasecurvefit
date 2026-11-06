@@ -54,6 +54,7 @@ from phasecurvefit._src.algorithm import (
 from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.normalize import StandardScalerNormalizer
+from phasecurvefit._src.nn.order_net import _chord_values
 from phasecurvefit._src.orderers.localflow import (
     LocalFlowOrderer,
     _finalize,
@@ -391,6 +392,13 @@ def transform(
     vs = qnp.stack([ps[k] for k in self.p_comps], axis=1)
     norm_ps = (vs - self.p_mean) / self.p_std
     return norm_qs.ustrip(""), norm_ps.ustrip("")
+
+
+@_chord_values.dispatch
+def _chord_values_quantity(chord: AbcQ, /) -> Float[Array, " N"]:
+    # Training uses only ratios of the chord (s / s_total), so any one length
+    # unit gives the same target. unxt 2 refuses ``jnp.asarray`` on a Quantity.
+    return u.ustrip(chord.unit, chord)
 
 
 # ==============================================================================

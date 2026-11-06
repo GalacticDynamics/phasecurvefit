@@ -1826,7 +1826,7 @@ tutorials = [
     { name = "galax" },
     { name = "jaxkd" },
     { name = "matplotlib" },
-    { name = "unxt" },
+    { name = "unxt", extra = ["interop-mpl"] },
 ]
 
 [package.dev-dependencies]
@@ -1932,6 +1932,7 @@ requires-dist = [
     { name = "unxt", marker = "extra == 'all'", specifier = ">=1.10.4" },
     { name = "unxt", marker = "extra == 'interop'", specifier = ">=1.10.4" },
     { name = "unxt", marker = "extra == 'tutorials'", specifier = ">=1.10.4" },
+    { name = "unxt", extras = ["interop-mpl"], marker = "extra == 'tutorials'" },
     { name = "zeroth", specifier = ">=1.0.1" },
 ]
 provides-extras = ["all", "interop", "kdtree", "tutorials"]
@@ -3375,6 +3376,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7b/74/5c7e1172257b8882d3bee17ca5ff18d61f6d4beafe85f79df46118f6edc6/unxt-1.11.4.tar.gz", hash = "sha256:118af7a495d813b5de13d677bcbd3336dbccc28838492d7b65bb7d836f55dbf9", size = 1066483, upload-time = "2026-06-29T13:17:32.485Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3b/52/f4215ba3879bbc540762f3b5ad07763a28887c1659e1be232cca3dc3bebc/unxt-1.11.4-py3-none-any.whl", hash = "sha256:66c43508919fecd43aff0e328d42bcae6871f5fbdd4499e1e6b2a7a83759ec5e", size = 94210, upload-time = "2026-06-29T13:17:31.072Z" },
+]
+
+[package.optional-dependencies]
+interop-mpl = [
+    { name = "matplotlib" },
 ]
 
 [[package]]

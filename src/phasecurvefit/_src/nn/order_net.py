@@ -21,7 +21,8 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 import optax
-from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
+import plum
+from jaxtyping import Array, ArrayLike, Bool, Float, Int, PRNGKeyArray
 
 from jaxmore.nn import masked_mean
 
@@ -281,6 +282,12 @@ def compute_loss(
     )
 
 
+@plum.dispatch
+def _chord_values(chord: ArrayLike, /) -> Float[Array, " N"]:
+    """Return the chord as a plain array. The unxt interop adds Quantities."""
+    return jnp.asarray(chord)
+
+
 def _weighted_compute_loss(
     model: OrderingNet,
     ws: Float[Array, " B TwoF"],
@@ -418,12 +425,13 @@ def train_ordering_net(
         The interpolation network to train.
     all_ws : Array, shape (N, 2*n_dims)
         Phase-space coordinates from the walk algorithm.
-    chord : Array, shape (N,) | None, keyword-only
+    chord : Array or Quantity, shape (N,) | None, keyword-only
         The orderer's arc-length parameter per observation, in input order
         (``OrderingResult.chord``). When given it supplies the arclength target
         that ``arclength_alpha`` blends toward; when ``None`` that target is
         approximated by summing straight-line steps between consecutive ordered
-        observations, which is noisier and lives in normalized space.
+        observations, which is noisier and lives in normalized space. A
+        Quantity chord is stripped in its own unit; only ratios of it are used.
     weights : Array, shape (N,) | None, keyword-only
         Per-tracer weights, in input order, e.g. the density at each pixel of
         a density field. They weight each tracer's terms in the loss, and the
@@ -504,7 +512,7 @@ def train_ordering_net(
     # normalized space, so it carries their scatter and weights each component
     # by its spread.
     if chord is not None:
-        s = jnp.asarray(chord)[ordering_indices[ordering_indices >= 0]]
+        s = _chord_values(chord)[ordering_indices[ordering_indices >= 0]]
         s = s - s[0]
     else:
         D = ordered_ws.shape[1] // 2

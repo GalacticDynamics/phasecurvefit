@@ -954,7 +954,7 @@ def train_autoencoder(
     ordering_indices : Int[Array, " N"]
         Ordering indices from walk algorithm. Valid indices (>= 0) indicate
         ordered tracers; -1 indicates skipped/unordered tracers.
-    chord : Array, shape (N,) | None, keyword-only
+    chord : Array or Quantity, shape (N,) | None, keyword-only
         The orderer's arc-length parameter (``OrderingResult.chord``), passed
         through to the encoder's arclength target. The ``OrderingResult``
         overload supplies this automatically.

@@ -101,7 +101,7 @@ def train_autoencoder(
         ordered tracers; -1 indicates skipped/unordered tracers.
     config : OrderingTrainingConfig, optional
         Training configuration for the encoder. If None, uses default config.
-    chord : Array, shape (N,) | None, keyword-only
+    chord : Array or Quantity, shape (N,) | None, keyword-only
         The orderer's arc-length parameter (``OrderingResult.chord``), passed
         through to the encoder's arclength target. The ``OrderingResult``
         overload supplies this automatically.
