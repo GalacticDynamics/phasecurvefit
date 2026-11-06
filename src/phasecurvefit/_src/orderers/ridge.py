@@ -214,8 +214,14 @@ def _estimate_bandwidth(
     sub, ws = pts[::step], w[::step]
     if not ws.any():  # the stride missed every weighted sample
         sub, ws = pts, w
-    spacing = float(np.median(cKDTree(sub).query(sub, 2)[0][:, 1]))
-    h = 0.1 * float(np.ptp(pts, axis=0).max())
+    extent = float(np.ptp(pts, axis=0).max())
+    if extent == 0:  # every sample at one point: any positive width orders them
+        return 1.0
+    # Floor at the typical gap between distinct samples; duplicates (gap 0)
+    # would otherwise allow a zero bandwidth, which the density divides by.
+    nn = cKDTree(sub).query(sub, 2)[0][:, 1]
+    spacing = float(np.median(nn[nn > 0])) if (nn > 0).any() else 1e-3 * extent
+    h = 0.1 * extent
     for _ in range(max_iter):
         backbone, _ = _backbone(sub, ws, h, k=k, core=core, trim=trim)
         dist, _ = cKDTree(backbone).query(sub)
@@ -299,7 +305,9 @@ def _smooth_and_project(
     if len(raw) < 2:  # a single vertex: no length to smooth over or project onto
         return raw, np.zeros(len(pts))
     step = np.linalg.norm(np.diff(raw, axis=0), axis=1)
-    sigma = 0.5 * h / max(float(np.median(step)), np.finfo(float).eps)
+    # Capped at the path's own length: wider means nothing, and coincident
+    # vertices (step 0) would otherwise ask for an astronomically wide kernel.
+    sigma = min(0.5 * h / max(float(np.median(step)), np.finfo(float).eps), len(raw))
     backbone = ndimage.gaussian_filter1d(raw, sigma, axis=0, mode="nearest")
     tangent = np.gradient(backbone, axis=0)
     tangent /= np.maximum(np.linalg.norm(tangent, axis=1, keepdims=True), 1e-300)

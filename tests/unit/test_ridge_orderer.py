@@ -223,6 +223,20 @@ class TestBandwidthEstimate:
         pos = {"x": jnp.linspace(0.0, 1.0, 50), "y": jnp.zeros(50)}
         assert _estimate(pos, jnp.ones(50)) >= 0.99 / 49  # the spacing, to rounding
 
+    @pytest.mark.parametrize(
+        "x",
+        [np.zeros(6), np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0])],
+        ids=["all-coincident", "mostly-duplicates"],
+    )
+    def test_never_zero(self, x):
+        """Coincident samples never give a zero bandwidth (it is divided by)."""
+        pos = {"x": jnp.asarray(x), "y": jnp.zeros(6)}
+        assert _estimate(pos, jnp.ones(6)) > 0
+        result = pcf.orderers.RidgeOrderer().order(
+            pos, jax.tree.map(jnp.zeros_like, pos)
+        )
+        assert bool(jnp.all(jnp.isfinite(result.chord)))
+
     def test_soft_mask(self):
         """A widening, noisy probability map still finds the arc by default."""
         pos, vel, w = _soft_arc()
