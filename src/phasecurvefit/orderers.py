@@ -22,6 +22,10 @@ MSTOrderer
 SOMOrderer
     Self-Organizing Map refinement: trains a 1-D SOM and orders by arc-length
     projection onto its backbone. Cite Starkman et al. (2023).
+RidgeOrderer
+    Backbone along the ridge of the weighted sample density, for density
+    fields (an image's pixels weighted by density) and point clouds alike.
+    Seeds a SOM: ``RidgeOrderer(bandwidth=...) | SOMOrderer()``.
 LocalFlowOrderer
     Velocity-following greedy walk.
     Momentum-weighted ordering: cite Nibauer et al. (2022).
@@ -41,6 +45,7 @@ __all__: tuple[str, ...] = (
     "LocalFlowOrderer",
     "MSTOrderer",
     "OrderingResult",
+    "RidgeOrderer",
     "SOMOrderer",
     "default_pipeline",
 )
@@ -51,4 +56,5 @@ from ._src.orderers.default_pipeline import default_pipeline
 from ._src.orderers.localflow import LocalFlowOrderer
 from ._src.orderers.mst import MSTOrderer
 from ._src.orderers.result import OrderingResult
+from ._src.orderers.ridge import RidgeOrderer
 from ._src.orderers.som import SOMOrderer

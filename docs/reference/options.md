@@ -49,6 +49,19 @@ instead of the defaults below.
 | `neighbors` | `None` | the nearest-neighbour backend; `None` picks SciPy for concrete inputs and `BucketKDTree` for traced ones ({doc}`../how-to/jax`) |
 | `nan_policy` | `"raise"` | what to do with NaN inputs |
 
+## `RidgeOrderer`
+
+{class}`~phasecurvefit.orderers.RidgeOrderer`: a backbone along the ridge of the
+weighted sample density ({doc}`../how-to/choose-orderer`). It does not use
+velocities, and it runs on the host, so it can't be traced under `jit`.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `bandwidth` | `None` | width of the Gaussian kernel for the density, in position, roughly the stream's half-width (in the unit system's length unit for Quantities); `None` estimates it as the RMS distance of the samples from the ridge, iterating from a tenth of the data's extent |
+| `k` | `8` | neighbours each sample links to in the graph the backbone runs on |
+| `core` | `0.2` | density, as a fraction of its peak, above which a sample can be an end of the backbone |
+| `trim` | `0.5` | cut the backbone where the density along it falls below this fraction of its median |
+
 ## `SOMOrderer`
 
 {class}`~phasecurvefit.orderers.SOMOrderer`: the self-organizing map

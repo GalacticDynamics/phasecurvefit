@@ -62,6 +62,7 @@ from phasecurvefit._src.orderers.localflow import (
 )
 from phasecurvefit._src.orderers.mst import MSTOrderer
 from phasecurvefit._src.orderers.result import OrderingResult
+from phasecurvefit._src.orderers.ridge import RidgeOrderer
 from phasecurvefit._src.orderers.som import SOMOrderer
 from phasecurvefit._src.query_config import WalkConfig
 
@@ -435,7 +436,7 @@ def _chord_unit(
 
 
 def _order_with_backbone_and_chord(
-    orderer: MSTOrderer | SOMOrderer,
+    orderer: MSTOrderer | SOMOrderer | RidgeOrderer,
     positions: VectorQComponents,
     velocities: VectorQComponents,
     /,
@@ -446,10 +447,10 @@ def _order_with_backbone_and_chord(
 ) -> OrderingResult:
     """Shared body for orderers whose Quantity dispatch returns a backbone and chord.
 
-    Currently ``MSTOrderer`` and ``SOMOrderer``. Strips units into ``usys``
-    (host-side), runs the orderer's plain-array pipeline, and reattaches units:
-    ``positions``/``velocities`` keep their input units, and ``backbone`` keeps
-    each component's own unit. ``chord`` is a single length for all
+    Currently ``MSTOrderer``, ``SOMOrderer`` and ``RidgeOrderer``. Strips units
+    into ``usys`` (host-side), runs the orderer's plain-array pipeline, and
+    reattaches units: ``positions``/``velocities`` keep their input units, and
+    ``backbone`` keeps each component's own unit. ``chord`` is a single length for all
     components, so it comes back in the shared position unit when the
     components agree, and in ``usys["length"]`` when they do not.
     """
@@ -526,6 +527,32 @@ def order(
         # attached is stripped into ``usys``'s unit of that same dimension.
         stripped = u.ustrip(usys, self.metric_scale)
         self = dataclasses.replace(self, metric_scale=stripped)
+    return _order_with_backbone_and_chord(
+        self, positions, velocities, metadata=metadata, init=init, weights=weights
+    )
+
+
+@RidgeOrderer.order.dispatch
+def order(
+    self: RidgeOrderer,
+    positions: VectorQComponents,
+    velocities: VectorQComponents,
+    *,
+    metadata: StateMetadata | None = None,
+    init: AbstractResult | None = None,
+    weights: Float[Array, " n_obs"] | None = None,
+) -> OrderingResult:
+    """Order Quantity-valued samples along the ridge of their density.
+
+    ``bandwidth`` is a length. A Quantity is stripped into ``usys``'s length
+    unit, the unit the positions are stripped into; a bare number is taken to
+    be in that unit already.
+    """
+    if isinstance(self.bandwidth, u.AbstractQuantity):
+        usys = _require_usys(metadata)
+        self = dataclasses.replace(
+            self, bandwidth=u.ustrip(usys["length"], self.bandwidth)
+        )
     return _order_with_backbone_and_chord(
         self, positions, velocities, metadata=metadata, init=init, weights=weights
     )
