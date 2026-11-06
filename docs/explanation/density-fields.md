@@ -54,6 +54,11 @@ $$
 For $r = 0.5$ and $R = 1.85$ that offset is 0.045, and the SOM's largest error on such
 a mask is 0.045.
 
+Where the curve is wide and noisy, the SOM's backbone can wiggle. With 30 prototypes
+on the tutorial's image, the prototypes near the wide end sit closer together than the
+curve is wide, so each follows the clumps of noise near it. The autoencoder fits one
+smooth track through all the samples, so the wiggle doesn't reach the final track.
+
 ## Why a wide curve trains differently
 
 Along a thin curve every sample sits close to the track, so there is little room for
@@ -83,6 +88,14 @@ ends.
 For a curve blurred by a symmetric kernel, the line density at the true end is half
 its value just inside, so this finds the end. A mask made by thickening a curve has a
 cap past each end that holds real weight, and the half-density point falls partway
-into it. In the tutorial the narrow end of the track is 0.05 from the true end, and
-the wide end, where the cap reaches 0.7 past the curve, is 0.33 past it. The image
-alone can't tell a short curve with a cap from a longer, blurrier one.
+into it. On the tutorial's image the wide end stops 0.33 past the true end, where the
+cap reaches 0.7 past the curve. The image alone can't tell a short curve with a cap
+from a longer, blurrier one, so the user has to say which it is.
+
+`TrainingConfig(track_ends="mask")` says the image is a mask. A curve thickened to
+half-width $w$ has a cap that reaches $w$ past its end, so each end is placed $w$ in
+from the farthest sample along the track. $w$ is the widest any sample reaches across
+the track near that end. This rule uses the samples' positions and ignores their
+weights, so it suits segmentation maps and other images with a definite edge. On the
+tutorial's image both ends land within 0.1 of the true ends. On a point cloud there is
+no edge, and the half-density rule is the one to use.

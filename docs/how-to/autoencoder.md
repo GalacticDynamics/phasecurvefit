@@ -121,6 +121,19 @@ config = pcf.nn.TrainingConfig(
 )
 ```
 
+If the image is a mask, such as a segmentation map, also set `track_ends="mask"` so
+the track ends where the curve inside the mask ends, rather than partway into the
+mask's rounded ends:
+
+```{code-cell} python
+config = pcf.nn.TrainingConfig(
+    freeze_encoder_final_training=True,
+    batch_size=1000,
+    track_ends="mask",
+    show_pbar=False,
+)
+```
+
 ## Use a faster, training-free track
 
 If speed matters more than accuracy, for example inside a likelihood evaluated at
