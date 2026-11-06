@@ -110,7 +110,7 @@ follows the ridge of the weighted density, so it finds the middle of a wide or
 blurred stream where the MST's longest path wanders across it. Set `bandwidth` to
 about the stream's half-width, and chain a SOM to refine it:
 
-```python
+```{code-cell} python
 g = jnp.linspace(-1.5, 1.5, 61)
 X, Y = jnp.meshgrid(g, g)
 image = jnp.exp(-((jnp.hypot(X, Y) - 1.0) ** 2) / (2 * 0.1**2)) * (Y > 0)
