@@ -275,7 +275,8 @@ def _trim_ends(
                 return j
         return len(c) - 1
 
+    # The fullest bin passes from both sides (its inward median is at most
+    # itself), so the scan from the left stops at or before it, the scan from
+    # the right at or after it, and lo <= hi.
     lo, hi = first(count), len(count) - 1 - first(count[::-1])
-    if hi < lo:  # no bin passes from either side: keep everything
-        return float(edges[0]), float(edges[-1])
     return float(edges[lo]), float(edges[hi + 1])

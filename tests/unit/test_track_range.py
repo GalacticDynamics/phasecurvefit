@@ -44,6 +44,11 @@ class TestTrimEnds:
         lo, hi = _trim_ends(along, 1.0 - 0.07 * along)
         assert (lo, hi) == pytest.approx((0.0, 10.0))
 
+    def test_too_few_samples_for_two_bins(self):
+        """Under 20 samples there is one bin, kept whole."""
+        lo, hi = _trim_ends(jnp.linspace(0.0, 1.0, 15), jnp.ones(15))
+        assert (lo, hi) == pytest.approx((0.0, 1.0))
+
     def test_narrow_stretch_at_an_end_is_kept(self):
         """A stretch at 40% of the median near an end isn't mistaken for a cap."""
         along = jnp.linspace(0.0, 10.0, 400)
@@ -78,6 +83,18 @@ class TestTrackRangeFallbacks:
         m, pos = model
         gamma = jnp.linspace(-0.3, 0.6, 20)
         rng = _track_range(m, pos, gamma, jnp.ones(20, dtype=bool), jnp.zeros(20))
+        assert rng == pytest.approx((-0.3, 0.6))
+
+    def test_undecodable_track(self, model, monkeypatch):
+        """A track that decodes to NaN everywhere falls back to the members' span."""
+        m, pos = model
+        monkeypatch.setattr(
+            type(m),
+            "decode",
+            lambda _self, g, **_: {k: jnp.full(jnp.shape(g), jnp.nan) for k in pos},
+        )
+        gamma = jnp.linspace(-0.3, 0.6, 20)
+        rng = _track_range(m, pos, gamma, jnp.ones(20, dtype=bool), None)
         assert rng == pytest.approx((-0.3, 0.6))
 
     def test_equal_gamma(self, model):
