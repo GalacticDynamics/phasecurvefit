@@ -189,12 +189,16 @@ class TestBandwidthEstimate:
     def test_blurred_width(self):
         """A Gaussian blur of sigma 0.1 gives a bandwidth of about 0.1."""
         pos, _, w = _arc_image()
-        assert 0.08 < _estimate(pos, w) < 0.12
+        h = _estimate(pos, w)
+        assert h > 0.08
+        assert h < 0.12
 
     def test_uniform_width(self):
         """A uniform band of half-width r gives about its RMS, r / sqrt(3)."""
         pos, _, w = _arc_image(uniform=True)
-        assert 0.07 < _estimate(pos, w) < 0.12  # r / sqrt(3) = 0.087
+        h = _estimate(pos, w)  # r / sqrt(3) = 0.087
+        assert h > 0.07
+        assert h < 0.12
 
     def test_point_cloud_width(self):
         """Samples scattered by 0.05 about the arc give about 0.05."""
@@ -202,7 +206,9 @@ class TestBandwidthEstimate:
         ang = jax.random.uniform(key_a, (400,), minval=0.0, maxval=jnp.pi)
         rad = 1.0 + 0.05 * jax.random.normal(key_r, (400,))
         pos = {"x": rad * jnp.cos(ang), "y": rad * jnp.sin(ang)}
-        assert 0.04 < _estimate(pos, jnp.ones(400)) < 0.065
+        h = _estimate(pos, jnp.ones(400))
+        assert h > 0.04
+        assert h < 0.065
 
     def test_subsample_matches(self):
         """An image too large to estimate on in full gives the same width."""
