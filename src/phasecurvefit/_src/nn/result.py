@@ -3,6 +3,7 @@
 __all__: tuple[str, ...] = ("AutoencoderResult", "fill_ordering_gaps")
 
 from dataclasses import KW_ONLY
+from typing import Literal
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -154,6 +155,7 @@ def _encode_to_result(
     prob_threshold: float,
     gamma_range: tuple[float, float],
     weights: FSzN | None = None,
+    track_ends: Literal["half_max", "mask"] = "half_max",
 ) -> AutoencoderResult:
     """Encode every tracer; order by gamma, keeping those with p >= threshold."""
     gamma, prob = model.encode(q, p)
@@ -163,7 +165,9 @@ def _encode_to_result(
         velocities=p,
         indices=order[prob[order] >= prob_threshold],
         gamma_range=gamma_range,
-        track_range=_track_range(model, q, gamma, prob >= prob_threshold, weights),
+        track_range=_track_range(
+            model, q, gamma, prob >= prob_threshold, weights, ends=track_ends
+        ),
         gamma=gamma,
         membership_prob=prob,
         model=model,
@@ -177,8 +181,14 @@ def _track_range(
     member: BSzN,
     weights: FSzN | None,
     /,
+    *,
+    ends: Literal["half_max", "mask"] = "half_max",
 ) -> tuple[float, float]:
-    """Find the span of gamma between the stream's half-maximum ends.
+    """Find the span of gamma between the ends of the curve the samples trace.
+
+    ``ends="half_max"`` (default) cuts where the line density falls to half,
+    as below. ``ends="mask"`` instead reads the ends from the shape of a mask's
+    caps (`_mask_ends`), for images made by thickening a curve.
 
     Works in physical length: decode the track over the members' span of
     gamma, project every member onto it
@@ -199,6 +209,9 @@ def _track_range(
     gamma; with members of total weight 0, or a track that can't be decoded,
     to the members' span.
     """
+    if ends not in ("half_max", "mask"):
+        msg = f"track_ends must be 'half_max' or 'mask', got {ends!r}."
+        raise ValueError(msg)
     g = np.asarray(gamma, dtype=float)
     keep = np.asarray(member, dtype=bool)
     if not keep.any():  # nothing to trim against
@@ -223,9 +236,15 @@ def _track_range(
     tangent /= np.maximum(np.linalg.norm(tangent, axis=1, keepdims=True), 1e-300)
     pts = _magnitudes(q, keys)[keep]
     _, near = cKDTree(track).query(pts)
-    along = s[near] + np.einsum("ij,ij->i", pts - track[near], tangent[near])
+    offset = pts - track[near]
+    step = np.einsum("ij,ij->i", offset, tangent[near])
+    along = s[near] + step
 
-    s_lo, s_hi = _trim_ends(along, w)
+    if ends == "mask":
+        across = np.linalg.norm(offset - step[:, None] * tangent[near], axis=1)
+        s_lo, s_hi = _mask_ends(along, across, s[-1])
+    else:
+        s_lo, s_hi = _trim_ends(along, w)
     s_lo, s_hi = np.clip([s_lo, s_hi], 0.0, s[-1])
     # np.interp needs strictly increasing lengths; repeated vertices (a running
     # mean's plateaus) give equal ones, and all their gamma decode to one point.
@@ -249,6 +268,37 @@ def _magnitudes(comps: VectorComponents, keys: list[str], /) -> np.ndarray:
         ],
         axis=1,
     )
+
+
+def _mask_ends(along: FSzN, across: FSzN, length: float, /) -> tuple[float, float]:
+    """Read each end of a thickened curve from the shape of its cap.
+
+    A mask made by thickening a curve by a half-width ``w`` has a cap past each
+    end that reaches exactly ``w`` beyond it. So the end is the tip, the
+    farthest any sample reaches along the track, minus the half-width just
+    inside it: the widest any sample reaches across the track within two
+    widths of that end (first guessed from the outer 15% of the track). This
+    uses where samples are, not their weights, so the end shifts linearly with
+    the cap rather than through a slow fall in density.
+    """
+    a = np.asarray(along, dtype=float)
+    r = np.asarray(across, dtype=float)
+
+    def half_width(inner: np.ndarray, /) -> float:
+        # Widest reach across the track among samples that project onto the
+        # stretch `inner` of the track measured from this end.
+        def widest(d: float, /) -> float:
+            near = (inner >= 0) & (inner <= d)
+            return float(r[near].max()) if near.any() else 0.0
+
+        first = widest(0.15 * length)
+        return widest(2 * first) if first > 0 else first
+
+    s_lo = a.min() + half_width(a)
+    s_hi = a.max() - half_width(length - a)
+    if s_hi <= s_lo:  # too short to have caps: keep everything
+        return float(a.min()), float(a.max())
+    return float(s_lo), float(s_hi)
 
 
 def _trim_ends(

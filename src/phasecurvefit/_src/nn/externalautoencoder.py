@@ -159,6 +159,8 @@ def train_autoencoder(
     # ===========================================
     # Train Encoder
 
+    # Read before narrowing to the encoder's config, which has no such field.
+    track_ends = config.track_ends if isinstance(config, TrainingConfig) else "half_max"
     if config is None:
         config = OrderingTrainingConfig()
     elif isinstance(config, TrainingConfig):
@@ -205,7 +207,12 @@ def train_autoencoder(
         gamma_range=model.gamma_range,
         # Members as the running-mean decoder counts them (its default threshold).
         track_range=_track_range(
-            model, positions, gamma, membership_prob >= 0.5, weights
+            model,
+            positions,
+            gamma,
+            membership_prob >= 0.5,
+            weights,
+            ends=track_ends,
         ),
     )
 

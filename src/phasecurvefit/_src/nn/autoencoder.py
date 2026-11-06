@@ -11,7 +11,7 @@ __all__: tuple[str, ...] = (
 import functools as ft
 from collections.abc import Mapping
 from dataclasses import KW_ONLY, dataclass
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Literal, cast
 
 import equinox as eqx
 import jax
@@ -315,6 +315,17 @@ class TrainingConfig:
 
     Applies to phase 3 (joint encoder+decoder training), which is where the
     decoder -- and therefore the residual -- exists.
+    """
+
+    track_ends: Literal["half_max", "mask"] = "half_max"
+    """How the trained result's ``track_range`` finds the ends of the curve.
+
+    ``"half_max"`` (default) cuts where the weighted number of samples per unit
+    length falls to half its value just inside, which is the true end of a
+    curve blurred by any symmetric kernel. ``"mask"`` reads each end from the
+    cap of a mask made by thickening a curve: the farthest any sample reaches
+    along the track, minus the mask's half-width there. Use it for segmentation
+    maps and other images with a definite edge, not for point clouds.
     """
 
     # =================================
@@ -1106,6 +1117,7 @@ def train_autoencoder(
         prob_threshold=config.member_threshold,
         gamma_range=model.gamma_range,
         weights=weights,
+        track_ends=config.track_ends,
     )
 
     return result, opt_states, losses
