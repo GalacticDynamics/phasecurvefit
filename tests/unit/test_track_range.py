@@ -148,4 +148,6 @@ class TestTrackRangeFit:
     def test_within_gamma_range(self, fitted):
         """``track_range`` lies inside ``gamma_range``."""
         lo, hi = fitted.track_range
-        assert fitted.gamma_range[0] <= lo < hi <= fitted.gamma_range[1]
+        assert fitted.gamma_range[0] <= lo
+        assert lo < hi
+        assert hi <= fitted.gamma_range[1]
