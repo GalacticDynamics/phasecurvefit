@@ -227,6 +227,10 @@ def _track_range(
 
     s_lo, s_hi = _trim_ends(along, w)
     s_lo, s_hi = np.clip([s_lo, s_hi], 0.0, s[-1])
+    # np.interp needs strictly increasing lengths; repeated vertices (a running
+    # mean's plateaus) give equal ones, and all their gamma decode to one point.
+    s, first = np.unique(s, return_index=True)
+    grid = grid[first]
     return float(np.interp(s_lo, s, grid)), float(np.interp(s_hi, s, grid))
 
 
