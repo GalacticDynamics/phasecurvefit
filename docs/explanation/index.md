@@ -9,7 +9,9 @@ order: by default an MST backbone ({doc}`mst`) refined by a self-organizing map
 ({doc}`som`), or the local-flow walk ({doc}`walk`). An autoencoder then gives every
 sample an ordering coordinate and fits a smooth track ({doc}`autoencoder`). A
 mixture model of the stream and a background can make that fit reject interlopers
-({doc}`outliers`).
+({doc}`outliers`). Data given as an image rather than a list of samples, such as a
+density map, goes through the same stages with each pixel weighted by its value
+({doc}`density-fields`).
 
 ```{toctree}
 :maxdepth: 1
@@ -20,4 +22,5 @@ mst
 som
 autoencoder
 outliers
+density-fields
 ```
