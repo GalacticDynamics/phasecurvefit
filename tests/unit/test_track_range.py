@@ -64,25 +64,25 @@ class TestTrackRangeFallbacks:
         model = pcf.nn.PathAutoencoder.make(
             normalizer=normalizer, gamma_range=(-1.0, 1.0), key=jax.random.key(0)
         )
-        return model, pos, vel
+        return model, pos
 
     def test_no_members(self, model):
         """With no members, the range is the span of all gamma."""
-        m, pos, vel = model
+        m, pos = model
         gamma = jnp.linspace(-0.3, 0.6, 20)
         rng = _track_range(m, pos, gamma, jnp.zeros(20, dtype=bool), None)
         assert rng == pytest.approx((-0.3, 0.6))
 
     def test_zero_weight_members(self, model):
         """Members of total weight 0 fall back to their span, without crashing."""
-        m, pos, vel = model
+        m, pos = model
         gamma = jnp.linspace(-0.3, 0.6, 20)
         rng = _track_range(m, pos, gamma, jnp.ones(20, dtype=bool), jnp.zeros(20))
         assert rng == pytest.approx((-0.3, 0.6))
 
     def test_equal_gamma(self, model):
         """Every member at one gamma gives that single point."""
-        m, pos, vel = model
+        m, pos = model
         rng = _track_range(m, pos, jnp.full(20, 0.3), jnp.ones(20, dtype=bool), None)
         assert rng == pytest.approx((0.3, 0.3))
 
