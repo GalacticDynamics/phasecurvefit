@@ -141,6 +141,27 @@ class TestRidgeOrdererValidation:
 class TestRidgeOrdererUnxt:
     """Quantity inputs give the same ordering as the stripped values."""
 
+    def test_bare_bandwidth_is_in_usys_length(self):
+        """With Quantity positions, a bare bandwidth is in the usys length unit."""
+        u = pytest.importorskip("unxt")
+        pos, vel, w = _arc_image()
+        q = {k: u.Q(v, "kpc") for k, v in pos.items()}
+        p = {k: u.Q(v, "km/s") for k, v in vel.items()}
+        meta = pcf.StateMetadata(usys=u.unitsystems.galactic)  # length: kpc
+        bare, unitful = (
+            pcf.order(
+                q,
+                p,
+                pcf.orderers.RidgeOrderer(bandwidth=bw),
+                metadata=meta,
+                weights=w,
+            )
+            for bw in (0.1, u.Q(100.0, "pc"))
+        )
+        np.testing.assert_allclose(
+            u.ustrip("kpc", bare.chord), u.ustrip("kpc", unitful.chord), atol=1e-5
+        )
+
     def test_quantity_matches_plain(self):
         """Positions in kpc with a bandwidth in pc match the bare-number run."""
         u = pytest.importorskip("unxt")
