@@ -13,7 +13,7 @@ the density there -- but it works on any weighted or unweighted point cloud.
    stream, since reaching one costs about ``1 / density**2``.
 3. *Ridge path*: the shortest path between the ends on the ``k``-nearest-
    neighbour graph, with each edge costing its length over the squared density
-   at its midpoint, so the path follows the ridge.
+   averaged over its two ends, so the path follows the ridge.
 4. *Trim*: the path runs out through the faint ends of the stream; it is cut
    where the density along it first and last reaches ``trim`` times its median.
    For a blurred line the density at the true end is half the interior value,
@@ -288,7 +288,7 @@ def _ridge_path(
     da = csgraph.dijkstra(g_len, directed=False, indices=a)
     b = int(np.argmax(np.where(np.isfinite(da), da, -1)))
 
-    # Ridge path between them: edge cost = length / density^2 at the midpoint.
+    # Ridge path between them: edge cost = length / (mean of the end densities)^2.
     cost = ell / (0.5 * (depth[rows] + depth[cols])) ** 2
     _, pred = csgraph.dijkstra(
         graph(cost, np.ones_like(rows, dtype=bool)),
