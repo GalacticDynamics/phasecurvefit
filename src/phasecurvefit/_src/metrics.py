@@ -25,13 +25,14 @@ from .phasespace import (
     unit_direction,
     unit_velocity,
 )
+from phasecurvefit._src._repr import ReprMixin
 
 vec_euclidean_distance = jax.vmap(euclidean_distance, in_axes=(None, 0))
 vec_unit_direction = jax.vmap(unit_direction, in_axes=(None, 0))
 vec_cosine_similarity = jax.vmap(cosine_similarity, in_axes=(None, 0))
 
 
-class AbstractDistanceMetric(eqx.Module):
+class AbstractDistanceMetric(ReprMixin, eqx.Module):
     """Abstract base class for distance metrics in phase-space walks.
 
     A distance metric computes modified distances between a current point and

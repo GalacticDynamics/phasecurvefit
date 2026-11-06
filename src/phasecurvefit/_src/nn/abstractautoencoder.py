@@ -10,12 +10,13 @@ import jax.numpy as jnp
 from jaxtyping import PRNGKeyArray
 
 from .normalize import AbstractNormalizer
+from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.custom_types import FSzN, VectorComponents
 
 Gamma: TypeAlias = FSzN  # noqa: UP040
 
 
-class AbstractAutoencoder(eqx.Module):
+class AbstractAutoencoder(ReprMixin, eqx.Module):
     encoder: eqx.Module
     decoder: eqx.Module
     normalizer: AbstractNormalizer

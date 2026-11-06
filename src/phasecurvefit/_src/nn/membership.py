@@ -105,6 +105,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray, Real
 
+from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.custom_types import FSz0, FSzN
 
 # Membership is clamped into [_EPS, 1 - _EPS] before any log is taken.
@@ -125,7 +126,7 @@ _LOG_SIGMA_MAX: float = 20.0
 _LOG_SIGMA_MIN: float = -20.0
 
 
-class WidthNet(eqx.Module):
+class WidthNet(ReprMixin, eqx.Module):
     r"""Width $\sigma$ of the foreground component along the ordering parameter.
 
     The foreground density need not have a uniform width. A stream, for example,

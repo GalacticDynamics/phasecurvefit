@@ -45,6 +45,7 @@ from jaxtyping import Array, Bool, Float, PRNGKeyArray
 from jaxmore import bounded_while_loop
 from zeroth import zeroth
 
+from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.checks import value_error_if
 from phasecurvefit._src.custom_types import FSz0, ISzN, VectorComponents
 from phasecurvefit._src.metrics import (
@@ -1138,7 +1139,7 @@ def chord(
     )
 
 
-class SOM1D(eqx.Module):
+class SOM1D(ReprMixin, eqx.Module):
     """A trained or untrained 1-D Self-Organizing Map.
 
     A thin, composable object over the functional core: it carries the

@@ -3,16 +3,23 @@
 __all__: tuple[str, ...] = ("AbstractNormalizer", "StandardScalerNormalizer")
 
 import abc
+from typing import Any
 
 import jax.numpy as jnp
 import plum
+import wadler_lindig as wl
 from jaxtyping import Array, Float
 
+from phasecurvefit._src._repr import ReprMixin, attrs_pdoc
 from phasecurvefit._src.custom_types import VectorComponents
 
 
-class AbstractNormalizer(metaclass=abc.ABCMeta):
+class AbstractNormalizer(ReprMixin, metaclass=abc.ABCMeta):
     """Abstract base class for normalizers used in autoencoders."""
+
+    def __pdoc__(self, **kw: Any) -> wl.AbstractDoc:
+        """Return the constructor form, from the instance attributes."""
+        return attrs_pdoc(self, vars(self).items(), **kw)
 
     @abc.abstractmethod
     def __init__(
