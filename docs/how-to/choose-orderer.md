@@ -107,8 +107,8 @@ options.
 For an image of a stream, make each pixel a sample weighted by its density
 ({doc}`data`) and order with a {class}`~phasecurvefit.orderers.RidgeOrderer`. It
 follows the ridge of the weighted density, so it finds the middle of a wide or
-blurred stream where the MST's longest path wanders across it. Set `bandwidth` to
-about the stream's half-width, and chain a SOM to refine it:
+blurred stream where the MST's longest path wanders across it. It works out the
+stream's width from the data. Chain a SOM to refine it:
 
 ```{code-cell} python
 g = jnp.linspace(-1.5, 1.5, 61)
@@ -118,11 +118,14 @@ keep = image.ravel() > 0.05  # each bright pixel becomes a sample
 pix = {"x": X.ravel()[keep], "y": Y.ravel()[keep]}
 pix_vel = {"x": jnp.zeros_like(pix["x"]), "y": jnp.zeros_like(pix["y"])}
 
-ridge = pcf.orderers.RidgeOrderer(bandwidth=0.1) | pcf.orderers.SOMOrderer(
+ridge = pcf.orderers.RidgeOrderer() | pcf.orderers.SOMOrderer(
     n_prototypes=20, metric=pcf.metrics.SpatialDistanceMetric()
 )
 res = pcf.order(pix, pix_vel, ridge, weights=image.ravel()[keep])
 ```
 
-It doesn't use velocities, so the direction of the ordering is arbitrary. It finds
-the ends to within about one `bandwidth`.
+It doesn't use velocities, so the direction of the ordering is arbitrary. The width
+it uses, `bandwidth`, is the RMS distance of the samples from the ridge, found by
+iterating from a wide first guess. Pass `bandwidth=` to set it yourself, for
+example to smooth over clumps in a noisy image. It finds the ends to within about
+one `bandwidth`.

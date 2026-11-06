@@ -5,7 +5,8 @@ the density there -- but it works on any weighted or unweighted point cloud.
 
 1. *Density*: a Gaussian kernel density estimate of the weighted samples at
    width ``bandwidth``. Smoothing a uniform tube or a blurred line puts the
-   ridge of this density on the centre line.
+   ridge of this density on the centre line. By default the bandwidth is
+   estimated from the data (see ``RidgeOrderer``).
 2. *Ends*: the two ends of the longest shortest path, by length, through the
    dense core (density at least ``core`` times its peak). Ranking the ends by
    the ridge cost below instead would pick a faint sample on the *side* of the
@@ -22,7 +23,7 @@ the density there -- but it works on any weighted or unweighted point cloud.
 
 Velocities are not used, so ``velocity_aware`` is ``False`` and the direction
 along the curve is arbitrary. The backbone seeds a SOM well:
-``RidgeOrderer(bandwidth=...) | SOMOrderer()``.
+``RidgeOrderer() | SOMOrderer()``.
 
 The neighbour searches and graph run on the host with SciPy, like
 ``MSTOrderer(neighbors=SciPy())``, so ``order()`` cannot be traced.
@@ -45,6 +46,10 @@ from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import FSz0, FSzN, VectorComponents
 
+# ponytail: the bandwidth is estimated on a strided subsample of at most this
+# many samples, so a wide first guess can't pair every pixel with every other.
+_N_ESTIMATE = 2000
+
 
 class RidgeOrderer(AbstractOrderer):
     """Order samples along the ridge of their weighted density.
@@ -55,6 +60,12 @@ class RidgeOrderer(AbstractOrderer):
         Width of the Gaussian kernel for the density estimate, in position
         units: roughly the half-width of the stream. Too small and the ridge
         follows noise or pixel structure; too large and it cuts bends.
+        ``None`` (default) estimates it from the data. It starts at a tenth of
+        the data's extent, finds the backbone, sets the bandwidth to the
+        weighted RMS distance of the samples from the backbone, and repeats
+        until that changes by less than 2%. The estimate runs on a strided
+        subsample of at most 2000 samples, and is never below their median
+        nearest-neighbour spacing.
     k
         Neighbours each sample links to in the graph the ridge path runs on.
     core
@@ -88,7 +99,7 @@ class RidgeOrderer(AbstractOrderer):
     >>> result = pcf.order(
     ...     pos,
     ...     vel,
-    ...     pcf.orderers.RidgeOrderer(bandwidth=0.1),
+    ...     pcf.orderers.RidgeOrderer(),
     ...     weights=image.ravel()[keep],
     ... )
     >>> radius = jnp.hypot(result.backbone["x"], result.backbone["y"])
@@ -97,7 +108,7 @@ class RidgeOrderer(AbstractOrderer):
 
     """
 
-    bandwidth: float | FSz0
+    bandwidth: float | FSz0 | None = None
     k: int = eqx.field(static=True, default=8)
     core: float = eqx.field(static=True, default=0.2)
     trim: float = eqx.field(static=True, default=0.5)
@@ -107,7 +118,8 @@ class RidgeOrderer(AbstractOrderer):
         # A Quantity is checked once its unit is stripped (the unxt dispatch
         # rebuilds the orderer with the bare number); anything else must be a
         # positive scalar, including a 0-d array.
-        if not hasattr(self.bandwidth, "unit") and not float(self.bandwidth) > 0:
+        bw = self.bandwidth
+        if bw is not None and not hasattr(bw, "unit") and not float(bw) > 0:
             msg = f"bandwidth must be positive, got {self.bandwidth}."
             raise ValueError(msg)
         if self.k < 1:
@@ -136,17 +148,17 @@ class RidgeOrderer(AbstractOrderer):
         if weights is not None:
             weights = check_weights(weights, n)
         w = np.ones(n) if weights is None else np.asarray(weights, dtype=float)
-        h = float(self.bandwidth)
+        opts = {"k": self.k, "core": self.core, "trim": self.trim}
 
         if n < 2:  # nothing to connect: identity ordering, as MSTOrderer
             backbone, chord = pts, np.zeros(n)
         else:
-            depth = _density(pts, w, h)
-            path = _ridge_path(pts, depth, k=min(self.k, n - 1), core=self.core)
-            d_path = depth[path]
-            inside = np.flatnonzero(d_path >= self.trim * np.median(d_path))
-            path = path[inside[0] : inside[-1] + 1]
-            backbone, chord = _smooth_and_project(pts, path, h)
+            h = (
+                _estimate_bandwidth(pts, w, **opts)
+                if self.bandwidth is None
+                else float(self.bandwidth)
+            )
+            backbone, chord = _backbone(pts, w, h, **opts)
         indices = np.argsort(chord, kind="stable").astype(np.int32)
         return OrderingResult(
             positions={c: jnp.asarray(v) for c, v in positions.items()},
@@ -158,6 +170,51 @@ class RidgeOrderer(AbstractOrderer):
             weights=weights,
             velocity_aware=False,
         )
+
+
+def _backbone(
+    pts: np.ndarray, w: np.ndarray, h: float, /, *, k: int, core: float, trim: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """Density, ridge path, trim and smoothing: steps 1-5 of the module docstring."""
+    depth = _density(pts, w, h)
+    path = _ridge_path(pts, depth, k=min(k, len(pts) - 1), core=core)
+    d_path = depth[path]
+    inside = np.flatnonzero(d_path >= trim * np.median(d_path))
+    return _smooth_and_project(pts, path[inside[0] : inside[-1] + 1], h)
+
+
+def _estimate_bandwidth(
+    pts: np.ndarray,
+    w: np.ndarray,
+    /,
+    *,
+    k: int,
+    core: float,
+    trim: float,
+    max_iter: int = 10,
+    rtol: float = 0.02,
+) -> float:
+    """Self-consistent bandwidth: the weighted RMS distance from the backbone.
+
+    Starts wide, at a tenth of the data's extent, where the ridge is smooth but
+    cuts bends, so the scatter about it overestimates the width; each round
+    then shrinks towards the scatter about the ridge it defines. Starting
+    narrow instead could lock onto noise or pixel structure.
+    """
+    step = max(1, len(pts) // _N_ESTIMATE)
+    sub, ws = pts[::step], w[::step]
+    if not ws.any():  # the stride missed every weighted sample
+        sub, ws = pts, w
+    spacing = float(np.median(cKDTree(sub).query(sub, 2)[0][:, 1]))
+    h = 0.1 * float(np.ptp(pts, axis=0).max())
+    for _ in range(max_iter):
+        backbone, _ = _backbone(sub, ws, h, k=k, core=core, trim=trim)
+        dist, _ = cKDTree(backbone).query(sub)
+        h_new = max(float(np.sqrt(np.sum(ws * dist**2) / np.sum(ws))), spacing)
+        if abs(h_new - h) <= rtol * h:
+            return h_new
+        h = h_new
+    return h
 
 
 def _density(pts: np.ndarray, w: np.ndarray, h: float, /) -> np.ndarray:

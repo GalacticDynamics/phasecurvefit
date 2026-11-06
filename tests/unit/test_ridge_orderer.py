@@ -10,7 +10,11 @@ import numpy as np
 import pytest
 
 import phasecurvefit as pcf
-from phasecurvefit._src.orderers.ridge import _density, _smooth_and_project
+from phasecurvefit._src.orderers.ridge import (
+    _density,
+    _estimate_bandwidth,
+    _smooth_and_project,
+)
 
 pytest.importorskip("scipy")
 
@@ -152,6 +156,79 @@ class TestRidgeOrderer:
         result = pcf.order(pos, vel, chain, weights=w)
         assert float(np.median(_radius_err(result.backbone))) < 0.02
         assert int(result.n_visited) == w.shape[0]
+
+
+def _soft_arc(seed: int = 0):
+    """Make a soft mask on the arc: widening, brighter in one stretch, noisy.
+
+    Like a segmentation probability map: the weight falls from the arc to 0 at
+    the edge, the half-width grows from 0.1 to 0.2 along the arc, and every
+    pixel carries 30% multiplicative noise.
+    """
+    g = jnp.linspace(-1.5, 1.5, 61)
+    X, Y = jnp.meshgrid(g, g)
+    theta = jnp.arctan2(Y, X)
+    half_width = 0.1 + 0.1 * theta / jnp.pi
+    across = jnp.clip(1.0 - ((jnp.hypot(X, Y) - 1.0) / half_width) ** 2, 0.0)
+    along = 1.0 + 0.5 * jnp.exp(-0.5 * ((theta - 1.0) / 0.3) ** 2)
+    noise = jax.random.lognormal(jax.random.key(seed), 0.3, X.shape)
+    image = (along * across * noise * (Y > 0)).ravel()
+    keep = image > 0
+    pos = {"x": X.ravel()[keep], "y": Y.ravel()[keep]}
+    return pos, jax.tree.map(jnp.zeros_like, pos), image[keep]
+
+
+def _estimate(pos, w):
+    pts = np.stack([np.asarray(pos[c]) for c in sorted(pos)], axis=1)
+    return _estimate_bandwidth(pts, np.asarray(w), k=8, core=0.2, trim=0.5)
+
+
+class TestBandwidthEstimate:
+    """With ``bandwidth=None`` the width is estimated from the data."""
+
+    def test_blurred_width(self):
+        """A Gaussian blur of sigma 0.1 gives a bandwidth of about 0.1."""
+        pos, _, w = _arc_image()
+        assert 0.08 < _estimate(pos, w) < 0.12
+
+    def test_uniform_width(self):
+        """A uniform band of half-width r gives about its RMS, r / sqrt(3)."""
+        pos, _, w = _arc_image(uniform=True)
+        assert 0.07 < _estimate(pos, w) < 0.12  # r / sqrt(3) = 0.087
+
+    def test_point_cloud_width(self):
+        """Samples scattered by 0.05 about the arc give about 0.05."""
+        key_a, key_r = jax.random.split(jax.random.key(0))
+        ang = jax.random.uniform(key_a, (400,), minval=0.0, maxval=jnp.pi)
+        rad = 1.0 + 0.05 * jax.random.normal(key_r, (400,))
+        pos = {"x": rad * jnp.cos(ang), "y": rad * jnp.sin(ang)}
+        assert 0.04 < _estimate(pos, jnp.ones(400)) < 0.065
+
+    def test_subsample_matches(self):
+        """An image too large to estimate on in full gives the same width."""
+        g = jnp.linspace(-1.5, 1.5, 151)
+        X, Y = jnp.meshgrid(g, g)
+        R = jnp.hypot(X, Y)
+        image = (jnp.exp(-((R - 1.0) ** 2) / (2 * 0.1**2)) * (Y > 0)).ravel()
+        keep = image > 0.05
+        assert int(keep.sum()) > 2000  # past the subsample limit
+        pos = {"x": X.ravel()[keep], "y": Y.ravel()[keep]}
+        coarse, _, w = _arc_image()
+        assert _estimate(pos, image[keep]) == pytest.approx(
+            _estimate(coarse, w), rel=0.1
+        )
+
+    def test_collinear_floor(self):
+        """Samples exactly on a line still get a positive width."""
+        pos = {"x": jnp.linspace(0.0, 1.0, 50), "y": jnp.zeros(50)}
+        assert _estimate(pos, jnp.ones(50)) >= 0.99 / 49  # the spacing, to rounding
+
+    def test_soft_mask(self):
+        """A widening, noisy probability map still finds the arc by default."""
+        pos, vel, w = _soft_arc()
+        result = pcf.order(pos, vel, pcf.orderers.RidgeOrderer(), weights=w)
+        assert float(np.median(_radius_err(result.backbone))) < 0.03
+        assert _angle_span(result.backbone) > 0.85 * np.pi
 
 
 class TestRidgeOrdererValidation:
