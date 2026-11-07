@@ -36,6 +36,19 @@ ordering, result, losses = pcf.fit_track(
 {class}`~phasecurvefit.nn.AutoencoderResult`, and `losses` the training loss per
 epoch.
 
+`fit_track` leaves samples far from the stream out of the ordering, so that the track
+does not bend out to interlopers at its ends ({doc}`../explanation/autoencoder`
+explains how). Left-out samples have `-1` in `ordering.indices`. Nothing is left
+out when you pass `weights`, as for an image. To keep every sample
+in the ordering, pass `outlier_clip_sigma=None`; to clip only more distant samples,
+pass a larger value:
+
+```{code-cell} python
+ordering, result, losses = pcf.fit_track(
+    pos, vel, key=jax.random.key(0), outlier_clip_sigma=None, training_config=config
+)
+```
+
 ## Step by step
 
 Build the pieces yourself to use a different orderer, a pre-built model, or another
