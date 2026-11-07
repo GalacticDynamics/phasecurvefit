@@ -195,7 +195,7 @@ Example:
 ```python
 import jax.numpy as jnp
 
-position: ScalarComponents = {
+position = {
     "x": jnp.array(1.0),
     "y": jnp.array(2.0),
 }
@@ -215,7 +215,7 @@ Example:
 ```python
 import jax.numpy as jnp
 
-position: VectorComponents = {
+position = {
     "x": jnp.array([0.0, 1.0, 2.0]),
     "y": jnp.array([0.0, 1.0, 2.0]),
 }
