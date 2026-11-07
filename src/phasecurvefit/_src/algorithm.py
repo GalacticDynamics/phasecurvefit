@@ -36,6 +36,7 @@ import jax.numpy as jnp
 import jax.tree as jtu
 import plum
 import quax
+import wadler_lindig as wl
 from jaxtyping import Array, Bool, Int
 
 from jaxmore import bounded_while_loop
@@ -45,6 +46,7 @@ from .custom_types import ISz0, RLikeSz0, VectorComponents
 from .orderers.result import OrderingResult
 from .phasespace import euclidean_distance
 from .query_config import WalkConfig
+from phasecurvefit._src._repr import ReprMixin, attrs_pdoc
 from phasecurvefit._src.checks import (
     check_velocities as _check_velocities,
     value_error_if,
@@ -53,7 +55,7 @@ from phasecurvefit._src.checks import (
 vec_euclidean_distance = jax.jit(jax.vmap(euclidean_distance, in_axes=(None, 0)))
 
 
-class StateMetadata(quax.Value):
+class StateMetadata(ReprMixin, quax.Value):
     """Metadata container for the local-flow walk's state.
 
     This holds optional context like unit systems that need to be passed
@@ -97,9 +99,9 @@ class StateMetadata(quax.Value):
         """Get with default value."""
         return self._data.get(key, default)  # pylint: disable=no-member
 
-    def __repr__(self) -> str:
-        """Return string representation."""
-        return f"StateMetadata({self._data!r})"
+    def __pdoc__(self, **kw: object) -> wl.AbstractDoc:
+        """Return the constructor form, ``StateMetadata(key=value, ...)``."""
+        return attrs_pdoc(self, self._data.items(), **kw)
 
     def __iter__(self) -> Iterator:
         return iter(self._data)

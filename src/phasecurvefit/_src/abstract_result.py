@@ -9,9 +9,10 @@ import equinox as eqx
 from jaxtyping import Array, PRNGKeyArray
 
 from .custom_types import ISzN, VectorComponents
+from phasecurvefit._src._repr import ReprMixin
 
 
-class AbstractResult(eqx.Module):
+class AbstractResult(ReprMixin, eqx.Module):
     """Abstract base class for walk algorithm results.
 
     This class defines the interface for walk result types that combine

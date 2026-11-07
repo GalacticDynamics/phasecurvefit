@@ -14,6 +14,7 @@ from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from .normalize import AbstractNormalizer
 from .order_net import OrderingNet
+from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import FSz0, RSz0
 
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     import phasecurvefit  # noqa: ICN001
 
 
-class AbstractExternalDecoder(eqx.Module):
+class AbstractExternalDecoder(ReprMixin, eqx.Module):
     """Abstract base class for external decoders."""
 
     def __call__(self, gamma: RSz0) -> Float[Array, " D"]:

@@ -22,6 +22,7 @@ import jaxknn
 import numpy as np
 from jaxtyping import Array, Float, Int
 
+from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.checks import value_error_if
 from phasecurvefit._src.optional_deps import OptDeps
 
@@ -116,7 +117,7 @@ def _no_neighbors(m: int, k: int, dtype: object, /) -> KnnOut:
     return jnp.zeros((m, k), jnp.int32), jnp.full((m, k), jnp.inf, dtype)
 
 
-class AbstractNeighborSearch(eqx.Module):
+class AbstractNeighborSearch(ReprMixin, eqx.Module):
     """An exact k-nearest-neighbour backend.
 
     ``knn(points, k)`` returns, for every point, its k nearest *other* points

@@ -22,11 +22,12 @@ from jaxmore.nn import masked_mean
 
 from .order_net import default_optimizer
 from .trainer import EqxScanTrainer, eqx_step
+from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import FSz0, RSz0, RSzN
 
 
-class AbstractTrackNet(eqx.Module):
+class AbstractTrackNet(ReprMixin, eqx.Module):
     r"""Interface for a trainable decoder mapping $\gamma \to$ position.
 
     A track net is the second half of the autoencoder: it reconstructs the

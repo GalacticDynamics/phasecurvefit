@@ -27,11 +27,12 @@ from jaxtyping import Array, ArrayLike, Bool, Float, Int, PRNGKeyArray
 from jaxmore.nn import masked_mean
 
 from .trainer import EqxScanTrainer, EqxTrainCarry, eqx_step
+from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import FSz0, FSzN
 
 
-class OrderingNet(eqx.Module):
+class OrderingNet(ReprMixin, eqx.Module):
     r"""Interpolation network:$(x, v) \;\mapsto\; (\gamma, p),$.
 
     This network takes N-D phase-space coordinates and outputs:

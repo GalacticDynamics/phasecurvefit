@@ -6,9 +6,10 @@ import equinox as eqx
 
 from .metrics import AbstractDistanceMetric, AlignedMomentumDistanceMetric
 from .strategies import AbstractQueryStrategy, BruteForce
+from phasecurvefit._src._repr import ReprMixin
 
 
-class WalkConfig(eqx.Module):
+class WalkConfig(ReprMixin, eqx.Module):
     """Configuration for neighbor queries in the local-flow walk.
 
     Composes a distance metric with a query strategy. This is the primary

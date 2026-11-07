@@ -32,6 +32,7 @@ import jax.numpy as jnp
 import plum
 from jaxtyping import Array, Float, Int
 
+from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
@@ -121,7 +122,7 @@ def _check_component_keys(
         raise ValueError(msg)
 
 
-class AbstractOrderer(eqx.Module):
+class AbstractOrderer(ReprMixin, eqx.Module):
     """Base class for ordering algorithms.
 
     Subclasses carry their own hyperparameters and implement :meth:`order`.

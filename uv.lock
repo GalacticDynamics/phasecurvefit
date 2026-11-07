@@ -1813,6 +1813,7 @@ dependencies = [
     { name = "plum-dispatch" },
     { name = "quax" },
     { name = "scipy" },
+    { name = "wadler-lindig-parts" },
     { name = "zeroth" },
 ]
 
@@ -1939,6 +1940,7 @@ requires-dist = [
     { name = "unxt", marker = "extra == 'interop'", specifier = ">=2.0" },
     { name = "unxt", marker = "extra == 'tutorials'", specifier = ">=2.0" },
     { name = "unxt", extras = ["interop-mpl"], marker = "extra == 'tutorials'" },
+    { name = "wadler-lindig-parts", specifier = ">=0.3.0" },
     { name = "zeroth", specifier = ">=1.0.1" },
 ]
 provides-extras = ["all", "interop", "kdtree", "tutorials"]
@@ -3442,11 +3444,24 @@ wheels = [
 
 [[package]]
 name = "wadler-lindig"
-version = "0.1.7"
+version = "0.1.8"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1e/67/cbae4bf7683a64755c2c1778c418fea96d00e34395bb91743f08bd951571/wadler_lindig-0.1.7.tar.gz", hash = "sha256:81d14d3fe77d441acf3ebd7f4aefac20c74128bf460e84b512806dccf7b2cd55", size = 15842, upload-time = "2025-06-18T07:00:42.843Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ea/bf/4caf1aada6c84eb3fadf9341a90367f436a759692456e1a234d444d428ee/wadler_lindig-0.1.8.tar.gz", hash = "sha256:1a94d51cd26100dda9e430c64539c5b92b9788c87f10db3e1c87503ab814411a", size = 16256, upload-time = "2026-10-25T19:06:02.92Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/96/04e7b441807b26b794da5b11e59ed7f83b2cf8af202bd7eba8ad2fa6046e/wadler_lindig-0.1.7-py3-none-any.whl", hash = "sha256:e3ec83835570fd0a9509f969162aeb9c65618f998b1f42918cfc8d45122fe953", size = 20516, upload-time = "2025-06-18T07:00:41.684Z" },
+    { url = "https://files.pythonhosted.org/packages/00/0b/b170089cd44848f25dbc9efda08e5aa4a8402d9a13f0d4d0f3d7808be539/wadler_lindig-0.1.8-py3-none-any.whl", hash = "sha256:8671e8c98449ae3f4e4ba720eccd63a502b3983042f8d112b49a9c6be49e8d92", size = 20840, upload-time = "2026-10-25T19:06:01.79Z" },
+]
+
+[[package]]
+name = "wadler-lindig-parts"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "plum-dispatch" },
+    { name = "wadler-lindig" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4a/21/91105479d3706aecb5fc86a4ab7b7995035f260a170cd416787f76090fe1/wadler_lindig_parts-0.3.0.tar.gz", hash = "sha256:bedf88b7a7634ae76cf0d513da9edef5514582b948d55a4634021ec33e25d1e0", size = 69783, upload-time = "2026-11-07T00:39:50.002Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/91/de/b2a3a69768375e52cc9ed50b2df7534f542c7e4e5858e9fbef29f9c19974/wadler_lindig_parts-0.3.0-py3-none-any.whl", hash = "sha256:63cac524c3ee7545b1b76f2a15da2c89f09122c8e3efdfe7cdc6c8942e59baa1", size = 28306, upload-time = "2026-11-07T00:39:48.837Z" },
 ]
 
 [[package]]

@@ -26,12 +26,14 @@ from abc import ABC, abstractmethod
 from typing import Any, NamedTuple
 
 import jax.numpy as jnp
+import wadler_lindig as wl
 from jaxtyping import Array
 
 from .custom_types import FLikeSz0, ISz0, VectorComponents
 from .metrics import AbstractDistanceMetric
 from .optional_deps import OptDeps
 from .phasespace import get_w_at
+from phasecurvefit._src._repr import ReprMixin, attrs_pdoc
 
 if OptDeps.JAXKD.installed:
     import jaxkd
@@ -57,7 +59,7 @@ class QueryResult(NamedTuple):
     indices: Array | None = None
 
 
-class AbstractQueryStrategy(ABC):
+class AbstractQueryStrategy(ReprMixin, ABC):
     """Abstract base class for neighbor query strategies.
 
     Strategies are minimally stateful. Configure via `__init__` (e.g., KD-tree
@@ -67,6 +69,10 @@ class AbstractQueryStrategy(ABC):
     the data point at ``idx`` and delegates to it. Override `query_at` only to
     use precomputed per-point state, as `KDTree` does.
     """
+
+    def __pdoc__(self, **kw: Any) -> wl.AbstractDoc:
+        """Return the constructor form, from the instance attributes."""
+        return attrs_pdoc(self, vars(self).items(), **kw)
 
     @abstractmethod
     def init(self, positions: VectorComponents, /, *, metadata: object) -> object:

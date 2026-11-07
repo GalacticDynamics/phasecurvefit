@@ -28,6 +28,7 @@ dependencies = [
   "plum-dispatch>=2.6.1",
   "quax>=0.4.6",
   "scipy>=1.11",
+  "wadler-lindig-parts>=0.3.0",
   "zeroth>=1.0.1",
 ]
 description = "Walk through phase-space observations"
