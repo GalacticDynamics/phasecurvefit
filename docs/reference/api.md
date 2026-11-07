@@ -193,6 +193,8 @@ Used for single phase-space points. Keys are coordinate/component names
 Example:
 
 ```python
+import jax.numpy as jnp
+
 position: ScalarComponents = {
     "x": jnp.array(1.0),
     "y": jnp.array(2.0),
@@ -211,6 +213,8 @@ Used for arrays of phase-space points. Keys are coordinate/component names
 Example:
 
 ```python
+import jax.numpy as jnp
+
 position: VectorComponents = {
     "x": jnp.array([0.0, 1.0, 2.0]),
     "y": jnp.array([0.0, 1.0, 2.0]),
