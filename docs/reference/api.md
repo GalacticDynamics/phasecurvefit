@@ -2,8 +2,7 @@
 
 Complete API documentation for phasecurvefit.
 
-```{eval-rst}
-.. currentmodule:: phasecurvefit
+```{currentmodule} phasecurvefit
 ```
 
 ## Main Functions
@@ -11,14 +10,16 @@ Complete API documentation for phasecurvefit.
 `order` is the primary entry point. With no orderer it runs `default_pipeline`, an
 MST backbone refined by a SOM; `fit_track` goes on to fit the autoencoder.
 
-```{eval-rst}
-.. autofunction:: order
+```{autofunction} order
+```
 
-.. autofunction:: phasecurvefit.orderers.default_pipeline
+```{autofunction} phasecurvefit.orderers.default_pipeline
+```
 
-.. autofunction:: fit_track
+```{autofunction} fit_track
+```
 
-.. autofunction:: combine_results
+```{autofunction} combine_results
 ```
 
 ## Orderers
@@ -26,58 +27,64 @@ MST backbone refined by a SOM; `fit_track` goes on to fit the autoencoder.
 Pluggable ordering stages, composable with `|`. See the
 [Orderers guide](../how-to/choose-orderer.md).
 
-```{eval-rst}
-.. currentmodule:: phasecurvefit.orderers
+```{currentmodule} phasecurvefit.orderers
+```
 
-.. autoclass:: AbstractOrderer
-   :members: order
-   :show-inheritance:
+```{autoclass} AbstractOrderer
+:members: order
+:show-inheritance:
+```
 
-.. autoclass:: LocalFlowOrderer
-   :members: order
-   :show-inheritance:
+```{autoclass} LocalFlowOrderer
+:members: order
+:show-inheritance:
+```
 
-.. autoclass:: MSTOrderer
-   :members: order
-   :show-inheritance:
+```{autoclass} MSTOrderer
+:members: order
+:show-inheritance:
+```
 
-.. autoclass:: SOMOrderer
-   :members: order
-   :show-inheritance:
+```{autoclass} SOMOrderer
+:members: order
+:show-inheritance:
+```
 
-.. autoclass:: RidgeOrderer
-   :members: order
-   :show-inheritance:
+```{autoclass} RidgeOrderer
+:members: order
+:show-inheritance:
+```
 
-.. autoclass:: ChainOrderer
-   :members: order
-   :show-inheritance:
+```{autoclass} ChainOrderer
+:members: order
+:show-inheritance:
+```
 
-.. autoclass:: OrderingResult
-   :members:
-   :special-members: __call__
-   :show-inheritance:
+```{autoclass} OrderingResult
+:members:
+:special-members: __call__
+:show-inheritance:
+```
 
-.. currentmodule:: phasecurvefit
+```{currentmodule} phasecurvefit
 ```
 
 ## Walk Configuration
 
-```{eval-rst}
-.. autoclass:: WalkConfig
-   :members:
+```{autoclass} WalkConfig
+:members:
+```
 
-.. autoclass:: StateMetadata
-   :members:
-   :no-inherited-members:
+```{autoclass} StateMetadata
+:members:
+:no-inherited-members:
 ```
 
 ## Result Accessor
 
 Helper function to extract ordered data from results.
 
-```{eval-rst}
-.. autofunction:: order_w
+```{autofunction} order_w
 ```
 
 ## Distance Metrics
@@ -85,112 +92,135 @@ Helper function to extract ordered data from results.
 Pluggable distance metrics for controlling how the algorithm selects the next point.
 See the [Metrics Guide](../how-to/tune-metric.md) for usage examples.
 
-```{eval-rst}
-.. currentmodule:: phasecurvefit.metrics
+```{currentmodule} phasecurvefit.metrics
+```
 
-.. autoclass:: AbstractDistanceMetric
-   :members:
-   :show-inheritance:
+```{autoclass} AbstractDistanceMetric
+:members:
+:show-inheritance:
+```
 
-.. autoclass:: AlignedMomentumDistanceMetric
-   :members:
-   :show-inheritance:
+```{autoclass} AlignedMomentumDistanceMetric
+:members:
+:show-inheritance:
+```
 
-.. autoclass:: SpatialDistanceMetric
-   :members:
-   :show-inheritance:
+```{autoclass} SpatialDistanceMetric
+:members:
+:show-inheritance:
+```
 
-.. autoclass:: FullPhaseSpaceDistanceMetric
-   :members:
-   :show-inheritance:
+```{autoclass} FullPhaseSpaceDistanceMetric
+:members:
+:show-inheritance:
+```
 
-.. currentmodule:: phasecurvefit
+```{currentmodule} phasecurvefit
 ```
 
 ## Query Strategies
 
 Neighbour-query strategies for the walk, set via `WalkConfig(strategy=...)`.
 
-```{eval-rst}
-.. currentmodule:: phasecurvefit.strats
+```{currentmodule} phasecurvefit.strats
+```
 
-.. autoclass:: AbstractQueryStrategy
-   :members:
-   :show-inheritance:
+```{autoclass} AbstractQueryStrategy
+:members:
+:show-inheritance:
+```
 
-.. autoclass:: BruteForce
-   :members:
-   :show-inheritance:
+```{autoclass} BruteForce
+:members:
+:show-inheritance:
+```
 
-.. autoclass:: KDTree
-   :members:
-   :show-inheritance:
+```{autoclass} KDTree
+:members:
+:show-inheritance:
+```
 
-.. autoclass:: QueryResult
-   :members:
+```{autoclass} QueryResult
+:members:
+```
 
-.. currentmodule:: phasecurvefit
+```{currentmodule} phasecurvefit
 ```
 
 ## Phase-Space Utilities
 
 Low-level functions for phase-space operations. Available in the `phasecurvefit.w` submodule.
 
-```{eval-rst}
-.. currentmodule:: phasecurvefit.w
+```{currentmodule} phasecurvefit.w
+```
 
-.. autofunction:: euclidean_distance
+```{autofunction} euclidean_distance
+```
 
-.. autofunction:: unit_direction
+```{autofunction} unit_direction
+```
 
-.. autofunction:: unit_velocity
+```{autofunction} unit_velocity
+```
 
-.. autofunction:: velocity_norm
+```{autofunction} velocity_norm
+```
 
-.. autofunction:: cosine_similarity
+```{autofunction} cosine_similarity
+```
 
-.. autofunction:: get_w_at
+```{autofunction} get_w_at
+```
 
-.. currentmodule:: phasecurvefit
+```{currentmodule} phasecurvefit
 ```
 
 ## Types
 
-```{eval-rst}
-.. autoclass:: WalkLocalFlowResult
-   :members:
-   :show-inheritance:
-
-.. data:: ScalarComponents
-   :annotation: : TypeAlias = dict[str, RLikeSz0]
-
-   Type alias for dictionaries mapping component names to scalar JAX arrays.
-
-   Used for single phase-space points. Keys are coordinate/component names
-   (e.g., "x", "y", "z"), values are 0-dimensional JAX arrays.
-
-   Example::
-
-       position: ScalarComponents = {
-           "x": jnp.array(1.0),
-           "y": jnp.array(2.0),
-       }
-
-.. data:: VectorComponents
-   :annotation: : TypeAlias = dict[str, RLikeSzN]
-
-   Type alias for dictionaries mapping component names to 1D JAX arrays.
-
-   Used for arrays of phase-space points. Keys are coordinate/component names
-   (e.g., "x", "y", "z"), values are 1-dimensional JAX arrays of shape (N,).
-
-   Example::
-
-       position: VectorComponents = {
-           "x": jnp.array([0.0, 1.0, 2.0]),
-           "y": jnp.array([0.0, 1.0, 2.0]),
-       }
+```{autoclass} WalkLocalFlowResult
+:members:
+:show-inheritance:
 ```
+
+````{py:data} ScalarComponents
+:annotation: : TypeAlias = dict[str, RLikeSz0]
+
+Type alias for dictionaries mapping component names to scalar JAX arrays.
+
+Used for single phase-space points. Keys are coordinate/component names
+(e.g., "x", "y", "z"), values are 0-dimensional JAX arrays.
+
+Example:
+
+```python
+import jax.numpy as jnp
+
+position = {
+    "x": jnp.array(1.0),
+    "y": jnp.array(2.0),
+}
+```
+````
+
+````{py:data} VectorComponents
+:annotation: : TypeAlias = dict[str, RLikeSzN]
+
+Type alias for dictionaries mapping component names to 1D JAX arrays.
+
+Used for arrays of phase-space points. Keys are coordinate/component names
+(e.g., "x", "y", "z"), values are 1-dimensional JAX arrays of shape (N,).
+
+Example:
+
+```python
+import jax.numpy as jnp
+
+position = {
+    "x": jnp.array([0.0, 1.0, 2.0]),
+    "y": jnp.array([0.0, 1.0, 2.0]),
+}
+```
+````
 
 ## Autoencoder Module
 
@@ -198,65 +228,79 @@ Neural network for interpolating skipped tracers. See [Autoencoder Guide](../how
 
 ### Classes
 
-```{eval-rst}
-.. autoclass:: phasecurvefit.nn.PathAutoencoder
-   :members: encode, decode, decode_position, predict
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.PathAutoencoder
+:members: encode, decode, decode_position, predict
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.OrderingNet
-   :members: __call__
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.OrderingNet
+:members: __call__
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.TrackNet
-   :members: __call__
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.TrackNet
+:members: __call__
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.TrainingConfig
-   :members:
+```{autoclass} phasecurvefit.nn.TrainingConfig
+:members:
+```
 
-.. autoclass:: phasecurvefit.nn.AbstractTrackNet
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.AbstractTrackNet
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.FourierTrackNet
-   :members: __call__
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.FourierTrackNet
+:members: __call__
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.AbstractAutoencoder
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.AbstractAutoencoder
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.AbstractExternalDecoder
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.AbstractExternalDecoder
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.EncoderExternalDecoder
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.EncoderExternalDecoder
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.RunningMeanDecoder
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.RunningMeanDecoder
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.AutoencoderResult
-   :members:
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.AutoencoderResult
+:members:
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.OrderingTrainingConfig
-   :members:
+```{autoclass} phasecurvefit.nn.OrderingTrainingConfig
+:members:
+```
 
-.. autoclass:: phasecurvefit.nn.AbstractNormalizer
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.AbstractNormalizer
+:show-inheritance:
+```
 
-.. autoclass:: phasecurvefit.nn.StandardScalerNormalizer
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.StandardScalerNormalizer
+:show-inheritance:
 ```
 
 ### Training Functions
 
-```{eval-rst}
-.. autofunction:: phasecurvefit.nn.train_autoencoder
+```{autofunction} phasecurvefit.nn.train_autoencoder
+```
 
-.. autofunction:: phasecurvefit.nn.fill_ordering_gaps
+```{autofunction} phasecurvefit.nn.fill_ordering_gaps
+```
 
-.. autofunction:: phasecurvefit.nn.train_ordering_net
+```{autofunction} phasecurvefit.nn.train_ordering_net
+```
 
-.. autofunction:: phasecurvefit.nn.encoder_loss
+```{autofunction} phasecurvefit.nn.encoder_loss
 ```
 
 ### Membership & Outlier Rejection
@@ -264,25 +308,31 @@ Neural network for interpolating skipped tracers. See [Autoencoder Guide](../how
 Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
 {doc}`/explanation/outliers`.
 
-```{eval-rst}
-.. autoclass:: phasecurvefit.nn.MixtureMembershipConfig
-   :members:
+```{autoclass} phasecurvefit.nn.MixtureMembershipConfig
+:members:
+```
 
-.. autoclass:: phasecurvefit.nn.WidthNet
-   :members: __call__
-   :show-inheritance:
+```{autoclass} phasecurvefit.nn.WidthNet
+:members: __call__
+:show-inheritance:
+```
 
-.. autofunction:: phasecurvefit.nn.posterior_membership
+```{autofunction} phasecurvefit.nn.posterior_membership
+```
 
-.. autofunction:: phasecurvefit.nn.mixture_membership_loss
+```{autofunction} phasecurvefit.nn.mixture_membership_loss
+```
 
-.. autofunction:: phasecurvefit.nn.membership_responsibility
+```{autofunction} phasecurvefit.nn.membership_responsibility
+```
 
-.. autofunction:: phasecurvefit.nn.sigma_ceiling
+```{autofunction} phasecurvefit.nn.sigma_ceiling
+```
 
-.. autofunction:: phasecurvefit.nn.membership_rampup
+```{autofunction} phasecurvefit.nn.membership_rampup
+```
 
-.. autofunction:: phasecurvefit.nn.uniform_background_density
+```{autofunction} phasecurvefit.nn.uniform_background_density
 ```
 
 ## SOM Module
@@ -292,27 +342,34 @@ Self-Organizing Map ordering, after Starkman et al. (2023). See
 
 {class}`~phasecurvefit.orderers.SOMOrderer` is listed under [Orderers](#orderers).
 
-```{eval-rst}
-.. py:module:: phasecurvefit.som
+```{py:module} phasecurvefit.som
+```
 
-.. autoclass:: phasecurvefit.som.SOM1D
-   :members: make, fit, backbone, chord, n_prototypes
-   :show-inheritance:
+```{autoclass} phasecurvefit.som.SOM1D
+:members: make, fit, backbone, chord, n_prototypes
+:show-inheritance:
+```
 
-.. autofunction:: phasecurvefit.som.init_prototypes
+```{autofunction} phasecurvefit.som.init_prototypes
+```
 
-.. autofunction:: phasecurvefit.som.fit
+```{autofunction} phasecurvefit.som.fit
+```
 
-.. autofunction:: phasecurvefit.som.densify
+```{autofunction} phasecurvefit.som.densify
+```
 
-.. autofunction:: phasecurvefit.som.chord
+```{autofunction} phasecurvefit.som.chord
+```
 
-.. autofunction:: phasecurvefit.som.bootstrap_weights
+```{autofunction} phasecurvefit.som.bootstrap_weights
+```
 
-.. autofunction:: phasecurvefit.som.bmu_distance
+```{autofunction} phasecurvefit.som.bmu_distance
+```
 
-.. autoclass:: phasecurvefit.som.FitResult
-   :members:
+```{autoclass} phasecurvefit.som.FitResult
+:members:
 ```
 
 ## Neighbour Backends
@@ -342,25 +399,27 @@ an Apple M2 Pro (10 cores, under load, so treat these as rough):
 `SciPy` queries with every core (`workers=-1`); the kd-tree query is only
 partly parallel on CPU. GPU was not measured.
 
-```{eval-rst}
-.. py:module:: phasecurvefit.neighbors
+```{py:module} phasecurvefit.neighbors
+```
 
-.. autoclass:: phasecurvefit.neighbors.AbstractNeighborSearch
-   :members: knn
+```{autoclass} phasecurvefit.neighbors.AbstractNeighborSearch
+:members: knn
+```
 
-.. autoclass:: phasecurvefit.neighbors.BucketKDTree
+```{autoclass} phasecurvefit.neighbors.BucketKDTree
+```
 
-.. autoclass:: phasecurvefit.neighbors.BruteForce
+```{autoclass} phasecurvefit.neighbors.BruteForce
+```
 
-.. autoclass:: phasecurvefit.neighbors.JaxKD
+```{autoclass} phasecurvefit.neighbors.JaxKD
+```
 
-.. autoclass:: phasecurvefit.neighbors.SciPy
+```{autoclass} phasecurvefit.neighbors.SciPy
 ```
 
 ## Index
 
-```{eval-rst}
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-```
+- {ref}`genindex`
+- {ref}`modindex`
+- {ref}`search`
