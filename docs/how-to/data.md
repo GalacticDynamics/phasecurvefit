@@ -92,10 +92,7 @@ two copies of that sample:
 - A sample with weight 0 is still ordered, but it doesn't count in the
   self-organizing map or the track fit.
 
-Weights must be finite and non-negative, with at least one positive. They don't
-yet work with the mixture-model outlier rejection
-(`TrainingConfig(membership=...)`, {doc}`outliers`), which raises
-`NotImplementedError`.
+Weights must be finite and non-negative, with at least one positive.
 
 ## Check the shapes
 
