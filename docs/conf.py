@@ -13,7 +13,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
+import sphinx.ext.autodoc.directive as autodoc_directive
 from pygments.lexers.python import PythonLexer
+from sphinx.parsers import RSTParser
+from sphinx.util.docutils import new_document
 
 # Add the package to the path
 _docs_dir = Path(__file__).parent
@@ -243,3 +246,24 @@ html_theme_options: dict[str, Any] = {
         },
     ],
 }
+
+
+# -- autodoc inside MyST ---------------------------------------------------
+
+
+def setup(app: Any) -> None:
+    """Let ```{autoclass}``` and friends work in MyST markdown pages.
+
+    autodoc generates reStructuredText, but inside a MyST page it hands that
+    text to MyST's markdown state, so it renders as literal text. Parse what
+    autodoc generates with the reStructuredText parser instead.
+    """
+
+    def parse_generated_content(state: Any, content: Any, documenter: Any) -> list:
+        doc = new_document(state.document["source"], state.document.settings)
+        parser = RSTParser()
+        parser.set_application(app)
+        parser.parse("\n".join(content), doc)
+        return list(doc.children)
+
+    autodoc_directive.parse_generated_content = parse_generated_content
