@@ -38,12 +38,56 @@ def test_runs_all_three_steps(arc):
 def test_ordering_result_matches_default_pipeline_alone(arc):
     """The ordering step is not silently different from calling it directly."""
     pos, vel, _ = arc(n=30)
-    direct = pcf.orderers.default_pipeline(pos, vel, n_prototypes=8)
+    direct = pcf.orderers.default_pipeline(
+        pos, vel, n_prototypes=8, outlier_clip_sigma=3.0
+    )
     ordering, _fitted, _losses = pcf.fit_track(
         pos, vel, key=jax.random.key(0), n_prototypes=8, training_config=_fast_config()
     )
     assert jnp.array_equal(ordering.indices, direct.indices)
     assert ordering.gamma_range == direct.gamma_range
+
+
+def test_outlier_clip_sigma_none_keeps_every_tracer(arc):
+    """``outlier_clip_sigma=None`` orders as the unclipped default pipeline."""
+    pos, vel, _ = arc(n=30)
+    direct = pcf.orderers.default_pipeline(pos, vel, n_prototypes=8)
+    ordering, _fitted, _losses = pcf.fit_track(
+        pos,
+        vel,
+        key=jax.random.key(0),
+        n_prototypes=8,
+        outlier_clip_sigma=None,
+        training_config=_fast_config(),
+    )
+    assert jnp.array_equal(ordering.indices, direct.indices)
+
+
+def test_interlopers_past_a_tip_are_left_out_of_the_ordering():
+    """Tracers far off the stream past its tip are not ordered.
+
+    Unclipped, the ordering puts them at the end of the stream, which teaches
+    the encoder to map them to the tip and bends the track out to them.
+    """
+    ang = jnp.linspace(0.0, jnp.pi, 80)
+    far = jnp.asarray([[-9.0, 4.0], [-8.5, 6.0]])  # beyond the tip at (-5, 0)
+    pos = {
+        "x": jnp.concatenate([5 * jnp.cos(ang), far[:, 0]]),
+        "y": jnp.concatenate([5 * jnp.sin(ang), far[:, 1]]),
+    }
+    vel = {
+        "x": jnp.concatenate([-jnp.sin(ang), jnp.zeros(2)]),
+        "y": jnp.concatenate([jnp.cos(ang), jnp.ones(2)]),
+    }
+    unclipped = pcf.orderers.default_pipeline(pos, vel, n_prototypes=10)
+    assert unclipped.indices[-2:].tolist() == [80, 81]
+
+    ordering, _fitted, _losses = pcf.fit_track(
+        pos, vel, key=jax.random.key(0), n_prototypes=10, training_config=_fast_config()
+    )
+    ordered = set(ordering.indices[ordering.indices >= 0].tolist())
+    assert ordered.isdisjoint({80, 81})
+    assert len(ordered) == 80
 
 
 def test_falls_back_below_n_prototypes_and_still_trains(arc):

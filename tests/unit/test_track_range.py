@@ -56,6 +56,24 @@ class TestTrimEnds:
         lo, _ = _trim_ends(along, weights)
         assert lo == pytest.approx(0.0)
 
+    def test_scattered_interlopers_past_the_end_are_cut(self):
+        """Single samples with gaps between them, past a dense end, are cut.
+
+        This is a track that bends out to reach a few interlopers past the
+        stream's tip: they fill scattered bins, which used to pass as a tail.
+        """
+        stream = jnp.linspace(0.0, 10.0, 400)
+        hook = jnp.asarray([11.0, 12.3, 13.1, 14.6, 15.0])
+        lo, hi = _trim_ends(jnp.concatenate([stream, hook]), jnp.ones(405))
+        assert lo == pytest.approx(0.0)
+        assert hi == pytest.approx(10.0, abs=0.4)
+
+    def test_sparse_samples_fall_back_to_the_local_rule(self):
+        """With empty bins everywhere, the ends come from the plain rule."""
+        along = jnp.asarray([0.0, 1.0, 4.0, 9.0, 10.0] * 4)
+        lo, hi = _trim_ends(along, jnp.ones(20))
+        assert (lo, hi) == pytest.approx((0.0, 10.0))
+
 
 class TestTrackRangeFallbacks:
     """``_track_range`` falls back to the members' span when it can't trim."""

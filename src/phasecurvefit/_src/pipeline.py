@@ -32,6 +32,7 @@ def fit_track(
     metadata: StateMetadata | None = None,
     weights: Float[Array, " N"] | None = None,
     n_prototypes: int = 15,
+    outlier_clip_sigma: float | None = 3.0,
     training_config: TrainingConfig | None = None,
 ) -> tuple[AbstractResult, AutoencoderResult, Float[Array, " n_epochs"]]:
     """Order, refine, and fit a smooth track through phase-space tracers.
@@ -60,6 +61,18 @@ def fit_track(
         carries them on to :func:`~phasecurvefit.nn.train_autoencoder`.
     n_prototypes
         Passed to :func:`~phasecurvefit.orderers.default_pipeline`.
+    outlier_clip_sigma
+        Passed to the SOM stage of
+        :func:`~phasecurvefit.orderers.default_pipeline`, which leaves out of the
+        ordering any tracer whose distance to its nearest prototype is this many
+        robust sigmas above the rest (see
+        :class:`~phasecurvefit.orderers.SOMOrderer`). The encoder then learns
+        those tracers as non-members, so the track does not bend out to reach
+        interlopers at the stream's tips. ``None`` keeps every tracer in the
+        ordering. With fewer than ``n_prototypes`` tracers the SOM stage, and
+        so the clipping, is skipped. It is also skipped when ``weights`` are
+        given, since the SOM's clipping works by setting its own per-tracer
+        weights.
     training_config
         Passed to :func:`~phasecurvefit.nn.train_autoencoder`. ``None`` uses
         its own defaults.
@@ -103,6 +116,7 @@ def fit_track(
         metadata=metadata,
         weights=weights,
         n_prototypes=n_prototypes,
+        outlier_clip_sigma=outlier_clip_sigma if weights is None else None,
     )
     normalizer = StandardScalerNormalizer(positions, velocities)
     model = PathAutoencoder.make(
