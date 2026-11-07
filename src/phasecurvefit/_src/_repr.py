@@ -1,9 +1,9 @@
 """Print behavior for phasecurvefit objects, via `wadler_lindig_parts`.
 
-`ReprMixin` sends ``repr``, ``str`` and ``format`` through one engine. ``repr``
-is the constructor form with arrays shown by dtype and shape, broken at 80
-columns (the spec ``call-type-width=80``, which matches `equinox.Module`'s
-repr). A format spec picks any other form the engine knows:
+`ReprMixin` is `wadler_lindig_parts.ReprMixin` with phasecurvefit's spec,
+``call-type-width=80``. ``repr`` is the constructor form with arrays shown by
+dtype and shape, broken at 80 columns, which matches `equinox.Module`'s repr.
+A format spec picks any other form the engine knows:
 
 >>> import jax.numpy as jnp
 >>> import phasecurvefit as pcf
@@ -22,19 +22,37 @@ StateMetadata(scale=f32[2])
 >>> f"{meta:call-array}"
 'StateMetadata(scale=Array([1., 2.], dtype=float32))'
 
+A notebook shows the same ``repr``: a constructor expression has no HTML form,
+so ``_repr_html_`` returns `None`.
+
 """
 
 __all__: tuple[str, ...] = ("ReprMixin", "attrs_pdoc")
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import jax
 import wadler_lindig as wl
 import wadler_lindig_parts as wlp
 
-#: The spec ``repr`` and ``str`` use.
-_REPR_SPEC = wlp.parse_spec("call-type-width=80")
+
+class ReprMixin(wlp.ReprMixin):
+    """`wadler_lindig_parts.ReprMixin` with phasecurvefit's ``repr`` spec.
+
+    Put it first among the bases, so it wins over `equinox.Module.__repr__`.
+    ``repr`` renders the object's `wadler_lindig` document: the dataclass
+    fields for an Equinox module, or the object's own ``__pdoc__``. A class
+    that is neither must define ``__pdoc__``, for example with `attrs_pdoc`.
+
+    ``format`` takes a `wadler_lindig_parts` spec: ``call`` for the
+    constructor form, ``array`` / ``values`` / ``type`` for how much of each
+    array to show, and ``width=<n>`` / ``indent=<n>`` for line breaking. The
+    ``product`` specs (``type`` on its own, ``html``, ``latex``) give the same
+    expression on one line. An empty spec is ``str``.
+    """
+
+    __repr_spec__ = "call-type-width=80"
 
 
 def _short_jax_array(obj: object, /) -> wl.AbstractDoc | None:
@@ -47,50 +65,15 @@ def _short_jax_array(obj: object, /) -> wl.AbstractDoc | None:
     return wl.array_summary(obj.shape, dtype, kind=None)
 
 
-def _render(obj: object, spec: wlp.Spec, /) -> str:
-    """Render ``obj``; under ``type``, JAX arrays drop wadler-lindig's ``(jax)``."""
-    extra: dict[str, Any] = {}
-    if spec["value"] == "type":
-        extra["custom"] = _short_jax_array
-    if spec["layout"] == "product":
-        # The fragment is laid out before the engine sees it, so it needs the
-        # spec's width and indent itself.
-        extra["fragment_width"] = spec["width"] or 80
-        extra["fragment_indent"] = spec["indent"] or 2
-    return wlp.render(obj, spec, **extra)
-
-
-class ReprMixin:
-    """Route ``repr``, ``str`` and ``format`` through `wadler_lindig_parts`.
-
-    Put it first among the bases, so it wins over `equinox.Module.__repr__`.
-    ``repr`` renders the object's `wadler_lindig` document: the dataclass
-    fields for an Equinox module, or the object's own ``__pdoc__``. A class
-    that is neither must define ``__pdoc__``, for example with `attrs_pdoc`.
-
-    ``format`` takes a `wadler_lindig_parts` spec: ``call`` for the
-    constructor form, ``array`` / ``values`` / ``type`` for how much of each
-    array to show, ``width=<n>`` / ``indent=<n>`` for line breaking, and
-    ``html`` / ``latex`` for markup. An empty spec is ``str``. Jupyter shows
-    the ``html`` form, in a ``<pre>`` block.
-    """
-
-    __slots__ = ()
-
-    def __repr__(self) -> str:
-        return _render(self, _REPR_SPEC)
-
-    def __str__(self) -> str:
-        return _render(self, _REPR_SPEC)
-
-    def __format__(self, spec: str, /) -> str:
-        if not spec:
-            return str(self)
-        return _render(self, wlp.parse_spec(spec, obj=self))
-
-    def _repr_html_(self) -> str:
-        """Show the repr in Jupyter, HTML-escaped and with its line breaks."""
-        return f"<pre>{format(self, 'html-type')}</pre>"
+@wlp.render_options.dispatch
+def _render_options_repr_mixin(
+    obj: ReprMixin,  # dispatch only
+    /,
+    *,
+    spec: wlp.Spec,
+) -> Mapping[str, Any]:
+    """Under ``type``, drop the ``(jax)`` that wadler-lindig adds to arrays."""
+    return {"custom": _short_jax_array} if spec["value"] == "type" else {}
 
 
 @wlp.pparts.dispatch
@@ -101,23 +84,22 @@ def _pparts_repr_mixin(
     markup: str = "text",  # the engine applies the markup
     short_arrays: Any = "compact",
     value_spec: str | None = None,
-    custom: Any = None,
-    fragment_width: int = 80,
-    fragment_indent: int = 2,
     **kw: Any,  # axes these objects do not act on
 ) -> tuple[Any, ...]:
-    """Show the whole object as one fragment: its constructor form."""
+    """Show the whole object as one fragment: its constructor form, on one line.
+
+    Plain text, so the engine escapes it for the markup. The ``product`` specs
+    are for markup, where a line break would only be collapsed again.
+    """
     if value_spec is not None:
         msg = (
             f"{type(obj).__name__} does not take a value format spec "
             f"({value_spec!r}): it holds several values, not one"
         )
         raise TypeError(msg)
-    extra = {} if custom is None else {"custom": custom}
-    doc = wl.pdoc(obj, indent=fragment_indent, short_arrays=short_arrays, **extra)
-    # A plain-text fragment, so the engine escapes it for the markup. A
-    # `doc_part` would be inserted unescaped and nested one level deeper.
-    return (wlp.PPart("value", wlp.doc_to_str(doc, fragment_width)),)
+    extra = {"custom": _short_jax_array} if short_arrays is True else {}
+    text = wl.pformat(obj, width=wlp.FLAT, short_arrays=short_arrays, **extra)
+    return (wlp.PPart("value", text),)
 
 
 def attrs_pdoc(

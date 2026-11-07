@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 import pytest
+import wadler_lindig_parts as wlp
 
 import phasecurvefit as pcf
 
@@ -39,18 +40,32 @@ def test_value_spec_is_refused(result: pcf.orderers.OrderingResult) -> None:
         format(result, ".2f")
 
 
-def test_repr_html_escapes_and_matches_repr() -> None:
-    meta = pcf.StateMetadata(usys="<si>")
-    html = meta._repr_html_()
-    assert html.startswith("<pre>")
+def test_is_a_wlp_repr_mixin() -> None:
+    assert isinstance(pcf.WalkConfig(), wlp.ReprMixin)
+
+
+@pytest.mark.parametrize(
+    "obj",
+    [pcf.WalkConfig(), pcf.StateMetadata(usys=None), pcf.strats.BruteForce()],
+    ids=["dataclass", "own-pdoc-module", "own-pdoc-plain"],
+)
+def test_notebook_shows_the_repr(obj: object) -> None:
+    """A constructor expression has no HTML form, so the hooks step aside."""
+    assert obj._repr_html_() is None  # type: ignore[attr-defined]
+    assert obj._repr_latex_() is None  # type: ignore[attr-defined]
+
+
+def test_html_spec_is_escaped_and_on_one_line() -> None:
+    html = f"{pcf.StateMetadata(usys='<si>'):html}"
     assert "&lt;si&gt;" in html
     assert "<si>" not in html
+    assert "\n" not in f"{pcf.WalkConfig():html}"
 
 
-def test_markup_honours_width() -> None:
-    cfg = pcf.WalkConfig()
-    assert "\n" not in f"{cfg:html-width=200}"
-    assert "\n" in f"{cfg:html-width=20}"
+def test_type_spec_drops_the_jax_suffix(result: pcf.orderers.OrderingResult) -> None:
+    for text in (repr(result), f"{result:type}"):
+        assert "i32[4]" in text
+        assert "(jax)" not in text
 
 
 def test_weak_typed_array_is_marked() -> None:
