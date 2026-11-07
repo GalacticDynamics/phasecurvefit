@@ -6,6 +6,7 @@ an observation: two parallel lines weighted 3:1 have a weighted centre line at
 a quarter of the way across, not halfway.
 """
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -315,34 +316,65 @@ class TestTrainAutoencoderWeights:
         # Shape of the weighting is the product: 4*3 on line 0, 1*1 on line 1.
         np.testing.assert_allclose(got[0] / got[-1], 12.0, rtol=1e-6)
 
-    def test_mixture_membership_raises(self):
-        """Mixture membership has no weight slot, so weights are refused."""
+    def test_mixture_weighted_track(self):
+        """With mixture membership the track follows the 3:1 weighted centre line.
+
+        A near-zero background makes every pixel a member, so the mixture
+        reduces to a weighted Gaussian fit and its track is the weighted mean.
+        """
         pos, vel, w = _two_lines()
         result = pcf.orderers.SOMOrderer(n_prototypes=10).order(pos, vel, weights=w)
-        cfg = _fast_config(membership=pcf.nn.MixtureMembershipConfig())
-        with pytest.raises(NotImplementedError, match="mixture membership"):
-            pcf.nn.train_autoencoder(
-                self._model(pos, vel, result), result, config=cfg, key=jr.key(1)
+        cfg = pcf.nn.TrainingConfig(
+            n_epochs_encoder=400,
+            n_epochs_decoder=300,
+            n_epochs_both=200,
+            batch_size=200,
+            show_pbar=False,
+            freeze_encoder_final_training=True,
+            membership=pcf.nn.MixtureMembershipConfig(
+                sigma_ceiling=(4.0, 1.0), sigma_init=1.0, background_density=1e-6
+            ),
+        )
+        ae, _, losses = pcf.nn.train_autoencoder(
+            self._model(pos, vel, result), result, config=cfg, key=jr.key(1)
+        )
+        assert bool(jnp.all(jnp.isfinite(losses)))
+        y = ae(jnp.linspace(-0.8, 0.8, 9))["y"]
+        np.testing.assert_allclose(y, 0.25, atol=0.05)
+
+    def test_mixture_loss_uses_weights(self):
+        """The joint mixture loss scales with the per-tracer weights."""
+        pos, vel, _ = _two_lines()
+        result = pcf.orderers.SOMOrderer(n_prototypes=10).order(pos, vel)
+        model = self._model(pos, vel, result)
+        membership = pcf.nn.MixtureMembershipConfig(lambda_velocity=0.0)
+        model = eqx.tree_at(
+            lambda m: m.width,
+            model,
+            membership.make_width_net(key=jr.key(2)),
+            is_leaf=lambda x: x is None,
+        )
+        qs, ps = model.normalizer.transform(pos, vel)
+        ws = jnp.concatenate([qs, ps], axis=1)
+        mask = jnp.ones(200, dtype=bool)
+
+        def loss(weights):
+            return float(
+                ae_mod.compute_decoder_loss(
+                    model,
+                    ws,
+                    weights,
+                    mask,
+                    lambda_q=1.0,
+                    lambda_p=1.0,
+                    member_threshold=0.5,
+                    key=jr.key(3),
+                    membership=membership,
+                    log_bg_density=-2.0,
+                )
             )
 
-    def test_joint_phase_mixture_raises(self):
-        """Called on its own, the joint phase also refuses weights with mixtures."""
-        pos, vel, w = _two_lines()
-        result = pcf.orderers.SOMOrderer(n_prototypes=10).order(pos, vel, weights=w)
-        model = self._model(pos, vel, result)
-        qs, ps = model.normalizer.transform(pos, vel)
-        cfg = pcf.nn.TrainingConfig(
-            membership=pcf.nn.MixtureMembershipConfig(), show_pbar=False
-        ).autoencoder_config()
-        with pytest.raises(NotImplementedError, match="mixture membership"):
-            ae_mod.train_ordering_and_track_net(
-                model,
-                jnp.concatenate([qs, ps], axis=1),
-                mask=jnp.ones(200, dtype=bool),
-                config=cfg,
-                weights=w,
-                key=jr.key(0),
-            )
+        assert loss(jnp.full(200, 3.0)) == pytest.approx(3 * loss(jnp.ones(200)))
 
     def test_fit_track_passes_weights(self):
         """fit_track threads weights through to the ordering it trains on."""

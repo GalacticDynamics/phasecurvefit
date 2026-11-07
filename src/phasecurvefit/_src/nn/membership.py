@@ -598,6 +598,7 @@ def mixture_membership_loss(
     *,
     log_bg_density: float,
     rampup: FSz0 | float = 1.0,
+    weights: FSzN | None = None,
 ) -> tuple[FSz0, FSzN]:
     r"""Negative log-likelihood of the stream/background mixture.
 
@@ -606,7 +607,7 @@ def mixture_membership_loss(
 
     .. math::
 
-        -\log \mathcal{L} = -\frac{1}{N} \sum_n \log\!\left[
+        -\log \mathcal{L} = -\frac{1}{N} \sum_n \omega_n \log\!\left[
             \pi_n \, \mathcal{N}\!\left(q_n; x_{\theta}(\gamma_n),
                                         \sigma_n^2 \mathbb{I}\right)
             + (1 - \pi_n) \, \rho_{\mathrm{bg}}
@@ -641,6 +642,12 @@ def mixture_membership_loss(
         pure reconstruction NLL and ``w=1`` the full mixture. Defaults to 1
         (no warm-up); see `membership_rampup` for why you almost certainly want
         to ramp.
+    weights : Array, shape (N,), optional
+        Per-star weights $\omega_n$, normalized to mean 1 over the training
+        set. A star of weight $\omega_n$ counts like $\omega_n$ coincident
+        stars, so it scales that star's term in the loss. It does not change the
+        star's responsibility, which depends only on where the star is. ``None``
+        (default) weighs every star equally.
 
     Returns
     -------
@@ -705,7 +712,8 @@ def mixture_membership_loss(
     # *log-likelihood* rather than to a residual, and a NaN-safe denominator.
     count = jnp.sum(mask)
     safe_count = jnp.where(count > 0, count, 1)
-    loss = -jnp.where(count > 0, jnp.sum(log_like * mask) / safe_count, 0.0)
+    w = 1.0 if weights is None else weights
+    loss = -jnp.where(count > 0, jnp.sum(w * log_like * mask) / safe_count, 0.0)
 
     return loss, responsibility
 

@@ -86,9 +86,9 @@ two copies of that sample:
 
 - The self-organizing map fits the weighted density. The MST and the local-flow
   walk order by geometry alone and pass the weights through unchanged.
-- The autoencoder weights its ordering targets and its fit to the track, but not
-  its membership probability. A low-weight sample counts less in the track and is
-  still a member.
+- The autoencoder weights its ordering targets and its fit to the track, including
+  the mixture likelihood when membership is on. A weight doesn't decide membership:
+  a low-weight sample counts less in the track and is still a member.
 - A sample with weight 0 is still ordered, but it doesn't count in the
   self-organizing map or the track fit.
 
