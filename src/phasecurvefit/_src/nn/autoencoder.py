@@ -483,6 +483,7 @@ def _velocity_and_tangent_hats(
 def _mixture_decoder_loss(
     model: PathAutoencoder,
     ws: Float[Array, " B TwoF"],
+    weights: Float[Array, " B"],
     mask: Bool[Array, " B"],
     /,
     *,
@@ -514,6 +515,9 @@ def _mixture_decoder_loss(
        track using each star in proportion to how much it currently looks like a
        member.
 
+    ``weights`` scale each star's terms, as if it were that many coincident
+    stars, and leave the responsibilities alone.
+
     """
     if model.width is None:  # pragma: no cover - guarded by the caller
         msg = "mixture membership requires `model.width` to be a WidthNet."
@@ -530,7 +534,14 @@ def _mixture_decoder_loss(
     sigma = jnp.minimum(jax.vmap(model.width)(gamma), sigma_ceil)
 
     nll, responsibility = mixture_membership_loss(
-        qs, qs_pred, prob, sigma, mask, log_bg_density=log_bg_density, rampup=rampup
+        qs,
+        qs_pred,
+        prob,
+        sigma,
+        mask,
+        log_bg_density=log_bg_density,
+        rampup=rampup,
+        weights=weights,
     )
 
     if lambda_velocity == 0:
@@ -542,7 +553,8 @@ def _mixture_decoder_loss(
     sq_tangent = jnp.sum(jnp.square(t_hat - ps_hat), axis=1)
 
     # Responsibilities are the E-step; treat them as fixed weights in the M-step.
-    resp = jax.lax.stop_gradient(responsibility) * mask
+    # Times the per-star weight, this is the expected member mass at each star.
+    resp = jax.lax.stop_gradient(responsibility) * weights * mask
     denom = jnp.sum(resp)
     tangent_l2 = jnp.where(
         denom > 0, jnp.sum(resp * sq_tangent) / jnp.maximum(denom, 1e-12), 0.0
@@ -610,6 +622,7 @@ def compute_decoder_loss(
         return _mixture_decoder_loss(
             model,
             ws,
+            weights,
             mask,
             lambda_p=lambda_p,
             lambda_velocity=membership.lambda_velocity,
@@ -808,8 +821,9 @@ def train_ordering_and_track_net(
         Multiplied into each tracer's loss term, on top of any
         ``config.weight_by_density`` weights, and the product is rescaled to
         the masked mean those weights have alone (1 without them), so adding
-        per-tracer weights never changes the loss scale. Not supported with
-        ``config.membership``. ``None`` (default) weighs tracers equally.
+        per-tracer weights never changes the loss scale. With
+        ``config.membership`` they scale each tracer's mixture terms but not
+        its responsibility. ``None`` (default) weighs tracers equally.
     key : PRNGKeyArray
         Random key for shuffling and batching.
 
@@ -835,11 +849,6 @@ def train_ordering_and_track_net(
     if weights is None:
         weights = density_w
     else:
-        if config.membership is not None:
-            # The mixture loss has no per-tracer weight slot; dropping the
-            # weights silently would fit an unweighted track.
-            msg = "per-tracer weights are not supported with mixture membership."
-            raise NotImplementedError(msg)
         w = check_weights(weights, all_ws.shape[0]).astype(all_ws.dtype)
         combined = density_w * w
         # Rescale *after* combining, to the masked mean the density weights
@@ -997,10 +1006,6 @@ def train_autoencoder(
     # Build default config if none provided
     if config is None:
         config = TrainingConfig()
-    if weights is not None and config.membership is not None:
-        # Checked here too, not only in phase 3, so it fails before training.
-        msg = "per-tracer weights are not supported with mixture membership."
-        raise NotImplementedError(msg)
 
     # Split the keys
     keys: Key[Array, " 5"] = jr.split(key, 5)

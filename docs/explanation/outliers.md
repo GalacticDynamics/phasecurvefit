@@ -71,6 +71,9 @@ self-referential label. The crossover is set by $\rho_{\mathrm{bg}}$, a backgrou
 surface density with a physical meaning, rather than a hand-picked cut. Hogg et al.
 argue against sigma-clipping and hand-tuned cuts for the same reason.
 
+With per-sample weights, each sample's term in the sum is multiplied by its weight,
+and its posterior membership doesn't change. {doc}`density-fields` derives this.
+
 The encoder's output is the prior $\pi_n$. The posterior membership, which
 {func}`~phasecurvefit.nn.posterior_membership` returns, also accounts for how far the
 star landed from the track, and is the number to use.

@@ -263,6 +263,45 @@ class TestMixtureMembershipLoss:
 
         assert float(l1) == pytest.approx(float(l2), rel=1e-9)
 
+    def test_weights_leave_responsibility(self) -> None:
+        """A weight scales a star's term; its responsibility depends on position."""
+        qs_meas = jnp.array([[0.0, 0.0], [0.0, 0.2], [0.0, 9.0]])
+        args = (qs_meas, jnp.zeros((3, 2)), jnp.full(3, 0.5), jnp.full(3, 0.1))
+        mask = jnp.ones(3, dtype=bool)
+
+        _, plain = mixture_membership_loss(*args, mask, log_bg_density=-4.6)
+        _, weighted = mixture_membership_loss(
+            *args, mask, log_bg_density=-4.6, weights=jnp.array([5.0, 0.01, 2.0])
+        )
+
+        np.testing.assert_array_equal(plain, weighted)
+
+    def test_integer_weights_match_copies(self) -> None:
+        """Weight 2 sums to the same total as two coincident copies."""
+        qs_meas = jnp.array([[0.0, 0.1], [0.0, 0.5]])
+        prob, sigma = jnp.array([0.8, 0.6]), jnp.array([0.2, 0.3])
+
+        weighted, _ = mixture_membership_loss(
+            qs_meas,
+            jnp.zeros((2, 2)),
+            prob,
+            sigma,
+            jnp.ones(2, dtype=bool),
+            log_bg_density=-4.6,
+            weights=jnp.array([2.0, 1.0]),
+        )
+        copies, _ = mixture_membership_loss(
+            qs_meas[jnp.array([0, 0, 1])],
+            jnp.zeros((3, 2)),
+            prob[jnp.array([0, 0, 1])],
+            sigma[jnp.array([0, 0, 1])],
+            jnp.ones(3, dtype=bool),
+            log_bg_density=-4.6,
+        )
+
+        # Both are means over the rows present: 2 rows against 3.
+        assert 2 * float(weighted) == pytest.approx(3 * float(copies), rel=1e-6)
+
     def test_empty_mask_is_zero_not_nan(self) -> None:
         """An all-False mask must give a finite loss, not NaN."""
         loss, _ = mixture_membership_loss(

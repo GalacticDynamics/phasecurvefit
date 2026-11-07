@@ -4,18 +4,102 @@ A density field is data given as an image of a wide, diffuse curve, such as a
 density map of a stellar stream from a simulation or a probability map from a
 segmentation. phasecurvefit fits a track through it by treating each pixel as a
 sample weighted by its value. This page
-explains why that needs a different orderer, two training settings, and care at the
-ends of the track. The [density-field tutorial](../tutorials/density_fields.ipynb)
+explains how the weights enter membership, and why a density field needs a different
+orderer, two training settings, and care at the ends of the track. The [density-field tutorial](../tutorials/density_fields.ipynb)
 runs the whole fit.
 
-## Why the weights skip membership
+## How the weights enter membership
 
-A weight of 2 counts like two coincident samples, so the SOM fits the weighted
-density and the autoencoder weights its fit to the track. The autoencoder's
-membership probability is left unweighted, because a weight sets how much a sample
-counts and says nothing about whether it belongs to the curve. Weighting it would
-push low-weight samples below the membership threshold and out of the fit, and in an
-image those are the faint pixels at the edges and tails.
+A weight $\omega_n$ counts like $\omega_n$ coincident samples, so the SOM fits the
+weighted density and the autoencoder weights its fit to the track. Taking that rule
+literally also settles how the weights enter membership.
+
+### In the mixture model
+
+The mixture model of {doc}`outliers` gives each sample the likelihood
+
+$$
+\mathcal{L}_n = \pi_n \mathcal{N}_n + (1 - \pi_n)\,\rho_{\mathrm{bg}} ,
+$$
+
+where $\mathcal{N}_n$ is the Gaussian about the track evaluated at the sample. The
+$\omega_n$ copies of sample $n$ sit at the same position, so they share
+$\mathcal{L}_n$ and together add $\omega_n \log \mathcal{L}_n$ to the
+log-likelihood. Training minimizes
+
+$$
+-\frac{1}{N} \sum_n \omega_n \log \mathcal{L}_n ,
+$$
+
+with the weights normalized to mean 1. Scaling every weight by the same factor scales
+the loss and leaves its minimum where it was.
+
+The posterior membership of a sample is
+
+$$
+\hat{q}_n = \frac{\pi_n \mathcal{N}_n}{\mathcal{L}_n} .
+$$
+
+The weight doesn't appear in it. The posterior depends on where the sample is and on
+the model, and every copy of a sample has the same posterior however many copies
+there are. The weight sets how hard the sample pulls on the model. For the membership,
+the gradient is
+
+$$
+\frac{\partial}{\partial \pi_n} \, \omega_n \log \mathcal{L}_n
+= \omega_n \, \frac{\mathcal{N}_n - \rho_{\mathrm{bg}}}{\mathcal{L}_n} .
+$$
+
+Its sign depends on whether the curve or the background explains the sample better,
+and the weight only scales it. A faint pixel inside the curve pulls weakly towards
+membership, and a faint pixel far outside it pulls weakly towards the background. In
+the velocity-alignment term each sample counts by $\omega_n \hat{q}_n$, the expected
+mass of members at that sample.
+
+For an image the sum has a continuum limit. With each pixel weighted by the image
+$I(q)$, the loss tends, as the pixels shrink, to
+
+$$
+-\frac{\int I(q) \log \mathcal{L}(q) \, dq}{\int I(q) \, dq} ,
+$$
+
+the cross-entropy between the normalized image and the model. Minimizing it is
+maximum likelihood for an unlimited number of samples drawn from the image. Pixels of
+value zero add nothing to it, so leaving them out of the samples changes nothing.
+
+### Why the weight isn't a prior on membership
+
+The weight could instead go into the prior, for example as $\omega_n \pi_n$ for
+weights between 0 and 1, so that faint pixels are less likely to be members. That
+reads the weight as evidence about which component a sample came from. In a density
+map the weight says how much is there. Putting it in the prior sends the faint pixels
+in the wings and tails of the curve to the background because they are faint, so
+the model fits a narrower, shorter curve than the image shows.
+
+The prior reading looks more natural for a segmentation map, whose values $p_n$ are
+probabilities that each pixel belongs to the curve. Those values are already the
+weights, though, so putting them in the prior as well would count them twice. Reading
+$p_n$ as the probability that pixel $n$ is part of the data gives the expected
+log-likelihood $\sum_n p_n \log \mathcal{L}_n$, the same loss as above.
+
+### In the encoder
+
+The encoder's first training phase learns its membership as a classifier, pushing
+the ordered samples towards 1 and uniform random points towards 0
+({doc}`outliers`). Its membership term is left unweighted. Weighting only the ordered
+samples would let a faint pixel count less against the same random points around
+it, and its membership would drop below the threshold. That comes from the random
+points, which have no weights of their own; weighting consistently would mean
+rescaling them as well, and that isn't implemented. The mixture model has no random
+points, since the background enters as the density $\rho_{\mathrm{bg}}$, so its
+weights need no such care.
+
+### Uncertainties
+
+The weighted sum gives the best-fitting track, which is all the training uses. Its
+curvature gives the uncertainty of that track only when the weights are counts, such
+as numbers of stars per pixel. For image intensities or segmentation probabilities,
+an uncertainty would need a noise model for the pixel values.
 
 ## Why order along the ridge
 

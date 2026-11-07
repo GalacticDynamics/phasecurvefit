@@ -117,3 +117,30 @@ The fitted width came out at 0.150, against a true 0.15.
 
 To clip outliers while ordering, before any training, use the MST's
 `edge_clip_sigma` or the SOM's `outlier_clip_sigma` ({doc}`som`).
+
+## Reject outliers in an image
+
+For an image, order the pixels with their values as weights
+([order a density field](choose-orderer.md#order-a-density-field)), then train with
+the mixture and the two settings a wide curve needs ({doc}`autoencoder`):
+
+```{code-cell} python
+config = pcf.nn.TrainingConfig(
+    freeze_encoder_final_training=True,
+    batch_size=1000,
+    membership=pcf.nn.MixtureMembershipConfig(),
+    show_pbar=False,
+)
+```
+
+Pass the weighted ordering to `train_autoencoder` as above, and it reads the weights
+from there. A weight sets how much a pixel counts in the fit, not whether it is a
+member, so the faint pixels at the edges of the curve stay members
+({doc}`../explanation/density-fields` derives why).
+
+On the density-field tutorial's image, with pixels of 0.1 and three bright blobs
+added, ordered with `RidgeOrderer() | SOMOrderer(n_prototypes=30)` and trained with
+these settings, thresholding the posterior at 0.5 kept every pixel on the curve. It
+rejected every pixel of the two blobs 2.0 and 3.2 from the curve. The third blob's
+centre is 0.59 from the curve, inside its half-width of 0.63 there, and the blob
+stayed a member.
