@@ -312,6 +312,11 @@ def _trim_ends(
     bin or two, while widening, brightening and fading vary over many bins, so
     only the cap is cut. A faint stretch longer than ``window`` bins counts as
     part of the stream: it is too long to be a cap.
+
+    An end bin also needs the ``window`` bins inward of it to be non-empty. A few
+    interlopers that the track bends out to reach fill scattered bins with empty
+    ones between them, and would otherwise pass as a faint tail. If no bin
+    passes that test on both sides, as for sparse samples, the test is dropped.
     """
     a = np.asarray(along, dtype=float)
     w = np.asarray(weights, dtype=float)
@@ -319,14 +324,25 @@ def _trim_ends(
     edges = np.linspace(a.min(), a.max(), n_bins + 1)
     count, _ = np.histogram(a, edges, weights=w)
 
-    def first(c: np.ndarray, /) -> int:
+    def first(c: np.ndarray, /, *, contiguous: bool) -> int:
         for j in range(len(c) - 1):
-            if c[j] > 0 and c[j] >= frac * np.median(c[j + 1 : j + 1 + window]):
+            inward = c[j + 1 : j + 1 + window]
+            if contiguous and not (inward > 0).all():
+                continue
+            if c[j] > 0 and c[j] >= frac * np.median(inward):
                 return j
-        return len(c) - 1
+        # No bin passed: with the contiguity test, past the far end, so that
+        # lo > hi below and the scan reruns without it.
+        return len(c) if contiguous else len(c) - 1
 
-    # The fullest bin passes from both sides (its inward median is at most
-    # itself), so the scan from the left stops at or before it, the scan from
-    # the right at or after it, and lo <= hi.
-    lo, hi = first(count), len(count) - 1 - first(count[::-1])
+    def scan(*, contiguous: bool) -> tuple[int, int]:
+        lo = first(count, contiguous=contiguous)
+        return lo, len(count) - 1 - first(count[::-1], contiguous=contiguous)
+
+    # Without the contiguity test the fullest bin passes from both sides (its
+    # inward median is at most itself), so the scan from the left stops at or
+    # before it, the scan from the right at or after it, and lo <= hi.
+    lo, hi = scan(contiguous=True)
+    if lo > hi:
+        lo, hi = scan(contiguous=False)
     return float(edges[lo]), float(edges[hi + 1])
