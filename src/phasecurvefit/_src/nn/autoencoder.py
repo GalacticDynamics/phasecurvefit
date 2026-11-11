@@ -239,8 +239,16 @@ class EncoderDecoderTrainingConfig:
     Use this if outliers survive as "members".
     """
 
-    freeze_encoder: bool = False
-    """Whether to freeze the encoder during Phase 3 (joint) training."""
+    freeze_encoder: bool | None = None
+    r"""Whether to freeze the encoder during Phase 3 (joint) training.
+
+    ``None`` (the default) freezes it when ``membership`` is set and trains it
+    otherwise. With mixture membership, an encoder trained jointly can move
+    $\gamma$ while the width and membership are still being fitted, which wrecks
+    the track and lets the fit declare every sample background. With
+    ``membership`` set, freezing fixes $\gamma$ and leaves the membership head
+    training, so the prior can still learn which samples to reject.
+    """
 
     weight_by_density: bool | Mapping[str, object] = False
     """Whether to inverse density weight the samples. USE WITH CARE."""
@@ -302,8 +310,14 @@ class TrainingConfig:
     )
     """Whether to inverse density weight the samples. USE WITH CARE."""
 
-    freeze_encoder_final_training: bool = EncoderDecoderTrainingConfig.freeze_encoder
-    """Whether to freeze the encoder during phase 3 training."""
+    freeze_encoder_final_training: bool | None = (
+        EncoderDecoderTrainingConfig.freeze_encoder
+    )
+    """Whether to freeze the encoder during phase 3 training.
+
+    ``None`` (the default) freezes it when ``membership`` is set and trains it
+    otherwise; see `EncoderDecoderTrainingConfig.freeze_encoder`.
+    """
 
     membership: MixtureMembershipConfig | None = None
     r"""Opt in to mixture-model membership (outlier rejection).
@@ -796,8 +810,9 @@ def train_ordering_and_track_net(
     r"""Train encoder and decoder jointly: Phase 3 of autoencoder training.
 
     This phase trains the decoder to reconstruct spatial positions from $\gamma$
-    values while aligning with velocity directions, updating the encoder too
-    unless ``config.freeze_encoder`` is set.
+    values while aligning with velocity directions. It updates the encoder too,
+    unless ``config.freeze_encoder`` is ``True``, or is ``None`` with
+    ``config.membership`` set.
 
     The training uses lax.scan for efficient batching and supports:
     - Linear ramping of lambda_p from min to max over epochs
@@ -879,11 +894,24 @@ def train_ordering_and_track_net(
         )
 
     # Model surgery: decide which parts of the model are trainable.
-    if config.freeze_encoder:
+    # ``None`` means: freeze when fitting the mixture (see the config field).
+    freeze = config.freeze_encoder
+    if freeze is None:
+        freeze = membership is not None
+    if freeze:
         # True for arrays, but False everywhere in the encoder subtree, so that
         # the encoder receives no gradient updates during this phase.
         filter_spec = jtu.map(eqx.is_array, model)
         encoder_false = jtu.map(lambda _: False, model.encoder)
+        if membership is not None:
+            # Gamma comes from the trunk and gamma head, which stay frozen. The
+            # membership head keeps training on the frozen features, so the
+            # prior can still learn from the residual which samples to reject.
+            encoder_false = eqx.tree_at(
+                lambda e: e.prob_head,
+                encoder_false,
+                jtu.map(eqx.is_array, model.encoder.prob_head),
+            )
         filter_spec = eqx.tree_at(lambda m: m.encoder, filter_spec, encoder_false)
     else:
         filter_spec = eqx.is_array

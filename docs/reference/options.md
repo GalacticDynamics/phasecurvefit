@@ -114,7 +114,7 @@ phase 3 both ({doc}`../explanation/autoencoder`).
 | `lambda_q` | `1.0` | weight of position reconstruction in phase 3 |
 | `lambda_p` | `(1.0, 5.0)` | `(start, stop)` of the velocity-alignment weight, ramped over phase 3 |
 | `weight_by_density` | `False` | weight samples by inverse density: `True`, or a mapping of keyword arguments passed to the density estimate; use with care |
-| `freeze_encoder_final_training` | `False` | freeze the encoder during phase 3 |
+| `freeze_encoder_final_training` | `None` | freeze the encoder during phase 3; `None` freezes it when `membership` is set, and then its membership head still trains |
 | `membership` | `None` | a `MixtureMembershipConfig` to turn on outlier rejection, see below |
 | `track_ends` | `"half_max"` | how `track_range` finds the ends: `"half_max"` where the line density falls to half, or `"mask"` from the caps of a mask made by thickening a curve ({doc}`../explanation/density-fields`) |
 
