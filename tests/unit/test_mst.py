@@ -108,7 +108,7 @@ class TestMSTOrderingCorrectness:
 
 
 class TestMSTChord:
-    """``chord`` is the arc length along the backbone at each sample's nearest vertex."""
+    """``chord`` is the arc length along the backbone at the nearest vertex."""
 
     @staticmethod
     def _line_with_interloper():
