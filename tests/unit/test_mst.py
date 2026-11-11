@@ -107,6 +107,64 @@ class TestMSTOrderingCorrectness:
         assert tip_t[1] > 0.98
 
 
+class TestMSTChord:
+    """``chord`` is the arc length along the backbone at each sample's nearest vertex."""
+
+    @staticmethod
+    def _line_with_interloper():
+        t = jnp.linspace(0.0, 3.0, 40)
+        pos = {"x": t, "y": jnp.zeros(40).at[20].set(0.5)}
+        vel = {"x": jnp.ones(40), "y": jnp.zeros(40)}
+        return pos, vel
+
+    def test_interloper_adds_no_length(self):
+        """A sample off to the side gets the backbone's arc length beside it.
+
+        Summing steps along the ordering would add the step out to the
+        interloper and back, about 1 on this line of length 3.
+        """
+        pos, vel = self._line_with_interloper()
+        res = pcf.orderers.MSTOrderer(k=5, jump_cap=10.0).order(pos, vel)
+        assert float(jnp.nanmax(res.chord)) == pytest.approx(3.0, abs=0.1)
+
+    def test_increases_along_ordering(self):
+        """The chord never decreases along the ordering."""
+        pos, vel = self._line_with_interloper()
+        res = pcf.orderers.MSTOrderer(k=5, jump_cap=10.0).order(pos, vel)
+        idx = np.asarray(res.indices)
+        chord = np.asarray(res.chord)[idx[idx >= 0]]
+        assert bool(np.all(np.diff(chord) >= 0))
+
+    def test_unvisited_is_nan(self):
+        """Samples the MST leaves unvisited carry ``nan``."""
+        # Two pieces 5 apart: only the longer one is ordered.
+        x = jnp.concatenate([jnp.linspace(0.0, 3.0, 30), jnp.linspace(8.0, 9.0, 10)])
+        pos = {"x": x, "y": jnp.zeros(40)}
+        vel = {"x": jnp.ones(40), "y": jnp.zeros(40)}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = pcf.orderers.MSTOrderer(
+                k=4, jump_cap=1.0, on_disconnected="largest"
+            ).order(pos, vel)
+        idx = np.asarray(res.indices)
+        visited = np.zeros(len(res.chord), dtype=bool)
+        visited[idx[idx >= 0]] = True
+        assert bool(np.all(np.isnan(np.asarray(res.chord)[~visited])))
+        assert bool(np.all(np.isfinite(np.asarray(res.chord)[visited])))
+
+    def test_jit_and_grad(self):
+        """Traced, it matches eager on the same backend, with a finite gradient."""
+        pos, vel = self._line_with_interloper()
+        orderer = pcf.orderers.MSTOrderer(
+            k=5, jump_cap=10.0, neighbors=pcf.neighbors.BucketKDTree()
+        )
+        eager = orderer.order(pos, vel).chord
+        traced = jax.jit(lambda q: orderer.order(q, vel).chord)(pos)
+        np.testing.assert_allclose(traced, eager, rtol=1e-6)
+        grad = jax.grad(lambda q: jnp.nansum(orderer.order(q, vel).chord))(pos)
+        assert all(bool(jnp.all(jnp.isfinite(g))) for g in grad.values())
+
+
 class TestMSTLoop:
     """Tests for MST loop."""
 

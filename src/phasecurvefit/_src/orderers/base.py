@@ -58,12 +58,14 @@ def chord_along_ordering(
 
     The chord contract is "distance travelled along the curve this result
     represents". For an orderer whose curve *is* the path through the visited
-    observations -- the walk, the MST backbone -- that is the cumulative
-    distance between consecutive ordered points, which is what this computes.
+    observations -- the local-flow walk -- that is the cumulative distance
+    between consecutive ordered points, which is what this computes.
 
-    An orderer that fits a separate smooth curve and projects onto it should not
-    use this: projecting is not the same as summing along the ordering, and such
-    an orderer has already paid for the projection.
+    An orderer that projects onto a curve should not use this: projecting is not
+    the same as summing along the ordering, and such an orderer has already paid
+    for the projection. The SOM and ridge orderers project onto a smooth
+    backbone, and the MST onto its longest path, where summing along the
+    ordering would count the scatter across the curve as length.
 
     Parameters
     ----------
