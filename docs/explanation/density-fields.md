@@ -155,7 +155,7 @@ $\gamma$ to vary across it. A wide field leaves that room, and two things go wro
 - The samples' spread across the curve, with variance about $r^2/3$, is much larger
   than the error the decoder has left to fix, so small batches keep the optimizer
   jittering around the track. On a uniform tube of half-width 0.5, batches of 1000
-  brought the track's largest error from 0.39 to 0.06.
+  brought the track's largest error away from its ends from 0.11 to 0.04.
 
 {doc}`../how-to/autoencoder` shows the two settings.
 
