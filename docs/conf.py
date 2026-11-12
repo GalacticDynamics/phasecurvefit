@@ -62,6 +62,10 @@ python_use_unqualified_type_names = True
 # outputs are stored in the sources, so each page shows what the current code
 # produces.
 nb_execution_mode = "force"
+# Except pages whose code cells only assert and display nothing. Each executed
+# page costs a kernel start and an `import phasecurvefit`, and the build has to
+# fit Read the Docs' time limit. Sybil still runs these cells in the doc tests.
+nb_execution_excludepatterns = ["contributing.md", "reference/migration/*"]
 nb_execution_timeout = -1  # tutorials train models; no per-cell timeout
 nb_execution_raise_on_error = True
 pygments_lexers = {"ipython3": PythonLexer()}
