@@ -164,6 +164,15 @@ def test_som_orderer_accepts_any_abstract_result_as_init(arc):
     assert result.chord is not None
     assert int(jnp.sum(jnp.isnan(result.chord))) == 10
 
+    # ``indices`` shorter than the data counts the missing tail as unvisited.
+    short = BareResult(positions=pos, velocities=vel, indices=indices[:50])
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", message=".*disagrees with the one it was given.*"
+        )
+        trimmed = pcf.orderers.SOMOrderer(n_prototypes=8).order(pos, vel, init=short)
+    np.testing.assert_array_equal(trimmed.indices, result.indices)
+
 
 @pytest.mark.parametrize("sign", [1.0, -1.0], ids=["flow+x", "flow-x"])
 def test_orient_by_velocity_orders_along_the_flow(sign, straight):

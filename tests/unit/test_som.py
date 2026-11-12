@@ -8,7 +8,7 @@ from scipy.stats import spearmanr
 
 import phasecurvefit as pcf
 from phasecurvefit import som
-from phasecurvefit._src.som import _safe_norm
+from phasecurvefit._src.som import _bin_prototypes, _safe_norm
 
 
 def test_init_prototypes_shape(helix):
@@ -727,6 +727,32 @@ class TestNumericalHazards:
         assert int(jnp.sum(pq["x"] == 0.0)) == 0
         assert jnp.all(jnp.diff(pq["x"]) > 0)
         assert float(pq["x"].max()) == pytest.approx(1000.0, rel=1e-3)
+
+    def test_large_binning_is_exact_with_a_traced_count(self):
+        """Above ``2**31`` the bins come from ``ceil(j m / K)`` on the device.
+
+        A chained SOM bins a traced number of visited points ``m``, so the
+        bin starts cannot be formed on the host. Compared against the exact
+        int64 bin of each rank, with padding after the first ``m`` points.
+        """
+        big_m, k, m = 100_000, 25_000, 90_000
+        assert big_m * k > 2**31, "test no longer takes the large branch"
+        x = jnp.linspace(0.0, 1000.0, big_m)
+        pos, vel = {"x": x}, {"x": jnp.ones(big_m)}
+        pq, _ = jax.jit(lambda n: _bin_prototypes(pos, vel, n, k))(jnp.asarray(m))
+
+        seg = np.arange(m, dtype=np.int64) * k // m
+        want = np.bincount(seg, weights=np.asarray(x[:m], np.float64)) / np.bincount(
+            seg
+        )
+        np.testing.assert_allclose(pq["x"], want, rtol=1e-5)
+
+    def test_large_binning_rejects_a_lattice_it_cannot_bin_exactly(self):
+        """``j b < K**2`` must fit int32, which caps ``K`` at 46340."""
+        k = 46_341
+        pos, vel = {"x": jnp.zeros(k)}, {"x": jnp.zeros(k)}
+        with pytest.raises(ValueError, match="at most 46340"):
+            _bin_prototypes(pos, vel, k, k)
 
     @pytest.mark.parametrize(
         "scale",
