@@ -149,6 +149,22 @@ def test_bmu_distance_shape_and_sign(helix):
     assert bool(jnp.all(d >= 0))
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"n_epochs": 0}, "n_epochs"),
+        ({"sigma_end": 0.0}, "sigma_end"),
+        ({"sigma_start": -1.0}, "sigma_start"),
+    ],
+)
+def test_fit_rejects_a_bad_schedule(helix, kwargs, match):
+    """``fit`` raises on an empty or non-positive schedule."""
+    pos, vel, _ = helix(n=30)
+    pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
+    with pytest.raises(ValueError, match=match):
+        som.fit(pq, pp, pos, vel, metric=pcf.metrics.SpatialDistanceMetric(), **kwargs)
+
+
 class TestFitOutlierMixture:
     """``fit``'s ``outlier_mixture``: curve-or-background membership."""
 
