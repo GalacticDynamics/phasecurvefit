@@ -19,6 +19,13 @@ MST backbone refined by a SOM; `fit_track` goes on to fit the autoencoder.
 ```{autofunction} fit_track
 ```
 
+```{autofunction} bootstrap_track
+```
+
+```{autoclass} TrackEnsemble
+:members: offsets, radius
+```
+
 ```{autofunction} combine_results
 ```
 

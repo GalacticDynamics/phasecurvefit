@@ -15,7 +15,8 @@ An analysis has five steps, and each has its guides:
 3. Fit a track: give every sample a value of $\gamma$ and fit a smooth track
    ({doc}`autoencoder`), or interpolate along an ordering ({doc}`interpolate`).
 4. Reject outliers: give each sample a calibrated membership probability
-   ({doc}`outliers`).
+   ({doc}`outliers`), and put an uncertainty band on the track
+   ({doc}`track-uncertainty`).
 5. Scale up: compile, batch and differentiate with JAX ({doc}`jax`), and run on a
    GPU ({doc}`gpu`).
 
@@ -35,6 +36,7 @@ som
 autoencoder
 interpolate
 outliers
+track-uncertainty
 jax
 gpu
 ```

@@ -104,6 +104,25 @@ or background mixture ({doc}`../how-to/som`).
 | `outlier_mixture` | `SOMMixture()` | a `SOMMixture` for the SOM stage, to leave out of the ordering samples it calls background; `None` keeps every sample ({doc}`../explanation/autoencoder`) |
 | `training_config` | `None` | a `TrainingConfig`; `None` uses its defaults |
 
+## `bootstrap_track`
+
+{func}`~phasecurvefit.bootstrap_track`: a fit and fits to bootstrap resamples, for the
+track's uncertainty ({doc}`../how-to/track-uncertainty`). It takes every option of
+`fit_track` and passes it to each fit.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `key` | required | random key, split for the reference fit and for each member |
+| `n_samples` | `20` | number of resamples; each costs one `fit_track` |
+| `weights` | `None` | per-sample weights, resampled with the samples |
+
+{class}`~phasecurvefit.TrackEnsemble`, which it returns:
+
+| Method | Option | Default | Meaning |
+|---|---|---|---|
+| `offsets(gamma)` | `n_dense` | `1000` | points per member track searched for the nearest one |
+| `radius(gamma, level)` | `level` | `0.68` | fraction of members inside the tube |
+
 ## `TrainingConfig`
 
 {class}`~phasecurvefit.nn.TrainingConfig`: autoencoder training

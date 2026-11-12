@@ -186,6 +186,18 @@ ignore = [
 "docs/**" = ["N803", "T201"]
 "docs/conf.py" = ["A001", "INP001", "T201"]
 "noxfile.py" = ["A001", "T20"]
+# Throwaway research scripts, not library code.
+"prototypes/**" = [
+  "ANN",
+  "D",
+  "E501",
+  "E731",
+  "INP001",
+  "N8",
+  "PLC0415",
+  "PTH",
+  "T20",
+]
 "src/phasecurvefit/_src/algorithm.py" = [
   "FBT003", # Boolean literal in function call is clearer than named constant
   "PYI025", # Set from collections.abc is clear in context
