@@ -67,15 +67,17 @@ Two things guard against this.
   `outlier_mixture=SOMMixture()` ({doc}`som`). A sample the mixture calls background
   is left out of the ordering, so the encoder learns it as a non-member and the track
   has no reason to reach for it. On the gapped stream this left out 13 of the 16
-  interlopers and none of the 404 members. It is off by default: samples that fill
+  interlopers and none of the 404 members. It is on by default. Samples that fill
   their own bounding box, as a mask or an image does, look like background to it,
-  and on a filled mask it left out 974 of 1071 pixels.
+  but a fit that calls most samples background keeps them all, so on a filled mask
+  it leaves out none of the 1071 pixels.
 
 The table gives the largest distance from the track over `track_range` to the true
-curve, for two training seeds, with default training settings. The last three rows are
+curve, for two training seeds, with default training settings, measured with and
+without `outlier_mixture`. The last three rows are
 one sine-shaped stream of 420 samples with 4% interlopers, at three widths.
 
-| stream | default | with the outlier mixture | interlopers left out |
+| stream | without the outlier mixture | with it (default) | interlopers left out |
 |---|---|---|---|
 | near-closed loop, no interlopers | 0.35, 0.40 | 0.33, 0.39 | - |
 | gapped, width 0.2 | 0.60, 0.53 | 0.17, 0.26 | 13 of 16 |

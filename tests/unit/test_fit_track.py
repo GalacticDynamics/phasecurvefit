@@ -2,6 +2,7 @@
 
 import jax
 import jax.numpy as jnp
+import pytest
 
 import phasecurvefit as pcf
 
@@ -38,7 +39,9 @@ def test_runs_all_three_steps(arc):
 def test_ordering_result_matches_default_pipeline_alone(arc):
     """The ordering step is not silently different from calling it directly."""
     pos, vel, _ = arc(n=30)
-    direct = pcf.orderers.default_pipeline(pos, vel, n_prototypes=8)
+    direct = pcf.orderers.default_pipeline(
+        pos, vel, n_prototypes=8, outlier_mixture=pcf.som.SOMMixture()
+    )
     ordering, _fitted, _losses = pcf.fit_track(
         pos, vel, key=jax.random.key(0), n_prototypes=8, training_config=_fast_config()
     )
@@ -46,10 +49,10 @@ def test_ordering_result_matches_default_pipeline_alone(arc):
     assert ordering.gamma_range == direct.gamma_range
 
 
-def test_outlier_mixture_is_passed_to_the_pipeline(arc):
+@pytest.mark.parametrize("mix", [None, pcf.som.SOMMixture(background_inflate=2.0)])
+def test_outlier_mixture_is_passed_to_the_pipeline(arc, mix):
     """``outlier_mixture`` orders as the default pipeline given it."""
     pos, vel, _ = arc(n=30)
-    mix = pcf.som.SOMMixture()
     direct = pcf.orderers.default_pipeline(
         pos, vel, n_prototypes=8, outlier_mixture=mix
     )
@@ -67,9 +70,9 @@ def test_outlier_mixture_is_passed_to_the_pipeline(arc):
 def test_interlopers_past_a_tip_are_left_out_of_the_ordering():
     """Tracers far off the stream past its tip are not ordered.
 
-    Without the outlier mixture, the ordering puts them at the end of the
-    stream, which teaches the encoder to map them to the tip and bends the track
-    out to them.
+    The outlier mixture is on by default. Without it, the ordering puts them at
+    the end of the stream, which teaches the encoder to map them to the tip and
+    bends the track out to them.
     """
     ang = jnp.linspace(0.0, jnp.pi, 80)
     far = jnp.asarray([[-9.0, 4.0], [-8.5, 6.0]])  # beyond the tip at (-5, 0)
@@ -89,7 +92,6 @@ def test_interlopers_past_a_tip_are_left_out_of_the_ordering():
         vel,
         key=jax.random.key(0),
         n_prototypes=10,
-        outlier_mixture=pcf.som.SOMMixture(),
         training_config=_fast_config(),
     )
     ordered = set(ordering.indices[ordering.indices >= 0].tolist())

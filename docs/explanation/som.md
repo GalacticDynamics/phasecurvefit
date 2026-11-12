@@ -171,8 +171,21 @@ helps.
 
 The background is flat over the samples' bounding box, so it needs room outside the
 curve. When the samples fill that box, as the pixels of a mask or an image do, the
-background explains them about as well as the curve does: on a straight mask of
-half-width 0.3, it called 974 of 1071 pixels background.
+background explains them better than the curve does. On a straight mask of half-width
+0.3, the flat background beat the fitted tube by 136 in total log-likelihood, and EM
+ended with a member fraction of 0.33, calling 974 of the 1071 pixels background.
+
+So a fit whose member fraction $\pi$ ends below 0.5 keeps every sample, as if the
+mixture were off. The SOM's input is meant to be a sample of a curve, and a fit that
+calls most of it background has fitted the box instead. On the mask this keeps all
+1071 pixels. The contaminated arc ended with $\pi$ between 0.76 and 1 at every level
+of background in the table of {doc}`../how-to/som`, and the four streams of
+{doc}`autoencoder` between 0.96 and 1, so none of them changed. I tried two other
+fixes. A flat background over a field 1.5 times wider on each axis kept every pixel
+of the mask, but at 120 and 240 background samples the arc's backbone error grew from
+0.038 to 0.14 and from 0.16 to 0.71. Holding $\pi$ at 0.5 or more in the M-step still
+rejected 472 pixels. The cost of the rule is a field where interlopers outnumber the
+members: there the mixture rejects nothing.
 
 ## Why perturbing the initialization gives no ensemble
 
