@@ -9,7 +9,7 @@ kernelspec:
 # Refine an ordering with a self-organizing map
 
 This guide shows how to use {class}`~phasecurvefit.orderers.SOMOrderer`: chained
-after another orderer, on its own, with outlier clipping, under `jit`, and as an
+after another orderer, on its own, with outlier rejection, under `jit`, and as an
 ensemble. {doc}`../explanation/som` explains how the map is trained and projected.
 
 ## Chain it after another orderer
@@ -117,27 +117,64 @@ If the SOM's ordering disagrees strongly with the one it was given, it warns. Ei
 the earlier ordering was poor, or the lattice is too coarse and has tangled a good
 ordering. If the earlier stage was doing well, raise `n_prototypes`.
 
-## Clip outliers
+## Reject outliers
 
 The SOM has no outlier rejection by default, and contamination pulls its backbone
-off the curve while the ordering still looks good. Set `outlier_clip_sigma` to reject
-samples far from their nearest prototype, iterating up to `outlier_clip_max_iters`
-times:
+off the curve while the ordering still looks good. Pass a
+{class}`~phasecurvefit.som.SOMMixture` as `outlier_mixture` to model each sample as
+drawn either from the curve or from a flat background:
 
 ```{code-cell} python
-som = pcf.orderers.SOMOrderer(n_prototypes=25, outlier_clip_sigma=3.0)
+k1, k2, k3 = jax.random.split(jax.random.key(2), 3)
+bg = {
+    "x": jax.random.uniform(k1, (30,), minval=-5.0, maxval=5.0),
+    "y": jax.random.uniform(k2, (30,), minval=0.0, maxval=5.0),
+}
+mixed_pos = {k: jnp.concatenate([noisy[k], bg[k]]) for k in noisy}
+mixed_vel = {k: jnp.concatenate([vel[k], jax.random.normal(k3, (30,))]) for k in vel}
+
+som = pcf.orderers.SOMOrderer(n_prototypes=25, outlier_mixture=pcf.som.SOMMixture())
+result = pcf.order(mixed_pos, mixed_vel, som)
+print(int(result.n_skipped), "samples rejected")
 ```
 
-A rejected sample gets `-1` in `indices` and `nan` in `chord`. Clipping at the MST
-stage instead, with `MSTOrderer(edge_clip_sigma=3.0) | SOMOrderer()`, also keeps the
-backbone on the curve, and the two can be combined. On an arc with uniform background
-mixed in, the backbone's error against the true track was:
+A rejected sample gets `-1` in `indices` and `nan` in `chord`, like a sample an
+earlier stage left unvisited. On a half-circle arc of 300 samples with scatter 0.21
+and uniform background mixed in, the backbone's mean distance from the true arc was:
 
-| contamination | SOM on its own | `MSTOrderer(edge_clip_sigma=3) \| SOMOrderer()` |
-|---|---|---|
-| 0% | 0.025 | 0.025 |
-| 10% | 0.100 | 0.026 |
-| 20% | 0.159 | 0.026 |
+| background samples | SOM on its own | with `outlier_mixture` | background rejected | arc samples rejected |
+|---|---|---|---|---|
+| 0 | 0.028 | 0.034 | - | 0 |
+| 30 (9%) | 0.129 | 0.035 | 26 | 0 |
+| 60 (17%) | 0.267 | 0.033 | 44 | 0 |
+| 120 (29%) | 0.454 | 0.038 | 80 | 0 |
+| 240 (44%) | 0.822 | 0.159 | 102 | 0 |
+
+At 60 background samples, the 16 it kept all lie within 0.6 of the arc, under three
+times the arc's scatter. At 240 the ones it kept reach 1.7 from the arc, which is
+where the larger error comes from. At 240 and 40 epochs it failed, keeping 237 of the
+240, with a backbone error of 0.65.
+
+The mixture works with `weights`: a weight counts a sample as that many copies, and
+doesn't change whether it is a member.
+
+The background density defaults to one over the area (or volume) of the positions'
+bounding box. If the samples don't fill the field, set `background_inflate` above 1
+or give `background_density` directly, in your position units.
+
+Chained after another orderer, the SOM keeps its neighbourhood narrow from the
+start, so it can't move a backbone that the earlier stage started in the background.
+After `MSTOrderer(edge_clip_sigma=3.0)` on the arc above, the error with the mixture
+was 0.073 at 60 background samples and 0.582 at 120. Passing
+`sigma_start=n_prototypes / 4` lets it re-form the lattice, and brought those to
+0.037 and 0.045 (0.108 at 240):
+
+```{code-cell} python
+chain = pcf.orderers.MSTOrderer(edge_clip_sigma=3.0) | pcf.orderers.SOMOrderer(
+    n_prototypes=25, sigma_start=25 / 4, outlier_mixture=pcf.som.SOMMixture()
+)
+result = pcf.order(mixed_pos, mixed_vel, chain)
+```
 
 ## Use it under `jit`
 
@@ -192,8 +229,7 @@ assert float(jnp.std(chords, axis=0).mean()) > 0
 {func}`~phasecurvefit.som.bootstrap_weights` draws `N` indices with replacement and
 returns how often each sample came up. A weight is a multiplicity: zero means the
 sample is absent, and `k` means it appears `k` times, so 0/1 weights give a
-subsample. `weights` and outlier clipping cannot be combined, since clipping sets its
-own weights.
+subsample.
 
 Perturbing the initial lattice does not give an ensemble: the members converge to the
 same answer within a few epochs ({doc}`../explanation/som`).

@@ -149,23 +149,24 @@ def test_bmu_distance_shape_and_sign(helix):
     assert bool(jnp.all(d >= 0))
 
 
-class TestFitOutlierClip:
-    """``fit``'s ``outlier_clip_sigma``: robust, iterated outlier rejection."""
+class TestFitOutlierMixture:
+    """``fit``'s ``outlier_mixture``: curve-or-background membership."""
 
-    def test_none_matches_the_default(self, helix):
-        """``outlier_clip_sigma=None`` (default) keeps every point."""
+    def test_none_keeps_everything(self, helix):
+        """``outlier_mixture=None`` (default) keeps every point at membership 1."""
         pos, vel, _ = helix(n=60)
         pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
         result = som.fit(
             pq, pp, pos, vel, metric=pcf.metrics.SpatialDistanceMetric(), n_epochs=20
         )
         assert bool(jnp.all(result.kept))
+        np.testing.assert_array_equal(result.responsibility, np.ones(60))
 
     def test_rejects_a_wild_outlier(self, helix):
         """A single point flung far off the curve is rejected, the rest kept."""
-        pos, vel, _ = helix(n=100, scatter=0.0)
+        pos, vel, _ = helix(n=100, scatter=0.05)
         pos = dict(pos)
-        pos["x"] = pos["x"].at[7].add(50.0)  # one point flung far off the curve
+        pos["x"] = pos["x"].at[7].add(50.0)
         pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
         result = som.fit(
             pq,
@@ -174,14 +175,14 @@ class TestFitOutlierClip:
             vel,
             metric=pcf.metrics.SpatialDistanceMetric(),
             n_epochs=20,
-            outlier_clip_sigma=3.0,
+            outlier_mixture=som.SOMMixture(),
         )
         assert not bool(result.kept[7])
         assert int(result.kept.sum()) == 99
 
     def test_clean_data_keeps_everything(self, helix):
         """No spurious rejections on a curve with no outliers."""
-        pos, vel, _ = helix(n=100)
+        pos, vel, _ = helix(n=100, scatter=0.05)
         pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
         result = som.fit(
             pq,
@@ -190,67 +191,112 @@ class TestFitOutlierClip:
             vel,
             metric=pcf.metrics.SpatialDistanceMetric(),
             n_epochs=20,
-            outlier_clip_sigma=3.0,
+            outlier_mixture=som.SOMMixture(),
         )
         assert bool(jnp.all(result.kept))
 
-    def test_is_jittable(self, helix):
-        """The whole refit-and-reclip loop compiles under jit."""
-        pos, vel, _ = helix(n=60)
+    def test_is_jittable_and_vmappable(self, helix):
+        """The mixture compiles under jit and maps under vmap."""
+        pos, vel, _ = helix(n=60, scatter=0.05)
         pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
         metric = pcf.metrics.SpatialDistanceMetric()
-        fn = jax.jit(
-            lambda a, b, c, d: som.fit(
-                a, b, c, d, metric=metric, n_epochs=10, outlier_clip_sigma=3.0
-            )
+
+        def run(a, b, c, d):
+            return som.fit(a, b, c, d, metric=metric, outlier_mixture=som.SOMMixture())
+
+        eager = run(pq, pp, pos, vel)
+        jitted = jax.jit(run)(pq, pp, pos, vel)
+        # float32 sums reorder under jit.
+        np.testing.assert_allclose(
+            jitted.responsibility, eager.responsibility, rtol=1e-3, atol=1e-3
         )
-        result = fn(pq, pp, pos, vel)
-        assert result.prototype_positions["x"].shape == (8,)
-        assert result.kept.shape == (60,)
+        batched = jax.vmap(run, in_axes=(None, None, 0, None))(
+            pq, pp, {k: jnp.stack([v, v]) for k, v in pos.items()}, vel
+        )
+        assert batched.responsibility.shape == (2, 60)
 
-    def test_mutually_exclusive_with_weights(self, helix):
-        """Passing both ``weights`` and ``outlier_clip_sigma`` is rejected."""
-        pos, vel, _ = helix(n=30)
-        pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
-        with pytest.raises(ValueError, match="mutually exclusive"):
-            som.fit(
+    def test_x64_keeps_float32(self, helix):
+        """Under x64, float32 data train and return float32 throughout."""
+        pos, vel, _ = helix(n=60, scatter=0.05)
+        pos = {k: v.astype(jnp.float32) for k, v in pos.items()}
+        vel = {k: v.astype(jnp.float32) for k, v in vel.items()}
+        with jax.enable_x64(new_val=True):
+            pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
+            result = som.fit(
                 pq,
                 pp,
                 pos,
                 vel,
                 metric=pcf.metrics.SpatialDistanceMetric(),
-                weights=jnp.ones(30),
-                outlier_clip_sigma=3.0,
+                outlier_mixture=som.SOMMixture(),
+            )
+        assert result.responsibility.dtype == jnp.float32
+        assert result.prototype_positions["x"].dtype == jnp.float32
+
+    def test_background_density_sets_the_crossover(self, helix):
+        """A background too faint to explain anything rejects nothing."""
+        pos, vel, _ = helix(n=100, scatter=0.05)
+        pos = dict(pos)
+        pos["x"] = pos["x"].at[7].add(50.0)
+        pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
+        result = som.fit(
+            pq,
+            pp,
+            pos,
+            vel,
+            metric=pcf.metrics.SpatialDistanceMetric(),
+            n_epochs=20,
+            outlier_mixture=som.SOMMixture(background_density=1e-30),
+        )
+        assert bool(jnp.all(result.kept))
+
+    def test_weights_count_as_copies(self, helix):
+        """Weight 2 on a datum fits exactly as two coincident copies of it.
+
+        In float64, so the only difference left is summation order.
+        """
+        with jax.enable_x64(new_val=True):
+            pos, vel, _ = helix(n=80, scatter=0.05)
+            pos = {k: v.astype(jnp.float64) for k, v in pos.items()}
+            vel = {k: v.astype(jnp.float64) for k, v in vel.items()}
+            pos["x"] = pos["x"].at[3].add(5.0)  # an outlier among the doubled
+            pq, pp = som.init_prototypes(pos, vel, n_prototypes=8)
+            metric = pcf.metrics.SpatialDistanceMetric()
+            mix = som.SOMMixture()
+            w = jnp.ones(80).at[:20].set(2.0)
+            weighted = som.fit(
+                pq, pp, pos, vel, metric=metric, weights=w, outlier_mixture=mix
             )
 
-    def test_rejects_a_non_positive_sigma(self, helix):
-        """A non-positive ``outlier_clip_sigma`` is rejected, not silently accepted."""
-        pos, vel, _ = helix(n=30)
-        pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
-        with pytest.raises(ValueError, match="outlier_clip_sigma"):
-            som.fit(
-                pq,
-                pp,
-                pos,
-                vel,
-                metric=pcf.metrics.SpatialDistanceMetric(),
-                outlier_clip_sigma=0.0,
-            )
+            def dup(c):
+                return {k: jnp.concatenate([v, v[:20]]) for k, v in c.items()}
 
-    def test_rejects_a_too_small_max_iters(self, helix):
-        """``outlier_clip_max_iters < 1`` is rejected, not silently accepted."""
-        pos, vel, _ = helix(n=30)
-        pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
-        with pytest.raises(ValueError, match="outlier_clip_max_iters"):
-            som.fit(
-                pq,
-                pp,
-                pos,
-                vel,
-                metric=pcf.metrics.SpatialDistanceMetric(),
-                outlier_clip_sigma=3.0,
-                outlier_clip_max_iters=0,
+            copies = som.fit(
+                pq, pp, dup(pos), dup(vel), metric=metric, outlier_mixture=mix
             )
+        for k in pos:
+            np.testing.assert_allclose(
+                weighted.prototype_positions[k],
+                copies.prototype_positions[k],
+                rtol=1e-10,
+                atol=1e-10,
+            )
+        np.testing.assert_allclose(
+            weighted.responsibility, copies.responsibility[:80], rtol=1e-8, atol=1e-10
+        )
+        assert not bool(weighted.kept[3])
+
+    @pytest.mark.parametrize(
+        ("kwargs", "match"),
+        [
+            ({"background_density": 0.0}, "background_density"),
+            ({"background_inflate": 0.0}, "background_inflate"),
+        ],
+    )
+    def test_invalid_config_raises(self, kwargs, match):
+        """Out-of-range settings are rejected at construction."""
+        with pytest.raises(ValueError, match=match):
+            som.SOMMixture(**kwargs)
 
 
 def test_densify_vertex_count(line):

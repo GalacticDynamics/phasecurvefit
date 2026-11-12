@@ -164,12 +164,36 @@ class TestSOMWeights:
         y = np.asarray(pcf.order(pos, vel, chain, weights=w).backbone["y"])
         np.testing.assert_allclose(y, 0.25 * 0.04, atol=2e-3)
 
-    def test_outlier_clip_is_exclusive(self):
-        """Weights and outlier clipping cannot be combined."""
-        pos, vel = _arc()
-        som = pcf.orderers.SOMOrderer(n_prototypes=10, outlier_clip_sigma=3.0)
-        with pytest.raises(ValueError, match="mutually exclusive"):
-            som.order(pos, vel, weights=jnp.ones(60))
+    @staticmethod
+    def _two_lines_with_background(n_bg: int = 20):
+        """Lines at y=0 (weight 3) and y=0.2 (weight 1), and a flat background."""
+        pos, vel, w = _two_lines(gap=0.2)
+        rng = np.random.default_rng(0)
+        pos = {
+            "x": jnp.concatenate([pos["x"], jnp.asarray(rng.uniform(0, 10, n_bg))]),
+            "y": jnp.concatenate([pos["y"], jnp.asarray(rng.uniform(-2.5, 2.5, n_bg))]),
+        }
+        vel = {k: jnp.concatenate([v, jnp.ones(n_bg) * v[0]]) for k, v in vel.items()}
+        return pos, vel, jnp.concatenate([w, jnp.ones(n_bg)])
+
+    @pytest.mark.parametrize(("weighted", "centre"), [(True, 0.05), (False, 0.1)])
+    def test_mixture_weighted_centre_line(self, weighted, centre):
+        """With the outlier mixture on, the backbone is the 3:1 weighted centre.
+
+        The background is rejected, the two lines are kept, and the weights
+        still set where between them the backbone runs.
+        """
+        pos, vel, w = self._two_lines_with_background()
+        som = pcf.orderers.SOMOrderer(
+            n_prototypes=10, n_epochs=20, outlier_mixture=pcf.som.SOMMixture()
+        )
+        result = som.order(pos, vel, weights=w if weighted else None)
+        np.testing.assert_allclose(result.backbone["y"], centre, atol=5e-3)
+        visited = np.zeros(220, bool)
+        idx = np.asarray(result.indices)
+        visited[idx[idx >= 0]] = True
+        assert visited[:200].all()  # both lines kept
+        assert (~visited[200:]).sum() >= 15  # most of the background rejected
 
 
 # ---------------------------------------------------------------------------

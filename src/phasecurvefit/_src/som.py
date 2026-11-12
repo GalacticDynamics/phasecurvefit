@@ -25,6 +25,7 @@ deviates from the paper's method in nine places, listed in
 __all__: tuple[str, ...] = (
     "SOM1D",
     "FitResult",
+    "SOMMixture",
     "bmu_distance",
     "bootstrap_weights",
     "chord",
@@ -33,6 +34,7 @@ __all__: tuple[str, ...] = (
     "init_prototypes",
 )
 
+from dataclasses import dataclass
 from typing import ClassVar, Final, NamedTuple
 
 import equinox as eqx
@@ -42,7 +44,6 @@ import jax.tree as jt
 import numpy as np
 from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
-from jaxmore import bounded_while_loop
 from zeroth import zeroth
 
 from phasecurvefit._src._repr import ReprMixin
@@ -52,14 +53,15 @@ from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
     SpatialDistanceMetric,
 )
+from phasecurvefit._src.nn.membership import uniform_background_density
 
 _TINY: Final = 1e-12
-# Mirrors `MSTOrderer`'s `_EDGE_CLIP_MIN_RATIO`: a point's distance to its
-# best-matching unit must be at least this multiple of the (kept) median before
-# it is a clip candidate, floors the (multiplicative) threshold so a well-fit
-# lattice -- where the robust spread collapses to ~0 -- is not shredded by
-# microscopic quantization-error variation.
-_OUTLIER_CLIP_MIN_RATIO: Final = 2.0
+# While the neighbourhood is wider than ``sigma_end``, the outlier mixture
+# widens the curve by this fraction of the neighbourhood's physical length; see
+# `fit`. Measured on a contaminated arc: 0.1 kept every member however long the
+# training ran, where no widening lost 256 of 300 at 40 epochs; 0.17 and up let
+# a background of 240 in 540 drag the backbone off at 20 epochs.
+_MIXTURE_ANNEAL: Final = 0.1
 
 
 def _check_matching_keys(**components: VectorComponents) -> None:
@@ -338,142 +340,190 @@ def _distance_matrix(
 
 
 class FitResult(NamedTuple):
-    """Trained prototypes, and which data survived outlier clipping.
-
-    A named result rather than a bare tuple so ``kept`` -- absent unless
-    ``outlier_clip_sigma`` is set -- never changes how many values ``fit``
-    returns.
+    """Trained prototypes, and each datum's membership of the curve.
 
     Attributes
     ----------
     prototype_positions, prototype_velocities : VectorComponents
         Trained prototypes, shape ``(K,)`` per component.
     kept : Bool[Array, " N"]
-        ``True`` for data that survived every outlier-clipping round.
-        All-``True`` when ``outlier_clip_sigma`` was ``None``.
+        ``True`` for data the outlier mixture counts as members of the curve
+        (``responsibility >= 0.5``). All-``True`` when ``outlier_mixture`` was
+        ``None``.
+    responsibility : Float[Array, " N"]
+        Posterior probability that each datum came from the curve rather than
+        the background, under the final prototypes. All ones when
+        ``outlier_mixture`` was ``None``.
 
     """
 
     prototype_positions: VectorComponents
     prototype_velocities: VectorComponents
     kept: Bool[Array, " N"]
+    responsibility: Float[Array, " N"]
 
 
-def _fit_core(
-    proto_positions: VectorComponents,
-    proto_velocities: VectorComponents,
-    positions: VectorComponents,
-    velocities: VectorComponents,
-    /,
-    *,
-    metric: AbstractDistanceMetric,
-    metric_scale: float | FSz0,
-    n_epochs: int,
-    sigma_start: float | None,
-    sigma_end: float,
-    weights: Float[Array, " N"] | None,
-) -> tuple[VectorComponents, VectorComponents]:
-    r"""Run the batch-Kohonen scan itself, without the outlier-clip wrapper.
+@dataclass(frozen=True, kw_only=True)
+class SOMMixture:
+    r"""Mixture-model outlier rejection for :func:`fit` and ``SOMOrderer``.
 
-    Split out of :func:`fit` so the clip-and-refit loop there can call this
-    directly instead of recursing into :func:`fit`.
+    Each datum's position comes either from the curve or from a flat
+    background,
+
+    .. math::
+
+        \mathcal{L}_n = \pi\, f(q_n) + (1 - \pi)\, \rho_{\mathrm{bg}} ,
+
+    where :math:`f` is a Gaussian tube of width :math:`s` about the polyline
+    through the prototype positions, open at its two ends. Every epoch computes
+    the posterior membership :math:`r_n` of each datum (the E-step), fits
+    :math:`\pi` and :math:`s` by their closed-form M-steps, and counts each
+    datum by :math:`\omega_n r_n` in the prototype update. A weight
+    :math:`\omega_n` multiplies every sum and never enters :math:`r_n`.
+    :doc:`/explanation/som` explains the model.
+
+    Attributes
+    ----------
+    background_density : float | None
+        :math:`\rho_{\mathrm{bg}}`, in inverse position units to the power
+        ``D``. ``None`` (default) uses the reciprocal volume of the positions'
+        bounding box (:func:`~phasecurvefit.nn.uniform_background_density`).
+    background_inflate : float
+        Scales each axis of that bounding box when ``background_density`` is
+        ``None``. Raise it when the data do not fill the field.
+
+    Examples
+    --------
+    >>> from phasecurvefit import som
+    >>> som.SOMMixture().background_density is None
+    True
+
     """
-    _check_matching_keys(
-        proto_positions=proto_positions,
-        proto_velocities=proto_velocities,
-        positions=positions,
-        velocities=velocities,
+
+    background_density: float | None = None
+    background_inflate: float = 1.0
+
+    __citation__: ClassVar[str] = "https://arxiv.org/abs/1008.4686"
+
+    def __post_init__(self) -> None:
+        """Validate the configuration."""
+        if self.background_density is not None and self.background_density <= 0:
+            msg = f"background_density must be positive, got {self.background_density}."
+            raise ValueError(msg)
+        if self.background_inflate <= 0:
+            msg = f"background_inflate must be positive, got {self.background_inflate}."
+            raise ValueError(msg)
+
+
+def _log_ndtr_diff(lo: Array, hi: Array, /) -> Array:
+    """``log(Phi(hi) - Phi(lo))`` for ``lo <= hi``, accurate in both tails.
+
+    Both arguments far above zero would round ``Phi`` to 1 for each and
+    the difference to 0, so that side is reflected (``Phi(hi) - Phi(lo)
+    = Phi(-lo) - Phi(-hi)``) and every evaluation happens where ``Phi`` is
+    small and ``log_ndtr`` is exact.
+    """
+    flip = lo > 0
+    a = jnp.where(flip, -hi, lo)
+    b = jnp.where(flip, -lo, hi)
+    log_b = jax.scipy.special.log_ndtr(b)
+    # ``a < b``, so the exponent is negative; ``-expm1`` keeps the small-
+    # interval end accurate.
+    return log_b + jnp.log(-jnp.expm1(jax.scipy.special.log_ndtr(a) - log_b))
+
+
+def _tube_e_step(
+    q: Float[Array, "N D"],
+    proto_q: Float[Array, "K D"],
+    omega: Float[Array, " N"],
+    pi: FSz0,
+    s2: FSz0,
+    log_bg: FSz0,
+    /,
+) -> tuple[Float[Array, " N"], Float[Array, " N"]]:
+    r"""Membership of the curve, and the squared distance the width is fitted to.
+
+    The curve is the polyline through the prototypes. Each of its ``K - 1``
+    segments carries a share of the members, spread uniformly along it and
+    scattered about it by an isotropic Gaussian of width ``s``. A segment from
+    ``a`` with unit direction ``u`` and length ``l`` then has the density
+
+    .. math::
+
+        \frac{1}{l}\, \mathcal{N}_{D-1}(d_\perp; s)\,
+        \left[\Phi\!\left(\frac{l - t}{s}\right)
+              - \Phi\!\left(\frac{-t}{s}\right)\right],
+        \qquad t = (q - a) \cdot u ,
+
+    a tube about the segment with Gaussian caps at its ends. The first and
+    last segments have no outer cap: the curve's ends are open, as in
+    :func:`chord`, so the bracket is 1 on that side. A segment's share is the
+    weighted fraction of the data it explains, counting each datum by its
+    share-free density under each segment. A Gaussian per prototype
+    instead is lumpy along the track wherever ``s`` is below the prototype
+    spacing, and members between prototypes look like background (on a clean
+    arc, 45 of 300 members were rejected).
+
+    Returns ``(r, d2)``: the posterior membership,
+    ``sigmoid(log_fg - log_bg)`` as in
+    :func:`~phasecurvefit.nn.membership_responsibility`, and each datum's
+    squared distance to the polyline, which the width's M-step uses.
+    """
+    n_dims = q.shape[1]
+    a = proto_q[:-1]
+    seg = proto_q[1:] - a
+    length = _safe_norm(seg)
+    s = jnp.sqrt(s2)
+    u = seg / jnp.where(length > 0, length, 1.0)[:, None]
+    # A zero-length segment (coincident prototypes) has no direction; floored
+    # at a sliver of the width, it is a point Gaussian.
+    length = jnp.maximum(length, 1e-3 * s)
+    first = jnp.arange(a.shape[0]) == 0
+    last = jnp.arange(a.shape[0]) == a.shape[0] - 1
+    norm = 0.5 * (n_dims - 1) * jnp.log(2.0 * jnp.pi * s2) + jnp.log(length)
+
+    def one(q_n: Float[Array, " D"]) -> tuple[Array, Array]:
+        # Per datum, as in `_distance_matrix`, so the (K - 1, D) residuals are
+        # never an (N, K - 1, D) array.
+        rel = q_n - a
+        t = jnp.sum(rel * u, axis=-1)
+        perp2 = jnp.maximum(jnp.sum(rel**2, axis=-1) - t**2, 0.0)
+        # The open ends. With Gaussian caps there, the data past a lattice that
+        # the wide early neighbourhood has drawn in look like background, stop
+        # pulling its ends back out, and the curve stays short: on a clean
+        # arc, half the members were rejected.
+        lo = jnp.where(first, -jnp.inf, -t / s)
+        hi = jnp.where(last, jnp.inf, (length - t) / s)
+        log_seg = -0.5 * perp2 / s2 + _log_ndtr_diff(lo, hi) - norm
+        # Squared distance to the polyline, from the nearest point of the
+        # nearest segment. Not an average over the segments by their share of
+        # the density: at a large width that share reaches distant stretches
+        # of the same curve, and the width fed on itself and ran away.
+        lo_t = jnp.where(first, -jnp.inf, 0.0)
+        hi_t = jnp.where(last, jnp.inf, length)
+        d2 = perp2 + (t - jnp.clip(t, lo_t, hi_t)) ** 2
+        return log_seg, jnp.min(d2)
+
+    log_seg, d2 = jax.vmap(one)(q)
+    # Each segment's share of the members is the weighted fraction of all the
+    # data it explains, re-estimated every epoch from the data alone. Equal
+    # shares failed when one outlier captured an end prototype: the segment
+    # out to it, holding one datum, still claimed 1/(K - 1) of the members, so
+    # the outlier stayed a member. Weighting the shares by membership instead
+    # fed back on itself, and segments that lost members lost their share.
+    # Each datum is split over the segments by its density under each, not
+    # given to the nearest: a datum outside a bend is equally near both
+    # segments meeting there, and a hard count flipped on rounding, which made
+    # the fit jump (by 0.03 in float64 between weights and the copies they
+    # stand for).
+    count = omega @ jax.nn.softmax(log_seg, axis=1)
+    tiny = jnp.finfo(count.dtype).tiny
+    log_share = jnp.log(jnp.maximum(count, tiny)) - jnp.log(
+        jnp.maximum(jnp.sum(count), tiny)
     )
-    _check_symmetric(metric)
-    if n_epochs < 1:
-        msg = f"n_epochs must be >= 1, got {n_epochs}."
-        raise ValueError(msg)
-    if sigma_end <= 0:
-        msg = f"sigma_end must be positive, got {sigma_end}."
-        raise ValueError(msg)
-
-    keys = tuple(sorted(proto_positions))
-    n_prototypes = len(zeroth(proto_positions.values()))
-    if n_prototypes < 2:
-        # K=0 reaches `argmin` on an empty (N, 0) distance matrix; K=1 trains a
-        # lattice that `densify` and `chord` then reject. Same floor as
-        # `init_prototypes`, `densify` and `chord`.
-        msg = (
-            f"fit needs at least 2 prototypes, got {n_prototypes}. A lattice "
-            f"that small has no neighbourhood to smooth over and cannot be "
-            f"densified into a backbone."
-        )
-        raise ValueError(msg)
-    start = max(n_prototypes / 4.0, sigma_end) if sigma_start is None else sigma_start
-    if start <= 0:
-        msg = f"sigma_start must be positive, got {start}."
-        raise ValueError(msg)
-
-    data_q = jt.map(jnp.asarray, positions)
-    data_p = jt.map(jnp.asarray, velocities)
-    ratio = sigma_end / start
-    span = max(n_epochs - 1, 1)
-
-    # The neighbourhood is evaluated on the (K, K) lattice, not an (N, K)
-    # array, using
-    #     h[n, k] = hkk[bmu[n], k]   =>   sum_n h[n,k] w_n
-    #                                   = sum_c hkk[c,k] (sum_{bmu(n)=c} w_n)
-    # Exact, not an approximation, and combines K partial sums rather than N.
-    # `_check_matching_keys` made both dicts share ``keys``.
-    n_pos = len(keys)
-    stacked = _pack(data_q, data_p, keys)
-    # Cast before squaring, not after: the integer square would overflow int32
-    # past K = 46342, and casting the (K,) lattice is cheaper than casting the
-    # (K, K) result. Exact integers stop at 2**24, but those entries are far
-    # off-diagonal and their Gaussian underflows to zero regardless.
-    lat = jnp.arange(n_prototypes).astype(stacked.dtype)
-    lattice_sq = (lat[:, None] - lat[None, :]) ** 2
-    omega = (
-        jnp.ones(stacked.shape[0], dtype=stacked.dtype)
-        if weights is None
-        else jnp.asarray(weights, dtype=stacked.dtype)
-    )
-    # A non-finite velocity (common in catalogues: no radial velocity) is left
-    # out of that component's averages rather than summed in: one NaN would
-    # otherwise reach every prototype through the neighbourhood and make every
-    # prototype velocity NaN. Per column, so the datum still pulls on positions
-    # and its finite velocity components. Positions are not masked: a datum
-    # without a position has nowhere to be placed.
-    present = jnp.isfinite(stacked).at[:, :n_pos].set(True)
-    contrib = omega[:, None] * present
-    weighted_stacked = jnp.where(present, stacked, 0.0) * omega[:, None]
-
-    def epoch(
-        carry: tuple[VectorComponents, VectorComponents], step: Array
-    ) -> tuple[tuple[VectorComponents, VectorComponents], None]:
-        pq, pp = carry
-        bmu = jnp.argmin(
-            _distance_matrix(metric, metric_scale, data_q, data_p, pq, pp), axis=1
-        )
-        # `step` comes from `arange(n_epochs)`, which is int64 under x64; left
-        # alone the division promotes sigma -- and the whole update with it --
-        # to float64, and the scan carry no longer matches its float32 input.
-        sigma = start * ratio ** (step.astype(stacked.dtype) / span)
-        # Segment reductions rather than an (N, K) one-hot. The one-hot fed two
-        # consumers -- a column sum and a matmul -- which blocked XLA from
-        # fusing the whole (N, K) chain, so it materialized: `fit` peaked at
-        # 416 MB for N=1e6, K=100 against 16 MB this way.
-        counts = jax.ops.segment_sum(contrib, bmu, num_segments=n_prototypes)
-        totals = jax.ops.segment_sum(weighted_stacked, bmu, num_segments=n_prototypes)
-        neighbourhood = jnp.exp(-lattice_sq / (2.0 * sigma**2))
-        weight = neighbourhood.T @ counts
-        # A lattice unit no datum reaches has zero weight *and* zero numerator
-        # (the Gaussian underflows in float32 ~11 units from the nearest
-        # best-matching unit); likewise a velocity component every nearby datum
-        # lacks. Leave it where it is rather than dividing 0/0.
-        live = weight > jnp.finfo(stacked.dtype).tiny
-        means = (neighbourhood.T @ totals) / jnp.where(live, weight, 1.0)
-        means = jnp.where(live, means, _pack(pq, pp, keys))
-        return _unpack(means, keys), None
-
-    init = (jt.map(jnp.asarray, proto_positions), jt.map(jnp.asarray, proto_velocities))
-    (trained_q, trained_p), _ = jax.lax.scan(epoch, init, jnp.arange(n_epochs))
-    return trained_q, trained_p
+    log_fg = jax.nn.logsumexp(log_seg + log_share, axis=1)
+    r = jax.nn.sigmoid(jnp.log(pi) - jnp.log1p(-pi) + log_fg - log_bg)
+    return r, d2
 
 
 def bmu_distance(
@@ -489,8 +539,7 @@ def bmu_distance(
 
     The quantization error `fit` minimizes but never returns: a large value
     means a datum sits far from every prototype, whether because it is an
-    outlier or because the lattice is too coarse to reach it. Used internally
-    by :func:`fit` to decide which is which when ``outlier_clip_sigma`` is set.
+    outlier or because the lattice is too coarse to reach it.
 
     Examples
     --------
@@ -524,6 +573,37 @@ def bmu_distance(
     return jnp.min(d, axis=1)
 
 
+def _check_schedule(
+    n_prototypes: int,
+    n_epochs: int,
+    sigma_start: float | None,
+    sigma_end: float,
+    /,
+) -> float:
+    """Validate `fit`'s lattice and schedule, and return the starting width."""
+    if n_epochs < 1:
+        msg = f"n_epochs must be >= 1, got {n_epochs}."
+        raise ValueError(msg)
+    if sigma_end <= 0:
+        msg = f"sigma_end must be positive, got {sigma_end}."
+        raise ValueError(msg)
+    if n_prototypes < 2:
+        # K=0 reaches `argmin` on an empty (N, 0) distance matrix; K=1 trains a
+        # lattice that `densify` and `chord` then reject. Same floor as
+        # `init_prototypes`, `densify` and `chord`.
+        msg = (
+            f"fit needs at least 2 prototypes, got {n_prototypes}. A lattice "
+            f"that small has no neighbourhood to smooth over and cannot be "
+            f"densified into a backbone."
+        )
+        raise ValueError(msg)
+    start = max(n_prototypes / 4.0, sigma_end) if sigma_start is None else sigma_start
+    if start <= 0:
+        msg = f"sigma_start must be positive, got {start}."
+        raise ValueError(msg)
+    return start
+
+
 def fit(
     proto_positions: VectorComponents,
     proto_velocities: VectorComponents,
@@ -537,8 +617,7 @@ def fit(
     sigma_start: float | None = None,
     sigma_end: float = 0.7,
     weights: Float[Array, " N"] | None = None,
-    outlier_clip_sigma: float | None = None,
-    outlier_clip_max_iters: int = 5,
+    outlier_mixture: SOMMixture | None = None,
 ) -> FitResult:
     r"""Train a 1-D SOM by batch Kohonen updates.
 
@@ -547,8 +626,8 @@ def fit(
 
     .. math::
 
-        p_k \leftarrow \frac{\sum_n h_{c(n),k}\, \omega_n\, w_n}
-                             {\sum_n h_{c(n),k}\, \omega_n},
+        p_k \leftarrow \frac{\sum_n h_{c(n),k}\, \omega_n r_n\, w_n}
+                             {\sum_n h_{c(n),k}\, \omega_n r_n},
         \qquad h_{ij} = \exp\!\left(-\frac{(i-j)^2}{2\sigma^2}\right)
 
     The neighbourhood is equation (A8) of the paper on the paper's linear
@@ -556,11 +635,12 @@ def fit(
     learning rate. This batch form is the fixed point of the conventional
     online Kohonen update, whose increment is proportional to ``w - p^(k)``
     (:doc:`/explanation/som` notes how that differs from (A9) as printed). ``omega_n``
-    is ``weights``, defaulting to ``1`` for every datum -- the paper has no such
-    term, so this is an addition, not a further deviation from (A9)/(A10): with
-    the default, the sum above is exactly the un-weighted one. A non-finite
-    velocity component is left out of both sums for that component, so a
-    missing velocity cannot poison every prototype through the neighbourhood.
+    is ``weights``, defaulting to ``1`` for every datum. ``r_n`` is the datum's
+    membership of the curve under ``outlier_mixture``, and ``1`` without it.
+    The paper has neither term, so with the defaults the sum above is exactly
+    the un-weighted one. A non-finite velocity component is left out of both
+    sums for that component, so a missing velocity cannot poison every
+    prototype through the neighbourhood.
 
     ``sigma`` anneals geometrically from ``sigma_start`` to ``sigma_end``, so the
     global ordering forms first and local detail is refined afterwards.
@@ -568,30 +648,18 @@ def fit(
     epoch at ``sigma_start`` and never narrows; pass ``sigma_start=sigma_end``
     to train a single epoch at the final width.
 
-    Setting ``outlier_clip_sigma`` layers on iterated, robust rejection of
-    quantization-error outliers, mirroring
-    :attr:`~phasecurvefit.orderers.MSTOrderer.edge_clip_sigma` /
-    ``edge_clip_max_iters`` in both mechanism and iteration, applied to each
-    datum's distance to its best-matching unit (:func:`bmu_distance`) rather
-    than MST edge length. Each iteration:
-
-    1. refits with the current per-datum weight (``1`` for a kept datum, ``0``
-       for a rejected one -- so rejected data stop pulling on any prototype
-       without changing any array's shape);
-    2. among the still-kept data, in log space (distances are positive and
-       heavy-tailed): computes the median and a robust spread
-       (``1.4826 * MAD``), then rejects everything beyond
-       ``median + max(outlier_clip_sigma * spread, log(2))`` -- the floor
-       keeps a well-fit lattice, where the spread collapses to ~0, from being
-       shredded by microscopic quantization-error variation;
-    3. stops when a round rejects nothing new, or after
-       ``outlier_clip_max_iters`` rounds, whichever first -- a rejection is
-       never undone once made.
-
-    There is no graph here, so there is no analogue of MST's component-size
-    veto (a long edge that would fragment the graph is kept); a quantization
-    error is a per-datum quantity, not shared between data, so nothing here
-    can "reconnect" the way a spared MST edge can.
+    Setting ``outlier_mixture`` models each datum's position as drawn either
+    from the curve or from a flat background (:class:`SOMMixture`). Each epoch
+    computes every datum's membership ``r_n`` from the current prototypes, fits
+    the mixing fraction and the curve's width by their closed-form M-steps, and
+    then updates the prototypes as above. While ``sigma`` is above
+    ``sigma_end`` the memberships are computed with the curve widened by a
+    tenth of the neighbourhood's physical length, ``sigma`` times the mean
+    prototype spacing, since the wide lattice is a smoothed copy of the curve;
+    the widening is zero at the last epoch, and throughout when
+    ``sigma_start == sigma_end``. A weight
+    multiplies every sum, the M-steps included, so a datum of weight ``w``
+    counts like ``w`` coincident copies; it never enters ``r_n``.
 
     Parameters
     ----------
@@ -617,25 +685,16 @@ def fit(
         Per-datum weight ``omega_n`` in the update above, shape ``(N,)``.
         ``None`` (default) weighs every datum equally. A datum weighted ``0``
         contributes to no prototype's update without changing any array's
-        shape. Mutually exclusive with ``outlier_clip_sigma``, which computes
-        its own weights round by round.
-    outlier_clip_sigma
-        Robust-sigma threshold in log space for outlier rejection. ``None``
-        (default) disables it -- ``fit`` then runs exactly one batch-Kohonen
-        pass, as if ``outlier_clip_sigma`` never existed. Otherwise must be
-        positive.
-    outlier_clip_max_iters
-        Maximum number of refit-and-reclip rounds when ``outlier_clip_sigma``
-        is set. Static; must be >= 1. Unused otherwise.
+        shape.
+    outlier_mixture
+        A :class:`SOMMixture` to reject outliers, or ``None`` (default) for none.
 
     Returns
     -------
     FitResult
-        Trained prototype positions and velocities, and a boolean ``(N,)``
-        ``kept`` mask -- all-``True`` unless ``outlier_clip_sigma`` rejected
-        something. A named result rather than a bare tuple so adding
-        ``outlier_clip_sigma`` never changed how many values this function
-        returns.
+        Trained prototype positions and velocities, each datum's
+        ``responsibility``, and the boolean ``kept`` mask
+        ``responsibility >= 0.5``.
 
     Examples
     --------
@@ -654,7 +713,7 @@ def fit(
     >>> bool(jnp.all(result.kept))
     True
 
-    With one wild outlier, ``outlier_clip_sigma`` finds it:
+    With one wild outlier, the mixture finds it:
 
     >>> pos_c = dict(pos)
     >>> pos_c["y"] = pos_c["y"].at[25].set(50.0)
@@ -666,7 +725,7 @@ def fit(
     ...     vel,
     ...     metric=pcf.metrics.SpatialDistanceMetric(),
     ...     n_epochs=20,
-    ...     outlier_clip_sigma=3.0,
+    ...     outlier_mixture=som.SOMMixture(),
     ... )
     >>> bool(result.kept[25])
     False
@@ -674,81 +733,154 @@ def fit(
     49
 
     """
-    if outlier_clip_sigma is None:
-        trained_q, trained_p = _fit_core(
-            proto_positions,
-            proto_velocities,
-            positions,
-            velocities,
-            metric=metric,
-            metric_scale=metric_scale,
-            n_epochs=n_epochs,
-            sigma_start=sigma_start,
-            sigma_end=sigma_end,
-            weights=weights,
-        )
-        n = len(zeroth(positions.values()))
-        return FitResult(trained_q, trained_p, jnp.ones(n, dtype=bool))
-
-    if weights is not None:
-        msg = "weights and outlier_clip_sigma are mutually exclusive."
-        raise ValueError(msg)
-    if outlier_clip_sigma <= 0:
-        msg = f"outlier_clip_sigma must be positive, got {outlier_clip_sigma}."
-        raise ValueError(msg)
-    if outlier_clip_max_iters < 1:
-        msg = f"outlier_clip_max_iters must be >= 1, got {outlier_clip_max_iters}."
-        raise ValueError(msg)
-
-    n = len(zeroth(positions.values()))
-    dtype = zeroth(positions.values()).dtype
-    log_floor = jnp.log(_OUTLIER_CLIP_MIN_RATIO)
-
-    def refit(kept: Bool[Array, " N"]) -> tuple[VectorComponents, VectorComponents]:
-        return _fit_core(
-            proto_positions,
-            proto_velocities,
-            positions,
-            velocities,
-            metric=metric,
-            metric_scale=metric_scale,
-            n_epochs=n_epochs,
-            sigma_start=sigma_start,
-            sigma_end=sigma_end,
-            weights=kept.astype(dtype),
-        )
-
-    State = tuple[Bool[Array, " N"], VectorComponents, VectorComponents, Array]
-
-    def cond_fn(state: State) -> Array:
-        return state[-1]
-
-    def body_fn(state: State) -> State:
-        kept, _pq, _pp, _cut_any = state
-        pq, pp = refit(kept)
-        dist = bmu_distance(metric, metric_scale, positions, velocities, pq, pp)
-        candidate = kept & (dist > 0)
-        loglen = jnp.where(candidate, jnp.log(jnp.where(candidate, dist, 1.0)), jnp.nan)
-        med = jnp.nanmedian(loglen)
-        mad = jnp.nanmedian(jnp.abs(loglen - med))
-        threshold = med + jnp.maximum(outlier_clip_sigma * 1.4826 * mad, log_floor)
-        cut = candidate & (loglen > threshold)
-        return kept & ~cut, pq, pp, jnp.any(cut)
-
-    init_state: State = (
-        jnp.ones(n, dtype=bool),
-        jt.map(jnp.asarray, proto_positions),
-        jt.map(jnp.asarray, proto_velocities),
-        jnp.asarray(True),  # noqa: FBT003  # always run the first iteration
+    _check_matching_keys(
+        proto_positions=proto_positions,
+        proto_velocities=proto_velocities,
+        positions=positions,
+        velocities=velocities,
     )
-    kept, trained_q, trained_p, _ = bounded_while_loop(
-        cond_fn,
-        body_fn,
-        init_state,
-        max_steps=outlier_clip_max_iters,
-        check_termination=False,
+    _check_symmetric(metric)
+    keys = tuple(sorted(proto_positions))
+    n_prototypes = len(zeroth(proto_positions.values()))
+    start = _check_schedule(n_prototypes, n_epochs, sigma_start, sigma_end)
+
+    data_q = jt.map(jnp.asarray, positions)
+    data_p = jt.map(jnp.asarray, velocities)
+    ratio = sigma_end / start
+    span = max(n_epochs - 1, 1)
+
+    # The neighbourhood is evaluated on the (K, K) lattice, not an (N, K)
+    # array, using
+    #     h[n, k] = hkk[bmu[n], k]   =>   sum_n h[n,k] w_n
+    #                                   = sum_c hkk[c,k] (sum_{bmu(n)=c} w_n)
+    # Exact, not an approximation, and combines K partial sums rather than N.
+    # `_check_matching_keys` made both dicts share ``keys``.
+    n_pos = len(keys)
+    stacked = _pack(data_q, data_p, keys)
+    dtype = stacked.dtype
+    # Cast before squaring, not after: the integer square would overflow int32
+    # past K = 46342, and casting the (K,) lattice is cheaper than casting the
+    # (K, K) result. Exact integers stop at 2**24, but those entries are far
+    # off-diagonal and their Gaussian underflows to zero regardless.
+    lat = jnp.arange(n_prototypes).astype(dtype)
+    lattice_sq = (lat[:, None] - lat[None, :]) ** 2
+    omega = (
+        jnp.ones(stacked.shape[0], dtype=dtype)
+        if weights is None
+        else jnp.asarray(weights, dtype=dtype)
     )
-    return FitResult(trained_q, trained_p, kept)
+    # A non-finite velocity (common in catalogues: no radial velocity) is left
+    # out of that component's averages rather than summed in: one NaN would
+    # otherwise reach every prototype through the neighbourhood and make every
+    # prototype velocity NaN. Per column, so the datum still pulls on positions
+    # and its finite velocity components. Positions are not masked: a datum
+    # without a position has nowhere to be placed.
+    present = jnp.isfinite(stacked).at[:, :n_pos].set(True)
+    clean = jnp.where(present, stacked, 0.0)
+    data_qs = stacked[:, :n_pos]
+
+    # The mixture lives in position space, like the autoencoder's. Its setup is
+    # a few reductions; the scan carries its two scalars either way, and
+    # ``use_mix`` (static) keeps them out of the update when it is off.
+    use_mix = outlier_mixture is not None
+    mix = SOMMixture() if outlier_mixture is None else outlier_mixture
+    if mix.background_density is None:
+        rho_bg = uniform_background_density(data_qs, inflate=mix.background_inflate)
+    else:
+        rho_bg = mix.background_density
+    log_bg = jnp.log(jnp.asarray(rho_bg, dtype=dtype))
+    # A floor on the width's square, relative to the field so it carries the
+    # data's units: all-coincident data would otherwise fit s = 0 and send
+    # every log density to -inf.
+    extent = jnp.max(data_qs, axis=0) - jnp.min(data_qs, axis=0)
+    s2_floor = 1e-12 * jnp.sum(jnp.where(extent > 0, extent, 1.0) ** 2)
+    total_w = jnp.maximum(jnp.sum(omega), jnp.finfo(dtype).tiny)
+    pi_bounds = (jnp.asarray(1e-6, dtype), jnp.asarray(1.0 - 1e-6, dtype))
+
+    # The tube scatters members across the curve, in D - 1 dimensions; a 1-D
+    # field has none, and its width only shapes the curve's two ends.
+    n_cross = max(n_pos - 1, 1)
+
+    def width_m_step(wr: Array, msd: Array, s2_old: Array) -> Array:
+        # Weighted by omega * r, like every other sum: a weight counts copies.
+        mass = jnp.sum(wr)
+        s2 = jnp.sum(wr * msd) / (n_cross * jnp.where(mass > 0, mass, 1.0))
+        return jnp.maximum(jnp.where(mass > 0, s2, s2_old), s2_floor)
+
+    def epoch(
+        carry: tuple[VectorComponents, VectorComponents, Array, Array], step: Array
+    ) -> tuple[tuple[VectorComponents, VectorComponents, Array, Array], None]:
+        pq, pp, pi, s2 = carry
+        bmu = jnp.argmin(
+            _distance_matrix(metric, metric_scale, data_q, data_p, pq, pp), axis=1
+        )
+        # `step` comes from `arange(n_epochs)`, which is int64 under x64; left
+        # alone the division promotes sigma -- and the whole update with it --
+        # to float64, and the scan carry no longer matches its float32 input.
+        sigma = start * ratio ** (step.astype(dtype) / span)
+        if use_mix:
+            # While the neighbourhood is wide, the lattice smooths the curve on
+            # the scale of sigma * spacing, and the data scatter about that
+            # smoothed curve more widely than about the final one. Without
+            # widening the curve for it, members the early lattice misses are
+            # called background, stop pulling it, and stay lost: on a clean
+            # arc trained 40 epochs, 256 of 300. The widening falls to zero as
+            # sigma reaches sigma_end, and is zero throughout when chained.
+            proto_qs = _stack(pq, keys)
+            spacing = jnp.sum(_safe_norm(jnp.diff(proto_qs, axis=0))) / (
+                n_prototypes - 1
+            )
+            anneal = (_MIXTURE_ANNEAL * spacing) ** 2 * jnp.maximum(
+                sigma**2 - sigma_end**2, 0.0
+            )
+            r, msd = _tube_e_step(data_qs, proto_qs, omega, pi, s2 + anneal, log_bg)
+            pi = jnp.clip(jnp.sum(omega * r) / total_w, *pi_bounds)
+            s2 = width_m_step(omega * r, msd, s2)
+            wr = omega * r
+        else:
+            wr = omega
+        # Segment reductions rather than an (N, K) one-hot. The one-hot fed two
+        # consumers -- a column sum and a matmul -- which blocked XLA from
+        # fusing the whole (N, K) chain, so it materialized: `fit` peaked at
+        # 416 MB for N=1e6, K=100 against 16 MB this way.
+        counts = jax.ops.segment_sum(
+            wr[:, None] * present, bmu, num_segments=n_prototypes
+        )
+        totals = jax.ops.segment_sum(
+            clean * wr[:, None], bmu, num_segments=n_prototypes
+        )
+        neighbourhood = jnp.exp(-lattice_sq / (2.0 * sigma**2))
+        weight = neighbourhood.T @ counts
+        # A lattice unit no datum reaches has zero weight *and* zero numerator
+        # (the Gaussian underflows in float32 ~11 units from the nearest
+        # best-matching unit); likewise a velocity component every nearby datum
+        # lacks. Leave it where it is rather than dividing 0/0.
+        live = weight > jnp.finfo(dtype).tiny
+        means = (neighbourhood.T @ totals) / jnp.where(live, weight, 1.0)
+        means = jnp.where(live, means, _pack(pq, pp, keys))
+        return (*_unpack(means, keys), pi, s2), None
+
+    init_q = jt.map(jnp.asarray, proto_positions)
+    init_p = jt.map(jnp.asarray, proto_velocities)
+    # Width seeded from each datum's nearest initial prototype, and an even
+    # mixing fraction; EM refines both from the first epoch. Skipped when the
+    # mixture is off, which would otherwise pay for a distance matrix.
+    s2_init = jnp.asarray(1.0, dtype)
+    if use_mix:
+        nearest = bmu_distance(
+            SpatialDistanceMetric(), 0.0, data_q, data_p, init_q, init_p
+        )
+        s2_init = width_m_step(omega, nearest**2, s2_init)
+    init = (init_q, init_p, jnp.asarray(0.5, dtype), s2_init)
+    (trained_q, trained_p, pi, s2), _ = jax.lax.scan(epoch, init, jnp.arange(n_epochs))
+
+    if not use_mix:
+        n = stacked.shape[0]
+        return FitResult(
+            trained_q, trained_p, jnp.ones(n, dtype=bool), jnp.ones(n, dtype=dtype)
+        )
+    resp, _ = _tube_e_step(data_qs, _stack(trained_q, keys), omega, pi, s2, log_bg)
+    return FitResult(trained_q, trained_p, resp >= 0.5, resp)
 
 
 def bootstrap_weights(key: PRNGKeyArray, n_obs: int, /) -> Float[Array, " N"]:

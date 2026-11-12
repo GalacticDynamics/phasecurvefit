@@ -372,6 +372,9 @@ Self-Organizing Map ordering, after Starkman et al. (2023). See
 :members:
 ```
 
+```{autoclass} phasecurvefit.som.SOMMixture
+```
+
 ## Neighbour Backends
 
 Exact k-nearest-neighbour backends for
