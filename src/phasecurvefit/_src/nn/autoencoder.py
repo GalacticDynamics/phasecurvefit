@@ -916,6 +916,14 @@ def train_ordering_and_track_net(
     else:
         filter_spec = eqx.is_array
 
+    if membership is not None:
+        # The width cap is not a parameter: open it for training (the annealed
+        # ceiling caps the width instead), and keep it out of the optimizer.
+        model = eqx.tree_at(lambda m: m.width.sigma_max, model, jnp.asarray(jnp.inf))
+        if callable(filter_spec):
+            filter_spec = jtu.map(filter_spec, model)
+        filter_spec = eqx.tree_at(lambda m: m.width.sigma_max, filter_spec, False)
+
     # ----------------------------------------
     # Train
 
@@ -952,6 +960,16 @@ def train_ordering_and_track_net(
         key=key,
         show_pbar=config.show_pbar,
     )
+
+    if membership is not None:
+        # Training capped the width at the ceiling, which ends at its ``stop``
+        # value. Cap the trained width there too, so `posterior_membership` and
+        # every later evaluation use the width the fit used.
+        model = eqx.tree_at(
+            lambda m: m.width.sigma_max,
+            model,
+            jnp.asarray(membership.sigma_ceiling[1], dtype=float),
+        )
 
     return cast("PathAutoencoder", model), opt_state, epoch_losses
 

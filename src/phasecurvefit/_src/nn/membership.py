@@ -196,6 +196,9 @@ class WidthNet(ReprMixin, eqx.Module):
     """
 
     mlp: eqx.nn.MLP
+    sigma_max: Float[Array, ""]
+    """Cap on the returned width. ``inf`` until training sets it to the final
+    width ceiling, so that the trained model returns the width the fit used."""
 
     sigma_min: float = eqx.field(static=True)
     width_size: int = eqx.field(static=True)
@@ -220,6 +223,7 @@ class WidthNet(ReprMixin, eqx.Module):
             raise ValueError(msg)
 
         self.sigma_min = sigma_min
+        self.sigma_max = jnp.asarray(jnp.inf)
         self.width_size = width_size
         self.depth = depth
 
@@ -260,7 +264,8 @@ class WidthNet(ReprMixin, eqx.Module):
         Returns
         -------
         sigma : Array, shape ()
-            Stream half-width, strictly positive and at least ``sigma_min``.
+            Stream half-width, strictly positive, at least ``sigma_min`` and at
+            most ``sigma_max``.
 
         """
         del key
@@ -268,7 +273,7 @@ class WidthNet(ReprMixin, eqx.Module):
         # log-widths above ~88 in float32, and an infinite width turns every
         # residual downstream into NaN.
         log_sigma = jnp.clip(self.mlp(gamma), _LOG_SIGMA_MIN, _LOG_SIGMA_MAX)
-        return self.sigma_min + jnp.exp(log_sigma)
+        return jnp.minimum(self.sigma_min + jnp.exp(log_sigma), self.sigma_max)
 
 
 def sigma_ceiling(

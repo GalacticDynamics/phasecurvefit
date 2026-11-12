@@ -40,6 +40,14 @@ class TestWidthNet:
         # Exactly sigma_init + sigma_min, since the final layer is zeroed.
         assert jnp.allclose(sigmas, 0.25 + net.sigma_min, atol=1e-6)
 
+    def test_sigma_max_caps_the_width(self) -> None:
+        """The width never exceeds ``sigma_max``, which starts open."""
+        net = WidthNet(sigma_init=0.5, key=jr.key(0))
+        assert bool(jnp.isinf(net.sigma_max))
+        capped = eqx.tree_at(lambda n: n.sigma_max, net, jnp.asarray(0.2))
+        sigmas = jax.vmap(capped)(jnp.linspace(-1.0, 1.0, 16))
+        np.testing.assert_allclose(sigmas, 0.2)
+
     def test_strictly_positive(self) -> None:
         """Widths must never be <= 0, whatever the weights."""
         net = WidthNet(sigma_init=0.1, sigma_min=1e-3, key=jr.key(1))
@@ -536,3 +544,38 @@ class TestFindsOutliers:
         assert lost < 0.5 * n_in, (
             f"membership collapsed: {lost}/{n_in} genuine members rejected"
         )
+
+
+class TestTrainedWidthCap:
+    """Training leaves the width capped at the final ceiling it used."""
+
+    def test_posterior_uses_the_capped_width(self) -> None:
+        """A width that starts above the ceiling is capped after training.
+
+        Training caps the width at ``min(width, ceiling)``, so the posterior
+        must use the same cap, or it scores samples with a wider width than
+        the fit did.
+        """
+        from phasecurvefit._src.nn.autoencoder import train_ordering_and_track_net
+
+        n = 64
+        t = jnp.linspace(0.0, 3.0, n)
+        pos = {"x": jnp.cos(t), "y": jnp.sin(t)}
+        vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
+        normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+        ae = pcf.nn.PathAutoencoder.make(
+            normalizer, gamma_range=(-1.0, 1.0), key=jr.key(0)
+        )
+        ws = jnp.concatenate(normalizer.transform(pos, vel), axis=1)
+        membership = MixtureMembershipConfig(sigma_init=1.0, sigma_ceiling=(2.0, 0.1))
+        config = pcf.nn.TrainingConfig(
+            n_epochs_both=3, batch_size=32, show_pbar=False, membership=membership
+        ).autoencoder_config()
+
+        trained, _, _ = train_ordering_and_track_net(
+            ae, ws, mask=jnp.ones(n, dtype=bool), config=config, key=jr.key(1)
+        )
+
+        assert float(trained.width.sigma_max) == pytest.approx(0.1)
+        gamma, _ = jax.vmap(trained.encoder, (0, None))(ws, None)
+        assert bool(jnp.all(jax.vmap(trained.width)(gamma) <= 0.1 + 1e-7))
