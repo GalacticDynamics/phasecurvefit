@@ -902,3 +902,36 @@ class TestPosteriorMembership:
         assert q.shape == (8,)
         assert bool(jnp.all(q >= 0.0))
         assert bool(jnp.all(q <= 1.0))
+
+    def test_caps_width_at_final_ceiling(self, rng_key: PRNGKeyArray):
+        """The posterior uses the width training ended with, ceiling included.
+
+        Training caps the width at ``sigma_ceiling``, whose last value is
+        ``stop``. Above the cap the width net gets no gradient, so its raw
+        output can stay wider than any width training used. Here it starts at
+        0.5 against a ``stop`` of 0.1, so the posterior must match a model whose
+        width is exactly 0.1.
+        """
+        model = self._model_with_width(rng_key)
+        model = eqx.tree_at(lambda m: m.width, model, None)
+        stop = 0.1
+        membership = pcf.nn.MixtureMembershipConfig(
+            sigma_init=0.5, sigma_ceiling=(1.0, stop)
+        )
+        config = pcf.nn.TrainingConfig(
+            n_epochs_both=2, membership=membership, show_pbar=False
+        ).autoencoder_config()
+        ws = self._make_ws()
+        trained, _, _ = train_ordering_and_track_net(
+            model, ws, mask=jnp.ones(8, dtype=bool), config=config, key=rng_key
+        )
+
+        sigma_min = 1e-3
+        flat = pcf.nn.WidthNet(
+            sigma_init=stop - sigma_min, sigma_min=sigma_min, key=rng_key
+        )
+        capped = eqx.tree_at(lambda m: m.width, trained, flat)
+
+        q = pcf.nn.posterior_membership(trained, ws, background_density=0.5)
+        q_capped = pcf.nn.posterior_membership(capped, ws, background_density=0.5)
+        assert jnp.allclose(q, q_capped, atol=1e-6)

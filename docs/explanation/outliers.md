@@ -76,7 +76,10 @@ and its posterior membership doesn't change. {doc}`density-fields` derives this.
 
 The encoder's output is the prior $\pi_n$. The posterior membership, which
 {func}`~phasecurvefit.nn.posterior_membership` returns, also accounts for how far the
-star landed from the track, and is the number to use.
+star landed from the track, and is the number to use. It uses the width capped at the
+`stop` of `sigma_ceiling`, the same cap as the last epoch of training. Above the cap the
+width network gets no gradient, so its own output there can be wider than any width the
+fit used.
 
 ## Two ways the fit can fail
 

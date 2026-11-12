@@ -77,6 +77,28 @@ class TestWidthNet:
         with pytest.raises(ValueError, match="sigma_init must be positive"):
             WidthNet(sigma_init=bad, key=jr.key(0))
 
+    def test_sigma_max_caps_width(self) -> None:
+        """With ``sigma_max`` set, the width never exceeds it."""
+        net = WidthNet(sigma_init=0.5, sigma_max=0.1, key=jr.key(0))
+        sigmas = jax.vmap(net)(jnp.linspace(-1.0, 1.0, 16))
+        assert jnp.allclose(sigmas, 0.1)
+
+    def test_no_sigma_max_is_uncapped(self) -> None:
+        """The default ``sigma_max=None`` leaves the width alone."""
+        net = WidthNet(sigma_init=0.5, key=jr.key(0))
+        assert float(net(jnp.array(0.0))) == pytest.approx(0.501)
+
+    def test_ceiling_overrides_sigma_max(self) -> None:
+        """An explicit ``ceiling`` replaces ``sigma_max``, as training needs."""
+        net = WidthNet(sigma_init=0.5, sigma_max=0.1, key=jr.key(0))
+        assert float(net(jnp.array(0.0), ceiling=0.3)) == pytest.approx(0.3)
+
+    @pytest.mark.parametrize("bad", [0.0, -1.0])
+    def test_rejects_nonpositive_sigma_max(self, bad: float) -> None:
+        """A non-positive cap is meaningless."""
+        with pytest.raises(ValueError, match="sigma_max must be positive"):
+            WidthNet(sigma_max=bad, key=jr.key(0))
+
 
 # ============================================================
 # Schedules

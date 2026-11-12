@@ -164,6 +164,10 @@ class WidthNet(ReprMixin, eqx.Module):
         Hard floor on the returned width. Guards the collapse-onto-a-star
         degeneracy. Should be well below the true stream width (e.g. the
         typical positional uncertainty).
+    sigma_max : float | None
+        Cap on the returned width when the call gives no ``ceiling``. Training
+        sets it to the last value of `sigma_ceiling`, so that a trained model
+        reports the width training ended with. ``None`` (default) means no cap.
     key : PRNGKeyArray
         JAX random key for initialisation.
 
@@ -198,6 +202,7 @@ class WidthNet(ReprMixin, eqx.Module):
     mlp: eqx.nn.MLP
 
     sigma_min: float = eqx.field(static=True)
+    sigma_max: float | None = eqx.field(static=True)
     width_size: int = eqx.field(static=True)
     depth: int = eqx.field(static=True)
 
@@ -210,6 +215,7 @@ class WidthNet(ReprMixin, eqx.Module):
         *,
         sigma_init: float = 0.1,
         sigma_min: float = 1e-3,
+        sigma_max: float | None = None,
         key: PRNGKeyArray,
     ) -> None:
         if sigma_init <= 0:
@@ -218,8 +224,12 @@ class WidthNet(ReprMixin, eqx.Module):
         if sigma_min <= 0:
             msg = f"sigma_min must be positive, got {sigma_min}."
             raise ValueError(msg)
+        if sigma_max is not None and sigma_max <= 0:
+            msg = f"sigma_max must be positive, got {sigma_max}."
+            raise ValueError(msg)
 
         self.sigma_min = sigma_min
+        self.sigma_max = sigma_max
         self.width_size = width_size
         self.depth = depth
 
@@ -247,7 +257,14 @@ class WidthNet(ReprMixin, eqx.Module):
         self.mlp = mlp
 
     @ft.partial(eqx.filter_jit)
-    def __call__(self, gamma: FSz0, /, key: PRNGKeyArray | None = None) -> FSz0:
+    def __call__(
+        self,
+        gamma: FSz0,
+        /,
+        key: PRNGKeyArray | None = None,
+        *,
+        ceiling: FSz0 | float | None = None,
+    ) -> FSz0:
         """Return the stream half-width at ordering parameter ``gamma``.
 
         Parameters
@@ -256,6 +273,9 @@ class WidthNet(ReprMixin, eqx.Module):
             Ordering parameter.
         key : PRNGKeyArray | None
             Unused; accepted for signature consistency with the other networks.
+        ceiling : Array, shape () | float | None
+            Cap on the width. Training passes this epoch's `sigma_ceiling`.
+            ``None`` (default) caps at ``sigma_max``, if set.
 
         Returns
         -------
@@ -268,7 +288,9 @@ class WidthNet(ReprMixin, eqx.Module):
         # log-widths above ~88 in float32, and an infinite width turns every
         # residual downstream into NaN.
         log_sigma = jnp.clip(self.mlp(gamma), _LOG_SIGMA_MIN, _LOG_SIGMA_MAX)
-        return self.sigma_min + jnp.exp(log_sigma)
+        sigma = self.sigma_min + jnp.exp(log_sigma)
+        cap = self.sigma_max if ceiling is None else ceiling
+        return sigma if cap is None else jnp.minimum(sigma, cap)
 
 
 def sigma_ceiling(

@@ -136,7 +136,7 @@ mixture model ({doc}`../how-to/outliers`).
 |---|---|---|
 | `sigma_init` | `0.1` | starting stream half-width, in the normalised coordinates the networks see |
 | `sigma_min` | `0.001` | floor on the width |
-| `sigma_ceiling` | `(0.5, 0.1)` | `(start, stop)` of the width ceiling, shrunk geometrically over training |
+| `sigma_ceiling` | `(0.5, 0.1)` | `(start, stop)` of the width ceiling, shrunk geometrically over training; the trained width stays capped at `stop` |
 | `warmup_frac` | `0.3` | fraction of training spent ramping the membership term in |
 | `background_density` | `None` | the background density $\rho_{\mathrm{bg}}$; `None` computes it from the extent of the training positions |
 | `background_inflate` | `1.0` | inflation of that extent when `background_density` is `None`; raise it if the stars do not fill the survey footprint |
