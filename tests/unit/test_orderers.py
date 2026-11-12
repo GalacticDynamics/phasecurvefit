@@ -1,5 +1,7 @@
 """Tests for the pluggable orderer abstraction (``pcf.orderers``)."""
 
+from typing import Any
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -44,7 +46,7 @@ class TestOrdererNamespace:
         itself gives, not this guard's misleading "both empty" one.
         """
         with pytest.raises(LookupError) as exc_info:
-            pcf.order(None, None)
+            pcf.order(None, None)  # type: ignore[arg-type]  # deliberately invalid
         assert "cannot both be empty" not in str(exc_info.value)
 
 
@@ -442,7 +444,7 @@ class TestLocalFlowNonFiniteVelocities:
     def test_rejects_an_unknown_nan_policy(self):
         """A typo fails at construction, not at the first NaN."""
         with pytest.raises(ValueError, match="nan_policy"):
-            pcf.orderers.LocalFlowOrderer(nan_policy="propagate")
+            pcf.orderers.LocalFlowOrderer(nan_policy="propagate")  # type: ignore[arg-type]  # deliberately invalid
 
 
 class TestConformance:
@@ -518,12 +520,13 @@ class TestVelocityAwareness:
         """
         pos, vel, _ = arc()
 
-        def run(scale: float, *, metric, expected: bool) -> float:
+        def run(scale: float, *, metric, expected: bool) -> jax.Array:
             orderer = pcf.orderers.LocalFlowOrderer(
                 metric_scale=scale, config=pcf.WalkConfig(metric=metric)
             )
             result = orderer.order(pos, vel)
             assert result.velocity_aware is expected
+            assert result.chord is not None
             return jnp.sum(result.chord)
 
         aligned = pcf.metrics.AlignedMomentumDistanceMetric()
@@ -559,7 +562,11 @@ class TestVelocityAwareness:
         pos, vel, _ = arc()
         plain = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0)
         assert plain.order(pos, vel).velocity_aware is False
-        for kw in ({"sever_cos_threshold": 0.9}, {"velocity_weight": 0.5}):
+        kws: tuple[dict[str, Any], ...] = (
+            {"sever_cos_threshold": 0.9},
+            {"velocity_weight": 0.5},
+        )
+        for kw in kws:
             orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, **kw)
             assert orderer.order(pos, vel).velocity_aware is True
         oriented = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, orient_by_velocity=True)

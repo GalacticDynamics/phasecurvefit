@@ -546,7 +546,7 @@ class TestComponentKeyValidation:
         """A prototype dict missing a data component must not reach the loop."""
         pos, vel = line(20, 9.0)
         pq, pp = som.init_prototypes(pos, vel, n_prototypes=6)
-        del pq["y"]
+        pq = {k: v for k, v in pq.items() if k != "y"}
         with pytest.raises(ValueError, match="same component keys"):
             som.fit(pq, pp, pos, vel, metric=pcf.metrics.SpatialDistanceMetric())
 

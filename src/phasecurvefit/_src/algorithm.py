@@ -28,7 +28,7 @@ __all__: tuple[str, ...] = (
 )
 
 from collections.abc import Iterator, KeysView, Set
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, TypedDict
 
 import equinox as eqx
 import jax
@@ -42,7 +42,7 @@ from jaxtyping import Array, Bool, Int
 from jaxmore import bounded_while_loop
 from zeroth import zeroth
 
-from .custom_types import ISz0, RLikeSz0, VectorComponents
+from .custom_types import ArrayComponents, ISz0, RLikeSz0, VectorComponents
 from .orderers.result import OrderingResult
 from .phasespace import euclidean_distance
 from .query_config import WalkConfig
@@ -179,6 +179,21 @@ class WalkLocalFlowResult(OrderingResult):
 
 Direction: TypeAlias = Literal["forward", "backward", "both"]  # noqa: UP040
 NanPolicy: TypeAlias = Literal["raise", "omit"]  # noqa: UP040
+
+
+class _HalfWalkKwargs(TypedDict):
+    """Keywords both halves of a ``direction="both"`` walk share."""
+
+    start_idx: int | ISz0
+    metric_scale: RLikeSz0
+    max_dist: float
+    terminate_indices: Set[int] | None
+    n_max: int | None
+    config: WalkConfig
+    metadata: StateMetadata
+    nan_policy: NanPolicy
+
+
 State: TypeAlias = tuple[  # noqa: UP040
     Int[Array, " n_obs"],  # indices in walk order (-1 for skipped)
     Array,  # visited_mask: float array of shape (n_obs,)
@@ -224,7 +239,7 @@ def _turned_back(
     that, a next tracer nearer the start than to the current one. Strict, so
     the first step -- from the start itself -- is never "nearer".
     """
-    heading = sum((next_x[k] - start_x[k]) * start_v[k] for k in start_x)
+    heading = sum((next_x[k] - start_x[k]) * start_v[k] for k in start_x)  # type: ignore[operator, misc]  # ArrayLike arithmetic
     nearer_start = euclidean_distance(start_x, next_x) < step_length
     return jnp.where(at_start, heading < 0, nearer_start)
 
@@ -235,7 +250,7 @@ def _local_flow_walk(
     vs: VectorComponents,
     /,
     *,
-    start_idx: int = 0,
+    start_idx: int | ISz0 = 0,
     metric_scale: RLikeSz0 = 1.0,
     max_dist: float = jnp.inf,
     terminate_indices: Set[int] | None = None,
@@ -347,7 +362,7 @@ def _local_flow_walk(
     metadata = StateMetadata() if metadata is None else metadata
 
     if direction == "both":
-        kwargs = {
+        kwargs: _HalfWalkKwargs = {
             "start_idx": start_idx,
             "metric_scale": metric_scale,
             "max_dist": max_dist,
@@ -425,9 +440,9 @@ def _local_flow_walk(
     )
 
     # Pack the state tuple
-    state: State = (ordered_arr, unvisited, start_idx, 1, False, metadata)
+    state: State = (ordered_arr, unvisited, start_idx, 1, False, metadata)  # type: ignore[assignment]  # Python scalars; the loop carries them as arrays
 
-    def cond_fn(state: State, /) -> bool:
+    def cond_fn(state: State, /) -> Bool[Array, ""]:
         """Continue looping if there are remaining points and iterations left."""
         # Partially unpack state for info related to stopping
         _, _, cur_idx, step, stop, *_ = state
@@ -549,7 +564,7 @@ def _local_flow_walk(
     )
 
 
-def order_w(res: WalkLocalFlowResult, /) -> tuple[VectorComponents, VectorComponents]:
+def order_w(res: WalkLocalFlowResult, /) -> tuple[ArrayComponents, ArrayComponents]:
     """Get xs and vs in the ordered sequence from a WalkLocalFlowResult.
 
     Filters out unvisited indices (marked as -1) and returns only the visited

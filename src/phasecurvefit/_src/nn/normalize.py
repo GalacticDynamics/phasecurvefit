@@ -11,7 +11,7 @@ import wadler_lindig as wl
 from jaxtyping import Array, Float
 
 from phasecurvefit._src._repr import ReprMixin, attrs_pdoc
-from phasecurvefit._src.custom_types import VectorComponents
+from phasecurvefit._src.custom_types import ArrayComponents, VectorComponents
 
 
 class AbstractNormalizer(ReprMixin, metaclass=abc.ABCMeta):
@@ -36,7 +36,7 @@ class AbstractNormalizer(ReprMixin, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def inverse_transform(
         self, qs: Float[Array, "N D"], ps: Float[Array, "N D"]
-    ) -> tuple[VectorComponents, VectorComponents]:
+    ) -> tuple[ArrayComponents, ArrayComponents]:
         """Inverse transform the data back to original space."""
 
     @property
@@ -90,7 +90,7 @@ class StandardScalerNormalizer(AbstractNormalizer):
     ) -> None:
         # Resolves to the plain no-op ``AbstractNormalizer.__init__`` (next in
         # the MRO), not back into this plum dispatch. Kept for static checkers.
-        super().__init__(qs, ps)
+        super().__init__(qs, ps)  # type: ignore[safe-super]  # no-op abstract init
 
         # Positions
         self.q_comps = list(qs.keys())
@@ -121,7 +121,7 @@ class StandardScalerNormalizer(AbstractNormalizer):
 
     def inverse_transform(
         self, qs: Float[Array, "N D"], ps: Float[Array, "N D"]
-    ) -> tuple[VectorComponents, VectorComponents]:
+    ) -> tuple[ArrayComponents, ArrayComponents]:
         """Inverse the standardization to return to original data space."""
         # Positions
         qs = (qs * self.q_std) + self.q_mean

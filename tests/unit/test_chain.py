@@ -63,7 +63,7 @@ def test_init_is_threaded_to_stages():
     seen = []
 
     class Recorder(pcf.orderers.AbstractOrderer):
-        def order(self, positions, velocities, *, metadata=None, init=None):  # noqa: ARG002
+        def order(self, positions, velocities, *, metadata=None, init=None):  # type: ignore[override]  # noqa: ARG002  # a test double; takes only what it records
             seen.append(init)
             return pcf.orderers.LocalFlowOrderer().order(positions, velocities)
 
@@ -93,7 +93,7 @@ class _LegacyOrderer(pcf.orderers.AbstractOrderer):
     where no prior result exists to forward.
     """
 
-    def order(self, positions, velocities, *, metadata=None):  # noqa: ARG002
+    def order(self, positions, velocities, *, metadata=None):  # type: ignore[override]  # noqa: ARG002  # deliberately the older signature
         return pcf.orderers.LocalFlowOrderer().order(positions, velocities)
 
 

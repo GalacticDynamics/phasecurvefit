@@ -53,11 +53,12 @@ def knn_edges(
         if velocity_weight > 0.0:
             # velocity_weight / scale may overflow: cap it, inf is not a weight
             w = jnp.minimum(
-                d + (velocity_weight / scale) * (1.0 - cos), jnp.finfo(d.dtype).max
+                d + (velocity_weight / scale) * (1.0 - cos),
+                jnp.finfo(d.dtype).max,  # type: ignore[no-untyped-call]  # untyped in jax
             )
         if sever_cos_threshold is not None:
             valid = valid & (cos >= sever_cos_threshold)
-    w = jnp.maximum(w, jnp.finfo(w.dtype).tiny)
+    w = jnp.maximum(w, jnp.finfo(w.dtype).tiny)  # type: ignore[no-untyped-call]  # untyped in jax
     return jnp.minimum(rows, cols), jnp.maximum(rows, cols), d, w, valid
 
 

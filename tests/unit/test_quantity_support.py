@@ -177,7 +177,7 @@ class TestWalkLocalFlowWithQuantities:
 
         # Check that positions have units preserved
         assert isinstance(result.positions["x"], u.AbstractQuantity)
-        assert isinstance(result.positions["y"], u.AbstractQuantity)
+        assert isinstance(result.positions["y"], u.AbstractQuantity)  # type: ignore[unreachable]  # mypy cannot see a Quantity here
         assert str(result.positions["x"].unit) == "m"
         assert str(result.positions["y"].unit) == "m"
 
@@ -294,7 +294,7 @@ class TestWalkLocalFlowWithQuantities:
 
         # Check that Quantities are preserved in output
         assert isinstance(result.positions["x"], u.AbstractQuantity)
-        assert isinstance(result.velocities["x"], u.AbstractQuantity)
+        assert isinstance(result.velocities["x"], u.AbstractQuantity)  # type: ignore[unreachable]  # mypy cannot see a Quantity here
         assert str(result.positions["x"].unit) == "m"
         assert str(result.velocities["x"].unit) == "m / s"
 

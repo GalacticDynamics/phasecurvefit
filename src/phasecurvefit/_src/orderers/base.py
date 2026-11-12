@@ -26,6 +26,7 @@ __all__: tuple[str, ...] = (
 import abc
 import os
 from pathlib import Path
+from typing import TypedDict
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -36,6 +37,17 @@ from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
+
+
+class _OrderKwargs(TypedDict, total=False):
+    """Optional keywords forwarded to ``AbstractOrderer.order``.
+
+    Built up and splatted so unset ones are omitted, for orderers predating them.
+    """
+
+    init: AbstractResult
+    weights: Float[Array, " n_obs"]
+
 
 # Frames a warning should skip to land on the user's line: this package, and the
 # plum dispatch and equinox bound-method wrappers between it and the caller. A
@@ -260,7 +272,7 @@ def order(
             positions, velocities, metadata=metadata, weights=weights
         )
     # Omit ``init`` and ``weights`` when unset, so orderers predating them work.
-    kw: dict[str, object] = {}
+    kw: _OrderKwargs = {}
     if init is not None:
         kw["init"] = init
     if weights is not None:

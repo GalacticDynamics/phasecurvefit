@@ -16,7 +16,7 @@ class TestEuclideanDistance:
         pos_b = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
 
         dist = pcf.w.euclidean_distance(pos_a, pos_b)
-        assert float(dist) == pytest.approx(5.0)
+        assert float(jnp.asarray(dist)) == pytest.approx(5.0)
 
     def test_point_to_point_3d(self):
         """Test Euclidean distance between two 3D points."""
@@ -24,13 +24,13 @@ class TestEuclideanDistance:
         pos_b = {"x": jnp.array(1.0), "y": jnp.array(2.0), "z": jnp.array(2.0)}
 
         dist = pcf.w.euclidean_distance(pos_a, pos_b)
-        assert float(dist) == pytest.approx(3.0)
+        assert float(jnp.asarray(dist)) == pytest.approx(3.0)
 
     def test_zero_distance(self):
         """Test distance from a point to itself."""
         pos = {"x": jnp.array(1.0), "y": jnp.array(2.0)}
         dist = pcf.w.euclidean_distance(pos, pos)
-        assert float(dist) == pytest.approx(0.0)
+        assert float(jnp.asarray(dist)) == pytest.approx(0.0)
 
     def test_point_to_array(self):
         """Test distance from a point to multiple points using vmap."""
@@ -55,7 +55,9 @@ class TestCosineSimilarity:
         vec_b = {"x": jnp.array(2.0), "y": jnp.array(0.0)}
 
         sim = pcf.w.cosine_similarity(vec_a, vec_b)
-        assert float(sim) == pytest.approx(1.0)  # dot product of unit vectors
+        assert float(jnp.asarray(sim)) == pytest.approx(
+            1.0
+        )  # dot product of unit vectors
 
     def test_antiparallel(self):
         """Test cosine similarity of antiparallel vectors."""
@@ -63,7 +65,7 @@ class TestCosineSimilarity:
         vec_b = {"x": jnp.array(-1.0), "y": jnp.array(0.0)}
 
         sim = pcf.w.cosine_similarity(vec_a, vec_b)
-        assert float(sim) == pytest.approx(-1.0)
+        assert float(jnp.asarray(sim)) == pytest.approx(-1.0)
 
     def test_orthogonal(self):
         """Test cosine similarity of orthogonal vectors."""
@@ -71,7 +73,7 @@ class TestCosineSimilarity:
         vec_b = {"x": jnp.array(0.0), "y": jnp.array(1.0)}
 
         sim = pcf.w.cosine_similarity(vec_a, vec_b)
-        assert float(sim) == pytest.approx(0.0)
+        assert float(jnp.asarray(sim)) == pytest.approx(0.0)
 
     def test_array_valued(self):
         """Test cosine similarity with array-valued components using vmap."""
@@ -97,37 +99,37 @@ class TestVelocityFunctions:
         """Test velocity norm for a 2D velocity."""
         vel = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
         norm = pcf.w.velocity_norm(vel)
-        assert float(norm) == pytest.approx(5.0)
+        assert float(jnp.asarray(norm)) == pytest.approx(5.0)
 
     def test_velocity_norm_3d(self):
         """Test velocity norm for a 3D velocity."""
         vel = {"x": jnp.array(1.0), "y": jnp.array(2.0), "z": jnp.array(2.0)}
         norm = pcf.w.velocity_norm(vel)
-        assert float(norm) == pytest.approx(3.0)
+        assert float(jnp.asarray(norm)) == pytest.approx(3.0)
 
     def test_unit_velocity_2d(self):
         """Test unit velocity for a 2D velocity."""
         vel = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
         uvel = pcf.w.unit_velocity(vel)
 
-        assert float(uvel["x"]) == pytest.approx(0.6)
-        assert float(uvel["y"]) == pytest.approx(0.8)
+        assert float(jnp.asarray(uvel["x"])) == pytest.approx(0.6)
+        assert float(jnp.asarray(uvel["y"])) == pytest.approx(0.8)
 
     def test_unit_velocity_3d(self):
         """Test unit velocity for a 3D velocity."""
         vel = {"x": jnp.array(1.0), "y": jnp.array(2.0), "z": jnp.array(2.0)}
         uvel = pcf.w.unit_velocity(vel)
 
-        assert float(uvel["x"]) == pytest.approx(1.0 / 3.0)
-        assert float(uvel["y"]) == pytest.approx(2.0 / 3.0)
-        assert float(uvel["z"]) == pytest.approx(2.0 / 3.0)
+        assert float(jnp.asarray(uvel["x"])) == pytest.approx(1.0 / 3.0)
+        assert float(jnp.asarray(uvel["y"])) == pytest.approx(2.0 / 3.0)
+        assert float(jnp.asarray(uvel["z"])) == pytest.approx(2.0 / 3.0)
 
     def test_unit_velocity_norm_is_one(self):
         """Test that unit velocity has norm 1."""
         vel = {"x": jnp.array(3.0), "y": jnp.array(4.0)}
         uvel = pcf.w.unit_velocity(vel)
         norm = pcf.w.velocity_norm(uvel)
-        assert float(norm) == pytest.approx(1.0)
+        assert float(jnp.asarray(norm)) == pytest.approx(1.0)
 
 
 class TestDirectionFunctions:
@@ -140,8 +142,8 @@ class TestDirectionFunctions:
 
         udir = pcf.w.unit_direction(pos_a, pos_b)
 
-        assert float(udir["x"]) == pytest.approx(0.6)
-        assert float(udir["y"]) == pytest.approx(0.8)
+        assert float(jnp.asarray(udir["x"])) == pytest.approx(0.6)
+        assert float(jnp.asarray(udir["y"])) == pytest.approx(0.8)
 
     def test_unit_direction_point_to_array(self):
         """Test unit directions from a point to multiple points using vmap."""
@@ -170,10 +172,10 @@ class TestUtilityFunctions:
 
         q, p = pcf.w.get_w_at(pos, vel, 1)
 
-        assert float(q["x"]) == pytest.approx(2.0)
-        assert float(q["y"]) == pytest.approx(5.0)
-        assert float(p["x"]) == pytest.approx(0.2)
-        assert float(p["y"]) == pytest.approx(0.5)
+        assert float(jnp.asarray(q["x"])) == pytest.approx(2.0)
+        assert float(jnp.asarray(q["y"])) == pytest.approx(5.0)
+        assert float(jnp.asarray(p["x"])) == pytest.approx(0.2)
+        assert float(jnp.asarray(p["y"])) == pytest.approx(0.5)
 
     def test_get_w_at_multiple_points(self):
         """Test extracting multiple points from arrays."""
@@ -182,9 +184,10 @@ class TestUtilityFunctions:
 
         q, _ = pcf.w.get_w_at(pos, vel, jnp.array([0, 2]))
 
-        assert q["x"].shape == (2,)
-        assert float(q["x"][0]) == pytest.approx(1.0)
-        assert float(q["x"][1]) == pytest.approx(3.0)
+        qx = jnp.asarray(q["x"])
+        assert qx.shape == (2,)
+        assert float(qx[0]) == pytest.approx(1.0)
+        assert float(qx[1]) == pytest.approx(3.0)
 
 
 class TestJAXCompatibility:

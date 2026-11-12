@@ -170,6 +170,7 @@ class TestRunningMeanDecoder:
         )
 
         # Test single gamma value within the decoder's valid range
+        assert decoder.gamma_train is not None
         gamma = jnp.mean(decoder.gamma_train)
         result = decoder(gamma)
 
@@ -186,6 +187,7 @@ class TestRunningMeanDecoder:
         )
 
         # Test multiple gamma values within the decoder's valid range
+        assert decoder.gamma_train is not None
         gamma_min = jnp.min(decoder.gamma_train)
         gamma_max = jnp.max(decoder.gamma_train)
         gammas = jnp.linspace(gamma_min, gamma_max, 3)
@@ -205,6 +207,7 @@ class TestRunningMeanDecoder:
 
         # JIT the vmapped decoder instead of the decoder itself
         jitted_decoder = jax.jit(jax.vmap(decoder))
+        assert decoder.gamma_train is not None
         gamma_min = jnp.min(decoder.gamma_train)
         gamma_max = jnp.max(decoder.gamma_train)
         gammas = jnp.linspace(gamma_min, gamma_max, 3)
@@ -229,6 +232,7 @@ class TestRunningMeanDecoder:
             window_size=0.1,
         )
 
+        assert decoder.gamma_train is not None
         gamma = jnp.mean(decoder.gamma_train)
         result = decoder(gamma)
 
@@ -254,6 +258,7 @@ class TestRunningMeanDecoder:
         )
 
         # Use a gamma value within both decoders' valid ranges
+        assert decoder_small.gamma_train is not None
         gamma = jnp.mean(decoder_small.gamma_train)
 
         # Both should produce valid outputs

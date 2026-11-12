@@ -5,15 +5,43 @@ in-arm spacing) with **opposite** velocities. Pure-spatial ordering zigzags
 between the arms; velocity information should keep them apart or orient them.
 """
 
+from typing import TypedDict
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 import phasecurvefit as pcf
+from phasecurvefit._src.algorithm import NanPolicy
 from phasecurvefit._src.orderers import mst as mst_module
 
 pytest.importorskip("scipy")
+
+
+class _Mechanism(TypedDict, total=False):
+    """One opt-in velocity mechanism of ``MSTOrderer``, as keyword arguments."""
+
+    velocity_weight: float
+    sever_cos_threshold: float | None
+    orient_by_velocity: bool
+
+
+class _MSTKwargs(_Mechanism, total=False):
+    """Keyword arguments for ``MSTOrderer`` shared between calls in a test."""
+
+    k: int
+    jump_cap: float
+    on_disconnected: mst_module.OnDisconnected
+    nan_policy: NanPolicy
+
+
+class _FloatSettings(TypedDict):
+    """The float settings of ``MSTOrderer`` given as JAX scalars."""
+
+    jump_cap: float
+    velocity_weight: float
+    edge_clip_sigma: float
 
 
 def _hairpin(n_a=50, n_b=40, gap=0.05):
@@ -101,7 +129,7 @@ class TestTipOrientation:
         assert xo_pos[0] < xo_pos[-1]
 
 
-_MECHANISMS = {
+_MECHANISMS: dict[str, _Mechanism] = {
     "velocity_weight": {"velocity_weight": 5.0},
     "sever_cos_threshold": {"sever_cos_threshold": 0.0},
     "orient_by_velocity": {"orient_by_velocity": True},
@@ -168,7 +196,7 @@ class TestMissingVelocities:
     def test_rejects_an_unknown_nan_policy(self):
         """A typo fails at construction, not at the first NaN."""
         with pytest.raises(ValueError, match="nan_policy"):
-            pcf.orderers.MSTOrderer(nan_policy="propagate")
+            pcf.orderers.MSTOrderer(nan_policy="propagate")  # type: ignore[arg-type]  # deliberately invalid
 
     @pytest.mark.parametrize("mechanism", [None, *sorted(_MECHANISMS)])
     def test_omit_accepts_nan(self, mechanism):
@@ -181,7 +209,7 @@ class TestMissingVelocities:
         """
         _, pos, vel = _line()
         vel = {"x": vel["x"].at[10:15].set(jnp.nan), "y": vel["y"]}
-        kw = {} if mechanism is None else _MECHANISMS[mechanism]
+        kw: _Mechanism = {} if mechanism is None else _MECHANISMS[mechanism]
         res = pcf.orderers.MSTOrderer(k=6, jump_cap=2.0, nan_policy="omit", **kw).order(
             pos, vel
         )
@@ -268,8 +296,13 @@ class TestMissingVelocities:
             "x": vel["x"].at[20].set(0.0).at[60].set(jnp.nan),
             "y": vel["y"].at[20].set(0.0),
         }
-        kw = {"k": 6, "jump_cap": 1.0, "on_disconnected": "largest"}
-        kw |= {"nan_policy": "omit", **_MECHANISMS[mechanism]}
+        kw: _MSTKwargs = {
+            "k": 6,
+            "jump_cap": 1.0,
+            "on_disconnected": "largest",
+            "nan_policy": "omit",
+            **_MECHANISMS[mechanism],
+        }
         scipy = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw)
         bucket = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.BucketKDTree(), **kw)
         want = np.asarray(scipy.order(pos, vel).indices)
@@ -534,12 +567,16 @@ class TestJaxGraphStageMatchesHost:
         Equinox already warns about a JAX array in a static field; it still works.
         """
         pos, vel = _tie_free_hairpin()
-        cfg = {"jump_cap": 3.0, "velocity_weight": 0.5, "edge_clip_sigma": 3.0}
+        cfg: _FloatSettings = {
+            "jump_cap": 3.0,
+            "velocity_weight": 0.5,
+            "edge_clip_sigma": 3.0,
+        }
         want = pcf.orderers.MSTOrderer(k=8, **cfg).order(pos, vel).indices
         got = pcf.orderers.MSTOrderer(
             k=8,
             neighbors=pcf.neighbors.BucketKDTree(),
-            **{key: jnp.asarray(val) for key, val in cfg.items()},
+            **{key: jnp.asarray(val) for key, val in cfg.items()},  # type: ignore[arg-type]  # deliberately JAX scalars
         ).order(pos, vel)
         np.testing.assert_array_equal(np.asarray(got.indices), np.asarray(want))
 

@@ -13,7 +13,13 @@ from scipy.spatial import cKDTree
 
 from .abstractautoencoder import AbstractAutoencoder
 from phasecurvefit._src.abstract_result import AbstractResult
-from phasecurvefit._src.custom_types import BSzN, FSzN, ISzN, VectorComponents
+from phasecurvefit._src.custom_types import (
+    ArrayComponents,
+    BSzN,
+    FSzN,
+    ISzN,
+    VectorComponents,
+)
 
 
 class AutoencoderResult(AbstractResult):
@@ -63,7 +69,7 @@ class AutoencoderResult(AbstractResult):
 
     def __call__(
         self, gamma: Array, /, *, key: PRNGKeyArray | None = None
-    ) -> VectorComponents:
+    ) -> ArrayComponents:
         r"""Interpolate spatial positions using the decoder network.
 
         Parameters
@@ -263,7 +269,10 @@ def _magnitudes(comps: VectorComponents, keys: list[str], /) -> np.ndarray:
     unit = getattr(comps[keys[0]], "unit", None)
     return np.stack(
         [
-            np.asarray(comps[k] if unit is None else comps[k].ustrip(unit), dtype=float)
+            np.asarray(
+                comps[k] if unit is None else comps[k].ustrip(unit),  # type: ignore[union-attr]  # Quantity iff unit
+                dtype=float,
+            )
             for k in keys
         ],
         axis=1,

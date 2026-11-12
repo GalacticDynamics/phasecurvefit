@@ -194,7 +194,8 @@ primitives when operating on `Quantity` values:
 Common commands:
 
 ```bash
-uv run nox -s lint      # Run linters (pre-commit + ruff)
+uv run nox -s lint      # Run linters (pre-commit + ruff, pylint, mypy)
+uv run nox -s mypy      # Type-check src/ and tests/ with mypy
 uv run nox -s test      # Run pytest suite
 uv run pytest tests/ -v # Run tests directly
 uv run pre-commit run -a # Run all pre-commit hooks

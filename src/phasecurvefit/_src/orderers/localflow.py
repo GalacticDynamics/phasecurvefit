@@ -170,7 +170,9 @@ class LocalFlowOrderer(AbstractOrderer):
         through on the result.
         """
         if weights is not None:
-            weights = check_weights(weights, next(iter(positions.values())).shape[0])
+            weights = check_weights(
+                weights, jnp.shape(next(iter(positions.values())))[0]
+            )
         result = _local_flow_walk(
             positions,
             velocities,

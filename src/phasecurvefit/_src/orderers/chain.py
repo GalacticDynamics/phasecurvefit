@@ -18,7 +18,7 @@ __all__: tuple[str, ...] = ("ChainOrderer",)
 
 from jaxtyping import Array, Float
 
-from .base import AbstractOrderer
+from .base import AbstractOrderer, _OrderKwargs
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
@@ -82,15 +82,13 @@ class ChainOrderer(AbstractOrderer):
         ``weights`` go to every stage.
         """
         # Omit ``weights`` when unset, so stages predating it still work.
-        kw: dict[str, object] = {} if weights is None else {"weights": weights}
         result = init
         for stage in self.stages:
-            if result is None:
-                # Omit ``init`` entirely so a stage written against v0.3.1's
-                # ``order()`` still works as the head of a chain.
-                result = stage.order(positions, velocities, metadata=metadata, **kw)
-            else:
-                result = stage.order(
-                    positions, velocities, metadata=metadata, init=result, **kw
-                )
+            kw: _OrderKwargs = {} if weights is None else {"weights": weights}
+            # Omit ``init`` while there is none, so a stage written against
+            # v0.3.1's ``order()`` still works as the head of a chain.
+            if result is not None:
+                kw["init"] = result
+            result = stage.order(positions, velocities, metadata=metadata, **kw)
+        assert result is not None  # noqa: S101  # __init__ rejects zero stages
         return result

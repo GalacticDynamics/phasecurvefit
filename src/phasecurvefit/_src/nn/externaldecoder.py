@@ -302,12 +302,13 @@ class RunningMeanDecoder(AbstractExternalDecoder):
 
         """
         # Preprocess the data
+        # positions and velocities come in the same form; mypy narrows only one.
         if isinstance(positions, Mapping):
-            qs_norm, ps_norm = normalizer.transform(positions, velocities)
+            qs_norm, ps_norm = normalizer.transform(positions, velocities)  # type: ignore[arg-type]
         else:
             # Assume already normalized array form
             qs_norm = positions
-            ps_norm = velocities
+            ps_norm = velocities  # type: ignore[assignment]
 
         # Predict gamma for all training samples (only need gamma, not prob)
         ws_norm = jnp.concatenate([qs_norm, ps_norm], axis=1)

@@ -31,6 +31,8 @@ The neighbour searches and graph run on the host with SciPy, like
 
 __all__: tuple[str, ...] = ("RidgeOrderer",)
 
+from typing import TypedDict
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -180,7 +182,7 @@ class RidgeOrderer(AbstractOrderer):
         if weights is not None:
             weights = check_weights(weights, n)
         w = np.ones(n) if weights is None else np.asarray(weights, dtype=float)
-        opts = {"k": self.k, "core": self.core, "trim": self.trim}
+        opts: _RidgeOpts = {"k": self.k, "core": self.core, "trim": self.trim}
 
         if n < 2:  # nothing to connect: identity ordering, as MSTOrderer
             backbone, chord = pts, np.zeros(n)
@@ -228,6 +230,14 @@ def _subsample(
             np.random.default_rng(0).choice(candidates, m, replace=False)
         )
     return pts[candidates], w[candidates]
+
+
+class _RidgeOpts(TypedDict):
+    """Keyword options shared by ``_backbone`` and ``_estimate_bandwidth``."""
+
+    k: int
+    core: float
+    trim: float
 
 
 def _backbone(

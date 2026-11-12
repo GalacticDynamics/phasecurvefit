@@ -21,6 +21,7 @@ from dataclasses import KW_ONLY
 import equinox as eqx
 import jax.numpy as jnp
 import jax.tree as jt
+import numpy as np
 from jaxtyping import Array, Bool, Int, PRNGKeyArray
 
 from zeroth import zeroth
@@ -260,11 +261,13 @@ class OrderingResult(AbstractResult):
         gamma_normalized = (gamma - min_gamma) / gamma_range_width
 
         if self.backbone is not None:
-            return self._interp_backbone(gamma_normalized)
+            return self._interp_backbone(self.backbone, gamma_normalized)
         return self._interp_ordered(gamma_normalized)
 
     @staticmethod
-    def _lerp_bracket(gamma_normalized: Array, n_control: Array, /) -> tuple:
+    def _lerp_bracket(
+        gamma_normalized: Array, n_control: int | Array, /
+    ) -> tuple[Array, Array, Array]:
         """Bracketing indices and weights for linear interpolation over n points."""
         indices_float = gamma_normalized * (n_control - 1)
         floor = jnp.floor(indices_float)
@@ -273,14 +276,17 @@ class OrderingResult(AbstractResult):
         idx_upper = jnp.clip(ceil.astype(jnp.int32), 0, n_control - 1)
         return idx_lower, idx_upper, indices_float - floor
 
-    def _interp_backbone(self, gamma_normalized: Array, /) -> VectorComponents:
+    def _interp_backbone(
+        self, backbone: VectorComponents, gamma_normalized: Array, /
+    ) -> VectorComponents:
         """Interpolate along the backbone polyline vertices.
 
         Uses ``backbone_size`` as the valid vertex count when set (the backbone
         arrays may be padded to a static shape beyond that point).
         """
+        n_control: int | Array
         if self.backbone_size is None:
-            n_control = len(zeroth(self.backbone.values()))
+            n_control = np.shape(zeroth(backbone.values()))[0]
             if n_control == 0:
                 msg = "Cannot interpolate: the backbone has no vertices."
                 raise ValueError(msg)
@@ -291,7 +297,7 @@ class OrderingResult(AbstractResult):
         def interpolate_component(vals: Array) -> Array:
             return (1 - w) * vals[lo] + w * vals[hi]
 
-        return jt.map(interpolate_component, self.backbone)
+        return jt.map(interpolate_component, backbone)
 
     def _interp_ordered(self, gamma_normalized: Array, /) -> VectorComponents:
         """Interpolate along the ordered visited observations (legacy walk)."""

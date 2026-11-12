@@ -41,6 +41,9 @@ jobs:
       - name: Run pre-commit
         run: uv run --frozen nox -s precommit
 
+      - name: Run mypy
+        run: uv run --frozen nox -s mypy
+
   smoke:
     name: Smoke Test (core dependencies only)
     runs-on: ubuntu-latest

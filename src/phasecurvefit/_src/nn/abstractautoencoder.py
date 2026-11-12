@@ -11,7 +11,7 @@ from jaxtyping import PRNGKeyArray
 
 from .normalize import AbstractNormalizer
 from phasecurvefit._src._repr import ReprMixin
-from phasecurvefit._src.custom_types import FSzN, VectorComponents
+from phasecurvefit._src.custom_types import ArrayComponents, FSzN, VectorComponents
 
 Gamma: TypeAlias = FSzN  # noqa: UP040
 
@@ -24,7 +24,7 @@ class AbstractAutoencoder(ReprMixin, eqx.Module):
     @property
     def gamma_range(self) -> tuple[float, float]:
         """Return the gamma range from the encoder."""
-        return self.encoder.gamma_range
+        return self.encoder.gamma_range  # type: ignore[attr-defined]  # encoder is typed as eqx.Module
 
     def encode(
         self,
@@ -53,7 +53,8 @@ class AbstractAutoencoder(ReprMixin, eqx.Module):
         """
         qs_norm, ps_norm = self.normalizer.transform(qs, ps)
         ws_norm = jnp.concatenate([qs_norm, ps_norm], axis=1)
-        gamma, prob = jax.vmap(self.encoder, (0, None))(jnp.atleast_2d(ws_norm), key)
+        # encoder/decoder are typed as eqx.Module, which mypy does not see as callable.
+        gamma, prob = jax.vmap(self.encoder, (0, None))(jnp.atleast_2d(ws_norm), key)  # type: ignore[type-var,operator]
         # Remove extra dim if input was 1D
         gamma = gamma.squeeze() if qs_norm.ndim == 1 else gamma
         prob = prob.squeeze() if qs_norm.ndim == 1 else prob
@@ -61,7 +62,7 @@ class AbstractAutoencoder(ReprMixin, eqx.Module):
 
     def decode(
         self, gamma: Gamma, /, *, key: PRNGKeyArray | None = None
-    ) -> VectorComponents:
+    ) -> ArrayComponents:
         r"""Decode $\gamma$ to reconstructed position.
 
         Parameters
@@ -79,7 +80,7 @@ class AbstractAutoencoder(ReprMixin, eqx.Module):
             Reconstructed dict of positions.
 
         """
-        qs_norm = jax.vmap(self.decoder, (0, None))(jnp.atleast_1d(gamma), key)
+        qs_norm = jax.vmap(self.decoder, (0, None))(jnp.atleast_1d(gamma), key)  # type: ignore[type-var,operator]  # eqx.Module
         qs_norm = qs_norm.squeeze() if gamma.ndim == 0 else qs_norm
         qs, _ = self.normalizer.inverse_transform(qs_norm, jnp.zeros_like(qs_norm))
         return qs

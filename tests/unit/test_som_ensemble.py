@@ -50,13 +50,14 @@ def test_fit_vmaps_over_an_ensemble(helix):
         eq, ep
     )
     fq = result.prototype_positions
+    fqx = jnp.asarray(fq["x"])
 
     # Indexed by component name, not `jt.leaves(...)[0]`: leaf order is an
     # implementation detail of the pytree, so a positional index silently
     # follows any change in structure to some other -- possibly constant -- leaf.
-    assert fq["x"].shape == (N_ENSEMBLE, N_PROTOTYPES)
+    assert fqx.shape == (N_ENSEMBLE, N_PROTOTYPES)
     # Members stay distinct ...
-    assert not jnp.allclose(fq["x"][0], fq["x"][1])
+    assert not jnp.allclose(fqx[0], fqx[1])
     # ... and training actually moved them. Without this the assertion above is
     # satisfied by the distinct *initializations* alone, so the test passes
     # even if `fit` returns its input untouched.
@@ -198,9 +199,10 @@ class TestEnsembleDiversityComesFromTheData:
             lambda w: som.fit(pq, pp, pos, vel, metric=metric, n_epochs=10, weights=w)
         )(weights).prototype_positions
 
-        off_diagonal = jnp.abs(fitted["x"][:, None, :] - fitted["x"][None, :, :]).max(
-            -1
-        )[~jnp.eye(8, dtype=bool)]
+        fx = jnp.asarray(fitted["x"])
+        off_diagonal = jnp.abs(fx[:, None, :] - fx[None, :, :]).max(-1)[
+            ~jnp.eye(8, dtype=bool)
+        ]
         # Orders of magnitude above float32 noise, and above the exactly-zero
         # collapse the jittered construction produces.
         assert float(off_diagonal.min()) > 1e-3

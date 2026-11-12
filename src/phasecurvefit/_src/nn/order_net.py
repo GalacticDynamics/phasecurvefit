@@ -14,7 +14,7 @@ __all__: tuple[str, ...] = (
 
 import functools as ft
 from dataclasses import KW_ONLY, dataclass
-from typing import ClassVar, cast
+from typing import ClassVar
 
 import equinox as eqx
 import jax
@@ -113,7 +113,7 @@ class OrderingNet(ReprMixin, eqx.Module):
         self.gamma_head = eqx.nn.Linear(width_size, 1, key=keys[1])
         self.prob_head = eqx.nn.Linear(width_size, 1, key=keys[2])
 
-    @ft.partial(eqx.filter_jit)
+    @eqx.filter_jit
     def __call__(
         self, ws: Float[Array, " {self.n_dims}"], /, key: PRNGKeyArray | None = None
     ) -> tuple[FSz0, FSz0]:
@@ -397,8 +397,9 @@ class OrderingNetTrainer(EqxScanTrainer):
         random_ws = jr.uniform(
             epoch_key,
             shape=self.random_ws_shape,
-            minval=self.ws_min,
-            maxval=self.ws_max,
+            # ws_min / ws_max default to None but are set before training.
+            minval=self.ws_min,  # type: ignore[arg-type]
+            maxval=self.ws_max,  # type: ignore[arg-type]
         )
         return (ordered_ws, gamma_target, weights, random_ws)
 
@@ -570,4 +571,4 @@ def train_ordering_net(
         show_pbar=config.show_pbar,
     )
 
-    return cast("OrderingNet", model), opt_state, epoch_losses
+    return model, opt_state, epoch_losses

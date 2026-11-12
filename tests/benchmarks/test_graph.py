@@ -5,6 +5,7 @@ stage within ~3x of the host stage at n = 1e5.
 """
 
 import functools
+from typing import Literal
 
 import jax
 import jax.numpy as jnp
@@ -68,7 +69,7 @@ def test_jax(benchmark, case, n):
 def test_host(benchmark, case, n):
     """The host (SciPy) graph stage, for reference."""
     p, v, nbr, cfg = _setup(case, n)
-    od = "connect" if cfg.pop("connect") else "largest"
+    od: Literal["connect", "largest"] = "connect" if cfg.pop("connect") else "largest"
     benchmark(
         lambda: _host_graph(
             p,

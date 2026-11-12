@@ -134,6 +134,7 @@ class TestSOMWeights:
         pos, vel, w = _two_lines()
         som = pcf.orderers.SOMOrderer(n_prototypes=10, n_epochs=20)
         result = som.order(pos, vel, weights=w)
+        assert result.backbone is not None
         y = np.asarray(result.backbone["y"])
         np.testing.assert_allclose(y, 0.25, atol=1e-3)
 
@@ -141,7 +142,9 @@ class TestSOMWeights:
         """Control: without weights the same backbone sits at y = 1/2."""
         pos, vel, _ = _two_lines()
         som = pcf.orderers.SOMOrderer(n_prototypes=10, n_epochs=20)
-        y = np.asarray(som.order(pos, vel).backbone["y"])
+        backbone = som.order(pos, vel).backbone
+        assert backbone is not None
+        y = np.asarray(backbone["y"])
         np.testing.assert_allclose(y, 0.5, atol=1e-3)
 
     def test_constant_weights_change_nothing(self):
@@ -151,6 +154,8 @@ class TestSOMWeights:
         plain = som.order(pos, vel)
         scaled = som.order(pos, vel, weights=jnp.full(60, 7.0))
         np.testing.assert_array_equal(plain.indices, scaled.indices)
+        assert plain.backbone is not None
+        assert scaled.backbone is not None
         np.testing.assert_allclose(
             plain.backbone["x"], scaled.backbone["x"], rtol=1e-5, atol=1e-5
         )
@@ -188,6 +193,7 @@ class TestSOMWeights:
             n_prototypes=10, n_epochs=20, outlier_mixture=pcf.som.SOMMixture()
         )
         result = som.order(pos, vel, weights=w if weighted else None)
+        assert result.backbone is not None
         np.testing.assert_allclose(result.backbone["y"], centre, atol=5e-3)
         visited = np.zeros(220, bool)
         idx = np.asarray(result.indices)

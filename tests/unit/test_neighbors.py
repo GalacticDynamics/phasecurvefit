@@ -259,8 +259,8 @@ class TestTracing:
     @pytest.mark.parametrize("k", [3, 8])
     def test_ties_independent_of_jit_and_padding(self, k):
         """On a grid (many equidistant neighbours) eager, jit and brute agree."""
-        g = np.stack(np.meshgrid(np.arange(7.0), np.arange(5.0)), -1).reshape(-1, 2)
-        g = jnp.asarray(g, jnp.float32)
+        grid = np.stack(np.meshgrid(np.arange(7.0), np.arange(5.0)), -1).reshape(-1, 2)
+        g = jnp.asarray(grid, jnp.float32)
         eager = pcf.neighbors.BucketKDTree().knn(g, k)[0]
         jitted = jax.jit(lambda x: pcf.neighbors.BucketKDTree().knn(x, k))(g)[0]
         brute = pcf.neighbors.BruteForce().knn(g, k)[0]

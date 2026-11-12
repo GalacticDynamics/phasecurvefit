@@ -81,7 +81,8 @@ class TestMSTAutoencoderIntegration:
         )
         result, *_ = pcf.nn.train_autoencoder(model, mst, config=cfg, key=k3)
 
-        path = result(jnp.linspace(*result.gamma_range, 1000))
+        gamma_lo, gamma_hi = result.gamma_range
+        path = result(jnp.linspace(gamma_lo, gamma_hi, 1000))
         A = np.stack([np.asarray(path["x"]), np.asarray(path["y"])], axis=1)
         hug = float(np.median(tree.query(A)[0]))
         assert hug < 4.0 * med, (
