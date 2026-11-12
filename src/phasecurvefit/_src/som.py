@@ -56,9 +56,9 @@ from phasecurvefit._src.metrics import (
 from phasecurvefit._src.nn.membership import uniform_background_density
 
 _TINY: Final = 1e-12
-# While the neighbourhood is wider than ``sigma_end``, the outlier mixture
-# widens the curve by this fraction of the neighbourhood's physical length; see
-# `fit`. Measured on a contaminated arc: 0.1 kept every member however long the
+# Early in training the outlier mixture widens the curve by this fraction of a
+# neighbourhood's physical length, annealed down to ``sigma_end``; see `fit`.
+# Measured on a contaminated arc: 0.1 kept every member however long the
 # training ran, where no widening lost 256 of 300 at 40 epochs; 0.17 and up let
 # a background of 240 in 540 drag the backbone off at 20 epochs.
 _MIXTURE_ANNEAL: Final = 0.1
@@ -382,6 +382,10 @@ class SOMMixture:
     :math:`\omega_n` multiplies every sum and never enters :math:`r_n`.
     :doc:`/explanation/som` explains the model.
 
+    The background needs room outside the curve. Samples that fill their own
+    bounding box, as the pixels of a mask or an image do, look like background:
+    on a straight mask of half-width 0.3 it rejected 974 of 1071 pixels.
+
     Attributes
     ----------
     background_density : float | None
@@ -652,12 +656,14 @@ def fit(
     from the curve or from a flat background (:class:`SOMMixture`). Each epoch
     computes every datum's membership ``r_n`` from the current prototypes, fits
     the mixing fraction and the curve's width by their closed-form M-steps, and
-    then updates the prototypes as above. While ``sigma`` is above
-    ``sigma_end`` the memberships are computed with the curve widened by a
-    tenth of the neighbourhood's physical length, ``sigma`` times the mean
-    prototype spacing, since the wide lattice is a smoothed copy of the curve;
-    the widening is zero at the last epoch, and throughout when
-    ``sigma_start == sigma_end``. A weight
+    then updates the prototypes as above. Early on the lattice is a rough copy
+    of the curve, so the memberships are computed with the curve widened by a
+    tenth of ``sigma_t`` times the mean prototype spacing, where ``sigma_t``
+    anneals geometrically from ``max(sigma_start, K / 4)`` to ``sigma_end``
+    over the epochs. The widening is zero at the last epoch. It anneals from
+    at least ``K / 4`` even when ``sigma_start`` is narrow, as it is chained
+    after another orderer, where the lattice starts from bin means that cut
+    inside the curve's bends. A weight
     multiplies every sum, the M-steps included, so a datum of weight ``w``
     counts like ``w`` coincident copies; it never enters ``r_n``.
 
@@ -747,6 +753,14 @@ def fit(
     data_q = jt.map(jnp.asarray, positions)
     data_p = jt.map(jnp.asarray, velocities)
     ratio = sigma_end / start
+    # The outlier mixture's widening anneals from at least the standalone
+    # starting width, even when the lattice itself starts narrow, as it does
+    # chained. Tied to the lattice's own width instead, a chained SOM got no
+    # widening at all, and on a near-closed three-lobed loop with 15
+    # prototypes the bin-mean lattice it starts from cut inside the lobes:
+    # 306 of 450 members were rejected.
+    start_t = max(start, n_prototypes / 4.0)
+    ratio_t = sigma_end / start_t
     span = max(n_epochs - 1, 1)
 
     # The neighbourhood is evaluated on the (K, K) lattice, not an (N, K)
@@ -819,19 +833,20 @@ def fit(
         # to float64, and the scan carry no longer matches its float32 input.
         sigma = start * ratio ** (step.astype(dtype) / span)
         if use_mix:
-            # While the neighbourhood is wide, the lattice smooths the curve on
-            # the scale of sigma * spacing, and the data scatter about that
-            # smoothed curve more widely than about the final one. Without
-            # widening the curve for it, members the early lattice misses are
-            # called background, stop pulling it, and stay lost: on a clean
-            # arc trained 40 epochs, 256 of 300. The widening falls to zero as
-            # sigma reaches sigma_end, and is zero throughout when chained.
+            # Early on, the lattice is a rough copy of the curve: smoothed on
+            # the scale of sigma * spacing while the neighbourhood is wide, or
+            # the bin means it was seeded with. The data scatter about it more
+            # widely than about the final lattice. Without widening the curve
+            # for it, members the early lattice misses are called background,
+            # stop pulling it, and stay lost: on a clean arc trained 40 epochs,
+            # 256 of 300. The widening falls to zero by the last epoch.
             proto_qs = _stack(pq, keys)
             spacing = jnp.sum(_safe_norm(jnp.diff(proto_qs, axis=0))) / (
                 n_prototypes - 1
             )
+            sigma_t = start_t * ratio_t ** (step.astype(dtype) / span)
             anneal = (_MIXTURE_ANNEAL * spacing) ** 2 * jnp.maximum(
-                sigma**2 - sigma_end**2, 0.0
+                sigma_t**2 - sigma_end**2, 0.0
             )
             r, msd = _tube_e_step(data_qs, proto_qs, omega, pi, s2 + anneal, log_bg)
             pi = jnp.clip(jnp.sum(omega * r) / total_w, *pi_bounds)

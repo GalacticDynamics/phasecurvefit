@@ -101,7 +101,7 @@ or background mixture ({doc}`../how-to/som`).
 | `metadata` | `None` | passed to the default pipeline |
 | `weights` | `None` | per-sample weights, passed to the default pipeline and on to training |
 | `n_prototypes` | `15` | SOM lattice points; with fewer samples the SOM stage is skipped |
-| `outlier_clip_sigma` | `3.0` | the SOM's outlier clipping: leave out of the ordering samples whose distance to their prototype is an outlier at this many sigma; `None` keeps every sample; skipped when `weights` are given ({doc}`../explanation/autoencoder`) |
+| `outlier_mixture` | `None` | a `SOMMixture` for the SOM stage, to leave out of the ordering samples it calls background; `None` keeps every sample. Not for masks or images ({doc}`../explanation/autoencoder`) |
 | `training_config` | `None` | a `TrainingConfig`; `None` uses its defaults |
 
 ## `TrainingConfig`

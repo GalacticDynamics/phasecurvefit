@@ -1099,8 +1099,8 @@ class TestSOMOutlierMixture:
         Mostly background, not all: this MST's ordering begins with background
         samples, so the chained SOM, which never widens its neighbourhood,
         starts its lattice off the arc's tip, and the tip's members fall
-        outside the curve (measured: 37 of the 46 newly rejected are
-        background, the other 9 the tip).
+        outside the curve (measured: 35 of the 42 newly rejected are
+        background, the other 7 the tip).
         """
         pos, vel, is_outlier = _contaminated_half_arc(n_arc=300, n_out=60)
         mst = pcf.orderers.MSTOrderer(k=10, jump_cap=3.0, edge_clip_sigma=3.0)

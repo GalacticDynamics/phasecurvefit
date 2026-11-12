@@ -135,17 +135,25 @@ draws the lattice in from the ends of the curve. With closed ends, the samples l
 outside looked like background, stopped pulling the ends back out, and on a clean arc
 half of the members were rejected.
 
-### Widening the curve while the lattice is wide
+### Widening the curve early in training
 
-While the neighbourhood is wide, the lattice is a smoothed copy of the curve, and the
-samples scatter about it by more than they will about the final one. So while $\sigma$
-is above `sigma_end` the memberships are computed with $s^2$ widened by
-$(0.1\,\sigma\,\Delta)^2 - (0.1\,\sigma_{\mathrm{end}}\,\Delta)^2$, where $\Delta$ is
-the mean spacing between prototypes. The widening is zero at the last epoch, and
-throughout when the SOM is chained, since it then starts at `sigma_end`. Without it,
-members the early lattice missed were called background and stayed lost: on a clean
-arc trained for 40 epochs, 256 of 300. A widening of 0.17 or more let a background of
-240 samples among 540 drag the backbone off at 20 epochs.
+Early in training the lattice is a rough copy of the curve, and the samples scatter
+about it by more than they will about the final one. While the neighbourhood is wide
+the lattice is a smoothed copy of the curve. Chained after another orderer, the
+neighbourhood starts narrow, but the lattice starts from the means of bins along the
+earlier ordering, which cut inside the curve's bends. So the memberships are computed
+with $s^2$ widened by
+$(0.1\,\sigma_t\,\Delta)^2 - (0.1\,\sigma_{\mathrm{end}}\,\Delta)^2$, where
+$\Delta$ is the mean spacing between prototypes and $\sigma_t$ shrinks geometrically
+from $\max(\sigma_{\mathrm{start}}, n_{\mathrm{prototypes}}/4)$ to
+$\sigma_{\mathrm{end}}$ over the epochs. The widening is zero at the last epoch.
+
+Without it, members the early lattice missed were called background and stayed lost:
+on a clean arc trained for 40 epochs, 256 of 300. Tied to the lattice's own
+neighbourhood, which stays at `sigma_end` when chained, the widening was zero there,
+and after an MST on a near-closed loop with three lobes and 15 prototypes, 306 of 450
+members were rejected. A widening of 0.17 or more let a background of 240 samples
+among 540 drag the backbone off at 20 epochs.
 
 ### Weights
 
@@ -157,9 +165,14 @@ sample of weight 2 trains exactly as two coincident copies of it.
 
 At 240 background samples among 540, the backbone stayed within 0.16 of the arc for
 10 epochs, and failed at 40 epochs, keeping almost all the background. Chained after
-another orderer the SOM never widens its neighbourhood, so it can't move a lattice the
+another orderer the SOM's neighbourhood stays narrow, so it can't move a lattice the
 earlier stage started in the background; {doc}`../how-to/som` shows the setting that
 helps.
+
+The background is flat over the samples' bounding box, so it needs room outside the
+curve. When the samples fill that box, as the pixels of a mask or an image do, the
+background explains them about as well as the curve does: on a straight mask of
+half-width 0.3, it called 974 of 1071 pixels background.
 
 ## Why perturbing the initialization gives no ensemble
 

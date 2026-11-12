@@ -36,16 +36,20 @@ ordering, result, losses = pcf.fit_track(
 {class}`~phasecurvefit.nn.AutoencoderResult`, and `losses` the training loss per
 epoch.
 
-`fit_track` leaves samples far from the stream out of the ordering, so that the track
-does not bend out to interlopers at its ends ({doc}`../explanation/autoencoder`
-explains how). Left-out samples have `-1` in `ordering.indices`. Nothing is left
-out when you pass `weights`, as for an image. To keep every sample
-in the ordering, pass `outlier_clip_sigma=None`; to clip only more distant samples,
-pass a larger value:
+For a point cloud with interlopers, pass an outlier mixture, so that `fit_track`
+leaves samples far from the stream out of the ordering and the track does not bend
+out to interlopers at its ends ({doc}`../explanation/autoencoder` explains how).
+Left-out samples have `-1` in `ordering.indices`. Don't use it for a mask or an
+image whose samples fill their own bounding box: there the mixture calls most of them
+background.
 
 ```{code-cell} python
 ordering, result, losses = pcf.fit_track(
-    pos, vel, key=jax.random.key(0), outlier_clip_sigma=None, training_config=config
+    pos,
+    vel,
+    key=jax.random.key(0),
+    outlier_mixture=pcf.som.SOMMixture(),
+    training_config=config,
 )
 ```
 

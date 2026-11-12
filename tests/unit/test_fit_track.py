@@ -38,9 +38,7 @@ def test_runs_all_three_steps(arc):
 def test_ordering_result_matches_default_pipeline_alone(arc):
     """The ordering step is not silently different from calling it directly."""
     pos, vel, _ = arc(n=30)
-    direct = pcf.orderers.default_pipeline(
-        pos, vel, n_prototypes=8, outlier_clip_sigma=3.0
-    )
+    direct = pcf.orderers.default_pipeline(pos, vel, n_prototypes=8)
     ordering, _fitted, _losses = pcf.fit_track(
         pos, vel, key=jax.random.key(0), n_prototypes=8, training_config=_fast_config()
     )
@@ -48,16 +46,19 @@ def test_ordering_result_matches_default_pipeline_alone(arc):
     assert ordering.gamma_range == direct.gamma_range
 
 
-def test_outlier_clip_sigma_none_keeps_every_tracer(arc):
-    """``outlier_clip_sigma=None`` orders as the unclipped default pipeline."""
+def test_outlier_mixture_is_passed_to_the_pipeline(arc):
+    """``outlier_mixture`` orders as the default pipeline given it."""
     pos, vel, _ = arc(n=30)
-    direct = pcf.orderers.default_pipeline(pos, vel, n_prototypes=8)
+    mix = pcf.som.SOMMixture()
+    direct = pcf.orderers.default_pipeline(
+        pos, vel, n_prototypes=8, outlier_mixture=mix
+    )
     ordering, _fitted, _losses = pcf.fit_track(
         pos,
         vel,
         key=jax.random.key(0),
         n_prototypes=8,
-        outlier_clip_sigma=None,
+        outlier_mixture=mix,
         training_config=_fast_config(),
     )
     assert jnp.array_equal(ordering.indices, direct.indices)
@@ -66,8 +67,9 @@ def test_outlier_clip_sigma_none_keeps_every_tracer(arc):
 def test_interlopers_past_a_tip_are_left_out_of_the_ordering():
     """Tracers far off the stream past its tip are not ordered.
 
-    Unclipped, the ordering puts them at the end of the stream, which teaches
-    the encoder to map them to the tip and bends the track out to them.
+    Without the outlier mixture, the ordering puts them at the end of the
+    stream, which teaches the encoder to map them to the tip and bends the track
+    out to them.
     """
     ang = jnp.linspace(0.0, jnp.pi, 80)
     far = jnp.asarray([[-9.0, 4.0], [-8.5, 6.0]])  # beyond the tip at (-5, 0)
@@ -79,11 +81,16 @@ def test_interlopers_past_a_tip_are_left_out_of_the_ordering():
         "x": jnp.concatenate([-jnp.sin(ang), jnp.zeros(2)]),
         "y": jnp.concatenate([jnp.cos(ang), jnp.ones(2)]),
     }
-    unclipped = pcf.orderers.default_pipeline(pos, vel, n_prototypes=10)
-    assert unclipped.indices[-2:].tolist() == [80, 81]
+    plain = pcf.orderers.default_pipeline(pos, vel, n_prototypes=10)
+    assert plain.indices[-2:].tolist() == [80, 81]
 
     ordering, _fitted, _losses = pcf.fit_track(
-        pos, vel, key=jax.random.key(0), n_prototypes=10, training_config=_fast_config()
+        pos,
+        vel,
+        key=jax.random.key(0),
+        n_prototypes=10,
+        outlier_mixture=pcf.som.SOMMixture(),
+        training_config=_fast_config(),
     )
     ordered = set(ordering.indices[ordering.indices >= 0].tolist())
     assert ordered.isdisjoint({80, 81})
@@ -135,3 +142,29 @@ def test_same_key_reproduces_the_fit(arc):
     out1 = fitted1(jnp.array(0.0))["x"]
     out2 = fitted2(jnp.array(0.0))["x"]
     assert jnp.array_equal(out1, out2)
+
+
+def test_interlopers_are_left_out_with_weights():
+    """The rejection works with weights, which clipping could not."""
+    ang = jnp.linspace(0.0, jnp.pi, 80)
+    far = jnp.asarray([[-9.0, 4.0], [-8.5, 6.0]])
+    pos = {
+        "x": jnp.concatenate([5 * jnp.cos(ang), far[:, 0]]),
+        "y": jnp.concatenate([5 * jnp.sin(ang), far[:, 1]]),
+    }
+    vel = {
+        "x": jnp.concatenate([-jnp.sin(ang), jnp.zeros(2)]),
+        "y": jnp.concatenate([jnp.cos(ang), jnp.ones(2)]),
+    }
+    ordering, _fitted, _losses = pcf.fit_track(
+        pos,
+        vel,
+        key=jax.random.key(0),
+        weights=jnp.ones(82).at[:40].set(2.0),
+        n_prototypes=10,
+        outlier_mixture=pcf.som.SOMMixture(),
+        training_config=_fast_config(),
+    )
+    ordered = set(ordering.indices[ordering.indices >= 0].tolist())
+    assert ordered.isdisjoint({80, 81})
+    assert len(ordered) == 80

@@ -158,6 +158,10 @@ where the larger error comes from. At 240 and 40 epochs it failed, keeping 237 o
 The mixture works with `weights`: a weight counts a sample as that many copies, and
 doesn't change whether it is a member.
 
+Don't use it on a mask or an image whose samples fill their own bounding box: there
+the background explains the samples as well as the curve does, and most of them are
+rejected.
+
 The background density defaults to one over the area (or volume) of the positions'
 bounding box. If the samples don't fill the field, set `background_inflate` above 1
 or give `background_density` directly, in your position units.
@@ -165,7 +169,7 @@ or give `background_density` directly, in your position units.
 Chained after another orderer, the SOM keeps its neighbourhood narrow from the
 start, so it can't move a backbone that the earlier stage started in the background.
 After `MSTOrderer(edge_clip_sigma=3.0)` on the arc above, the error with the mixture
-was 0.073 at 60 background samples and 0.582 at 120. Passing
+was 0.085 at 60 background samples and 0.596 at 120. Passing
 `sigma_start=n_prototypes / 4` lets it re-form the lattice, and brought those to
 0.037 and 0.045 (0.108 at 240):
 
