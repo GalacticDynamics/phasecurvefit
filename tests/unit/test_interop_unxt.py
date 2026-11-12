@@ -2,13 +2,34 @@
 
 import re
 
+import jax
 import pytest
+import quax
 
 import quaxed.numpy as jnp
 import unxt as u
 
 import phasecurvefit as pcf
 from phasecurvefit._src.nn.order_net import _chord_values
+
+
+class TestScatterQuantity:
+    """The ``lax.scatter_p`` handlers, reached by ``x.at[i].set(y)``."""
+
+    def test_quantity_operand_keeps_its_unit(self):
+        """The update is converted to the operand's unit before scattering."""
+        out = quax.quaxify(lambda x, y: x.at[1].set(y))(
+            u.Q(jnp.zeros(3), "m"), u.Q(2.0, "km")
+        )
+        assert isinstance(out, u.AbstractQuantity)
+        assert out.unit == u.unit("m")
+        assert out.value.tolist() == [0.0, 2000.0, 0.0]
+
+    def test_array_operand_takes_the_stripped_update(self):
+        """A plain operand gets the update's value in the update's own unit."""
+        out = quax.quaxify(lambda x, y: x.at[1].set(y))(jnp.zeros(3), u.Q(2.0, "m"))
+        assert isinstance(out, jax.Array)
+        assert jnp.array_equal(out, jnp.array([0.0, 2.0, 0.0]))
 
 
 class TestEuclideanDistanceQuantity:
