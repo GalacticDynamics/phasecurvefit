@@ -120,8 +120,8 @@ displaced across the track, thresholding the posterior at 0.5 gave:
 
 The fitted width came out at 0.150, against a true 0.15.
 
-To clip outliers while ordering, before any training, use the MST's
-`edge_clip_sigma` or the SOM's `outlier_clip_sigma` ({doc}`som`).
+To reject outliers while ordering, before any training, use the MST's
+`edge_clip_sigma` or the SOM's `outlier_mixture` ({doc}`som`).
 
 ## Reject outliers in an image
 

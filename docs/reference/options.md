@@ -77,9 +77,18 @@ velocities, and it runs on the host, so it can't be traced under `jit`.
 | `sigma_end` | `0.7` | final neighbourhood width in lattice units |
 | `densify_factor` | `5` | backbone samples per lattice segment |
 | `orient_by_velocity` | `False` | flip the ordering so $\gamma$ increases along the mean velocity |
-| `outlier_clip_sigma` | `None` | reject samples whose distance to their prototype is an outlier at this many sigma |
-| `outlier_clip_max_iters` | `5` | most rounds of outlier clipping |
+| `outlier_mixture` | `None` | a `phasecurvefit.som.SOMMixture` to reject outliers, see below |
 | `nan_policy` | `"raise"` | `"raise"` or `"omit"` for NaN inputs |
+
+### `SOMMixture`
+
+{class}`~phasecurvefit.som.SOMMixture`: outlier rejection for the SOM, a curve
+or background mixture ({doc}`../how-to/som`).
+
+| Option | Default | Meaning |
+|---|---|---|
+| `background_density` | `None` | density of the flat background, per unit position volume; `None` uses one over the volume of the positions' bounding box |
+| `background_inflate` | `1.0` | scale each side of that bounding box by this; raise it when the data do not fill the field |
 
 ## `fit_track`
 
@@ -92,7 +101,7 @@ velocities, and it runs on the host, so it can't be traced under `jit`.
 | `metadata` | `None` | passed to the default pipeline |
 | `weights` | `None` | per-sample weights, passed to the default pipeline and on to training |
 | `n_prototypes` | `15` | SOM lattice points; with fewer samples the SOM stage is skipped |
-| `outlier_clip_sigma` | `3.0` | the SOM's outlier clipping: leave out of the ordering samples whose distance to their prototype is an outlier at this many sigma; `None` keeps every sample; skipped when `weights` are given ({doc}`../explanation/autoencoder`) |
+| `outlier_mixture` | `None` | a `SOMMixture` for the SOM stage, to leave out of the ordering samples it calls background; `None` keeps every sample. Not for masks or images ({doc}`../explanation/autoencoder`) |
 | `training_config` | `None` | a `TrainingConfig`; `None` uses its defaults |
 
 ## `TrainingConfig`

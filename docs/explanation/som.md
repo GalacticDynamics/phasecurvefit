@@ -92,9 +92,87 @@ The SOM has no outlier rejection of its own by default, and contamination pulls 
 backbone towards the contaminants. More prototypes make this worse, because they chase
 the interlopers. The failure is silent: the ordering's rank correlation against the
 truth stays above 0.99 even at 20% contamination, while the reconstructed track, which
-is what you use downstream, degrades up to four times. Chaining after an orderer that
-rejects outliers, or turning on `outlier_clip_sigma`, keeps the backbone on the curve
-({doc}`../how-to/som`).
+is what you use downstream, degrades up to four times. Turning on `outlier_mixture`
+keeps the backbone on the curve ({doc}`../how-to/som`).
+
+## The outlier mixture
+
+`outlier_mixture` uses the model {doc}`outliers` describes for the autoencoder, after
+Hogg, Bovy & Lang (2010), §3. Each sample's position comes either from the curve or
+from a flat background:
+
+$$
+\mathcal{L}_n = \pi\, f(q_n) + (1 - \pi)\, \rho_{\mathrm{bg}} ,
+$$
+
+where $\pi$ is the fraction of members, $f$ the curve's density and
+$\rho_{\mathrm{bg}}$ one over the volume of the field. Batch Kohonen training is close
+to fitting a Gaussian mixture: Gepperth & Pfülb (2020) show that an energy-based SOM
+does gradient descent on an approximation of a Gaussian mixture's log-likelihood. So
+the mixture is fitted by EM inside the training loop. Each epoch computes every
+sample's membership $r_n$ from the current prototypes, refits $\pi$ and the curve's
+width $s$ in closed form, and then counts each sample by $\omega_n r_n$ in the update.
+With the prototypes standing in for the track, nothing has to be ordered before
+membership can be computed.
+
+### The curve's density
+
+$f$ is a Gaussian tube of width $s$ about the polyline through the prototypes. Each
+segment carries a share of the members, spread evenly along it. A Gaussian about each
+prototype would be simpler, but it is lumpy along the track wherever $s$ is smaller
+than the spacing between prototypes, and samples between two prototypes then look like
+background: on a clean arc it rejected 45 of 300 members.
+
+A segment's share is the weighted fraction of all the samples it explains, refitted
+each epoch. With equal shares, an outlier that drew an end prototype out to itself,
+as one does in a plain SOM, stayed a member, because the long segment out to it still
+claimed its share of the members. Weighting the shares by membership instead fed back
+on itself, and stretches that lost members lost their share.
+
+The tube is open at its two ends, as {func}`~phasecurvefit.som.chord` is: past the
+end prototypes the end segments carry on. Early in training the wide neighbourhood
+draws the lattice in from the ends of the curve. With closed ends, the samples left
+outside looked like background, stopped pulling the ends back out, and on a clean arc
+half of the members were rejected.
+
+### Widening the curve early in training
+
+Early in training the lattice is a rough copy of the curve, and the samples scatter
+about it by more than they will about the final one. While the neighbourhood is wide
+the lattice is a smoothed copy of the curve. Chained after another orderer, the
+neighbourhood starts narrow, but the lattice starts from the means of bins along the
+earlier ordering, which cut inside the curve's bends. So the memberships are computed
+with $s^2$ widened by
+$(0.1\,\sigma_t\,\Delta)^2 - (0.1\,\sigma_{\mathrm{end}}\,\Delta)^2$, where
+$\Delta$ is the mean spacing between prototypes and $\sigma_t$ shrinks geometrically
+from $\max(\sigma_{\mathrm{start}}, n_{\mathrm{prototypes}}/4)$ to
+$\sigma_{\mathrm{end}}$ over the epochs. The widening is zero at the last epoch.
+
+Without it, members the early lattice missed were called background and stayed lost:
+on a clean arc trained for 40 epochs, 256 of 300. Tied to the lattice's own
+neighbourhood, which stays at `sigma_end` when chained, the widening was zero there,
+and after an MST on a near-closed loop with three lobes and 15 prototypes, 306 of 450
+members were rejected. A widening of 0.17 or more let a background of 240 samples
+among 540 drag the backbone off at 20 epochs.
+
+### Weights
+
+A weight multiplies a sample's terms in every sum, the M-steps included, and never
+enters its membership, the rule {doc}`density-fields` derives for the autoencoder. A
+sample of weight 2 trains exactly as two coincident copies of it.
+
+### Limits
+
+At 240 background samples among 540, the backbone stayed within 0.16 of the arc for
+10 epochs, and failed at 40 epochs, keeping almost all the background. Chained after
+another orderer the SOM's neighbourhood stays narrow, so it can't move a lattice the
+earlier stage started in the background; {doc}`../how-to/som` shows the setting that
+helps.
+
+The background is flat over the samples' bounding box, so it needs room outside the
+curve. When the samples fill that box, as the pixels of a mask or an image do, the
+background explains them about as well as the curve does: on a straight mask of
+half-width 0.3, it called 974 of 1071 pixels background.
 
 ## Why perturbing the initialization gives no ensemble
 
@@ -139,7 +217,7 @@ so published numbers will not reproduce exactly:
 8. **The binning coordinate differs.** The paper bins along `phi_1`, the longitude of
    its fitted great-circle frame (§2.1); here the samples are binned along the first
    principal axis of the positions.
-9. **Outlier clipping is an addition** not in the paper.
+9. **The outlier mixture is an addition** not in the paper.
 
 ## References
 
@@ -148,3 +226,9 @@ Fast Track: Rapid construction of stellar stream paths.* MNRAS **522**(4), 5022�
 [arXiv:2212.00949](https://arxiv.org/abs/2212.00949),
 doi:[10.1093/mnras/stad1166](https://doi.org/10.1093/mnras/stad1166). The BibTeX entry
 is on the {doc}`../reference/citation` page.
+
+Hogg, D. W., Bovy, J., & Lang, D. (2010). *Data analysis recipes: Fitting a model to
+data.* [arXiv:1008.4686](https://arxiv.org/abs/1008.4686).
+
+Gepperth, A., & Pfülb, B. (2020). *A Rigorous Link Between Self-Organizing Maps and
+Gaussian Mixture Models.* [arXiv:2009.11710](https://arxiv.org/abs/2009.11710).

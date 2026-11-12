@@ -16,6 +16,7 @@ If you use this module, please cite that paper.
 __all__: tuple[str, ...] = (
     "SOM1D",
     "FitResult",
+    "SOMMixture",
     "bmu_distance",
     "bootstrap_weights",
     "chord",
@@ -27,6 +28,7 @@ __all__: tuple[str, ...] = (
 from ._src.som import (
     SOM1D,
     FitResult,
+    SOMMixture,
     bmu_distance,
     bootstrap_weights,
     chord,

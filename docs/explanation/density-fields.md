@@ -56,6 +56,11 @@ membership, and a faint pixel far outside it pulls weakly towards the background
 the velocity-alignment term each sample counts by $\omega_n \hat{q}_n$, the expected
 mass of members at that sample.
 
+The SOM's outlier mixture follows the same rule: a weight multiplies a sample's terms
+in the prototype update and in the fits of the member fraction and the curve's width,
+and doesn't appear in the sample's membership, which depends on where the sample is
+and on the model ({doc}`som`).
+
 For an image the sum has a continuum limit. With each pixel weighted by the image
 $I(q)$, the loss tends, as the pixels shrink, to
 

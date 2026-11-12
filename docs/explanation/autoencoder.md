@@ -57,32 +57,35 @@ track out to reach it. On a gapped stream of width 0.2 with 4% interlopers (the
 reproducer in issue #224), the two interlopers ordered last got $\gamma$ of 0.92 and
 0.94, while no member went past 0.65, and the track ran 5.3 off the true curve.
 
-{func}`~phasecurvefit.fit_track` guards against this in two places.
+Two things guard against this.
 
-- It orders with the SOM's outlier clipping on, `outlier_clip_sigma=3`. A sample whose
-  distance to its nearest prototype is an outlier among the rest is left out of the
-  ordering, so the encoder learns it as a non-member and the track has no reason to
-  reach for it. On the gapped stream this left out 9 of the 16 interlopers and none
-  of the 404 members.
 - `track_range` does not count scattered samples as the end of the stream. Each end
   needs the few bins of line density just inside it to be non-empty. A track that
   bends out to a handful of interlopers passes them one at a time, with empty bins
-  in between, and that stretch is cut. This applies to every trained result, not just
-  to `fit_track`.
+  in between, and that stretch is cut. This applies to every trained result.
+- {func}`~phasecurvefit.fit_track` can order with the SOM's outlier mixture,
+  `outlier_mixture=SOMMixture()` ({doc}`som`). A sample the mixture calls background
+  is left out of the ordering, so the encoder learns it as a non-member and the track
+  has no reason to reach for it. On the gapped stream this left out 13 of the 16
+  interlopers and none of the 404 members. It is off by default: samples that fill
+  their own bounding box, as a mask or an image does, look like background to it,
+  and on a filled mask it left out 974 of 1071 pixels.
 
 The table gives the largest distance from the track over `track_range` to the true
 curve, for two training seeds, with default training settings. The last three rows are
 one sine-shaped stream of 420 samples with 4% interlopers, at three widths.
 
-| stream | before | `track_range` change only | both changes |
+| stream | default | with the outlier mixture | interlopers left out |
 |---|---|---|---|
-| near-closed loop, no interlopers | 0.35, 0.40 | 0.35, 0.40 | 0.35, 0.40 |
-| gapped, width 0.2 | 5.27, 5.27 | 0.60, 0.53 | 0.14, 0.21 |
-| width 0.3 | 5.54, 5.96 | 0.48, 0.58 | 0.18, 0.06 |
-| width 1.0 | 5.05, 2.95 | 1.60, 1.13 | 1.18, 2.51 |
+| near-closed loop, no interlopers | 0.35, 0.40 | 0.33, 0.39 | - |
+| gapped, width 0.2 | 0.60, 0.53 | 0.17, 0.26 | 13 of 16 |
+| width 0.3 | 0.64, 0.60 | 0.14, 0.14 | 11 of 16 |
+| width 1.0 | 1.11, 1.51 | 2.39, 1.76 | 4 of 16 |
 
-On the loop every sample stayed in the ordering. On the widest stream the track still
-strays by one to two and a half widths, with or without clipping.
+With the mixture, every sample of the loop stayed in the ordering, and so did every
+member of the sine streams except one on the widest. On the widest stream the
+interlopers sit among the members, the mixture left out only 4, and the track strayed
+further than without it.
 
 The mixture model of {doc}`outliers` also removes the hook, but it is not on by
 default. On the clean loop it rejected between a quarter and three fifths of the
