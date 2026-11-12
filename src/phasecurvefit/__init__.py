@@ -18,6 +18,8 @@ order : function
     another algorithm.
 fit_track : function
     Order, refine and fit a smooth track in one call.
+bootstrap_track : function
+    Fit a track and its uncertainty, by refitting bootstrap resamples.
 combine_results : function
     Combine results from forward and backward walks into a single ordering.
 WalkLocalFlowResult : NamedTuple
@@ -92,6 +94,8 @@ __all__: tuple[str, ...] = (
     "order",
     # End-to-end
     "fit_track",
+    "bootstrap_track",
+    "TrackEnsemble",
     # Query configuration
     "WalkConfig",
     # Result accessor
@@ -106,7 +110,7 @@ from ._src.algorithm import (
     order_w,
 )
 from ._src.orderers.base import order
-from ._src.pipeline import fit_track
+from ._src.pipeline import TrackEnsemble, bootstrap_track, fit_track
 from ._src.query_config import WalkConfig
 from ._version import version as __version__
 
