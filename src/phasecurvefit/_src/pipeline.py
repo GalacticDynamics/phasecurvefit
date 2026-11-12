@@ -8,6 +8,9 @@ callers who want a fitted track without assembling the steps themselves.
 
 __all__: tuple[str, ...] = ("TrackEnsemble", "bootstrap_track", "fit_track")
 
+from collections.abc import Mapping
+from typing import Any
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -153,6 +156,10 @@ class TrackEnsemble(ReprMixin, eqx.Module):
     members : tuple[AutoencoderResult, ...]
         The tracks fitted to the resamples.
 
+    :meth:`offsets` and :meth:`radius` only call each track on $\gamma$ and
+    read its ``track_range``, so code that uses the band should not depend on
+    the members being :class:`~phasecurvefit.nn.AutoencoderResult`.
+
     """
 
     reference: AutoencoderResult
@@ -183,13 +190,14 @@ class TrackEnsemble(ReprMixin, eqx.Module):
         """
         ref = self.reference
         gamma = jnp.atleast_1d(jnp.asarray(gamma))
-        keys = list(ref.positions)
+        q = ref(gamma)
+        keys = list(q)
 
-        def stack(q: dict[str, Array], /) -> Float[Array, "N D"]:
+        def stack(q: Mapping[str, Array], /) -> Float[Array, "N D"]:
             return jnp.stack([q[k] for k in keys], axis=-1)
 
-        c = stack(ref.model.decode(gamma))
-        dc = jax.vmap(jax.jacfwd(lambda g: stack(ref.model.decode(g))))(gamma)
+        c = stack(q)
+        dc = jax.vmap(jax.jacfwd(lambda g: stack(ref(g))))(gamma)
         t = dc / jnp.linalg.norm(dc, axis=-1, keepdims=True)
 
         def one(member: AutoencoderResult, /) -> Float[Array, "G D"]:
@@ -211,9 +219,10 @@ class TrackEnsemble(ReprMixin, eqx.Module):
         r"""Radius of the tube about the reference that holds ``level`` of the members.
 
         At each point it is the ``level`` quantile of the members' distances
-        from the reference (the norms of :meth:`offsets`), leaving out
-        members whose track stops short of that point. Plot the reference
-        with this radius on either side of it.
+        from the reference (the norms of :meth:`offsets`). A member whose
+        track stops short of that point counts as outside the tube, so the
+        radius is NaN where fewer than ``level`` of the members reach. Plot
+        the reference with this radius on either side of it.
 
         It measures the variance of the fit and not its bias, so where the
         track bends the true curve can lie outside it more often than
@@ -221,7 +230,8 @@ class TrackEnsemble(ReprMixin, eqx.Module):
 
         """
         dist = jnp.linalg.norm(self.offsets(gamma, n_dense=n_dense), axis=-1)
-        return jnp.nanquantile(dist, level, axis=0)
+        r = jnp.quantile(jnp.where(jnp.isnan(dist), jnp.inf, dist), level, axis=0)
+        return jnp.where(jnp.isinf(r), jnp.nan, r)
 
 
 def bootstrap_track(
@@ -230,11 +240,8 @@ def bootstrap_track(
     *,
     key: PRNGKeyArray,
     n_samples: int = 20,
-    metadata: StateMetadata | None = None,
     weights: Float[Array, " N"] | None = None,
-    n_prototypes: int = 15,
-    outlier_clip_sigma: float | None = 3.0,
-    training_config: TrainingConfig | None = None,
+    **fit_options: Any,
 ) -> TrackEnsemble:
     """Fit a track and its uncertainty, by refitting bootstrap resamples.
 
@@ -245,8 +252,7 @@ def bootstrap_track(
     noise in the data.
 
     A resample repeats some tracers and leaves out others. Repeats are passed as
-    repeated rows rather than as weights, so :func:`fit_track`'s outlier
-    clipping stays on.
+    repeated rows, so ``weights`` stay free for their own meaning.
 
     Parameters
     ----------
@@ -261,8 +267,9 @@ def bootstrap_track(
         its weight. A bootstrap treats each tracer as one independent draw, so
         it gives an honest uncertainty only when the tracers are independent,
         for example stars, and not the pixels of an image.
-    metadata, n_prototypes, outlier_clip_sigma, training_config
-        Passed to every :func:`fit_track` call.
+    **fit_options
+        Any other option of :func:`fit_track`, such as ``training_config`` or
+        ``outlier_mixture``, passed to every call.
 
     Returns
     -------
@@ -306,18 +313,9 @@ def bootstrap_track(
         k: PRNGKeyArray,
         /,
     ) -> AutoencoderResult:
-        return fit_track(
-            pos,
-            vel,
-            key=k,
-            metadata=metadata,
-            weights=w,
-            n_prototypes=n_prototypes,
-            outlier_clip_sigma=outlier_clip_sigma,
-            training_config=training_config,
-        )[1]
+        return fit_track(pos, vel, key=k, weights=w, **fit_options)[1]
 
-    n = next(iter(positions.values())).shape[0]
+    n = jnp.shape(next(iter(positions.values())))[0]
     key_ref, *keys = jr.split(key, n_samples + 1)
     reference = fit(positions, velocities, weights, key_ref)
     members = []
@@ -327,8 +325,8 @@ def bootstrap_track(
         idx = jr.randint(key_draw, (n,), 0, n)
         members.append(
             fit(
-                {c: v[idx] for c, v in positions.items()},
-                {c: v[idx] for c, v in velocities.items()},
+                {c: jnp.asarray(v)[idx] for c, v in positions.items()},
+                {c: jnp.asarray(v)[idx] for c, v in velocities.items()},
                 None if weights is None else jnp.asarray(weights)[idx],
                 key_fit,
             )

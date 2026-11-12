@@ -69,12 +69,16 @@ tangent = jnp.stack(jnp.gradient(jnp.stack([track["x"], track["y"]]), axis=1))
 tangent = tangent / jnp.linalg.norm(tangent, axis=0)
 nx, ny = -tangent[1], tangent[0]
 
+# draw the band only where enough members reach to define it
+ok = jnp.isfinite(r68)
+x, y, r68, nx, ny = track["x"][ok], track["y"][ok], r68[ok], nx[ok], ny[ok]
+
 fig, ax = plt.subplots()
 ax.scatter(pos["x"], pos["y"], s=2, c="0.6")
 ax.plot(track["x"], track["y"], c="C0")
 ax.fill(
-    jnp.concatenate([track["x"] + r68 * nx, (track["x"] - r68 * nx)[::-1]]),
-    jnp.concatenate([track["y"] + r68 * ny, (track["y"] - r68 * ny)[::-1]]),
+    jnp.concatenate([x + r68 * nx, (x - r68 * nx)[::-1]]),
+    jnp.concatenate([y + r68 * ny, (y - r68 * ny)[::-1]]),
     color="C0",
     alpha=0.3,
 )
@@ -82,7 +86,8 @@ ax.set_aspect("equal")
 ```
 
 The radius is NaN where fewer than the requested fraction of members reach that far,
-usually just inside the ends of the track.
+usually just inside the ends of the track. A member that stops short counts as outside
+the tube, so the band never rests on the few members that happen to reach.
 
 ## Use the offsets directly
 

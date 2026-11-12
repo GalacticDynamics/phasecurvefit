@@ -3,7 +3,8 @@
 Prototypes only, not library code. `common.py` makes the mock data and measures
 coverage. `run_dataset.py` runs methods A, B and C on one dataset.
 `run_interlopers.py` runs the bootstrap on data with interlopers. `analyze.py`
-prints the summary.
+prints the summary. `run_shipped.py` and `analyze_shipped.py` measure
+`pcf.bootstrap_track` as it ships (see the last results section).
 
 ## Setup
 
@@ -25,7 +26,9 @@ prints the summary.
 
 - **A, bootstrap of the whole pipeline.** Each member refits MST → SOM →
   autoencoder on a multinomial resample (`som.bootstrap_weights` passed as
-  `weights`) with a fresh training key. 20 members.
+  `weights`) with a fresh training key. 20 members. Passing weights turned off
+  `fit_track`'s outlier clipping on this version of the pipeline, so A is not
+  quite what `bootstrap_track` does.
 - **B, seed ensemble (deep ensemble).** Same data, a fresh training key per
   member. The ordering is deterministic, so only training randomness varies. 20
   members.
@@ -75,6 +78,31 @@ from member to member. The bias is still there (band-centre rms 0.045). The
 bands are wide enough to cover it here, except at the far tip (0.3 at s = 0.95).
 This run changes two things at once: interlopers, and index resampling with
 clipping on. So it doesn't separate their effects.
+
+## Results, the shipped `bootstrap_track`
+
+Re-run after rebasing on #268, which made `fit_track` use `SOMMixture()` by
+default. `run_shipped.py` calls
+`pcf.bootstrap_track(pos, vel, key=key(seed), n_samples=20)` with the default
+`TrainingConfig`, on the same 12 clean datasets. It scores the members as above
+(the per-point interval), and also scores the tube that `TrackEnsemble.radius`
+returns: covered when the reference's offset from the truth along the true
+normal is at most the radius at the reference point nearest the true point.
+
+|                    | 68% coverage | 95% coverage | 68% width      | 95% width      |
+| ------------------ | ------------ | ------------ | -------------- | -------------- |
+| per-point interval | 0.56         | 0.84         | 0.027 (half)   | 0.048 (half)   |
+| tube from `radius` | 0.58         | 0.88         | 0.032 (radius) | 0.057 (radius) |
+
+8.6 s per fit (4 processes at once). The radius was never NaN at the 46 points,
+which lie inside s = 0.05–0.95. The reference's error is 0.038 rms. The members'
+spread (0.028) matches the scatter of the reference across datasets (0.030). The
+bias has rms 0.022 and is largest at the bend near s = 0.83 (+0.047) and at the
+far tip (−0.074 at s = 0.95), where 68% coverage is 0.25–0.33. The conclusions
+above hold.
+
+The 0.62/0.89 tube coverage quoted in an earlier draft of the docs had no script
+behind it and is replaced by this table.
 
 ## Not measured
 

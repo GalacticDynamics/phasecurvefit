@@ -1,5 +1,7 @@
 """Tests for ``pcf.bootstrap_track`` and ``pcf.TrackEnsemble``."""
 
+import inspect
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -7,6 +9,7 @@ import numpy as np
 import pytest
 
 import phasecurvefit as pcf
+from phasecurvefit._src import pipeline
 
 
 def _fast_config():
@@ -94,13 +97,55 @@ def test_member_that_stops_short_gives_nan(ensemble):
 
 
 def test_radius_is_quantile_of_distance(ensemble):
-    g = _gamma(ensemble)
+    g = _gamma(ensemble)[1:-1]
     dist = jnp.linalg.norm(ensemble.offsets(g), axis=-1)
     r68 = ensemble.radius(g, 0.68)
     r95 = ensemble.radius(g, 0.95)
-    assert r68.shape == (7,)
-    assert jnp.allclose(r68, jnp.nanquantile(dist, 0.68, axis=0), equal_nan=True)
+    assert r68.shape == (5,)
+    full = jnp.all(jnp.isfinite(dist), axis=0)  # every member reaches
+    assert jnp.allclose(r68[full], jnp.quantile(dist, 0.68, axis=0)[full])
     assert jnp.all(jnp.nan_to_num(r95 - r68) >= 0)
+
+
+def test_radius_counts_members_that_stop_short_as_outside(ensemble):
+    """With 2 of 3 members reaching a point, no 68% tube holds there."""
+    ref = ensemble.reference
+    lo, hi = ref.track_range
+    short = eqx.tree_at(lambda r: r.track_range, ref, (lo, lo + 0.5 * (hi - lo)))
+    ens = pcf.TrackEnsemble(ref, (ref, ref, short))
+    g = jnp.array([lo + 0.25 * (hi - lo), lo + 0.9 * (hi - lo)])
+    r = ens.radius(g, 0.68)
+    assert jnp.isfinite(r[0])
+    assert jnp.isnan(r[1])
+    assert jnp.isfinite(ens.radius(g, 0.3)[1])
+
+
+def test_passes_fit_track_options_through(monkeypatch):
+    seen = []
+
+    def fake_fit_track(pos, vel, **kw):
+        seen.append(kw)
+        return None, ensemble_result, None
+
+    ensemble_result = object()
+    monkeypatch.setattr(pipeline, "fit_track", fake_fit_track)
+    pos = {"x": jnp.arange(10.0), "y": jnp.zeros(10)}
+    vel = {"x": jnp.ones(10), "y": jnp.zeros(10)}
+    ens = pipeline.bootstrap_track(
+        pos, vel, key=jax.random.key(0), n_samples=2, outlier_mixture=None
+    )
+    assert len(seen) == 3
+    assert all(kw["outlier_mixture"] is None for kw in seen)
+    assert ens.members == (ensemble_result, ensemble_result)
+
+
+def test_accepts_every_fit_track_option():
+    """Every keyword of fit_track can be given to bootstrap_track."""
+    fit = inspect.signature(pcf.fit_track).parameters
+    boot = inspect.signature(pcf.bootstrap_track).parameters
+    takes_any = any(p.kind is p.VAR_KEYWORD for p in boot.values())
+    missing = [n for n in fit if n not in boot and n not in ("positions", "velocities")]
+    assert takes_any or not missing
 
 
 def test_n_samples_must_be_positive():
