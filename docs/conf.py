@@ -66,7 +66,9 @@ nb_execution_mode = "force"
 # page costs a kernel start and an `import phasecurvefit`, and the build has to
 # fit Read the Docs' time limit. Sybil still runs these cells in the doc tests.
 nb_execution_excludepatterns = ["contributing.md", "reference/migration/*"]
-nb_execution_timeout = -1  # tutorials train models; no per-cell timeout
+# A cell that hangs fails the build here, with a log, instead of running into
+# Read the Docs' build limit, which kills the build and throws its log away.
+nb_execution_timeout = 300
 nb_execution_raise_on_error = True
 pygments_lexers = {"ipython3": PythonLexer()}
 
