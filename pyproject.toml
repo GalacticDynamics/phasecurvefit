@@ -82,8 +82,8 @@ docs = [
   "sphinxext-opengraph>=0.9.2",
   "jaxkd>=0.0.5",
   "galax>=0.1.0",
-  # Executing the tutorials. `nb_execution_mode` is "force" off ReadTheDocs
-  # (docs/conf.py), so a docs build runs every notebook: ipykernel provides the
+  # Executing the tutorials. `nb_execution_mode` is "force" (docs/conf.py), so
+  # a docs build runs every notebook: ipykernel provides the
   # kernel, matplotlib is imported by all of them (unxt[interop-mpl] lets it plot
   # Quantities), and ipywidgets backs the progress bars `jax_tqdm` draws through
   # `tqdm.auto`.

@@ -7,7 +7,6 @@ https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 __all__: tuple[str, ...] = ()
 
-import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -59,11 +58,10 @@ extensions = [
 
 python_use_unqualified_type_names = True
 
-# Locally, execute everything. On ReadTheDocs, execute the MyST markdown guides
-# (cheap, and their figures are not stored) but not the tutorial notebooks.
-_ON_RTD = os.environ.get("READTHEDOCS") == "True"  # the value RTD sets
-nb_execution_mode = "auto" if _ON_RTD else "force"
-nb_execution_excludepatterns = ["tutorials/*"] if _ON_RTD else []
+# Execute every guide and tutorial on every build, here and on ReadTheDocs. No
+# outputs are stored in the sources, so each page shows what the current code
+# produces.
+nb_execution_mode = "force"
 nb_execution_timeout = -1  # tutorials train models; no per-cell timeout
 nb_execution_raise_on_error = True
 pygments_lexers = {"ipython3": PythonLexer()}
@@ -93,6 +91,9 @@ exclude_patterns = [
     "superpowers",  # local design notes, git-ignored
     "_build",
     "**.ipynb_checkpoints",
+    # Each tutorial's source is its MyST Markdown file. The .ipynb is generated
+    # from it, only for the Colab badges.
+    "tutorials/*.ipynb",
     "Thumbs.db",
     ".DS_Store",
     ".env",
