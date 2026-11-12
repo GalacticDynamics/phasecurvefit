@@ -96,6 +96,11 @@ Both settings below close off a way the fit can fail. Keep them on.
   only then lets the model reject samples. Without it, training can declare the
   whole dataset background and never recover.
 
+With `membership` set, the encoder's $\gamma$ is also frozen during the joint phase,
+because an encoder that keeps training can make the same collapse happen. Leave
+`freeze_encoder_final_training` at its default ({doc}`../explanation/outliers`
+explains why).
+
 ## What to expect
 
 On a synthetic arc of 400 members with width $\sigma = 0.15$, plus 30 outliers

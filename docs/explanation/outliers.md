@@ -81,7 +81,8 @@ star landed from the track, and is the number to use.
 ## Two ways the fit can fail
 
 A plain mixture likelihood has two degenerate optima, and training can reach both.
-Each is closed off by a schedule.
+Each is closed off by a schedule. A third failure, from the encoder, is covered in
+the next section.
 
 **Width inflation.** If a few outliers sit only a few widths off the track, the
 likelihood prefers to widen the stream to include them over lowering their $\pi_n$, so
@@ -101,6 +102,20 @@ to about 8, against a true width of 0.15, and rejected all 400 genuine members.
 with membership held near 1, and only then lets the model reject stars. In the loss,
 $\pi^{\mathrm{eff}}_n = 1 - w(t)\,(1 - \pi_n)$, so at $w = 0$ it is a plain Gaussian fit
 to the track.
+
+## Why the encoder is frozen
+
+A third failure comes from the encoder. If it keeps training while the mixture is
+fitted, $\gamma$ can move under the track during the warm-up, before the width and
+the membership have settled. The track then drifts off the stream, and once the
+warm-up ends the fit calls every star background. On the outlier tutorial's data,
+ordered with the default pipeline, this happened on 3 of 5 training seeds.
+
+So with mixture membership the encoder is frozen during the joint phase by default.
+The trunk and the $\gamma$ head keep the weights from the first phase, which fixes
+$\gamma$, and the membership head keeps training on the frozen features, so the prior
+can still learn which stars to reject. On the same data and seeds, none of the fits
+collapsed, and every one rejected all 25 interlopers.
 
 ## What it does not fix
 

@@ -16,7 +16,10 @@ start point. {doc}`../how-to/choose-orderer` shows how to set it up.
    ordering coordinate $\gamma \in [-1, 1]$.
 
 The backbone is kept on the result as `result.backbone`, and calling the result
-interpolates along it.
+interpolates along it. Each sample's arc length, measured at its nearest backbone
+vertex, is kept as `result.chord`. A sample off to the side of the curve, such as an
+interloper the tree threads in, gets the arc length of the backbone next to it, so it
+adds no length of its own.
 
 Ordering from end to end with short steps is what a near-closed loop needs. A walk
 on such a loop has to start at the right place, and where the velocity reverses at a

@@ -206,7 +206,7 @@ class TestTrainingConfig:
         assert config.lambda_p == (1.0, 5.0)
         assert config.member_threshold == 0.5
         assert config.weight_by_density is False
-        assert config.freeze_encoder_final_training is False
+        assert config.freeze_encoder_final_training is None
         assert config.show_pbar is True
 
     def test_custom_values(self):
@@ -325,12 +325,24 @@ class TestTrainAutoencoder:
         leaves = [x for x in jax.tree.leaves(grads) if eqx.is_array(x)]
         assert all(jnp.all(jnp.isfinite(g)) for g in leaves), "non-finite gradient"
 
-    def test_freeze_encoder_trains_only_decoder(self, rng_key: PRNGKeyArray):
-        """`freeze_encoder_final_training` leaves every encoder weight untouched.
+    @pytest.mark.parametrize(
+        ("freeze", "membership", "frozen"),
+        [
+            pytest.param(True, None, True, id="explicit"),
+            pytest.param(None, pcf.nn.MixtureMembershipConfig(), True, id="mixture"),
+            pytest.param(None, None, False, id="plain"),
+        ],
+    )
+    def test_freeze_encoder_trains_only_decoder(
+        self, rng_key: PRNGKeyArray, freeze, membership, frozen
+    ):
+        """A frozen encoder keeps its gamma weights; the decoder still trains.
 
         The trainer and the step must split the model with the same
         `filter_spec`; if they disagree, the frozen encoder trains anyway (or
-        the optimizer state and gradients no longer line up).
+        the optimizer state and gradients no longer line up). Left at ``None``,
+        the encoder is frozen exactly when mixture membership is on, and then
+        its membership head still trains.
         """
         n = 64
         t = jnp.linspace(0, 3, n)
@@ -345,7 +357,8 @@ class TestTrainAutoencoder:
             n_epochs_both=3,
             batch_size=32,
             show_pbar=False,
-            freeze_encoder_final_training=True,
+            freeze_encoder_final_training=freeze,
+            membership=membership,
         ).autoencoder_config()
 
         trained, _, _ = train_ordering_and_track_net(
@@ -355,10 +368,18 @@ class TestTrainAutoencoder:
         def arrays(m):
             return jax.tree.leaves(eqx.filter(m, eqx.is_array))
 
-        assert all(
-            jnp.array_equal(a, b)
-            for a, b in zip(arrays(trained.encoder), arrays(ae.encoder), strict=True)
-        ), "encoder changed while frozen"
+        def same(new, old):
+            return all(
+                jnp.array_equal(a, b)
+                for a, b in zip(arrays(new), arrays(old), strict=True)
+            )
+
+        # Gamma comes from the trunk and the gamma head.
+        assert same(trained.encoder.mlp, ae.encoder.mlp) is frozen
+        assert same(trained.encoder.gamma_head, ae.encoder.gamma_head) is frozen
+        # With the mixture the membership head keeps training even when frozen.
+        prob_frozen = frozen and membership is None
+        assert same(trained.encoder.prob_head, ae.encoder.prob_head) is prob_frozen
         assert not all(
             jnp.array_equal(a, b)
             for a, b in zip(arrays(trained.decoder), arrays(ae.decoder), strict=True)

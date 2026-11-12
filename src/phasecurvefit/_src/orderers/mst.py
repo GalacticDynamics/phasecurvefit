@@ -642,6 +642,37 @@ def _finish_jax(P, full, blen, in_comp, flip, neighbors, /):  # noqa: ANN001, AN
     return idx, _orient_backbone(full, blen, flip, jnp)
 
 
+def _backbone_chord(  # noqa: ANN202
+    P: jax.Array,
+    cb: jax.Array,
+    idx_full: jax.Array,
+    neighbors,  # noqa: ANN001
+    /,
+):
+    """Arc length along the backbone at each tracer's nearest vertex, in input order.
+
+    This is the coordinate the MST orders by, measured along the oriented
+    backbone ``cb`` (padded by repeating its last vertex, which adds no
+    length). Summing the steps between consecutive ordered tracers instead
+    would count the scatter across the curve as length, and an interloper
+    threaded into the ordering would add a long step out to it and back.
+    Unvisited tracers carry ``nan``.
+    """
+    n = P.shape[0]
+    # The padded tail repeats a vertex, and the gradient of a norm is NaN at a
+    # zero-length segment, so take the root only where the length is positive.
+    sq = jnp.sum(jnp.square(jnp.diff(cb, axis=0)), axis=1)
+    seg = jnp.where(sq > 0, jnp.sqrt(jnp.where(sq > 0, sq, 1.0)), 0.0)
+    s_bb = jnp.concat([jnp.zeros(1, cb.dtype), jnp.cumsum(seg)])
+    # The nearest vertex is a discrete choice; length flows through ``cb``.
+    near = neighbors.knn(
+        jax.lax.stop_gradient(cb), 1, queries=jax.lax.stop_gradient(P)
+    )[0][:, 0]
+    slot = jnp.where(idx_full >= 0, idx_full, n)
+    visited = jnp.zeros(n, dtype=bool).at[slot].set(True, mode="drop")
+    return jnp.where(visited, s_bb[near], jnp.nan)
+
+
 def _jax_graph(
     P: jax.Array,
     V: jax.Array,
@@ -1175,7 +1206,11 @@ class MSTOrderer(AbstractOrderer):
             gamma_range=(-1.0, 1.0),
             backbone=backbone,
             backbone_size=backbone_len,
-            chord=chord_along_ordering(qs, idx_full),
+            chord=(
+                chord_along_ordering(qs, idx_full)
+                if n < 2
+                else _backbone_chord(P, backbone_full, idx_full, neighbors)
+            ),
             weights=weights,
             # ``orient_by_velocity`` only picks a direction; it does not make
             # the ordering itself velocity-aware.
