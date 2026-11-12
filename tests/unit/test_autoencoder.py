@@ -183,10 +183,10 @@ class TestAutoencoder:
         )
 
         gamma = jnp.linspace(0, 1, 5)
-        pos = ae.decode(gamma)
+        decoded = ae.decode(gamma)
 
-        assert len(pos) == 2
-        assert pos["x"].shape == (5,)
+        assert len(decoded) == 2
+        assert decoded["x"].shape == (5,)
 
 
 class TestTrainingConfig:

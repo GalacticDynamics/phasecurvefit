@@ -113,7 +113,7 @@ def scatter_p_quantity(
     unit = operand.unit
     operand_ = u.ustrip(operand)
     updates_ = u.ustrip(unit, updates)
-    out = lax.scatter_p.impl(operand_, scatter_indices, updates_, **kw)  # type: ignore[no-untyped-call]
+    out = lax.scatter_p.impl(operand_, scatter_indices, updates_, **kw)
     return operand.__class__(out, unit)
 
 
@@ -124,7 +124,7 @@ def scatter_p_array_quantity(
     """Handle ``lax.scatter`` when operand is array and updates are Quantities."""
     unit = updates.unit
     updates_ = u.ustrip(unit, updates)
-    return lax.scatter_p.impl(operand, scatter_indices, updates_, **kw)  # type: ignore[no-untyped-call]
+    return lax.scatter_p.impl(operand, scatter_indices, updates_, **kw)
 
 
 @plum.dispatch
@@ -141,7 +141,7 @@ def euclidean_distance(q_a: ScalarQComponents, q_b: ScalarQComponents, /) -> RQS
     Quantity(Array(5., dtype=float32, weak_type=True), unit='m')
 
     """
-    return quax.quaxify(phasespace.euclidean_distance)(q_a, q_b)
+    return quax.quaxify(phasespace.euclidean_distance)(q_a, q_b)  # type: ignore[return-value]  # quaxify keeps the array signature
 
 
 @plum.dispatch
@@ -161,7 +161,7 @@ def unit_direction(
      'y': Quantity(Array(0.8, dtype=float32, weak_type=True), unit='')}
 
     """
-    return quax.quaxify(phasespace.unit_direction)(q_a, q_b)
+    return quax.quaxify(phasespace.unit_direction)(q_a, q_b)  # type: ignore[return-value]  # quaxify keeps the array signature
 
 
 @plum.dispatch
@@ -178,7 +178,7 @@ def velocity_norm(velocity: ScalarQComponents, /) -> RQSz0:
     Array(5., dtype=float32, weak_type=True)
 
     """
-    return quax.quaxify(phasespace.velocity_norm)(velocity)
+    return quax.quaxify(phasespace.velocity_norm)(velocity)  # type: ignore[return-value]  # quaxify keeps the array signature
 
 
 @plum.dispatch
@@ -195,7 +195,7 @@ def unit_velocity(velocity: ScalarQComponents, /) -> ScalarQComponents:
      'y': Quantity(Array(0.8, dtype=float32, ...), unit='')}
 
     """
-    return quax.quaxify(phasespace.unit_velocity)(velocity)
+    return quax.quaxify(phasespace.unit_velocity)(velocity)  # type: ignore[return-value]  # quaxify keeps the array signature
 
 
 @plum.dispatch
@@ -212,10 +212,10 @@ def cosine_similarity(vel_a: ScalarQComponents, vel_b: ScalarQComponents, /) -> 
     Quantity(Array(0., dtype=float32, ...), unit='')
 
     """
-    return quax.quaxify(phasespace.cosine_similarity)(vel_a, vel_b)
+    return quax.quaxify(phasespace.cosine_similarity)(vel_a, vel_b)  # type: ignore[return-value]  # quaxify keeps the array signature
 
 
-_local_flow_walk_plain = algorithm._local_flow_walk.invoke(  # noqa: SLF001
+_local_flow_walk_plain = algorithm._local_flow_walk.invoke(  # type: ignore[attr-defined]  # noqa: SLF001  # plum Function, typed as the def
     VectorComponents, VectorComponents
 )
 
@@ -328,14 +328,16 @@ def _local_flow_walk(
     if not isinstance(metric_scale, u.AbstractQuantity):
         msg = "`metric_scale` must be an `unxt.AbstractQuantity`."  # type: ignore[unreachable]
         raise TypeError(msg)
-    metric_scale = u.ustrip(usys, metric_scale)
+    metric_scale_value = u.ustrip(usys, metric_scale)
     if not isinstance(max_dist, u.AbstractQuantity):
         msg = "`max_dist` must be an `unxt.AbstractQuantity`."  # type: ignore[unreachable]
         raise TypeError(msg)
-    max_dist = u.ustrip(usys, max_dist)
+    max_dist_value = u.ustrip(usys, max_dist)
 
     q_values = {k: u.ustrip(usys, v) for k, v in positions.items()}
-    p_values = {k: u.ustrip(usys, v) for k, v in velocities.items()}
+    p_values: Mapping[str, object] = {
+        k: u.ustrip(usys, v) for k, v in velocities.items()
+    }
     # Check before quaxify: inside it even concrete arrays are quax tracers, so
     # the check could only defer (an EquinoxRuntimeError, not ValueError).
     if config.metric.uses_velocity:
@@ -348,8 +350,8 @@ def _local_flow_walk(
         q_values,
         p_values,
         start_idx=start_idx,
-        metric_scale=metric_scale,
-        max_dist=max_dist,
+        metric_scale=metric_scale_value,
+        max_dist=max_dist_value,
         terminate_indices=terminate_indices,
         n_max=n_max,
         config=config,
@@ -360,7 +362,7 @@ def _local_flow_walk(
     return dataclasses.replace(result, positions=positions, velocities=velocities)
 
 
-@StandardScalerNormalizer.__init__.dispatch
+@StandardScalerNormalizer.__init__.dispatch  # type: ignore[attr-defined, untyped-decorator]  # plum method, typed as the def
 def init(
     self: "StandardScalerNormalizer",
     qs: VectorQComponents,
@@ -369,7 +371,7 @@ def init(
     **kwargs: object,
 ) -> None:
     # Explicit two-arg form: this overload is defined outside the class body.
-    super(StandardScalerNormalizer, self).__init__(qs, ps)
+    super(StandardScalerNormalizer, self).__init__(qs, ps)  # type: ignore[safe-super]  # no-op abstract init
 
     self.q_comps = list(qs.keys())
     xs = qnp.stack(list(qs.values()), axis=1)
@@ -382,24 +384,24 @@ def init(
     self.p_std = qnp.std(vs, axis=0) + qnp.ones_like(self.p_mean) * 1e-8
 
 
-@StandardScalerNormalizer.transform.dispatch
+@StandardScalerNormalizer.transform.dispatch  # type: ignore[attr-defined, untyped-decorator]  # plum method, typed as the def
 def transform(
     self: "StandardScalerNormalizer",
     qs: VectorQComponents,
     ps: VectorQComponents,
 ) -> tuple[Float[Array, "N D"], Float[Array, "N D"]]:
-    xs = qnp.stack([qs[k] for k in self.q_comps], axis=1)
+    xs = qnp.stack([qs[k] for k in self.q_comps], axis=1)  # type: ignore[misc]  # quaxed takes Quantities
     norm_qs = (xs - self.q_mean) / self.q_std
-    vs = qnp.stack([ps[k] for k in self.p_comps], axis=1)
+    vs = qnp.stack([ps[k] for k in self.p_comps], axis=1)  # type: ignore[misc]  # quaxed takes Quantities
     norm_ps = (vs - self.p_mean) / self.p_std
-    return norm_qs.ustrip(""), norm_ps.ustrip("")
+    return norm_qs.ustrip(""), norm_ps.ustrip("")  # type: ignore[attr-defined]  # quaxed returns Quantities
 
 
-@_chord_values.dispatch
+@_chord_values.dispatch  # type: ignore[attr-defined, untyped-decorator]  # plum Function, typed as the def
 def _chord_values_quantity(chord: AbcQ, /) -> Float[Array, " N"]:
     # Training uses only ratios of the chord (s / s_total), so any one length
     # unit gives the same target. unxt 2 refuses ``jnp.asarray`` on a Quantity.
-    return u.ustrip(chord.unit, chord)
+    return u.ustrip(chord.unit, chord)  # type: ignore[return-value]  # unxt.ustrip returns an Array here
 
 
 # ==============================================================================
@@ -464,6 +466,8 @@ def _order_with_backbone_and_chord(
 
     length_unit = usys["length"]
     chord_unit = _chord_unit(positions, usys)
+    # These orderers always set a backbone.
+    assert result.backbone is not None  # noqa: S101
     backbone = {
         k: u.uconvert(positions[k].unit, u.Q(v, length_unit))
         for k, v in result.backbone.items()
@@ -593,7 +597,7 @@ def order(
     def _as_length_q(val: object, /) -> AbcQ:
         return val if isinstance(val, u.AbstractQuantity) else u.Q(val, usys["length"])
 
-    result = algorithm._local_flow_walk(  # noqa: SLF001
+    result = algorithm._local_flow_walk(  # type: ignore[call-arg]  # noqa: SLF001  # usys: Quantity dispatch
         positions,
         velocities,
         start_idx=_resolve_start_idx(self.start_idx, init),

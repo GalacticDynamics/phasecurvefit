@@ -242,6 +242,7 @@ class TestBandwidthEstimate:
         result = pcf.orderers.RidgeOrderer().order(
             pos, jax.tree.map(jnp.zeros_like, pos)
         )
+        assert result.chord is not None
         assert bool(jnp.all(jnp.isfinite(result.chord)))
 
     def test_half_the_samples_weightless(self):
@@ -286,6 +287,7 @@ class TestBandwidthEstimate:
         pos = {"x": X.ravel()[keep], "y": Y.ravel()[keep]}
         vel = jax.tree.map(jnp.zeros_like, pos)
         result = pcf.orderers.RidgeOrderer().order(pos, vel, weights=image[keep])
+        assert result.chord is not None
         assert result.chord.shape == (int(keep.sum()),)
         assert float(np.median(_radius_err(result.backbone))) < 0.03
 
@@ -323,14 +325,17 @@ class TestRidgeOrdererValidation:
         pos, vel, w = _arc_image()
         with jax.enable_x64(new_val=True):
             result = pcf.orderers.RidgeOrderer(bandwidth=0.1).order(pos, vel, weights=w)
+        assert result.chord is not None
         assert result.chord.dtype == jnp.float32
-        assert result.backbone["x"].dtype == jnp.float32
+        assert result.backbone is not None
+        assert jnp.asarray(result.backbone["x"]).dtype == jnp.float32
 
     def test_integer_positions(self):
         """Integer pixel indices give a float, fractional chord."""
         pos, vel, w = _arc_image()
         idx = {k: jnp.round((v + 1.5) / 0.05).astype(jnp.int32) for k, v in pos.items()}
         result = pcf.orderers.RidgeOrderer(bandwidth=2.0).order(idx, vel, weights=w)
+        assert result.chord is not None
         assert jnp.issubdtype(result.chord.dtype, jnp.floating)
         assert bool(jnp.any(result.chord != jnp.round(result.chord)))
 

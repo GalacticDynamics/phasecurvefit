@@ -862,7 +862,8 @@ def train_ordering_and_track_net(
     if config.weight_by_density:
         kde_kw = config.weight_by_density
         kde_kw = kde_kw if isinstance(kde_kw, Mapping) else {}
-        density_w = compute_weights(model.encoder, all_ws, key=subkey, **kde_kw)
+        # User-supplied KDE options (e.g. ``bandwidth``), checked by compute_weights.
+        density_w = compute_weights(model.encoder, all_ws, key=subkey, **kde_kw)  # type: ignore[arg-type]
     else:
         density_w = jnp.ones(all_ws.shape[0], dtype=all_ws.dtype)
     if weights is None:
@@ -968,7 +969,7 @@ def train_ordering_and_track_net(
         width = cast("WidthNet", model.width)
         model = eqx.tree_at(lambda m: m.width, model, _with_sigma_max(width, final))
 
-    return cast("PathAutoencoder", model), opt_state, epoch_losses
+    return model, opt_state, epoch_losses
 
 
 def _with_sigma_max(width: WidthNet, sigma_max: float, /) -> WidthNet:

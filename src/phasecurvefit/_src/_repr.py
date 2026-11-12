@@ -29,15 +29,15 @@ so ``_repr_html_`` returns `None`.
 
 __all__: tuple[str, ...] = ("ReprMixin", "attrs_pdoc")
 
-from collections.abc import Iterable, Mapping
-from typing import Any
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any, TypedDict
 
 import jax
 import wadler_lindig as wl
 import wadler_lindig_parts as wlp
 
 
-class ReprMixin(wlp.ReprMixin):
+class ReprMixin(wlp.ReprMixin):  # type: ignore[misc]  # wadler_lindig_parts is untyped
     """`wadler_lindig_parts.ReprMixin` with phasecurvefit's ``repr`` spec.
 
     Put it first among the bases, so it wins over `equinox.Module.__repr__`.
@@ -65,7 +65,11 @@ def _short_jax_array(obj: object, /) -> wl.AbstractDoc | None:
     return wl.array_summary(obj.shape, dtype, kind=None)
 
 
-@wlp.render_options.dispatch
+class _PformatExtra(TypedDict, total=False):
+    custom: Callable[[object], wl.AbstractDoc | None]
+
+
+@wlp.render_options.dispatch  # type: ignore[untyped-decorator]  # untyped plum dispatcher
 def _render_options_repr_mixin(
     obj: ReprMixin,  # dispatch only
     /,
@@ -76,7 +80,7 @@ def _render_options_repr_mixin(
     return {"custom": _short_jax_array} if spec["value"] == "type" else {}
 
 
-@wlp.pparts.dispatch
+@wlp.pparts.dispatch  # type: ignore[untyped-decorator]  # untyped plum dispatcher
 def _pparts_repr_mixin(
     obj: ReprMixin,
     /,
@@ -97,7 +101,7 @@ def _pparts_repr_mixin(
             f"({value_spec!r}): it holds several values, not one"
         )
         raise TypeError(msg)
-    extra = {"custom": _short_jax_array} if short_arrays is True else {}
+    extra: _PformatExtra = {"custom": _short_jax_array} if short_arrays is True else {}
     text = wl.pformat(obj, width=wlp.FLAT, short_arrays=short_arrays, **extra)
     return (wlp.PPart("value", text),)
 

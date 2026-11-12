@@ -78,5 +78,5 @@ def connect(
         i32(0),
     )
     _, blo, bhi, bd, bv, *_ = jax.lax.while_loop(cond, body, init)
-    bd = jnp.maximum(bd, jnp.finfo(bd.dtype).tiny)
+    bd = jnp.maximum(bd, jnp.finfo(bd.dtype).tiny)  # type: ignore[no-untyped-call]  # untyped in jax
     return blo, bhi, bd, bv

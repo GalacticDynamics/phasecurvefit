@@ -29,7 +29,7 @@ import jax.numpy as jnp
 import wadler_lindig as wl
 from jaxtyping import Array
 
-from .custom_types import FLikeSz0, ISz0, VectorComponents
+from .custom_types import FLikeSz0, ISz0, ScalarComponents, VectorComponents
 from .metrics import AbstractDistanceMetric
 from .optional_deps import OptDeps
 from .phasespace import get_w_at
@@ -87,8 +87,8 @@ class AbstractQueryStrategy(ReprMixin, ABC):
         self,
         state: object,
         /,
-        current_pos: dict[str, Array],
-        current_vel: dict[str, Array],
+        current_pos: ScalarComponents,
+        current_vel: ScalarComponents,
         positions: VectorComponents,
         velocities: VectorComponents,
         metric_fn: AbstractDistanceMetric,
@@ -166,8 +166,8 @@ class BruteForce(AbstractQueryStrategy):
         self,
         state: object,  # noqa: ARG002
         /,
-        current_pos: dict[str, Array],
-        current_vel: dict[str, Array],
+        current_pos: ScalarComponents,
+        current_vel: ScalarComponents,
         positions: VectorComponents,
         velocities: VectorComponents,
         metric_fn: AbstractDistanceMetric,
@@ -250,8 +250,8 @@ class KDTree(AbstractQueryStrategy):
     def _candidates(
         self,
         indices: Array,
-        current_pos: dict[str, Array],
-        current_vel: dict[str, Array],
+        current_pos: ScalarComponents,
+        current_vel: ScalarComponents,
         positions: VectorComponents,
         velocities: VectorComponents,
         metric_fn: AbstractDistanceMetric,
@@ -264,12 +264,12 @@ class KDTree(AbstractQueryStrategy):
         )
         return QueryResult(distances=distances, indices=indices)
 
-    def query(
+    def query(  # type: ignore[override]  # each strategy has its own state type
         self,
         kd_state: dict[str, Any],
         /,
-        current_pos: dict[str, Array],
-        current_vel: dict[str, Array],
+        current_pos: ScalarComponents,
+        current_vel: ScalarComponents,
         positions: VectorComponents,
         velocities: VectorComponents,
         metric_fn: AbstractDistanceMetric,
@@ -290,7 +290,7 @@ class KDTree(AbstractQueryStrategy):
             metric_scale,
         )
 
-    def query_at(
+    def query_at(  # type: ignore[override]  # each strategy has its own state type
         self,
         kd_state: dict[str, Any],
         current_idx: ISz0,

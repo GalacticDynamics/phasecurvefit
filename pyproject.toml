@@ -92,7 +92,12 @@ docs = [
   "unxt[interop-mpl]>=2.0",
   "ipywidgets>=8.1.8",
 ]
-lint = ["cz-conventional-gitmoji>=0.6.1", "prek>=0.5.3", "pylint>=3.3.8"]
+lint = [
+  "cz-conventional-gitmoji>=0.6.1",
+  "mypy>=2.4.1",
+  "prek>=0.5.3",
+  "pylint>=3.3.8",
+]
 nox = ["nox>=2024.10.9", "nox-uv>=0.6.3"]
 test = [
   "beartype>=0.21.0",
@@ -235,12 +240,17 @@ run.source = ["phasecurvefit"]
 disallow_incomplete_defs = false
 disallow_untyped_defs    = false
 enable_error_code        = ["ignore-without-code", "redundant-expr", "truthy-bool"]
-files                    = ["src", "tests"]
-python_version           = "3.12"
-strict                   = true
-warn_return_any          = false
-warn_unreachable         = true
-warn_unused_configs      = true
+# `tests/` has no `__init__.py` and repeats file names across subdirectories
+# (e.g. `unit/test_autoencoder.py` and `benchmarks/test_autoencoder.py`), so
+# modules are named from their path rather than their file name.
+explicit_package_bases = true
+files                  = ["src", "tests"]
+mypy_path              = ["src"]
+python_version         = "3.12"
+strict                 = true
+warn_return_any        = false
+warn_unreachable       = true
+warn_unused_configs    = true
 
 [[tool.mypy.overrides]]
 disable_error_code       = ["name-defined", "no-redef", "type-arg"]
@@ -249,17 +259,42 @@ disallow_untyped_defs    = true
 module                   = "phasecurvefit.*"
 
 [[tool.mypy.overrides]]
+# Tests are not annotated, so calling one unannotated helper from another is
+# expected. Everything else in strict mode still applies to them.
+disallow_untyped_calls = false
+module                 = ["tests.*"]
+
+[[tool.mypy.overrides]]
+# These modules pass `unxt.Quantity` values through array-typed functions,
+# which works at runtime through quax and plum dispatch but which mypy cannot
+# model. `unxt.Quantity(1.0, "m")` is also typed from its field
+# (`Array | StaticValue`), so mypy rejects a float value the converter accepts.
+# Only `arg-type` and `union-attr` (a Quantity's `.unit`) are off; every other
+# check still applies here.
+disable_error_code = ["arg-type", "union-attr"]
+module = [
+  "phasecurvefit._interop.interop_unxt",
+  "tests.unit.test_interop_unxt",
+  "tests.unit.test_orderers_unxt",
+  "tests.unit.test_quantity_support",
+  "tests.usage.test_epitrochoid",
+]
+
+[[tool.mypy.overrides]]
 ignore_missing_imports = true
 module = [
   "equinox.*",
-  "flax.*",
   "hypothesis.*",
   "jax.*",
+  "jaxkd.*",
+  "jaxknn.*",
   "jaxtyping.*",
   "numpy.*",
   "optax.*",
   "plum.*",
+  "scipy.*",
   "unxt.*",
+  "wadler_lindig_parts.*",
   "zeroth.*",
 ]
 

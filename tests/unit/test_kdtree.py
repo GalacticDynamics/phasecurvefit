@@ -102,6 +102,7 @@ def test_kdtree_query_at_evaluates_metric_on_candidates_only():
 
     res = strategy.query_at(state, jnp.asarray(5), pos, vel, metric, 1.0)
 
+    assert res.indices is not None
     assert res.indices.shape == (4,)
     assert res.distances.shape == (4,)
     # Self plus the three nearest: 4 and 6, then one of the tied 3 and 7.
@@ -125,7 +126,7 @@ def test_kdtree_query_at_matches_query_by_position():
         cur_pos = {k: v[i] for k, v in pos.items()}
         cur_vel = {k: v[i] for k, v in vel.items()}
         live = strategy.query(state, cur_pos, cur_vel, pos, vel, metric, 0.5)
-        assert (at.indices == live.indices).all()
+        assert jnp.all(at.indices == live.indices)
         assert jnp.allclose(at.distances, live.distances)
 
 

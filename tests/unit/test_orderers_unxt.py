@@ -56,6 +56,7 @@ class TestMSTUnxt:
         )
         assert isinstance(res.positions["x"], u.AbstractQuantity)
         assert isinstance(res.velocities["x"], u.AbstractQuantity)
+        assert res.backbone is not None
         assert isinstance(res.backbone["x"], u.AbstractQuantity)
         assert res.positions["x"].unit == u.unit("kpc")
 

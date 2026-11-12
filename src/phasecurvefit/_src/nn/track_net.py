@@ -10,7 +10,6 @@ __all__: tuple[str, ...] = (
 import abc
 import functools as ft
 from dataclasses import KW_ONLY, dataclass
-from typing import cast
 
 import equinox as eqx
 import jax
@@ -24,7 +23,7 @@ from .order_net import default_optimizer
 from .trainer import EqxScanTrainer, eqx_step
 from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.checks import check_weights
-from phasecurvefit._src.custom_types import FSz0, RSz0, RSzN
+from phasecurvefit._src.custom_types import FLikeSz0, FSz0, RSz0, RSzN
 
 
 class AbstractTrackNet(ReprMixin, eqx.Module):
@@ -111,10 +110,10 @@ class TrackNet(AbstractTrackNet):
             key=key,
         )
 
-    @ft.partial(eqx.filter_jit)
+    @eqx.filter_jit
     def __call__(
         self, gamma: RSz0, /, key: PRNGKeyArray | None = None
-    ) -> tuple[Float[Array, " {self.out_size}"], FSz0]:
+    ) -> Float[Array, " {self.out_size}"]:
         """Forward pass through Param-Net.
 
         Parameters
@@ -250,7 +249,7 @@ class FourierTrackNet(AbstractTrackNet):
         ang = jnp.pi * ks * gamma
         return jnp.concatenate([jnp.atleast_1d(gamma), jnp.sin(ang), jnp.cos(ang)])
 
-    @ft.partial(eqx.filter_jit)
+    @eqx.filter_jit
     def __call__(
         self, gamma: RSz0, /, key: PRNGKeyArray | None = None
     ) -> Float[Array, " {self.out_size}"]:
@@ -270,8 +269,8 @@ def decoder_loss(
     p_hat: RSzN,
     mask: Bool[Array, " N"],
     *,
-    lambda_q: float = 100,
-    lambda_p: float = 100,
+    lambda_q: FLikeSz0 = 100,
+    lambda_p: FLikeSz0 = 100,
 ) -> RSz0:
     r"""Loss for Param-Net decoder: position + momentum direction matching.
 
@@ -346,7 +345,8 @@ def decoder_loss(
 
     # Full loss
     prefactor = 1 / (lambda_q + lambda_p)
-    return prefactor * (lambda_q * spatial_l2 + lambda_p * tangent_l2)
+    # lambda_* are ArrayLike, so numpy stubs widen the result; it is a JAX Array.
+    return prefactor * (lambda_q * spatial_l2 + lambda_p * tangent_l2)  # type: ignore[return-value]
 
 
 def compute_loss(
@@ -451,4 +451,4 @@ def train_track_net(
         show_pbar=config.show_pbar,
     )
 
-    return cast("TrackNet", model), opt_state, epoch_losses
+    return model, opt_state, epoch_losses

@@ -2,6 +2,7 @@
 
 import re
 import warnings
+from typing import Any
 
 import equinox as eqx
 import jax
@@ -160,6 +161,7 @@ def test_som_orderer_accepts_any_abstract_result_as_init(arc):
 
     assert int(result.n_visited) == 50
     assert int(result.n_skipped) == 10
+    assert result.chord is not None
     assert int(jnp.sum(jnp.isnan(result.chord))) == 10
 
 
@@ -204,8 +206,8 @@ def test_orient_by_velocity_keeps_backbone_and_ordering_in_step(sign, straight):
     first_x = float(pos["x"][order[0]])
     last_x = float(pos["x"][order[-1]])
 
-    lo = float(result(jnp.array(result.gamma_range[0]))["x"])
-    hi = float(result(jnp.array(result.gamma_range[1]))["x"])
+    lo = float(jnp.asarray(result(jnp.array(result.gamma_range[0]))["x"]))
+    hi = float(jnp.asarray(result(jnp.array(result.gamma_range[1]))["x"]))
 
     assert abs(lo - first_x) < abs(lo - last_x)
     assert abs(hi - last_x) < abs(hi - first_x)
@@ -279,13 +281,14 @@ def test_fit_with_the_default_metric_covers_the_data():
 
     orderer = pcf.orderers.SOMOrderer(n_prototypes=11)
     pq, pp = som.init_prototypes(pos, vel, n_prototypes=11)
+    metric, metric_scale = orderer._resolve_metric(pos, vel, None)
     result = som.fit(
         pq,
         pp,
         pos,
         vel,
-        metric=orderer._resolve_metric(pos, vel, None)[0],
-        metric_scale=orderer.metric_scale,
+        metric=metric,
+        metric_scale=metric_scale,
         n_epochs=50,
     )
 
@@ -306,7 +309,8 @@ def test_som_orderer_default_metric_is_symmetric(arc):
     ``AlignedMomentumDistanceMetric`` too and guards nothing.
     """
     orderer = pcf.orderers.SOMOrderer()
-    resolved, _ = orderer._resolve_metric(*arc()[:2], None)
+    pos, vel, _ = arc()
+    resolved, _ = orderer._resolve_metric(pos, vel, None)
     assert isinstance(resolved, pcf.metrics.SpatialDistanceMetric)
 
     a_pos = {"x": jnp.array(0.0), "y": jnp.array(0.0)}
@@ -401,7 +405,11 @@ class TestVelocityAwarePropagation:
         pos, vel, _ = arc()
         plain = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0)
         assert plain.order(pos, vel).velocity_aware is False
-        for kw in ({"sever_cos_threshold": 0.9}, {"velocity_weight": 0.5}):
+        kws: tuple[dict[str, Any], ...] = (
+            {"sever_cos_threshold": 0.9},
+            {"velocity_weight": 0.5},
+        )
+        for kw in kws:
             orderer = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, **kw)
             assert orderer.order(pos, vel).velocity_aware is True
         oriented = pcf.orderers.MSTOrderer(k=8, jump_cap=3.0, orient_by_velocity=True)
@@ -509,7 +517,16 @@ def test_som_disagreement_warning_points_at_the_caller(entry, arc):
     prior = pcf.orderers.OrderingResult(positions=pos, velocities=vel, indices=shuffled)
 
     class Shuffled(pcf.orderers.AbstractOrderer):
-        def order(self, positions, velocities, *, metadata=None, init=None):  # noqa: ARG002
+        def order(
+            self,
+            positions,
+            velocities,
+            *,
+            metadata=None,
+            init=None,
+            weights=None,
+        ):
+            del positions, velocities, metadata, init, weights
             return prior
 
     som = pcf.orderers.SOMOrderer(n_prototypes=10)
@@ -880,7 +897,6 @@ class TestDisagreementWarningIsBestEffort:
             if abs(np.corrcoef(np.arange(n), rank)[0, 1]) < threshold:
                 return jnp.asarray(perm)
         pytest.fail("no sufficiently disagreeing permutation found")
-        return None
 
     class _Init:
         velocity_aware = False
@@ -894,7 +910,7 @@ class TestDisagreementWarningIsBestEffort:
         kept = jnp.ones(n, dtype=bool)
 
         with pytest.warns(UserWarning, match="disagrees with the one it was given"):
-            orderer._warn_if_disagrees(perm, kept, sub_q, self._Init())
+            orderer._warn_if_disagrees(perm, kept, sub_q, self._Init())  # type: ignore[arg-type]  # duck-typed stub
 
     def test_the_reported_fraction_is_unchanged_on_a_normal_track(self):
         """Cancelling ``length`` must not alter the number it used to print.
@@ -910,7 +926,7 @@ class TestDisagreementWarningIsBestEffort:
         kept = jnp.ones(n, dtype=bool)
 
         with pytest.warns(UserWarning, match="% of the track") as record:
-            orderer._warn_if_disagrees(perm, kept, sub_q, self._Init())
+            orderer._warn_if_disagrees(perm, kept, sub_q, self._Init())  # type: ignore[arg-type]  # duck-typed stub
 
         expected = 100 * 0.7 / (8 - 1)
         assert f"{expected:.1f}% of the track" in str(record[0].message)
@@ -936,7 +952,7 @@ class TestDisagreementWarningIsBestEffort:
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            orderer._warn_if_disagrees(perm, kept, sub_q, self._Init())
+            orderer._warn_if_disagrees(perm, kept, sub_q, self._Init())  # type: ignore[arg-type]  # duck-typed stub
 
 
 class TestTracingAStandaloneVersusChainedStage:
@@ -1091,7 +1107,7 @@ class TestSOMOutlierMixture:
     def test_rejects_a_non_config(self):
         """Anything but a ``SOMMixture`` is rejected at construction."""
         with pytest.raises(TypeError, match="outlier_mixture"):
-            pcf.orderers.SOMOrderer(outlier_mixture=3.0)
+            pcf.orderers.SOMOrderer(outlier_mixture=3.0)  # type: ignore[arg-type]  # deliberately invalid
 
     def test_composes_with_a_prior_stage(self):
         """Chained: the SOM's own rejections narrow, never override, init's.
@@ -1128,6 +1144,7 @@ class TestSOMOutlierMixture:
         batched_pos = {k: jnp.stack([v, v]) for k, v in pos.items()}
         batched_vel = {k: jnp.stack([v, v]) for k, v in vel.items()}
         out = jax.vmap(lambda q, p: orderer.order(q, p).chord)(batched_pos, batched_vel)
+        assert out is not None
         assert out.shape == (2, 60)
 
 
@@ -1224,7 +1241,7 @@ class TestNonFiniteVelocities:
     def test_rejects_an_unknown_nan_policy(self):
         """A typo fails at construction, not at the first NaN."""
         with pytest.raises(ValueError, match="nan_policy"):
-            pcf.orderers.SOMOrderer(nan_policy="propagate")
+            pcf.orderers.SOMOrderer(nan_policy="propagate")  # type: ignore[arg-type]  # deliberately invalid
 
     def test_prototype_velocities_stay_finite(self, straight):
         """One NaN tracer used to make every prototype velocity NaN."""
@@ -1286,6 +1303,7 @@ class TestNonFiniteVelocities:
         batched_pos = {k: jnp.stack([v, v]) for k, v in pos.items()}
         batched_vel = {k: jnp.stack([v, v]) for k, v in vel.items()}
         out = jax.vmap(lambda q, p: orderer.order(q, p).chord)(batched_pos, batched_vel)
+        assert out is not None
         assert out.shape == (2, 200)
 
 

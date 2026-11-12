@@ -39,7 +39,8 @@ __all__: tuple[str, ...] = ("MSTOrderer",)
 
 import functools
 import warnings
-from typing import Any, Literal, get_args
+from types import ModuleType
+from typing import Any, Literal, TypeAlias, get_args
 
 import equinox as eqx
 import jax
@@ -78,6 +79,9 @@ from phasecurvefit._src.neighbors import (
 )
 
 OnDisconnected = Literal["raise", "warn", "largest", "connect"]
+# An array from either backend: the stage helpers below run on NumPy or JAX,
+# chosen by their ``xp`` module argument.
+_XArray: TypeAlias = np.ndarray | jax.Array  # noqa: UP040
 # An edge must be at least this multiple of the median length to be a clip
 # candidate. Floors the (multiplicative) threshold so a uniformly-sampled
 # backbone -- where the robust spread collapses to ~0 -- is not shredded by
@@ -170,14 +174,14 @@ def _check_velocities_traceable(
     Traced: ``eqx.error_if`` with a static message naming the enabled
     mechanisms (a JAX runtime error at run time; no counts).
     """
-    kw = {
-        "nan_policy": nan_policy,
-        "velocity_weight": velocity_weight,
-        "sever_cos_threshold": sever_cos_threshold,
-        "orient_by_velocity": orient_by_velocity,
-    }
     if not _traced(V):
-        _check_velocities(np.asarray(V), **kw)
+        _check_velocities(
+            np.asarray(V),
+            nan_policy=nan_policy,
+            velocity_weight=velocity_weight,
+            sever_cos_threshold=sever_cos_threshold,
+            orient_by_velocity=orient_by_velocity,
+        )
         return V
     used = _velocity_users(
         velocity_weight=velocity_weight,
@@ -229,7 +233,7 @@ def _edge_cosine(V: np.ndarray, rows: np.ndarray, cols: np.ndarray, /) -> np.nda
     return np.divide(num, den, out=np.ones(num.shape), where=den > 0.0)
 
 
-def _has_direction(V, xp, /):  # noqa: ANN001, ANN202
+def _has_direction[XA: (np.ndarray, jax.Array)](V: XA, xp: ModuleType, /) -> XA:
     """Rows with a velocity direction: some component nonzero, none NaN.
 
     Component-wise rather than ``norm > 0``: a float32 norm of a tiny velocity
@@ -238,7 +242,9 @@ def _has_direction(V, xp, /):  # noqa: ANN001, ANN202
     return xp.any(V != 0, axis=1) & ~xp.any(xp.isnan(V), axis=1)
 
 
-def _directed_knn(P, V, k_eff, neighbors, /):  # noqa: ANN001, ANN202
+def _directed_knn(
+    P: jax.Array, V: jax.Array, k_eff: int, neighbors: AbstractNeighborSearch, /
+) -> tuple[jax.Array, jax.Array]:
     """KNN among directed tracers, and each tracer's nearest directed one.
 
     Stage (a) of ``_directionless_as_leaves``, in the selected backend with
@@ -497,7 +503,7 @@ def _host_graph(
     edge_clip_sigma: float | None,
     edge_clip_max_iters: int,
     workers: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.int32, np.ndarray, np.bool_]:
     """Stage (b): the graph algorithms, on the host.
 
     ``nbr`` (n, k_eff) holds each point's self-excluded neighbour indices from
@@ -538,6 +544,7 @@ def _host_graph(
     cos = _edge_cosine(V, rows, cols) if need_cos else None
     weights = d_edges.copy()
     if velocity_weight > 0.0:  # Mechanism 1: phase-space edge weights
+        assert cos is not None  # noqa: S101  # need_cos
         weights = d_edges + velocity_weight * (1.0 - cos)
     # scipy's csgraph treats zero weights as missing edges, which would cut
     # coincident points (repeat observations) out of the graph. Floor to the
@@ -545,6 +552,7 @@ def _host_graph(
     weights = np.maximum(weights, np.finfo(weights.dtype).tiny)
     keep = d_edges <= jump_cap  # sever long cross-loop edges (spatial)
     if sever_cos_threshold is not None:  # Mechanism 2: velocity-aware severing
+        assert cos is not None  # noqa: S101  # need_cos
         keep = keep & (cos >= sever_cos_threshold)
     # Left directed: csgraph treats it as undirected, taking the smaller nonzero
     # of graph[i, j] and graph[j, i]. Distances and cosines are symmetric.
@@ -588,7 +596,14 @@ def _host_graph(
     return full, np.int32(bb.size), in_comp, np.bool_(flip)
 
 
-def _order_keys(s, in_comp, flip, n, xp, /):  # noqa: ANN001, ANN202
+def _order_keys(
+    s: _XArray,
+    in_comp: _XArray,
+    flip: _XArray | np.bool_,
+    n: int,
+    xp: ModuleType,
+    /,
+) -> tuple[_XArray, _XArray]:
     """Sort keys (primary, secondary): (s, idx), or (-s, -idx) when flipped.
 
     Unvisited points sort last. This reproduces the original arc-length argsort
@@ -600,14 +615,24 @@ def _order_keys(s, in_comp, flip, n, xp, /):  # noqa: ANN001, ANN202
     return primary, secondary
 
 
-def _orient_backbone(full, blen, flip, xp, /):  # noqa: ANN001, ANN202
+def _orient_backbone[XA: (np.ndarray, jax.Array)](
+    full: XA, blen: _XArray | np.int32, flip: _XArray | np.bool_, xp: ModuleType, /
+) -> XA:
     """Reverse the valid prefix of the padded backbone when ``flip``."""
     i = xp.arange(full.shape[0])
     rev = xp.where(i < blen, blen - 1 - i, 0)
     return xp.where(flip, full[rev], full)
 
 
-def _finish_numpy(P, full, blen, in_comp, flip, workers, /):  # noqa: ANN001, ANN202
+def _finish_numpy(
+    P: np.ndarray,
+    full: np.ndarray,
+    blen: np.int32,
+    in_comp: np.ndarray,
+    flip: np.bool_,
+    workers: int,
+    /,
+) -> tuple[np.ndarray, np.ndarray]:
     """Stage (c) in NumPy (the eager scipy path): projection and ordering."""
     P = np.asarray(P, np.float64)  # float32 segment lengths overflow (~1.8e19)
     n = P.shape[0]
@@ -621,7 +646,15 @@ def _finish_numpy(P, full, blen, in_comp, flip, workers, /):  # noqa: ANN001, AN
     return idx, _orient_backbone(full, blen, flip, np)
 
 
-def _finish_jax(P, full, blen, in_comp, flip, neighbors, /):  # noqa: ANN001, ANN202
+def _finish_jax(
+    P: jax.Array,
+    full: jax.Array,
+    blen: jax.Array,
+    in_comp: jax.Array,
+    flip: jax.Array,
+    neighbors: AbstractNeighborSearch,
+    /,
+) -> tuple[jax.Array, jax.Array]:
     """Stage (c) in JAX: arc-length projection onto the backbone, then ordering.
 
     The padded backbone tail repeats the last real vertex: a tie with it goes
@@ -642,13 +675,13 @@ def _finish_jax(P, full, blen, in_comp, flip, neighbors, /):  # noqa: ANN001, AN
     return idx, _orient_backbone(full, blen, flip, jnp)
 
 
-def _backbone_chord(  # noqa: ANN202
+def _backbone_chord(
     P: jax.Array,
     cb: jax.Array,
     idx_full: jax.Array,
-    neighbors,  # noqa: ANN001
+    neighbors: AbstractNeighborSearch,
     /,
-):
+) -> jax.Array:
     """Arc length along the backbone at each tracer's nearest vertex, in input order.
 
     This is the coordinate the MST orders by, measured along the oriented
@@ -874,7 +907,14 @@ def _graph_and_order(
     if traced or _traced(nbr):
         real = jnp.ones(n, bool)
         full, blen, in_comp, flip, n_comp = _jax_graph(
-            P_g, V, nbr, nbr_dir, leaf, real, scale, **gcfg
+            P_g,
+            V,
+            nbr,
+            nbr_dir,
+            leaf,
+            real,
+            scale,
+            **gcfg,  # type: ignore[arg-type]  # keywords from _GRAPH_STATIC
         )
         if cfg["on_disconnected"] == "raise":
             msg = _disconnected_message("multiple", *why)
@@ -1111,7 +1151,7 @@ class MSTOrderer(AbstractOrderer):
         if self.neighbors is not None and not isinstance(
             self.neighbors, AbstractNeighborSearch
         ):
-            msg = (
+            msg = (  # type: ignore[unreachable]  # runtime guard on a mistyped field
                 "neighbors must be a phasecurvefit.neighbors backend instance, "
                 f"e.g. pcf.neighbors.SciPy(); got {self.neighbors!r}."
             )

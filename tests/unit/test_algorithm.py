@@ -358,7 +358,11 @@ class TestNearestNeighborsWithMomentum:
         p = {"x": jnp.array([1.0, 1.0, 1.0, 1.0, 1.0])}
 
         result = pcf.order(
-            q, p, pcf.orderers.LocalFlowOrderer(metric_scale=0.0, terminate_indices={2})
+            q,
+            p,
+            pcf.orderers.LocalFlowOrderer(
+                metric_scale=0.0, terminate_indices=frozenset({2})
+            ),
         )
 
         # Should visit indices 0, 1, 2 and then stop

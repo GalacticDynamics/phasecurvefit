@@ -103,7 +103,7 @@ def _is_concrete(x: object, /) -> bool:
     ``grad`` tracer carries its primal value and counts as concrete; a ``jit``
     tracer has none.
     """
-    return not isinstance(x, jax.core.Tracer) or x.to_concrete_value() is not None
+    return not isinstance(x, jax.core.Tracer) or x.to_concrete_value() is not None  # type: ignore[no-untyped-call]  # untyped jax internal
 
 
 def _scale_is_nonzero(scale: float | FSz0, /, *, remedy: str) -> bool:
@@ -318,7 +318,7 @@ class SOMOrderer(AbstractOrderer):
         if self.outlier_mixture is not None and not isinstance(
             self.outlier_mixture, _som.SOMMixture
         ):
-            msg = (
+            msg = (  # type: ignore[unreachable]  # runtime check on a field given the wrong type
                 f"outlier_mixture must be a phasecurvefit.som.SOMMixture or "
                 f"None, got {type(self.outlier_mixture).__name__}."
             )
@@ -664,7 +664,10 @@ class SOMOrderer(AbstractOrderer):
             lam = jnp.where(flip, total - lam, lam)
             # Only ``backbone_q`` is carried on the result, so only it is
             # flipped; ``backbone_p`` is not read again.
-            backbone_q = {k: jnp.where(flip, v[::-1], v) for k, v in backbone_q.items()}
+            backbone_q = {
+                k: jnp.where(flip, v[::-1], v)  # type: ignore[index]  # jaxtyping shape alias: 1-D arrays
+                for k, v in backbone_q.items()
+            }
 
         # ``stable=True`` is JAX's default, made explicit because the tie
         # behaviour is a contract: observations with equal chord values keep

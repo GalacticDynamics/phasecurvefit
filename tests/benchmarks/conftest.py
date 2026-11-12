@@ -2,7 +2,7 @@
 
 import jax.numpy as jnp
 import pytest
-from jaxtyping import PRNGKeyArray
+from jaxtyping import Array, PRNGKeyArray
 
 import phasecurvefit as pcf
 
@@ -26,7 +26,9 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture
-def simple_2d_stream(rng_key: PRNGKeyArray) -> tuple[dict, dict]:
+def simple_2d_stream(
+    rng_key: PRNGKeyArray,
+) -> tuple[dict[str, Array], dict[str, Array]]:
     """Create a simple 2D stream for benchmarking.
 
     Returns
@@ -45,7 +47,9 @@ def simple_2d_stream(rng_key: PRNGKeyArray) -> tuple[dict, dict]:
 
 
 @pytest.fixture
-def medium_2d_stream(rng_key: PRNGKeyArray) -> tuple[dict, dict]:
+def medium_2d_stream(
+    rng_key: PRNGKeyArray,
+) -> tuple[dict[str, Array], dict[str, Array]]:
     """Create a medium 2D stream (100 points).
 
     Returns
@@ -64,7 +68,7 @@ def medium_2d_stream(rng_key: PRNGKeyArray) -> tuple[dict, dict]:
 
 
 @pytest.fixture
-def large_2d_stream(rng_key: PRNGKeyArray) -> tuple[dict, dict]:
+def large_2d_stream(rng_key: PRNGKeyArray) -> tuple[dict[str, Array], dict[str, Array]]:
     """Create a large 2D stream (500 points).
 
     Returns
@@ -83,7 +87,9 @@ def large_2d_stream(rng_key: PRNGKeyArray) -> tuple[dict, dict]:
 
 
 @pytest.fixture
-def simple_3d_stream(rng_key: PRNGKeyArray) -> tuple[dict, dict]:
+def simple_3d_stream(
+    rng_key: PRNGKeyArray,
+) -> tuple[dict[str, Array], dict[str, Array]]:
     """Create a simple 3D stream (50 points).
 
     Returns

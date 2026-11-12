@@ -39,6 +39,7 @@ def lint(s: nox.Session, /) -> None:
     """Run all linting checks."""
     s.notify("precommit")
     s.notify("pylint")
+    s.notify("mypy")
 
 
 @session(uv_groups=["lint"], reuse_venv=True)
@@ -54,6 +55,16 @@ def precommit(s: nox.Session, /) -> None:
 def pylint(s: nox.Session, /) -> None:
     """Run PyLint."""
     s.run("pylint", "src/phasecurvefit", *s.posargs)
+
+
+@session(uv_groups=["lint", "test"], reuse_venv=True)
+def mypy(s: nox.Session, /) -> None:
+    """Type-check `src/` and `tests/` (config in `[tool.mypy]`, pyproject.toml).
+
+    Needs the test group as well as lint: the tests import pytest, hypothesis
+    and unxt, which mypy must resolve.
+    """
+    s.run("mypy", *s.posargs)
 
 
 # =============================================================================

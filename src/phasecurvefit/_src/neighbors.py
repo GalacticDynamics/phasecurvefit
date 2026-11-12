@@ -20,6 +20,7 @@ import jax
 import jax.numpy as jnp
 import jaxknn
 import numpy as np
+from jax.typing import DTypeLike
 from jaxtyping import Array, Float, Int
 
 from phasecurvefit._src._repr import ReprMixin
@@ -69,7 +70,8 @@ _NOT_FINITE = "kNN inputs must be finite (no NaN or inf)."
 
 def _check_args(points: Array, k: int, queries: Array | None, /) -> None:
     """Check ``k >= 1`` and (n, d) shapes; shared by every backend."""
-    if isinstance(k, bool) or not isinstance(k, int | np.integer) or k < 1:
+    # runtime guard for untyped callers: bool is an int
+    if isinstance(k, bool) or not isinstance(k, int | np.integer) or k < 1:  # type: ignore[redundant-expr]
         msg = f"k must be an integer >= 1, got {k!r}."
         raise ValueError(msg)
     if jnp.ndim(points) != 2:
@@ -93,7 +95,7 @@ def _check_finite(points: Array, queries: Array | None, /) -> Array:
 
 
 def _prep(
-    points: Array, k: int, queries: Array | None, /, *, dtype: object = None
+    points: Array, k: int, queries: Array | None, /, *, dtype: DTypeLike | None = None
 ) -> tuple[Array, Array | None, Array]:
     """Validate, cast and rescale inputs: ``(points, queries, scale)``.
 
@@ -112,7 +114,7 @@ def _prep(
     return points / scale, None if q is None else q / scale, scale
 
 
-def _no_neighbors(m: int, k: int, dtype: object, /) -> KnnOut:
+def _no_neighbors(m: int, k: int, dtype: DTypeLike, /) -> KnnOut:
     """Return the empty-search result: index 0, distance inf, for every slot."""
     return jnp.zeros((m, k), jnp.int32), jnp.full((m, k), jnp.inf, dtype)
 

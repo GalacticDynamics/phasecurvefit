@@ -171,7 +171,7 @@ class SpatialDistanceMetric(AbstractDistanceMetric):
         """
         del current_vel, velocities, metric_scale
         # Compute Euclidean distances in position space (vmap over array)
-        return vec_euclidean_distance(current_pos, positions)
+        return vec_euclidean_distance(current_pos, positions)  # type: ignore[return-value]  # jax.vmap keeps the scalar signature
 
 
 @final
@@ -265,7 +265,7 @@ class AlignedMomentumDistanceMetric(AbstractDistanceMetric):
         cos_sim = vec_cosine_similarity(unit_vel, unit_dirs)
 
         # Momentum distance: d = d0 + λ * (1 - cos_sim)
-        return d0 + metric_scale * (1.0 - cos_sim)
+        return d0 + metric_scale * (1.0 - cos_sim)  # type: ignore[return-value]  # jax.vmap keeps the scalar signature
 
 
 @final

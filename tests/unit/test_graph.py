@@ -74,7 +74,7 @@ def _scipy_graph(n, lo, hi, w, valid):
 
     (``csr_matrix`` would *sum* duplicate entries.)
     """
-    best = {}
+    best: dict[tuple[int, int], float] = {}
     for i, j, ww in zip(lo[valid], hi[valid], w[valid], strict=True):
         best[(int(i), int(j))] = min(best.get((int(i), int(j)), np.inf), float(ww))
     rows = [i for i, _ in best]

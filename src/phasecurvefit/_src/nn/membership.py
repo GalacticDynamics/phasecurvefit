@@ -96,7 +96,6 @@ __all__: tuple[str, ...] = (
     "uniform_background_density",
 )
 
-import functools as ft
 from dataclasses import KW_ONLY, dataclass
 from typing import ClassVar
 
@@ -251,12 +250,13 @@ class WidthNet(ReprMixin, eqx.Module):
             mlp,
             (
                 jnp.zeros_like(final.weight),
-                jnp.full_like(final.bias, jnp.log(sigma_init)),
+                # eqx.nn.Linear.bias is Optional; MLP layers always have one.
+                jnp.full_like(final.bias, jnp.log(sigma_init)),  # type: ignore[arg-type]
             ),
         )
         self.mlp = mlp
 
-    @ft.partial(eqx.filter_jit)
+    @eqx.filter_jit
     def __call__(
         self,
         gamma: FSz0,

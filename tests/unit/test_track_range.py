@@ -165,9 +165,12 @@ class TestMaskEnds:
 
     def test_overlapping_caps_keep_span(self):
         """Caps wider than the whole span leave nothing to cut, so it is kept."""
+        # float64 NumPy on purpose: as float32 JAX arrays this case gives
+        # (0.1, 0.5), not the full span.
         along = np.array([-0.5, 0.0, 0.05, 0.5])
         across = np.array([0.0, 0.6, 0.6, 0.0])
-        assert _mask_ends(along, across, 0.05) == pytest.approx((-0.5, 0.5))
+        ends = _mask_ends(along, across, 0.05)  # type: ignore[arg-type]
+        assert ends == pytest.approx((-0.5, 0.5))
 
 
 def _mask_segment():
@@ -210,7 +213,7 @@ class TestMaskTrackEnds:
         gamma = jnp.linspace(-0.9, 0.9, pos["x"].shape[0])
         member = jnp.ones(gamma.shape, dtype=bool)
         with pytest.raises(ValueError, match="track_ends"):
-            _track_range(model, pos, gamma, member, None, ends="edge")
+            _track_range(model, pos, gamma, member, None, ends="edge")  # type: ignore[arg-type]  # deliberately invalid
 
 
 def _blurred_segment():

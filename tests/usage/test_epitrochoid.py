@@ -1,6 +1,7 @@
 """Matplotlib tests for epitrochoid autoencoder fitting."""
 
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 import jax
 import jax.random as jr
@@ -11,6 +12,9 @@ import quaxed.numpy as jnp
 import unxt as u
 
 import phasecurvefit as pcf
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
 
 plt = pytest.importorskip("matplotlib.pyplot")
 
@@ -81,7 +85,7 @@ def make_self_intersecting_stream(
 
 
 @pytest.mark.mpl_image_compare(deterministic=True)
-def test_epitrochoid_autoencoder_fit() -> plt.Figure:
+def test_epitrochoid_autoencoder_fit() -> "Figure":
     """Test epitrochoid generation and autoencoder fitting with visualization.
 
     This test:
@@ -155,7 +159,8 @@ def test_epitrochoid_autoencoder_fit() -> plt.Figure:
     rejected_membership = all_probs < 0.9
 
     # Decode predicted path
-    qs_pred = result.model.decode(jnp.linspace(*result.model.gamma_range, 1_000))
+    gamma_lo, gamma_hi = result.model.gamma_range
+    qs_pred = result.model.decode(jnp.linspace(gamma_lo, gamma_hi, 1_000))
 
     # Extract values from Quantities for plotting
     qs_x_vals = jnp.asarray(u.ustrip(qs["x"]))

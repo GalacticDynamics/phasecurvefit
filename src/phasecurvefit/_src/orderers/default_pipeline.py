@@ -130,7 +130,7 @@ def default_pipeline(
         raise TypeError(msg) from exc
     if n_visited < n_prototypes:
         return mst_result
-    som = SOMOrderer(n_prototypes=n_prototypes, **som_kwargs)
+    som = SOMOrderer(n_prototypes=n_prototypes, **som_kwargs)  # type: ignore[arg-type]  # SOMOrderer validates its own keywords
     return som.order(
         positions, velocities, metadata=metadata, init=mst_result, weights=weights
     )

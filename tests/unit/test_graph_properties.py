@@ -34,7 +34,7 @@ def _graph(seed, n, ties):
 
 
 def _sym(n, lo, hi, w, mask):
-    best = {}
+    best: dict[tuple[int, int], float] = {}
     for i, j, ww in zip(lo[mask], hi[mask], w[mask], strict=True):
         best[(int(i), int(j))] = min(best.get((int(i), int(j)), np.inf), float(ww))
     g = csr_matrix(

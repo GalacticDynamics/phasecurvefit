@@ -48,7 +48,12 @@ from zeroth import zeroth
 
 from phasecurvefit._src._repr import ReprMixin
 from phasecurvefit._src.checks import value_error_if
-from phasecurvefit._src.custom_types import FSz0, ISzN, VectorComponents
+from phasecurvefit._src.custom_types import (
+    ArrayComponents,
+    FSz0,
+    ISzN,
+    VectorComponents,
+)
 from phasecurvefit._src.metrics import (
     AbstractDistanceMetric,
     SpatialDistanceMetric,
@@ -62,6 +67,11 @@ _TINY: Final = 1e-12
 # training ran, where no widening lost 256 of 300 at 40 epochs; 0.17 and up let
 # a background of 240 in 540 drag the backbone off at 20 epochs.
 _MIXTURE_ANNEAL: Final = 0.1
+
+
+def _n_rows(components: VectorComponents, /) -> int:
+    """Return the number of points: the length of the first component."""
+    return len(zeroth(components.values()))  # type: ignore[arg-type]  # ArrayLike includes scalars; components are 1-D
 
 
 def _check_matching_keys(**components: VectorComponents) -> None:
@@ -146,7 +156,7 @@ def _pack(
 
 def _unpack(
     arr: Float[Array, "N TwoD"], keys: tuple[str, ...], /
-) -> tuple[VectorComponents, VectorComponents]:
+) -> tuple[ArrayComponents, ArrayComponents]:
     """Split a `_pack`-ed array back into position and velocity dicts."""
     d = len(keys)
     q = {k: arr[:, i] for i, k in enumerate(keys)}
@@ -160,7 +170,7 @@ def init_prototypes(
     *,
     n_prototypes: int,
     ordering: ISzN | None = None,
-) -> tuple[VectorComponents, VectorComponents]:
+) -> tuple[ArrayComponents, ArrayComponents]:
     """Initialize prototypes by equi-frequency binning.
 
     This is the paper's default initialization: place a prototype at the average
@@ -229,7 +239,7 @@ def init_prototypes(
             f"not a mask -- pass an OrderingResult's `ordering`, not `visited`."
         )
         raise TypeError(msg)
-    n_obs = len(zeroth(positions.values()))
+    n_obs = _n_rows(positions)
     ordering = value_error_if(
         ordering,
         jnp.any(ordering < 0) | jnp.any(ordering >= n_obs),
@@ -357,8 +367,8 @@ class FitResult(NamedTuple):
 
     """
 
-    prototype_positions: VectorComponents
-    prototype_velocities: VectorComponents
+    prototype_positions: ArrayComponents
+    prototype_velocities: ArrayComponents
     kept: Bool[Array, " N"]
     responsibility: Float[Array, " N"]
 
@@ -521,7 +531,7 @@ def _tube_e_step(
     # the fit jump (by 0.03 in float64 between weights and the copies they
     # stand for).
     count = omega @ jax.nn.softmax(log_seg, axis=1)
-    tiny = jnp.finfo(count.dtype).tiny
+    tiny = jnp.finfo(count.dtype).tiny  # type: ignore[no-untyped-call]  # jnp.finfo is untyped
     log_share = jnp.log(jnp.maximum(count, tiny)) - jnp.log(
         jnp.maximum(jnp.sum(count), tiny)
     )
@@ -747,7 +757,7 @@ def fit(
     )
     _check_symmetric(metric)
     keys = tuple(sorted(proto_positions))
-    n_prototypes = len(zeroth(proto_positions.values()))
+    n_prototypes = _n_rows(proto_positions)
     start = _check_schedule(n_prototypes, n_epochs, sigma_start, sigma_end)
 
     data_q = jt.map(jnp.asarray, positions)
@@ -798,6 +808,7 @@ def fit(
     # ``use_mix`` (static) keeps them out of the update when it is off.
     use_mix = outlier_mixture is not None
     mix = SOMMixture() if outlier_mixture is None else outlier_mixture
+    rho_bg: float | Array
     if mix.background_density is None:
         rho_bg = uniform_background_density(data_qs, inflate=mix.background_inflate)
     else:
@@ -808,7 +819,7 @@ def fit(
     # every log density to -inf.
     extent = jnp.max(data_qs, axis=0) - jnp.min(data_qs, axis=0)
     s2_floor = 1e-12 * jnp.sum(jnp.where(extent > 0, extent, 1.0) ** 2)
-    total_w = jnp.maximum(jnp.sum(omega), jnp.finfo(dtype).tiny)
+    total_w = jnp.maximum(jnp.sum(omega), jnp.finfo(dtype).tiny)  # type: ignore[no-untyped-call]  # jnp.finfo is untyped
     pi_bounds = (jnp.asarray(1e-6, dtype), jnp.asarray(1.0 - 1e-6, dtype))
 
     # The tube scatters members across the curve, in D - 1 dimensions; a 1-D
@@ -870,7 +881,7 @@ def fit(
         # (the Gaussian underflows in float32 ~11 units from the nearest
         # best-matching unit); likewise a velocity component every nearby datum
         # lacks. Leave it where it is rather than dividing 0/0.
-        live = weight > jnp.finfo(dtype).tiny
+        live = weight > jnp.finfo(dtype).tiny  # type: ignore[no-untyped-call]  # jnp.finfo is untyped
         means = (neighbourhood.T @ totals) / jnp.where(live, weight, 1.0)
         means = jnp.where(live, means, _pack(pq, pp, keys))
         return (*_unpack(means, keys), pi, s2), None
@@ -1041,7 +1052,7 @@ def _resample_uniform(
     # shift accumulates with M -- 6e-4 of the total arc length at M=5001 --
     # so nudging an already strictly increasing ``s`` would perturb the common
     # case for nothing. Selected branchlessly to stay traceable.
-    eps = jnp.finfo(s.dtype).eps * jnp.where(s[-1] > 0, s[-1], 1.0)
+    eps = jnp.finfo(s.dtype).eps * jnp.where(s[-1] > 0, s[-1], 1.0)  # type: ignore[no-untyped-call]  # jnp.finfo is untyped
     ramp = s + jnp.arange(s.shape[0]) * eps
     s = jnp.where(jnp.all(jnp.diff(s) > 0), s, ramp)
     target = jnp.linspace(0.0, s[-1], C.shape[0], dtype=s.dtype)
@@ -1056,7 +1067,7 @@ def densify(
     /,
     *,
     factor: int = 5,
-) -> tuple[VectorComponents, VectorComponents]:
+) -> tuple[ArrayComponents, ArrayComponents]:
     """Turn prototypes into a smooth, arc-length-uniform backbone polyline.
 
     Densifying to a C1 curve is what removes the paper's 2-D "convexity" case.
@@ -1110,7 +1121,7 @@ def densify(
     _check_matching_keys(
         proto_positions=proto_positions, proto_velocities=proto_velocities
     )
-    n_prototypes = len(zeroth(proto_positions.values()))
+    n_prototypes = _n_rows(proto_positions)
     if n_prototypes < 2:
         msg = (
             f"densify needs at least 2 prototypes to form a backbone, got "
@@ -1253,7 +1264,7 @@ def chord(
         backbone_velocities=backbone_velocities,
     )
     _check_symmetric(metric)
-    n_vertices = len(zeroth(backbone_positions.values()))
+    n_vertices = _n_rows(backbone_positions)
     if n_vertices < 2:
         msg = (
             f"backbone must have at least 2 vertices to project onto, got "
@@ -1347,7 +1358,7 @@ class SOM1D(ReprMixin, eqx.Module):
     @property
     def n_prototypes(self) -> int:
         """Number of prototypes, ``K``."""
-        return len(zeroth(self.prototype_positions.values()))
+        return _n_rows(self.prototype_positions)
 
     def fit(
         self, positions: VectorComponents, velocities: VectorComponents, /
@@ -1370,7 +1381,7 @@ class SOM1D(ReprMixin, eqx.Module):
             (result.prototype_positions, result.prototype_velocities),
         )
 
-    def backbone(self) -> tuple[VectorComponents, VectorComponents]:
+    def backbone(self) -> tuple[ArrayComponents, ArrayComponents]:
         """Return the densified, arc-length-uniform backbone polyline."""
         return densify(
             self.prototype_positions,

@@ -3,6 +3,7 @@
 import functools
 import re
 import warnings
+from typing import TypedDict
 
 import jax
 import jax.numpy as jnp
@@ -13,6 +14,22 @@ import phasecurvefit as pcf
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.optional_deps import OptDeps
 from phasecurvefit._src.orderers import mst
+
+
+class _MSTKwargs(TypedDict, total=False):
+    """Graph keyword arguments for ``MSTOrderer`` shared between calls in a test."""
+
+    k: int
+    jump_cap: float
+    velocity_weight: float
+
+
+class _WarnKwargs(TypedDict):
+    """Keyword arguments for ``mst._warn_if_disconnected``."""
+
+    k: int
+    jump_cap: float
+    sever_cos_threshold: float | None
 
 
 def _open_arc(n=200, seed=0):
@@ -125,6 +142,7 @@ class TestMSTChord:
         """
         pos, vel = self._line_with_interloper()
         res = pcf.orderers.MSTOrderer(k=5, jump_cap=10.0).order(pos, vel)
+        assert res.chord is not None
         assert float(jnp.nanmax(res.chord)) == pytest.approx(3.0, abs=0.1)
 
     def test_increases_along_ordering(self):
@@ -146,8 +164,9 @@ class TestMSTChord:
             res = pcf.orderers.MSTOrderer(
                 k=4, jump_cap=1.0, on_disconnected="largest"
             ).order(pos, vel)
+        assert res.chord is not None
         idx = np.asarray(res.indices)
-        visited = np.zeros(len(res.chord), dtype=bool)
+        visited = np.zeros(len(res.chord), dtype=np.bool_)
         visited[idx[idx >= 0]] = True
         assert bool(np.all(np.isnan(np.asarray(res.chord)[~visited])))
         assert bool(np.all(np.isfinite(np.asarray(res.chord)[visited])))
@@ -160,8 +179,9 @@ class TestMSTChord:
         )
         eager = orderer.order(pos, vel).chord
         traced = jax.jit(lambda q: orderer.order(q, vel).chord)(pos)
+        assert eager is not None
         np.testing.assert_allclose(traced, eager, rtol=1e-6)
-        grad = jax.grad(lambda q: jnp.nansum(orderer.order(q, vel).chord))(pos)
+        grad = jax.grad(lambda q: jnp.nansum(orderer.order(q, vel).chord))(pos)  # type: ignore[arg-type]  # chord is set by MSTOrderer
         assert all(bool(jnp.all(jnp.isfinite(g))) for g in grad.values())
 
 
@@ -275,7 +295,7 @@ class TestMSTDisconnected:
     def test_connect_is_a_no_op_on_a_connected_graph(self):
         """With nothing to bridge, ``"connect"`` gives the ``"raise"`` answer."""
         pos, vel, _ = _open_arc(n=100)
-        kw = {"k": 8, "jump_cap": 2.0}
+        kw: _MSTKwargs = {"k": 8, "jump_cap": 2.0}
         a = pcf.orderers.MSTOrderer(**kw, on_disconnected="connect").order(pos, vel)
         b = pcf.orderers.MSTOrderer(**kw, on_disconnected="raise").order(pos, vel)
         assert jnp.array_equal(a.indices, b.indices)
@@ -302,7 +322,7 @@ class TestMSTDisconnected:
     def test_unknown_on_disconnected_raises(self):
         """An unknown policy is rejected at construction, not treated as 'largest'."""
         with pytest.raises(ValueError, match="on_disconnected"):
-            pcf.orderers.MSTOrderer(on_disconnected="nonsense")
+            pcf.orderers.MSTOrderer(on_disconnected="nonsense")  # type: ignore[arg-type]  # deliberately invalid
 
 
 def _arc_with_interlopers(n_arc=200, n_out=15, seed=0):
@@ -670,6 +690,7 @@ class TestMSTJaxTraceability:
             res = pcf.orderers.MSTOrderer(k=8, jump_cap=2.0).order(
                 {"x": x, "y": pos["y"]}, vel
             )
+            assert res.backbone_size is not None
             # indices/backbone_size are int32; grad needs a float cotangent
             # target, so combine them into one float loss to check both.
             return jnp.sum(res.indices.astype(jnp.float32)) + res.backbone_size.astype(
@@ -874,6 +895,10 @@ class TestMSTBackends:
                 _distinct_backbone(got), _distinct_backbone(want)
             )
             return
+        assert got.backbone_size is not None
+        assert want.backbone_size is not None
+        assert got.backbone is not None
+        assert want.backbone is not None
         assert int(got.backbone_size) == int(want.backbone_size)
         np.testing.assert_array_equal(
             np.asarray(got.backbone["x"]), np.asarray(want.backbone["x"])
@@ -883,7 +908,7 @@ class TestMSTBackends:
         """``neighbors=None``: SciPy for concrete inputs, the kd-tree when traced."""
         assert pcf.orderers.MSTOrderer().neighbors is None
         pos, vel, _ = _open_arc(n=200)
-        kw = {"k": 10, "jump_cap": 2.0}
+        kw: _MSTKwargs = {"k": 10, "jump_cap": 2.0}
         auto = pcf.orderers.MSTOrderer(**kw)
         scipy = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw)
         bucket = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.BucketKDTree(), **kw)
@@ -908,7 +933,7 @@ class TestMSTBackends:
                 return pcf.neighbors.BruteForce().knn(points, k, queries=queries)
 
         pos, vel, _ = _open_arc(n=120)
-        kw = {"k": 8, "jump_cap": 2.0, "velocity_weight": 1.0}
+        kw: _MSTKwargs = {"k": 8, "jump_cap": 2.0, "velocity_weight": 1.0}
         custom = pcf.orderers.MSTOrderer(neighbors=Wrapped(), **kw)
         brute = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.BruteForce(), **kw)
         np.testing.assert_array_equal(
@@ -936,7 +961,9 @@ class TestMSTBackends:
         )
 
         def loss(vx):
-            return orderer.order(pos, {**vel, "x": vx}).backbone["x"].sum()
+            backbone = orderer.order(pos, {**vel, "x": vx}).backbone
+            assert backbone is not None
+            return jnp.sum(backbone["x"])
 
         with pytest.raises(TypeError, match="BucketKDTree"):
             jax.grad(loss)(vel["x"])
@@ -975,6 +1002,7 @@ class TestMSTBackends:
         with pytest.raises(TypeError, match="workers"):
             pcf.orderers.MSTOrderer(workers=4)
         orderer = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(workers=2))
+        assert isinstance(orderer.neighbors, pcf.neighbors.SciPy)
         assert orderer.neighbors.workers == 2
 
     @pytest.mark.parametrize("make", _JAX_BACKENDS)
@@ -994,7 +1022,7 @@ class TestMSTBackends:
             rng.normal(size=(n, 3)).astype(np.float32),
             rng.normal(size=(n, 3)).astype(np.float32),
         )
-        kw = {"k": 10, "jump_cap": 100.0}
+        kw: _MSTKwargs = {"k": 10, "jump_cap": 100.0}
         want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw).order(
             pos, vel
         )
@@ -1064,7 +1092,8 @@ class TestMSTBackends:
             )
             eager = orderer.order(pos, vel)
             jitted = jax.jit(lambda q, v: orderer.order(q, v).indices)(pos, vel)
-            assert eager.backbone["x"].dtype == jnp.float64
+            assert eager.backbone is not None
+            assert jnp.asarray(eager.backbone["x"]).dtype == jnp.float64
         np.testing.assert_array_equal(
             np.asarray(eager.indices), np.asarray(want.indices)
         )
@@ -1091,7 +1120,7 @@ class TestMSTBackends:
         p = p[rng.permutation(400)].astype(np.float32)
         pos = {"x": jnp.asarray(p[:, 0]), "y": jnp.asarray(p[:, 1])}
         vel = {"x": jnp.ones(400), "y": jnp.zeros(400)}
-        kw = {"k": 10, "jump_cap": 1.0}
+        kw: _MSTKwargs = {"k": 10, "jump_cap": 1.0}
         want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw).order(
             pos, vel
         )
@@ -1105,7 +1134,7 @@ class TestMSTBackends:
         x = np.random.default_rng(2).permutation(np.linspace(0, 32e19, 40))
         pos = {"x": jnp.asarray(x, jnp.float32), "y": jnp.zeros(40, jnp.float32)}
         vel = {"x": jnp.ones(40), "y": jnp.zeros(40)}
-        kw = {"k": 5, "jump_cap": 1e30}
+        kw: _MSTKwargs = {"k": 5, "jump_cap": 1e30}
         want = pcf.orderers.MSTOrderer(neighbors=pcf.neighbors.SciPy(), **kw).order(
             pos, vel
         )
@@ -1175,10 +1204,12 @@ class TestMSTPureJax:
         real = jnp.ones(n, bool)  # no split: nbr doubles as the directed table
         one = jnp.ones((), P.dtype)  # scale: P is already in range
         hlo = fn.lower(P, P, nbr, nbr, nbr[:, 0], real, one).compile().as_text()
+        assert hlo is not None
         big = []
         for line in hlo.splitlines():
             if " constant(" in line:
                 m = re.search(r"\w+\[([\d,]*)\]", line)
+                assert m is not None
                 size = int(np.prod([int(s) for s in m.group(1).split(",") if s]))
                 if size > n // 2:
                     big.append(line.strip())
@@ -1231,7 +1262,7 @@ class TestMSTPureJax:
 
         Called directly: coverage cannot see ``jax.debug.callback``'s thread.
         """
-        kw = {"k": 5, "jump_cap": 1.0, "sever_cos_threshold": None}
+        kw: _WarnKwargs = {"k": 5, "jump_cap": 1.0, "sever_cos_threshold": None}
         with pytest.warns(UserWarning, match="disconnected into 3 components"):
             mst._warn_if_disconnected(jnp.int32(3), **kw)
         mst._warn_if_disconnected(jnp.int32(1), **kw)  # `filterwarnings = error`
@@ -1279,6 +1310,8 @@ class TestMSTPureJax:
         np.testing.assert_array_equal(
             np.asarray(jitted.indices), np.asarray(eager.indices)
         )
+        assert jitted.backbone_size is not None
+        assert eager.backbone_size is not None
         assert int(jitted.backbone_size) == int(eager.backbone_size)
 
     def test_vmap_connect(self):
@@ -1332,6 +1365,8 @@ class TestMSTPureJax:
             np.testing.assert_array_equal(
                 np.asarray(got.indices), np.asarray(ref.indices)
             )
+            assert got.backbone_size is not None
+            assert ref.backbone_size is not None
             assert int(got.backbone_size) == int(ref.backbone_size)
 
     def test_eager_bucket_reuses_compiled_graph(self):
@@ -1339,7 +1374,8 @@ class TestMSTPureJax:
         orderer = pcf.orderers.MSTOrderer(k=5, neighbors=_BKD)
         pos, vel, _ = _open_arc(n=120)
         orderer.order(pos, vel)
-        size = mst._jax_graph_jit._cache_size()
+        size = mst._jax_graph_jit._cache_size()  # type: ignore[attr-defined]  # private jax API
         cut = {c: x[:-3] for c, x in pos.items()}, {c: x[:-3] for c, x in vel.items()}
         orderer.order(*cut)
-        assert mst._jax_graph_jit._cache_size() == size
+        new_size = mst._jax_graph_jit._cache_size()  # type: ignore[attr-defined]  # private jax API
+        assert new_size == size
