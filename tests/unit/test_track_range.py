@@ -185,7 +185,8 @@ def _mask_segment():
 class TestMaskTrackEnds:
     """``TrainingConfig(track_ends="mask")`` ends the track at a mask's ends."""
 
-    def test_mask_ends_at_the_segment_ends(self):
+    @pytest.mark.parametrize("mixture", [None, pcf.som.SOMMixture()])
+    def test_mask_ends_at_the_segment_ends(self, mixture):
         """The track over ``track_range`` ends within 0.1 of x=0 and x=4."""
         pos, vel = _mask_segment()
         cfg = pcf.nn.TrainingConfig(
@@ -197,10 +198,27 @@ class TestMaskTrackEnds:
             show_pbar=False,
         )
         _, fitted, _ = pcf.fit_track(
-            pos, vel, key=jax.random.key(0), training_config=cfg
+            pos,
+            vel,
+            key=jax.random.key(0),
+            training_config=cfg,
+            outlier_mixture=mixture,
         )
         ends = np.sort(np.asarray(fitted(jnp.asarray(fitted.track_range))["x"]))
         np.testing.assert_allclose(ends, [0.0, 4.0], atol=0.1)
+
+    def test_outlier_mixture_keeps_every_pixel(self):
+        """The SOM's mixture leaves no pixel of the mask out of the ordering.
+
+        The pixels fill their bounding box, so a flat background over that box
+        explains them better than the curve does, and EM ends with most of them
+        called background. That fit keeps every pixel instead.
+        """
+        pos, vel = _mask_segment()
+        res = pcf.orderers.default_pipeline(
+            pos, vel, outlier_mixture=pcf.som.SOMMixture()
+        )
+        assert int(res.n_skipped) == 0
 
     def test_unknown_track_ends(self):
         """An unknown ``track_ends`` raises."""

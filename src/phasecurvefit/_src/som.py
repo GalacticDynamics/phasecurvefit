@@ -67,6 +67,10 @@ _TINY: Final = 1e-12
 # training ran, where no widening lost 256 of 300 at 40 epochs; 0.17 and up let
 # a background of 240 in 540 drag the backbone off at 20 epochs.
 _MIXTURE_ANNEAL: Final = 0.1
+# A mixture fit whose member fraction ends below this keeps every datum; see
+# `fit`. The SOM's input is a sample of a curve, so a fit that calls most of
+# it background has fitted the bounding box instead.
+_MIN_MEMBER_FRACTION: Final = 0.5
 
 
 def _n_rows(components: VectorComponents, /) -> int:
@@ -393,8 +397,11 @@ class SOMMixture:
     :doc:`/explanation/som` explains the model.
 
     The background needs room outside the curve. Samples that fill their own
-    bounding box, as the pixels of a mask or an image do, look like background:
-    on a straight mask of half-width 0.3 it rejected 974 of 1071 pixels.
+    bounding box, as the pixels of a mask or an image do, are explained better
+    by the background than by the curve, and EM ends with most of them called
+    background. A fit whose member fraction :math:`\pi` ends below 0.5 has
+    fitted the box rather than the curve, so it keeps every datum, as without
+    the mixture.
 
     Attributes
     ----------
@@ -675,7 +682,10 @@ def fit(
     after another orderer, where the lattice starts from bin means that cut
     inside the curve's bends. A weight
     multiplies every sum, the M-steps included, so a datum of weight ``w``
-    counts like ``w`` coincident copies; it never enters ``r_n``.
+    counts like ``w`` coincident copies; it never enters ``r_n``. A fit whose
+    mixing fraction ends below 0.5 keeps every datum, with ``responsibility``
+    1: it called most of the data background, which is what happens when the
+    data fill their own bounding box.
 
     Parameters
     ----------
@@ -906,6 +916,14 @@ def fit(
             trained_q, trained_p, jnp.ones(n, dtype=bool), jnp.ones(n, dtype=dtype)
         )
     resp, _ = _tube_e_step(data_qs, _stack(trained_q, keys), omega, pi, s2, log_bg)
+    # A fit that calls most of the data background has fitted the box, not
+    # the curve: samples that fill their own bounding box (a mask's pixels)
+    # are explained better by the flat background than by any tube, so EM
+    # drifts there (pi 0.33 on a straight mask of half-width 0.3). Neither a
+    # larger field nor a floor on pi in the M-step fixed that without losing
+    # heavily contaminated arcs, whose pi stays above 0.76. Such a fit keeps
+    # every datum, as without the mixture.
+    resp = jnp.where(pi < _MIN_MEMBER_FRACTION, jnp.ones_like(resp), resp)
     return FitResult(trained_q, trained_p, resp >= 0.5, resp)
 
 

@@ -24,6 +24,8 @@ from phasecurvefit._src.nn import (
 from phasecurvefit._src.orderers.default_pipeline import default_pipeline
 from phasecurvefit._src.som import SOMMixture
 
+_DEFAULT_MIXTURE = SOMMixture()
+
 
 def fit_track(
     positions: VectorComponents,
@@ -33,7 +35,7 @@ def fit_track(
     metadata: StateMetadata | None = None,
     weights: Float[Array, " N"] | None = None,
     n_prototypes: int = 15,
-    outlier_mixture: SOMMixture | None = None,
+    outlier_mixture: SOMMixture | None = _DEFAULT_MIXTURE,
     training_config: TrainingConfig | None = None,
 ) -> tuple[AbstractResult, AutoencoderResult, Float[Array, " n_epochs"]]:
     """Order, refine, and fit a smooth track through phase-space tracers.
@@ -68,11 +70,11 @@ def fit_track(
         of the ordering any tracer the curve-or-background mixture calls
         background. The encoder learns those tracers as non-members, so the
         track does not bend out to reach interlopers at the stream's tips.
-        ``None`` (default) keeps every tracer in the ordering. Off by default
-        because samples that fill their own bounding box, as a mask or image
-        does, look like background to it: on a filled mask it left out 974 of
-        1071 pixels. With fewer than ``n_prototypes`` tracers the SOM stage,
-        and so the rejection, is skipped. It works with ``weights``.
+        Defaults to ``SOMMixture()``. A fit that calls most tracers background,
+        as it does when they fill their own bounding box like a mask's pixels,
+        keeps them all. ``None`` keeps every tracer in the ordering. With fewer
+        than ``n_prototypes`` tracers the SOM stage, and so the rejection, is
+        skipped. It works with ``weights``.
     training_config
         Passed to :func:`~phasecurvefit.nn.train_autoencoder`. ``None`` uses
         its own defaults.

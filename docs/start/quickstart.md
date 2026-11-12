@@ -81,8 +81,8 @@ other.
 
 ## Fit a smooth track
 
-{func}`~phasecurvefit.fit_track` runs the same ordering, then trains an autoencoder
-that gives every point a value of $\gamma$ and learns a smooth mean track
+{func}`~phasecurvefit.fit_track` runs the same ordering, leaving out the samples its
+outlier mixture calls background, then trains an autoencoder that gives every point a value of $\gamma$ and learns a smooth mean track
 $x(\gamma)$. Training takes a few seconds.
 
 ```{code-cell} python

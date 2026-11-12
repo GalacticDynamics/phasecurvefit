@@ -158,9 +158,10 @@ where the larger error comes from. At 240 and 40 epochs it failed, keeping 237 o
 The mixture works with `weights`: a weight counts a sample as that many copies, and
 doesn't change whether it is a member.
 
-Don't use it on a mask or an image whose samples fill their own bounding box: there
-the background explains the samples as well as the curve does, and most of them are
-rejected.
+On a mask or an image whose samples fill their own bounding box, the background
+explains the samples better than the curve does, and the fit ends with most of them
+called background. A fit like that keeps every sample, so there the mixture does
+nothing ({doc}`../explanation/som`).
 
 The background density defaults to one over the area (or volume) of the positions'
 bounding box. If the samples don't fill the field, set `background_inflate` above 1
