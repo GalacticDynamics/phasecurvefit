@@ -123,19 +123,19 @@ Pick the line that matches your data. Each one leads to a tutorial that runs fro
 simulated data to a result.
 
 - **A stream or curve, and no known start point.** A minimum-spanning-tree backbone
-  finds both ends itself: [order a stream with no start index](tutorials/stream_mst.ipynb).
+  finds both ends itself: [order a stream with no start index](tutorials/stream_mst.md).
 - **A stream with a known progenitor or start point.** Walk along the flow from it
-  and fit the track: [the stream autoencoder tutorial](tutorials/stream_autoencoder.ipynb),
+  and fit the track: [the stream autoencoder tutorial](tutorials/stream_autoencoder.md),
   the best first tutorial.
 - **A curve that crosses itself.** The default pipeline orders by position and cuts
   across the crossings, so use a velocity-aware orderer instead:
-  [the epitrochoid autoencoder tutorial](tutorials/epitrochoid_autoencoder.ipynb).
+  [the epitrochoid autoencoder tutorial](tutorials/epitrochoid_autoencoder.md).
 - **Contaminated data.** A stream-plus-background mixture model gives each sample
-  a membership probability: [the outlier-rejection tutorial](tutorials/outlier_rejection.ipynb).
+  a membership probability: [the outlier-rejection tutorial](tutorials/outlier_rejection.md).
 - **A track that must be fast**, for example inside a likelihood evaluated at every
-  step of an MCMC: [the training-free running-mean track](tutorials/stream_runningmean.ipynb).
+  step of an MCMC: [the training-free running-mean track](tutorials/stream_runningmean.md).
 - **An image or density map, not a list of samples.** Each pixel becomes a sample
-  weighted by its value: [the density-field tutorial](tutorials/density_fields.ipynb).
+  weighted by its value: [the density-field tutorial](tutorials/density_fields.md).
 
 ## The documentation
 

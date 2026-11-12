@@ -89,7 +89,7 @@ ax.legend();
 
 Training runs in three phases with different objectives, so compare `losses` only
 within a phase. The
-[stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb) shows how to
+[stream autoencoder tutorial](../tutorials/stream_autoencoder.md) shows how to
 read the loss curve and check the final model.
 
 ## Change the training settings
@@ -152,7 +152,7 @@ config = pcf.nn.TrainingConfig(
 If speed matters more than accuracy, for example inside a likelihood evaluated at
 every step of an MCMC, a {class}`~phasecurvefit.nn.RunningMeanDecoder` can replace
 the trained decoder. The
-[stream running-mean tutorial](../tutorials/stream_runningmean.ipynb) shows how, and
+[stream running-mean tutorial](../tutorials/stream_runningmean.md) shows how, and
 when it is accurate enough.
 
 To reject interlopers while training, see {doc}`outliers`.
