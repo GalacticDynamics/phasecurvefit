@@ -409,6 +409,10 @@ def posterior_membership(
                          {\pi_n \, \mathcal{N}(r_n; 0, \sigma^2(\gamma_n))
                           + (1 - \pi_n) \, \rho_{\mathrm{bg}}}
 
+    Here $\sigma(\gamma_n)$ is the fitted width, capped at the ceiling training
+    ended with (the ``stop`` of ``sigma_ceiling``), so the posterior uses the
+    same width as the last epoch of training.
+
     Requires a model trained with `MixtureMembershipConfig` (so that
     ``model.width`` exists).
 
@@ -545,7 +549,7 @@ def _mixture_decoder_loss(
     qs_pred = jax.vmap(model.decoder, (0, None))(gamma, skey2)
 
     # Stream half-width at each star's gamma, capped by the annealing ceiling.
-    sigma = jnp.minimum(jax.vmap(model.width)(gamma), sigma_ceil)
+    sigma = jax.vmap(ft.partial(model.width, ceiling=sigma_ceil))(gamma)
 
     nll, responsibility = mixture_membership_loss(
         qs,
@@ -953,7 +957,30 @@ def train_ordering_and_track_net(
         show_pbar=config.show_pbar,
     )
 
+    if membership is not None:
+        # Keep the width training ended with. Above the ceiling the width net
+        # gets no gradient, so its raw output can be wider than any width the
+        # fit used; `posterior_membership` must not see that.
+        start, stop = membership.sigma_ceiling
+        final = float(
+            sigma_ceiling(config.n_epochs - 1, config.n_epochs, start=start, stop=stop)
+        )
+        width = cast("WidthNet", model.width)
+        model = eqx.tree_at(lambda m: m.width, model, _with_sigma_max(width, final))
+
     return cast("PathAutoencoder", model), opt_state, epoch_losses
+
+
+def _with_sigma_max(width: WidthNet, sigma_max: float, /) -> WidthNet:
+    """Return `width` with the same weights and a new static ``sigma_max``."""
+    fresh = WidthNet(
+        width.width_size,
+        width.depth,
+        sigma_min=width.sigma_min,
+        sigma_max=sigma_max,
+        key=jr.key(0),
+    )
+    return eqx.tree_at(lambda w: w.mlp, fresh, width.mlp)
 
 
 # ===================================================================
