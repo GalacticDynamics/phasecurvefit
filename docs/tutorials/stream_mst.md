@@ -249,7 +249,7 @@ membership = pcf.nn.MixtureMembershipConfig(
     sigma_ceiling=(1.0, 0.3),  # anneal the width ceiling down
     warmup_frac=0.4,  # fit the track before rejecting anything
 )
-config = pcf.nn.TrainingConfig(membership=membership)
+config = pcf.nn.TrainingConfig(n_epochs_encoder=400, membership=membership)
 result, _, losses = pcf.nn.train_autoencoder(
     model, mstresult, config=config, key=train_key
 )
@@ -285,7 +285,7 @@ plt.show()
 
 Because we trained with `MixtureMembershipConfig`, the encoder's membership is a calibrated **posterior**: `posterior_membership` folds the encoder's prior together with how far each star landed from the fitted track. The interlopers -- far from the track -- get a low posterior; the stream keeps a high one. Pass `ws` in the same normalised frame used for training.
 
-Genuine stars also dip below 0.5 where the track doesn't reach them. In this run the track stops a little short of the sparse, fanned-out tip of the upper tail, so the few dozen stars at the very tip sit far from the track and the mixture model counts them as background. That is why Hogg et al. recommend keeping the posterior as a *weight* rather than a hard threshold.
+Genuine stars also dip below 0.5 where they sit far from the track, which happens where the stream is broad and at the sparse, fanned-out tip of the upper tail. The mixture model counts those stars as background. That is why Hogg et al. recommend keeping the posterior as a *weight* rather than a hard threshold.
 
 ```{code-cell} ipython3
 # posterior_membership expects ws in the normalised training frame.
@@ -338,7 +338,7 @@ ax.legend()
 plt.show()
 ```
 
-**What to look for:** the interlopers are dark (low posterior), while the stream stays bright. Two interlopers stay above 0.5: they landed about half a kiloparsec from the track, as far out as some genuine stars. About half of the 42 genuine stars below 0.5 are the sparse tip of the upper tail, past where the track stops, and a few are near the progenitor, where the stream is broader than a single width allows.
+**What to look for:** the interlopers are dark (low posterior), while the stream stays bright. One interloper stays above 0.5: it landed about 0.6 kpc from the track, as far out as some genuine stars. The 31 genuine stars below 0.5 are spread along the stream, about a quarter of them near the progenitor, where the stream is broader than a single width allows.
 
 ## Takeaways
 
