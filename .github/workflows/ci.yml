@@ -67,10 +67,9 @@ jobs:
             pytest tests/smoke --noconftest -o addopts= -p no:cacheprovider
 
   docs:
-    # ReadTheDocs shows the tutorials' stored outputs without running them
-    # (docs/conf.py). Off ReadTheDocs the docs build executes every notebook and
-    # guide and fails on any cell error or Sphinx warning, so this job checks that
-    # every notebook still runs with the current code.
+    # The docs build executes every tutorial and guide (docs/conf.py) and fails
+    # on any cell error or Sphinx warning, so this job checks that every notebook
+    # still runs with the current code.
     name: Docs build (executes notebooks)
     runs-on: ubuntu-latest
     needs: [pre-commit]

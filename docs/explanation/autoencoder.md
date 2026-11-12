@@ -3,7 +3,7 @@
 An ordering is not yet a smooth track, and it may be incomplete. The local-flow walk
 follows a single thread through the data, so it leaves out samples off to the side of
 its path and everything beyond a gap larger than `max_dist`. On the simulated stream
-in the [stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb), the walk
+in the [stream autoencoder tutorial](../tutorials/stream_autoencoder.md), the walk
 orders 248 of 8000 stars. An outlier-rejecting chain also leaves samples out on
 purpose. And any orderer gives only an order, not a curve you can evaluate. The
 autoencoder, from Appendix A.2 of Nibauer et al. (2022), fills both gaps.
@@ -40,7 +40,7 @@ A running-mean decoder, {class}`~phasecurvefit.nn.RunningMeanDecoder`, can repla
 the trained decoder. It averages the positions of member samples within a window in
 $\gamma$, needs no training, and is fast enough to evaluate inside a likelihood at
 every step of an MCMC. It cuts inside tight bends, by an amount set by the window size
-([epitrochoid running-mean tutorial](../tutorials/epitrochoid_runningmean.ipynb)).
+([epitrochoid running-mean tutorial](../tutorials/epitrochoid_runningmean.md)).
 
 ## Membership
 

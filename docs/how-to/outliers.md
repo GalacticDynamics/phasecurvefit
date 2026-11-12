@@ -12,7 +12,7 @@ This guide shows how to train the autoencoder with a stream-plus-background mixt
 model, and read a calibrated membership probability for each sample.
 {doc}`../explanation/outliers` explains why the default membership cannot reject
 outliers and how the mixture model fixes it. The
-[outlier-rejection tutorial](../tutorials/outlier_rejection.ipynb) runs it end to end
+[outlier-rejection tutorial](../tutorials/outlier_rejection.md) runs it end to end
 on a mock stream with injected interlopers.
 
 ## Turn it on

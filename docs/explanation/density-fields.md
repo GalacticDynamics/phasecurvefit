@@ -5,7 +5,7 @@ density map of a stellar stream from a simulation or a probability map from a
 segmentation. phasecurvefit fits a track through it by treating each pixel as a
 sample weighted by its value. This page
 explains how the weights enter membership, and why a density field needs a different
-orderer, two training settings, and care at the ends of the track. The [density-field tutorial](../tutorials/density_fields.ipynb)
+orderer, two training settings, and care at the ends of the track. The [density-field tutorial](../tutorials/density_fields.md)
 runs the whole fit.
 
 ## How the weights enter membership

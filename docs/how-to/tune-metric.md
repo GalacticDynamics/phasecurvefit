@@ -57,14 +57,14 @@ single value suits every dataset:
   With $\lambda \approx s$ it weighs direction and distance about equally. With
   $\lambda \gg s$ it strongly prefers to keep going straight ahead, which also means
   longer strides and more skipped points. The
-  [stream autoencoder tutorial](../tutorials/stream_autoencoder.ipynb) uses
+  [stream autoencoder tutorial](../tutorials/stream_autoencoder.md) uses
   $\lambda = 100$ kpc for a stream whose steps are at most a few kpc, so even a step
   $15°$ off the velocity costs more than a 3 kpc step straight ahead.
 - **Full phase-space metric:** $\tau$ is a **time** that turns a velocity difference
   into an equivalent distance. Choose it so that $\tau\,\Delta v$ between points on
   *different* parts of the curve is much larger than the spacing between neighbours
   on the *same* part. The
-  [epitrochoid autoencoder tutorial](../tutorials/epitrochoid_autoencoder.ipynb)
+  [epitrochoid autoencoder tutorial](../tutorials/epitrochoid_autoencoder.md)
   uses $\tau = 4$ s: where two strands cross, their velocities differ by at least
   about 580 m/s, which puts the wrong strand over 2 km away against a spacing of
   about 3 m.

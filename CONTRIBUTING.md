@@ -35,7 +35,10 @@ following:
   platforms/configurations).
 
 - **Documentation**: if you are adding new functionality, be sure to include a
-  description in the main documentation (in `docs/`).
+  description in the main documentation (in `docs/`). A tutorial's source is its
+  MyST Markdown file in `docs/tutorials/`. Edit only the `.md`. A pre-commit
+  hook generates the `.ipynb` next to it, with no outputs, for the Colab badge;
+  commit both.
 
 - **Performance improvements**: if you are making changes that impact
   `phasecurvefit` performance, consider adding a performance benchmark in
