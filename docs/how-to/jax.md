@@ -12,13 +12,11 @@ This guide shows how to use the orderers under `jit`, `vmap` and `grad`.
 
 ## Which orderers trace
 
-- {class}`~phasecurvefit.orderers.LocalFlowOrderer` and
-  {class}`~phasecurvefit.orderers.MSTOrderer` work under `jit`, `vmap` and `grad`.
-- {class}`~phasecurvefit.orderers.SOMOrderer` works under them on its own, but not
-  chained after another stage ({doc}`som`).
-- The default pipeline, `pcf.order(pos, vel)` with no orderer, does not: whether its
-  SOM stage runs depends on how many samples the MST visited. It raises a
-  `TypeError` saying so. Pass an explicit orderer instead.
+- {class}`~phasecurvefit.orderers.LocalFlowOrderer`,
+  {class}`~phasecurvefit.orderers.MSTOrderer` and
+  {class}`~phasecurvefit.orderers.SOMOrderer` work under `jit`, `vmap` and `grad`,
+  on their own and chained ({doc}`som`).
+- So does the default pipeline, `pcf.order(pos, vel)` with no orderer.
 - Calling any result to interpolate along it, `result(gamma)`, traces whichever
   orderer produced it ({doc}`interpolate`).
 

@@ -15,7 +15,7 @@ you have and what you want to the call to use and the page to read.
 | samples with some missing velocities (NaN) | the default pipeline, which skips missing velocities when it orients the ordering | {doc}`../how-to/data` |
 | `unxt` Quantities with physical units | any orderer, with `metadata=pcf.StateMetadata(usys=...)` | {doc}`../how-to/units` |
 | a dataset where background points mix with the curve | an MST with `edge_clip_sigma`, then the mixture membership model | {doc}`../how-to/outliers`, {doc}`../tutorials/outlier_rejection` |
-| an ordering to run inside `jit` or `vmap` | an explicit {class}`~phasecurvefit.orderers.MSTOrderer` or {class}`~phasecurvefit.orderers.LocalFlowOrderer`; the default pipeline cannot be traced | {doc}`../how-to/jax` |
+| an ordering to run inside `jit`, `vmap` or `grad` | any orderer, the default pipeline included, except the ones that run on the host: {class}`~phasecurvefit.orderers.RidgeOrderer` and `MSTOrderer(neighbors=SciPy())` | {doc}`../how-to/jax` |
 
 ## What you want
 

@@ -41,7 +41,6 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.tree as jt
-import numpy as np
 from jaxtyping import Array, Bool, Float, PRNGKeyArray
 
 from zeroth import zeroth
@@ -270,34 +269,79 @@ def init_prototypes(
     )
 
     m = int(ordering.shape[0])
-    if m < n_prototypes:
-        msg = (
-            "binning needs at least n_prototypes points; got "
-            f"{m} points for n_prototypes={n_prototypes}."
-        )
-        raise ValueError(msg)
+    return _bin_prototypes(
+        jt.map(lambda v: jnp.asarray(v)[ordering], positions),
+        jt.map(lambda v: jnp.asarray(v)[ordering], velocities),
+        m,
+        n_prototypes,
+    )
 
-    # Contiguous, equal-count bins along the ordering. ``m`` and
-    # ``n_prototypes`` are both static, so which form is safe is known at trace
-    # time. The direct product overflows int32 once ``m * K > 2**31`` (N=2.2e6
-    # with K=1000 suffices, and x64 is off by default); the wrapped negative ids
+
+def _bin_prototypes(
+    positions: VectorComponents,
+    velocities: VectorComponents,
+    n_valid: int | Array,
+    n_prototypes: int,
+    /,
+) -> tuple[ArrayComponents, ArrayComponents]:
+    """Equi-frequency bin the first ``n_valid`` points, already in order.
+
+    ``positions`` and ``velocities`` are in the order to bin along. Only the
+    first ``n_valid`` entries are binned; the rest are padding and reach no
+    prototype. ``n_valid`` may be traced, so a stage chained after another can
+    bin exactly what that stage visited while every array keeps the static
+    length ``M``. With ``n_valid == M`` this is plain equi-frequency binning.
+    """
+    big_m = _n_rows(positions)
+    if _is_concrete(n_valid):
+        if int(n_valid) < n_prototypes:
+            msg = (
+                "binning needs at least n_prototypes points; got "
+                f"{int(n_valid)} points for n_prototypes={n_prototypes}."
+            )
+            raise ValueError(msg)
+    else:
+        n_valid = value_error_if(
+            n_valid,
+            n_valid < n_prototypes,
+            "binning needs at least n_prototypes points; got fewer visited "
+            f"points than n_prototypes={n_prototypes}.",
+        )
+
+    # Contiguous, equal-count bins along the ordering: rank ``r`` goes to bin
+    # ``floor(r * K / m)``. ``big_m`` and ``n_prototypes`` are both static, and
+    # ``r < m <= big_m``, so which form is safe is known at trace time. The
+    # direct product overflows int32 once ``m * K > 2**31`` (N=2.2e6 with
+    # K=1000 suffices, and x64 is off by default); the wrapped negative ids
     # are then silently dropped by ``segment_sum`` and rescued by
     # ``maximum(counts, 1)`` into prototypes stacked at the origin -- a wrong
     # lattice, with no error raised.
-    if m * n_prototypes < 2**31:
-        segment = jnp.minimum(jnp.arange(m) * n_prototypes // m, n_prototypes - 1)
+    rank = jnp.arange(big_m)
+    valid = rank < n_valid
+    if big_m * n_prototypes < 2**31:
+        segment = jnp.minimum(rank * n_prototypes // n_valid, n_prototypes - 1)
     else:
-        # Bin ``j`` starts at ``ceil(j * m / K)``, formed host-side in exact
-        # int64 so nothing on device can overflow. Only taken above the
-        # threshold: the binary search costs ~1.7x the direct product, and the
-        # host-side ceil is O(K), which is not free at K = 1e5.
-        starts = -(-np.arange(n_prototypes, dtype=np.int64) * m // n_prototypes)
-        segment = jnp.searchsorted(jnp.asarray(starts), jnp.arange(m), side="right") - 1
+        # Bin ``j`` starts at ``ceil(j * m / K)``. With ``m = a K + b`` that is
+        # ``j a + ceil(j b / K)``, and ``j b < K**2`` fits int32 for every
+        # lattice ``_fit_core`` can square without overflow. Exact, and needs
+        # no host-side ``m``, so it traces. Only taken above the threshold: the
+        # binary search costs ~1.7x the direct product.
+        if n_prototypes > 46340:
+            msg = (
+                f"n_prototypes={n_prototypes} is too large to bin "
+                f"{big_m} points without int32 overflow; use at most 46340."
+            )
+            raise ValueError(msg)
+        a, b = n_valid // n_prototypes, n_valid % n_prototypes
+        j = jnp.arange(n_prototypes)
+        starts = j * a + (j * b + n_prototypes - 1) // n_prototypes
+        segment = jnp.searchsorted(starts, rank, side="right") - 1
+    # Padding goes to bin ``K``, which ``bincount`` and ``segment_sum`` drop.
+    segment = jnp.where(valid, segment, n_prototypes)
     counts = jnp.maximum(jnp.bincount(segment, length=n_prototypes), 1)
 
     def bin_mean(values: Array) -> Array:
-        ordered = jnp.asarray(values)[ordering]
-        total = jax.ops.segment_sum(ordered, segment, num_segments=n_prototypes)
+        total = jax.ops.segment_sum(values, segment, num_segments=n_prototypes)
         return total / counts
 
     def finite_bin_mean(values: Array) -> Array:
@@ -305,15 +349,24 @@ def init_prototypes(
         # prototype would otherwise win every velocity-aware `argmin` (which
         # returns the first NaN) on the first epoch. A bin with no finite entry
         # takes the mean of all finite entries (0 if there are none).
-        ordered = jnp.asarray(values)[ordering]
-        ok = jnp.isfinite(ordered)
-        clean = jnp.where(ok, ordered, 0.0)
+        ok = jnp.isfinite(values) & valid
+        clean = jnp.where(ok, values, 0.0)
         total = jax.ops.segment_sum(clean, segment, num_segments=n_prototypes)
         n_ok = jax.ops.segment_sum(ok.astype(clean.dtype), segment, n_prototypes)
         fallback = jnp.sum(clean) / jnp.maximum(jnp.sum(ok), 1)
         return jnp.where(n_ok > 0, total / jnp.maximum(n_ok, 1), fallback)
 
     return jt.map(bin_mean, positions), jt.map(finite_bin_mean, velocities)
+
+
+def _is_concrete(x: object, /) -> bool:
+    """Whether ``x`` has a value here, i.e. it is not an abstract tracer.
+
+    The same test as ``jax.core.is_concrete``, which jax 0.12 removed. A
+    ``grad`` tracer carries its primal value and counts as concrete; a ``jit``
+    tracer has none.
+    """
+    return not isinstance(x, jax.core.Tracer) or x.to_concrete_value() is not None  # type: ignore[no-untyped-call]  # untyped jax internal
 
 
 def _distance_matrix(
@@ -639,6 +692,7 @@ def fit(
     sigma_end: float = 0.7,
     weights: Float[Array, " N"] | None = None,
     outlier_mixture: SOMMixture | None = None,
+    mask: Bool[Array, " N"] | None = None,
 ) -> FitResult:
     r"""Train a 1-D SOM by batch Kohonen updates.
 
@@ -714,6 +768,15 @@ def fit(
         shape.
     outlier_mixture
         A :class:`SOMMixture` to reject outliers, or ``None`` (default) for none.
+    mask
+        Which data take part, shape ``(N,)``. ``None`` (default) means all of
+        them. A ``False`` datum is treated as absent: its weight is ``0`` in
+        every sum, the mixture's included, and it is ``False`` in ``kept`` with
+        ``responsibility`` 0. Unlike dropping it, this keeps every shape static,
+        so a mask known only at run time still traces. A masked datum must
+        still hold finite positions, since a weight of ``0`` times a non-finite
+        value is not ``0``, and it still counts towards the bounding box of the
+        default ``background_density``.
 
     Returns
     -------
@@ -803,6 +866,8 @@ def fit(
         if weights is None
         else jnp.asarray(weights, dtype=dtype)
     )
+    if mask is not None:
+        omega = jnp.where(mask, omega, 0.0)
     # A non-finite velocity (common in catalogues: no radial velocity) is left
     # out of that component's averages rather than summed in: one NaN would
     # otherwise reach every prototype through the neighbourhood and make every
@@ -910,11 +975,10 @@ def fit(
     init = (init_q, init_p, jnp.asarray(0.5, dtype), s2_init)
     (trained_q, trained_p, pi, s2), _ = jax.lax.scan(epoch, init, jnp.arange(n_epochs))
 
+    n = stacked.shape[0]
+    member = jnp.ones(n, dtype=bool) if mask is None else jnp.asarray(mask, bool)
     if not use_mix:
-        n = stacked.shape[0]
-        return FitResult(
-            trained_q, trained_p, jnp.ones(n, dtype=bool), jnp.ones(n, dtype=dtype)
-        )
+        return FitResult(trained_q, trained_p, member, member.astype(dtype))
     resp, _ = _tube_e_step(data_qs, _stack(trained_q, keys), omega, pi, s2, log_bg)
     # A fit that calls most of the data background has fitted the box, not
     # the curve: samples that fill their own bounding box (a mask's pixels)
@@ -924,7 +988,9 @@ def fit(
     # heavily contaminated arcs, whose pi stays above 0.76. Such a fit keeps
     # every datum, as without the mixture.
     resp = jnp.where(pi < _MIN_MEMBER_FRACTION, jnp.ones_like(resp), resp)
-    return FitResult(trained_q, trained_p, resp >= 0.5, resp)
+    # Masked data stay out either way.
+    resp = jnp.where(member, resp, 0.0)
+    return FitResult(trained_q, trained_p, member & (resp >= 0.5), resp)
 
 
 def bootstrap_weights(key: PRNGKeyArray, n_obs: int, /) -> Float[Array, " N"]:
