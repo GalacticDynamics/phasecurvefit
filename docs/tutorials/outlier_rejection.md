@@ -186,7 +186,7 @@ membership and then refitting, is the M-step of the expectation-maximisation
 algorithm.
 
 ```{code-cell} ipython3
-def fit(cfg, data=None, n_epochs=3000, *, key=None):
+def fit(cfg, data=None, n_epochs=1500, *, key=None):
     """Fit encoder + decoder + stream width jointly, under the mixture likelihood."""
     if key is None:
         key = jr.key(10)
@@ -261,9 +261,9 @@ cfg = MixtureMembershipConfig(
     warmup_frac=0.3,  # fit the track before rejecting anything
 )
 
-e = np.arange(0, 3000, 30)
-ceil = [float(sigma_ceiling(int(i), 3000, start=1.5, stop=0.15)) for i in e]
-ramp = [float(membership_rampup(int(i), 3000, warmup_frac=0.3)) for i in e]
+e = np.arange(0, 1500, 15)
+ceil = [float(sigma_ceiling(int(i), 1500, start=1.5, stop=0.15)) for i in e]
+ramp = [float(membership_rampup(int(i), 1500, warmup_frac=0.3)) for i in e]
 
 fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 3.2))
 a1.plot(e, ceil, "C0")
@@ -435,7 +435,7 @@ membership = pcf.nn.MixtureMembershipConfig(
     sigma_ceiling=(0.5, 0.1),  # anneal the width ceiling down
     warmup_frac=0.3,  # fit the track before rejecting anything
 )
-config = pcf.nn.TrainingConfig(n_epochs_both=2000, membership=membership)
+config = pcf.nn.TrainingConfig(n_epochs_both=1000, membership=membership)
 result, opt_states, losses = pcf.nn.train_autoencoder(
     model, walkresult, config=config, key=train_key
 )

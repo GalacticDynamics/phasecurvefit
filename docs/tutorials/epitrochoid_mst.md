@@ -327,7 +327,7 @@ ae_model = pcf.nn.PathAutoencoder.make(
 
 # Stop after the decoder phase (see above): no joint phase on this hard topology.
 config = pcf.nn.TrainingConfig(
-    n_epochs_encoder=800, n_epochs_decoder=1200, n_epochs_both=0
+    n_epochs_encoder=400, n_epochs_decoder=600, n_epochs_both=0
 )
 result, _, losses = pcf.nn.train_autoencoder(
     ae_model, res_vel, key=train_key, config=config

@@ -133,6 +133,7 @@ model = pcf.nn.PathAutoencoder.make(
     key=jax.random.key(0),
 )
 config = pcf.nn.TrainingConfig(
+    n_epochs_encoder=400,
     freeze_encoder_final_training=True,
     batch_size=1000,
     track_ends="mask",
