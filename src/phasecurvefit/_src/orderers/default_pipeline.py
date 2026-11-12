@@ -13,6 +13,8 @@ __all__: tuple[str, ...] = ("default_pipeline",)
 import jax
 from jaxtyping import Array, Float
 
+from zeroth import zeroth
+
 from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
 from phasecurvefit._src.custom_types import VectorComponents
@@ -58,11 +60,10 @@ def default_pipeline(
     the SOM stage simply cannot help there, so it is skipped instead of
     failing.
 
-    Unlike its MST stage alone, this cannot run under ``jit`` or ``vmap``: the
-    fallback test and the SOM stage both need the concrete visited count, and
-    a SOM stage chained after another cannot be traced. To trace an ordering,
-    pass :func:`~phasecurvefit.order` an explicit orderer (``MSTOrderer()`` and
-    ``LocalFlowOrderer()`` both trace; see :doc:`/how-to/jax`).
+    It runs under ``jit``, ``vmap`` and ``grad`` (see :doc:`/how-to/jax`).
+    Under ``jit`` and ``vmap`` the fallback test uses the number of tracers,
+    which is the number this MST visits: it joins every piece and clips no
+    edges.
 
     Parameters
     ----------
@@ -119,15 +120,11 @@ def default_pipeline(
     mst_result = mst.order(positions, velocities, metadata=metadata, weights=weights)
     try:
         n_visited = int(mst_result.n_visited)
-    except jax.errors.ConcretizationTypeError as exc:
-        msg = (
-            "The default ordering pipeline cannot run under jit or vmap: "
-            "whether to run the SOM stage depends on the number of tracers "
-            "visited, which is only known once the MST has run. Pass an "
-            "explicit orderer instead, e.g. `pcf.orderers.MSTOrderer(...)` or "
-            "`pcf.orderers.LocalFlowOrderer()`, both of which can be traced."
-        )
-        raise TypeError(msg) from exc
+    except jax.errors.ConcretizationTypeError:
+        # Under ``jit``/``vmap`` the visited count has no value yet. This MST
+        # joins every piece (``on_disconnected="connect"``) and clips no edges,
+        # so it visits every tracer and the static count stands in for it.
+        n_visited = len(zeroth(positions.values()))  # type: ignore[arg-type]  # components are 1-D
     if n_visited < n_prototypes:
         return mst_result
     som = SOMOrderer(n_prototypes=n_prototypes, **som_kwargs)  # type: ignore[arg-type]  # SOMOrderer validates its own keywords

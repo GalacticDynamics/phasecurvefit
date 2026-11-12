@@ -25,7 +25,6 @@ import warnings
 from typing import ClassVar, Literal
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import plum
 
@@ -63,6 +62,7 @@ def _train_and_project(
     metric: AbstractDistanceMetric,
     metric_scale: float | FSz0,
     sub_w: FSzN | None,
+    mask: BSzN | None,
     /,
 ) -> tuple[VectorComponents, VectorComponents, FSzN, BSzN]:
     """Run fit -> densify -> chord as one XLA program.
@@ -84,6 +84,7 @@ def _train_and_project(
         sigma_end=orderer.sigma_end,
         weights=sub_w,
         outlier_mixture=orderer.outlier_mixture,
+        mask=mask,
     )
     backbone_q, backbone_p = _som.densify(
         result.prototype_positions,
@@ -96,14 +97,7 @@ def _train_and_project(
     return backbone_q, backbone_p, lam, result.kept
 
 
-def _is_concrete(x: object, /) -> bool:
-    """Whether ``x`` has a value here, i.e. it is not an abstract tracer.
-
-    The same test as ``jax.core.is_concrete``, which jax 0.12 removed. A
-    ``grad`` tracer carries its primal value and counts as concrete; a ``jit``
-    tracer has none.
-    """
-    return not isinstance(x, jax.core.Tracer) or x.to_concrete_value() is not None  # type: ignore[no-untyped-call]  # untyped jax internal
+_is_concrete = _som._is_concrete  # noqa: SLF001
 
 
 def _scale_is_nonzero(scale: float | FSz0, /, *, remedy: str) -> bool:
@@ -243,15 +237,14 @@ class SOMOrderer(AbstractOrderer):
 
     Notes
     -----
-    Standalone, ``order()`` is JAX-traceable: ``jit`` it, or build the orderer
-    inside one. **Chained after another stage it is not.** The working set is
-    whatever the prior stage visited, so its size depends on that stage's
-    values; under a transform ``init.indices`` is a tracer and no shape known
-    at trace time can hold the result. Chaining therefore raises rather than
-    compiling. Run the chain outside ``jit`` -- or order in two steps and hand
-    the second a concrete ``init``. The SOM *core* (``fit``, ``densify``,
-    ``chord``) is traceable either way, so this is a limit of the working-set
-    selection, not of the algorithm.
+    ``order()`` is JAX-traceable under ``jit``, ``vmap`` and ``grad``, both
+    standalone and chained after another stage. Chained, the SOM keeps all
+    ``N`` observations at a fixed shape and masks out the ones the prior stage
+    left unvisited: they get zero weight in the fit and stay ``-1`` in
+    :attr:`OrderingResult.indices`. The equi-frequency binning that seeds the
+    lattice counts only the visited ones, in the prior stage's order. The
+    disagreement warning needs concrete values, so it is skipped under
+    ``jit`` and ``vmap``.
 
     Examples
     --------
@@ -362,6 +355,7 @@ class SOMOrderer(AbstractOrderer):
         sub_q: VectorComponents,
         sub_p: VectorComponents,
         init: AbstractResult | None,
+        mask: BSzN | None = None,
         /,
     ) -> tuple[AbstractDistanceMetric, float | FSz0]:
         """Pick the metric and scale, following ``init`` when unset.
@@ -423,13 +417,15 @@ class SOMOrderer(AbstractOrderer):
 
         v = jnp.stack([sub_p[k] for k in sorted(sub_p)], axis=-1)
         # ``sub_q`` is already in the prior stage's order, so consecutive
-        # differences are steps along the track.
+        # differences are steps along the track. The padding after the visited
+        # points repeats the last one, so its steps are exactly zero.
         length = _polyline_length(sub_q)
         sigma_phys = self.sigma_end * length / (self.n_prototypes - 1)
         # Over finite speeds only: one NaN made the median NaN, and the guard
         # below then silently set the scale -- and velocity awareness -- to 0.
         norm = jnp.linalg.norm(v, axis=-1)
-        speed = jnp.nanmedian(jnp.where(jnp.isfinite(norm), norm, jnp.nan))
+        ok = jnp.isfinite(norm) if mask is None else jnp.isfinite(norm) & mask
+        speed = jnp.nanmedian(jnp.where(ok, norm, jnp.nan))
         # A uniformly tiny (not zero) ``speed`` -- a near-static clump, or a
         # unit system where the numeric magnitude is small -- does not blow
         # this up: ``scale`` and ``speed`` are reciprocal by construction, so
@@ -466,7 +462,8 @@ class SOMOrderer(AbstractOrderer):
         epitrochoid, a lattice that destroys the ordering scores 0.28 while
         every lattice that improves it scores 0.89 or above.
         """
-        if init is None:
+        if init is None or not _is_concrete(kept):
+            # Under ``jit``/``vmap`` there is no value to judge or print.
             return
         # ``sub_q`` is in the prior stage's order, so the prior rank is just
         # position in the array. ``perm`` is the ordering ``order`` already
@@ -477,10 +474,9 @@ class SOMOrderer(AbstractOrderer):
         rank = jnp.zeros(n, dtype=perm.dtype).at[perm].set(prior)
         # A point ``outlier_mixture`` rejected sorts to the tail regardless
         # of its prior rank, which is rejection showing up as reordering, not
-        # reordering itself. No concreteness guard needed for this mask: this
-        # returns above when ``init is None``, and with an ``init`` the
-        # working-set selection in ``order`` has already refused to trace.
-        # Nothing reaches this line without values.
+        # reordering itself. ``kept`` is also ``False`` on the padding slots a
+        # prior stage left unvisited. Slicing on it is safe: ``kept`` has a
+        # value here, checked above.
         prior, rank = prior[kept], rank[kept]
         if prior.shape[0] < 3:
             return
@@ -547,12 +543,13 @@ class SOMOrderer(AbstractOrderer):
         # Points a prior stage rejected as outliers stay rejected.
         if init is None:
             work = jnp.arange(n_obs)
+            mask = None
         else:
             # ``indices`` is the only ordering field ``AbstractResult`` guarantees.
             prior = jnp.asarray(init.indices)
-            # The core's own range guard cannot see these: the subset below is
-            # re-indexed to ``arange(len(work))`` before it reaches
-            # ``init_prototypes``. Without this, an ``init`` carried over from a
+            # The core's own range guard cannot see these: the binning below
+            # runs on slots already gathered into the prior stage's order, not
+            # on these indices. Without this, an ``init`` carried over from a
             # larger dataset gathers out of bounds, which JAX silently clamps --
             # the result then reports every observation visited while several
             # carry a nan chord.
@@ -570,10 +567,9 @@ class SOMOrderer(AbstractOrderer):
             # A repeated visited index would gather one observation twice into
             # the working set while silently dropping another. That is exactly
             # what ``init_prototypes``'s own repeat guard exists to catch, but
-            # ``sub_ordering`` below is a synthetic ``arange`` (the subset is
-            # already in the prior stage's order), which is repeat-free by
-            # construction and so can never trigger that guard -- it has to be
-            # checked here instead, against the real indices.
+            # the binning below sees slots already gathered into the prior
+            # stage's order, never the indices themselves, so it can never
+            # trigger that guard -- it has to be checked here instead.
             visited_counts = jnp.bincount(
                 jnp.where(prior >= 0, prior, n_obs), length=n_obs + 1
             )
@@ -585,32 +581,41 @@ class SOMOrderer(AbstractOrderer):
                 "drops another silently; each visited index must appear at "
                 "most once.",
             )
-            if not _is_concrete(prior):
-                # Without values the visited subset has no size, and no shape
-                # fixed at trace time can hold it. Not fixable here: the mask
-                # would have to travel through the whole core so rejected
-                # points stay rejected without slicing. See the class docstring.
-                msg = (
-                    "SOMOrderer cannot be traced when chained after another "
-                    "stage: `init.indices` has no value while tracing, so the "
-                    "visited subset has a data-dependent shape. Run the chain "
-                    "outside `jit` (the SOM core -- fit/densify/chord -- is "
-                    "itself jittable, as is SOMOrderer standalone), or order "
-                    "in two steps and pass a concrete `init`."
-                )
-                raise TypeError(msg)
-            work = prior[prior >= 0]
+            # Fixed shape: all ``n_obs`` slots, the visited observations first
+            # in the prior stage's order, then padding. Slicing out the visited
+            # subset instead would give a shape that depends on the prior
+            # stage's values, which no trace can hold. The padding repeats the
+            # last visited observation, so it holds finite data whenever the
+            # visited data do (a zero weight times a NaN is still NaN), its
+            # polyline steps are exactly zero, and the velocity checks below see
+            # nothing they would not see anyway. ``mask`` keeps it out of the
+            # binning, the fit and the result.
+            n_prior = prior.shape[0]
+            if n_prior < n_obs:
+                prior = jnp.pad(prior, (0, n_obs - n_prior), constant_values=-1)
+            visited = prior >= 0
+            # Stable, so the visited keep their order. A repeat-free index set in
+            # range has at most ``n_obs`` visited entries, so truncating to
+            # ``n_obs`` (when ``indices`` is longer) drops only padding.
+            compact = prior[jnp.argsort(~visited, stable=True)][:n_obs]
+            n_vis = jnp.sum(visited)
+            slot = jnp.arange(n_obs)
+            mask = slot < n_vis
+            work = jnp.where(mask, compact, compact[jnp.maximum(n_vis - 1, 0)])
         sub_q = {k: v[work] for k, v in full_q.items()}
         sub_p = {k: v[work] for k, v in full_p.items()}
         sub_w = None if weights is None else weights[work]
 
-        # With a prior stage, the subset is already in that stage's order, so
-        # equi-frequency binning along it is binning along the identity.
-        sub_ordering = None if init is None else jnp.arange(work.shape[0])
-
-        proto_q, proto_p = _som.init_prototypes(
-            sub_q, sub_p, n_prototypes=self.n_prototypes, ordering=sub_ordering
-        )
+        if init is None:
+            proto_q, proto_p = _som.init_prototypes(
+                sub_q, sub_p, n_prototypes=self.n_prototypes
+            )
+        else:
+            # The slots are already in the prior stage's order, so
+            # equi-frequency binning along it is binning the first ``n_vis``.
+            proto_q, proto_p = _som._bin_prototypes(  # noqa: SLF001
+                sub_q, sub_p, n_vis, self.n_prototypes
+            )
 
         # The standalone default, ``K / 4``, smooths over a quarter of the
         # lattice on the first epoch and erases the prior stage's ordering. With
@@ -621,7 +626,7 @@ class SOMOrderer(AbstractOrderer):
             if self.sigma_start is None and init is not None
             else self.sigma_start
         )
-        metric, metric_scale = self._resolve_metric(sub_q, sub_p, init)
+        metric, metric_scale = self._resolve_metric(sub_q, sub_p, init, mask)
         if metric.uses_velocity or self.orient_by_velocity:
             sub_p = check_velocities(
                 sub_p,
@@ -643,6 +648,7 @@ class SOMOrderer(AbstractOrderer):
             metric,
             metric_scale,
             sub_w,
+            mask,
         )
         if self.orient_by_velocity:
             # Flip so the chord runs along the mean velocity rather than
@@ -674,9 +680,9 @@ class SOMOrderer(AbstractOrderer):
         # the order they arrived in, i.e. the prior stage's ordering. A point
         # ``outlier_mixture`` rejected sorts to the end (its key is +inf,
         # never its -- possibly tied -- ``lam``) rather than being dropped from
-        # ``work``, which would make its shape data-dependent; ``kept`` is
-        # all-``True`` when outlier rejection is off, reproducing the old sort
-        # and scatter exactly.
+        # ``work``, which would make its shape data-dependent. ``kept`` is
+        # also ``False`` on the padding slots, so they sort to the end too, and
+        # it is all-``True`` standalone with outlier rejection off.
         sort_key = jnp.where(kept, lam, jnp.inf)
         perm = jnp.argsort(sort_key, stable=True)
         self._warn_if_disagrees(perm, kept, sub_q, init)
@@ -686,10 +692,13 @@ class SOMOrderer(AbstractOrderer):
             .at[: ordered.shape[0]]
             .set(ordered.astype(jnp.int32))
         )
+        # Padding slots scatter to ``n_obs``, which ``mode="drop"`` discards, so
+        # a point the prior stage left unvisited keeps its ``nan``.
+        target = work if mask is None else jnp.where(mask, work, n_obs)
         chord_full = (
             jnp.full(n_obs, jnp.nan, dtype=lam.dtype)
-            .at[work]
-            .set(jnp.where(kept, lam, jnp.nan))
+            .at[target]
+            .set(jnp.where(kept, lam, jnp.nan), mode="drop")
         )
 
         return OrderingResult(

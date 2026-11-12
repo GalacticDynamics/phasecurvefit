@@ -956,12 +956,11 @@ class TestDisagreementWarningIsBestEffort:
 
 
 class TestTracingAStandaloneVersusChainedStage:
-    """Standalone the orderer traces; chained it cannot, and must say why.
+    """The orderer traces standalone and chained after another stage.
 
-    The working set is whatever a prior stage visited, so its size depends on
-    that stage's values. Under a transform ``init.indices`` is a tracer and no
-    shape fixed at trace time holds the result, so the chained case cannot
-    compile at all -- the point is that it fails *legibly*.
+    Chained, the SOM keeps all ``N`` observations at a fixed shape and masks
+    out the ones the prior stage left unvisited, so ``init.indices`` may be a
+    tracer.
     """
 
     @staticmethod
@@ -980,24 +979,54 @@ class TestTracingAStandaloneVersusChainedStage:
         )
         assert run(pos, vel).shape == (60,)
 
-    def test_chained_under_jit_names_the_limit(self):
-        """A bare ``NonConcreteBooleanIndexError`` names neither cause nor cure.
-
-        ``match`` pins the remedy, not just the type: the whole value of the
-        guard is that it points somewhere.
-        """
+    @pytest.mark.parametrize(
+        "chain",
+        [
+            pcf.orderers.MSTOrderer() | pcf.orderers.SOMOrderer(),
+            pcf.orderers.LocalFlowOrderer(metric_scale=0.0)
+            | pcf.orderers.SOMOrderer(n_prototypes=8),
+            pcf.orderers.MSTOrderer(edge_clip_sigma=2.0)
+            | pcf.orderers.SOMOrderer(outlier_mixture=som.SOMMixture()),
+        ],
+    )
+    def test_chained_jit_matches_eager(self, chain):
+        """Under ``jit`` the chain gives the eager result."""
         pos, vel = self._curve()
-        chain = pcf.orderers.LocalFlowOrderer(
-            metric_scale=0.0
-        ) | pcf.orderers.SOMOrderer(n_prototypes=8)
+        eager = pcf.order(pos, vel, chain)
+        traced = jax.jit(lambda q, p: pcf.order(q, p, chain))(pos, vel)
+        np.testing.assert_array_equal(traced.indices, eager.indices)
+        np.testing.assert_allclose(traced.chord, eager.chord, rtol=1e-5, atol=1e-6)
 
-        with pytest.raises(TypeError, match="cannot be traced when chained"):
-            jax.jit(lambda q, p: pcf.order(q, p, chain).chord)(pos, vel)
-        with pytest.raises(TypeError, match=re.escape("outside `jit`")):
-            jax.jit(lambda q, p: pcf.order(q, p, chain).chord)(pos, vel)
+    def test_chained_grad_under_jit(self):
+        """Gradients reach the chord through the whole default chain."""
+        t = jnp.linspace(0.0, jnp.pi, 80)
+        x0, y0 = 5 * jnp.cos(t), 5 * jnp.sin(t)
+        vel = {"x": -jnp.sin(t), "y": jnp.cos(t)}
+        chain = pcf.orderers.MSTOrderer() | pcf.orderers.SOMOrderer()
+
+        def loss(dx):
+            return jnp.sum(pcf.order({"x": x0 + dx, "y": y0}, vel, chain).chord ** 2)
+
+        traced = jax.jit(jax.grad(loss))(jnp.zeros_like(x0))
+        eager = jax.grad(loss)(jnp.zeros_like(x0))
+        assert bool(jnp.all(jnp.isfinite(traced)))
+        assert float(jnp.abs(traced).sum()) > 0
+        np.testing.assert_allclose(traced, eager, rtol=1e-4, atol=1e-4)
+
+    def test_chained_vmap_matches_eager(self):
+        """Each batch member gets the result it would get on its own."""
+        pos, vel = self._curve()
+        chain = pcf.orderers.MSTOrderer() | pcf.orderers.SOMOrderer(n_prototypes=8)
+        shifts = jnp.asarray([0.0, 0.3])
+        batched = jax.vmap(
+            lambda s: pcf.order({"x": pos["x"] + s, "y": pos["y"]}, vel, chain).indices
+        )(shifts)
+        for i, s in enumerate(shifts):
+            one = pcf.order({"x": pos["x"] + s, "y": pos["y"]}, vel, chain)
+            np.testing.assert_array_equal(batched[i], one.indices)
 
     def test_chaining_still_works_untraced(self):
-        """The guard must not cost the ordinary, documented usage."""
+        """The ordinary, documented usage."""
         pos, vel = self._curve()
         chain = pcf.orderers.LocalFlowOrderer(
             metric_scale=0.0
@@ -1006,6 +1035,88 @@ class TestTracingAStandaloneVersusChainedStage:
         result = pcf.order(pos, vel, chain)
         assert int(result.n_visited) == 60
         assert np.isfinite(np.asarray(result.chord)).all()
+
+    def test_too_few_visited_raises_under_jit(self):
+        """The binning's minimum is checked at run time when it is traced."""
+        pos, vel = self._curve(n=12)
+        chain = pcf.orderers.MSTOrderer() | pcf.orderers.SOMOrderer(n_prototypes=8)
+        prior = pcf.order(pos, vel, pcf.orderers.MSTOrderer())
+        few = eqx.tree_at(
+            lambda r: r.indices, prior, jnp.where(jnp.arange(12) < 5, prior.indices, -1)
+        )
+        with pytest.raises(ValueError, match="at least n_prototypes"):
+            chain.stages[1].order(pos, vel, init=few)
+        with pytest.raises(Exception, match="at least n_prototypes"):
+            jax.jit(lambda i: chain.stages[1].order(pos, vel, init=i).indices)(few)
+
+
+class TestMaskingMatchesSlicing:
+    """A masked working set gives exactly what slicing out the visited did.
+
+    Before the mask, the chained SOM ran on ``indices[indices >= 0]``: the
+    visited subset, already in the prior stage's order. Running the SOM on
+    that subset as its own dataset, with an identity ``init``, is that old
+    computation. The chained result on the full data must match it, mapped
+    back through the subset's indices.
+    """
+
+    @staticmethod
+    def _sliced(pos, vel, prior, som):
+        work = np.asarray(prior.indices)
+        work = work[work >= 0]
+        sub_q = {k: v[work] for k, v in pos.items()}
+        sub_p = {k: v[work] for k, v in vel.items()}
+        m = work.shape[0]
+        # Only ``indices`` and ``velocity_aware`` of ``init`` are read.
+        ident = eqx.tree_at(
+            lambda r: r.indices, prior, jnp.arange(m, dtype=prior.indices.dtype)
+        )
+        return work, som.order(sub_q, sub_p, init=ident)
+
+    @pytest.mark.parametrize(
+        ("mst", "som"),
+        [
+            (
+                pcf.orderers.MSTOrderer(edge_clip_sigma=3.0),
+                pcf.orderers.SOMOrderer(),
+            ),
+            (
+                pcf.orderers.MSTOrderer(k=8, jump_cap=0.6, on_disconnected="largest"),
+                pcf.orderers.SOMOrderer(
+                    outlier_mixture=som.SOMMixture(), orient_by_velocity=True
+                ),
+            ),
+        ],
+    )
+    def test_matches(self, mst, som):
+        """Indices, chord and backbone match the sliced computation."""
+        pos, vel, _ = _contaminated_half_arc()
+        n = pos["x"].shape[0]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            prior = pcf.order(pos, vel, mst)
+            assert int(prior.n_visited) < n  # the case that needs the mask
+            work, sliced = self._sliced(pos, vel, prior, som)
+            chained = som.order(pos, vel, init=prior)
+
+        sub_idx = np.asarray(sliced.indices)
+        expected = np.full(n, -1)
+        expected[: sub_idx.shape[0]] = np.where(
+            sub_idx >= 0, work[np.maximum(sub_idx, 0)], -1
+        )
+        np.testing.assert_array_equal(chained.indices, expected)
+        expected_chord = np.full(n, np.nan)
+        expected_chord[work] = np.asarray(sliced.chord)
+        # The mixture's sums may round one float32 ulp apart: XLA fuses the
+        # masked weights differently, though the arithmetic is the same.
+        np.testing.assert_allclose(chained.chord, expected_chord, rtol=1e-5, atol=1e-5)
+        for k in pos:
+            np.testing.assert_allclose(
+                chained.backbone[k], sliced.backbone[k], rtol=1e-5, atol=1e-5
+            )
+        # A point the prior stage left unvisited stays unvisited.
+        unvisited = np.setdiff1d(np.arange(n), work)
+        assert not np.isin(unvisited, np.asarray(chained.indices)).any()
 
 
 def _contaminated_half_arc(n_arc=300, n_out=60, scatter=0.21, radius=5.0, seed=0):

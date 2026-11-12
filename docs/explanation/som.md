@@ -23,6 +23,11 @@ Chained after another orderer, the SOM starts from that ordering and holds its
 neighbourhood narrow (at `sigma_end`) from the start, so it refines the ordering
 locally rather than re-deriving a global one.
 
+If the earlier stage left some samples unvisited, the SOM keeps them in its arrays
+and gives them zero weight. They take no part in seeding or training, and they stay
+unvisited (`-1`) in the result. Since no array changes size, the chained SOM runs
+under `jit`, `vmap` and `grad`.
+
 On its own, its only way to seed the lattice is to bin the samples along the first
 principal axis of the positions. That is a fair proxy for order along the curve only
 while the curve does not double back along that axis, up to about one turn. Beyond

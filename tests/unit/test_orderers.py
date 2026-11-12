@@ -206,20 +206,23 @@ class TestDefaultPipeline:
         # An explicit orderer still takes ``init``.
         pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(), init=prior)
 
-    def test_tracing_the_default_says_to_pass_an_orderer(self, arc):
-        """Under jit/vmap the default cannot decide whether to run the SOM: say so."""
+    def test_the_default_traces(self, arc):
+        """Under jit/vmap the default gives its eager result."""
         pos, vel, _ = arc(n=30)
-        with pytest.raises(TypeError, match="explicit orderer"):
-            jax.jit(lambda q, p: pcf.order(q, p).chord)(pos, vel)
+        eager = pcf.order(pos, vel)
+        traced = jax.jit(lambda q, p: pcf.order(q, p))(pos, vel)
+        np.testing.assert_array_equal(traced.indices, eager.indices)
+        np.testing.assert_allclose(traced.chord, eager.chord, rtol=1e-5, atol=1e-6)
         batched = jax.tree.map(lambda a: a[None], (pos, vel))
-        with pytest.raises(TypeError, match="explicit orderer"):
-            jax.vmap(lambda q, p: pcf.order(q, p).chord)(*batched)
-        # ...while the explicit orderers it points to do trace.
-        for orderer in (
-            pcf.orderers.MSTOrderer(jump_cap=float("inf")),
-            pcf.orderers.LocalFlowOrderer(),
-        ):
-            jax.jit(lambda q, p, o=orderer: pcf.order(q, p, o).chord)(pos, vel)
+        indices = jax.vmap(lambda q, p: pcf.order(q, p).indices)(*batched)
+        np.testing.assert_array_equal(indices[0], eager.indices)
+
+    def test_the_traced_fallback_uses_the_tracer_count(self):
+        """Too few tracers for the SOM falls back to the MST under jit too."""
+        q = {"x": jnp.array([0.0, 1.0, 2.0])}
+        p = {"x": jnp.array([1.0, 1.0, 1.0])}
+        traced = jax.jit(lambda q: pcf.order(q, p).indices)(q)
+        np.testing.assert_array_equal(traced, pcf.order(q, p).indices)
 
     def test_explicit_orderer_bypasses_the_default(self, arc):
         """Passing an orderer is unaffected by the default changing."""

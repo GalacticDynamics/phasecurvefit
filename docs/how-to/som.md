@@ -196,10 +196,14 @@ chord = jax.jit(
 assert chord.shape == (60,)
 ```
 
-Chained after another stage it cannot, because the number of samples it works on
-depends on what the earlier stage visited. Chaining under `jit` raises a `TypeError`.
-Run the chain outside `jit`, or order in two steps and pass the second stage a
-concrete `init`.
+Chained after another stage it can too, and so can the default pipeline. Samples the
+earlier stage left unvisited stay unvisited:
+
+```{code-cell} python
+chain = pcf.orderers.MSTOrderer() | pcf.orderers.SOMOrderer(n_prototypes=8)
+chord = jax.jit(lambda q, p: pcf.order(q, p, chain).chord)(arc, arc_vel)
+assert chord.shape == (60,)
+```
 
 ## Build an ensemble
 
