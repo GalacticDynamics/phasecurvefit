@@ -174,8 +174,9 @@ class TrackEnsemble(ReprMixin, eqx.Module):
 
         Returns
         -------
-        Array, shape (n_members, len(gamma), n_spatial_dims)
-            The perpendicular offsets, in the order of the position
+        Array
+            The perpendicular offsets, with shape ``(n_members, len(gamma),
+            n_spatial_dims)`` and the last axis in the order of the position
             components. NaN where a member's nearest point is one of its
             ends, which means its track stops short of that reference point.
 
