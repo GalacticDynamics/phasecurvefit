@@ -797,6 +797,36 @@ class PathAutoencoderTrainer(EqxScanTrainer):
         return kw
 
 
+def _trainable(
+    model: PathAutoencoder,
+    freeze_encoder: bool | None,  # noqa: FBT001
+    membership: MixtureMembershipConfig | None,
+    /,
+) -> PyTree[bool]:
+    """Which arrays of ``model`` the joint phase trains, as a boolean pytree.
+
+    ``freeze_encoder=None`` freezes the encoder when ``membership`` is set (see
+    `EncoderDecoderTrainingConfig.freeze_encoder`). With ``membership`` set,
+    freezing keeps the trunk and gamma head, which give gamma, and trains the
+    membership head, so the prior can still learn from the residual which
+    samples to reject. The width cap ``sigma_max`` is never trained.
+    """
+    spec = jtu.map(eqx.is_array, model)
+    freeze = membership is not None if freeze_encoder is None else freeze_encoder
+    if freeze:
+        frozen = jtu.map(lambda _: False, model.encoder)
+        if membership is not None:
+            frozen = eqx.tree_at(
+                lambda e: e.prob_head,
+                frozen,
+                jtu.map(eqx.is_array, model.encoder.prob_head),
+            )
+        spec = eqx.tree_at(lambda m: m.encoder, spec, frozen)
+    if membership is not None:
+        spec = eqx.tree_at(lambda m: m.width.sigma_max, spec, replace=False)
+    return spec
+
+
 def train_ordering_and_track_net(
     model: PathAutoencoder,
     all_ws: Float[Array, "N TwoF"],
@@ -893,36 +923,11 @@ def train_ordering_and_track_net(
             jnp.log(membership.resolve_background_density(all_ws[:, :D]))
         )
 
-    # Model surgery: decide which parts of the model are trainable.
-    # ``None`` means: freeze when fitting the mixture (see the config field).
-    freeze = config.freeze_encoder
-    if freeze is None:
-        freeze = membership is not None
-    if freeze:
-        # True for arrays, but False everywhere in the encoder subtree, so that
-        # the encoder receives no gradient updates during this phase.
-        filter_spec = jtu.map(eqx.is_array, model)
-        encoder_false = jtu.map(lambda _: False, model.encoder)
-        if membership is not None:
-            # Gamma comes from the trunk and gamma head, which stay frozen. The
-            # membership head keeps training on the frozen features, so the
-            # prior can still learn from the residual which samples to reject.
-            encoder_false = eqx.tree_at(
-                lambda e: e.prob_head,
-                encoder_false,
-                jtu.map(eqx.is_array, model.encoder.prob_head),
-            )
-        filter_spec = eqx.tree_at(lambda m: m.encoder, filter_spec, encoder_false)
-    else:
-        filter_spec = eqx.is_array
-
+    # The width cap is not a parameter: open it for training (the annealed
+    # ceiling caps the width instead); `_trainable` keeps it out of the optimizer.
     if membership is not None:
-        # The width cap is not a parameter: open it for training (the annealed
-        # ceiling caps the width instead), and keep it out of the optimizer.
         model = eqx.tree_at(lambda m: m.width.sigma_max, model, jnp.asarray(jnp.inf))
-        if callable(filter_spec):
-            filter_spec = jtu.map(filter_spec, model)
-        filter_spec = eqx.tree_at(lambda m: m.width.sigma_max, filter_spec, False)
+    filter_spec = _trainable(model, config.freeze_encoder, membership)
 
     # ----------------------------------------
     # Train

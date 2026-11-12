@@ -14,6 +14,7 @@ import optax
 import pytest
 
 import phasecurvefit as pcf
+from phasecurvefit._src.nn.autoencoder import train_ordering_and_track_net
 from phasecurvefit.nn import (
     MixtureMembershipConfig,
     WidthNet,
@@ -556,8 +557,6 @@ class TestTrainedWidthCap:
         must use the same cap, or it scores samples with a wider width than
         the fit did.
         """
-        from phasecurvefit._src.nn.autoencoder import train_ordering_and_track_net
-
         n = 64
         t = jnp.linspace(0.0, 3.0, n)
         pos = {"x": jnp.cos(t), "y": jnp.sin(t)}
