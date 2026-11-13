@@ -13,6 +13,7 @@ Needs NumPyro, the ``phasecurvefit[numpyro]`` extra.
 
 __all__: tuple[str, ...] = ("TrackPosterior", "sample_track", "track_model")
 
+import functools
 import warnings
 from typing import Any, Literal
 
@@ -94,6 +95,59 @@ def _layout(d: int, n_q: int, velocity_tie: float | None, /) -> tuple[bool, int,
     return tied, n_slack, (n_q + 1 + n_slack if tied else d)
 
 
+@functools.partial(jax.jit, static_argnums=(3, 4, 5, 6, 7, 8))
+def _log_likelihood(
+    z: Array,
+    sites: dict[str, Array],
+    weights: Array | None,
+    log_rho_bg: float | None,
+    n_q: int,
+    n_grid: int,
+    line_density: bool,  # noqa: FBT001  # positional, as jit's static args
+    width_varies: bool,  # noqa: FBT001
+    velocity_tie: float | None,
+    /,
+) -> Array:
+    """Each star's log-likelihood, given the latents.
+
+    Jitted on its own because NumPyro runs the model op by op while it sets up
+    a guide, and each op would compile separately (seconds in all, per call).
+    """
+    d = z.shape[1]
+    tied, n_slack, n_mean = _layout(d, n_q, velocity_tie)
+    x_all = _channels(
+        jnp.linspace(-1.0, 1.0, n_grid), sites["alpha"], sites["length"], sites["beta"]
+    )
+    x, col = x_all[:, :n_mean], n_mean
+
+    if tied:
+        t = jnp.gradient(x[:, :n_q], axis=0)
+        t = t / jnp.linalg.norm(t, axis=-1, keepdims=True).clip(1e-12)
+        v = jnp.exp(x[:, n_q : n_q + 1]) * t
+        if n_slack:
+            v = v + (velocity_tie or 0.0) * x[:, n_q + 1 :]
+        x = jnp.concatenate([x[:, :n_q], v], -1)
+
+    log_pi: Array | float = -jnp.log(n_grid)
+    if line_density:
+        log_pi, col = jax.nn.log_softmax(x_all[:, col]), col + 1
+    sigma = sites["sigma"]
+    if width_varies:
+        sigma = sigma * jnp.exp(x_all[:, col])
+
+    d2 = (z[:, None, :] - x[None]) ** 2  # (N, K, D)
+    ll = _log_normal_iso(jnp.sum(d2[..., :n_q], -1), sigma, n_q)
+    if d > n_q:
+        ll = ll + _log_normal_iso(jnp.sum(d2[..., n_q:], -1), sites["sigma_p"], d - n_q)
+    log_fg = jax.nn.logsumexp(ll + log_pi, -1)
+    if log_rho_bg is not None:
+        f_bg = sites["f_bg"]
+        log_fg = jnp.logaddexp(jnp.log1p(-f_bg) + log_fg, jnp.log(f_bg) + log_rho_bg)
+    if weights is not None:  # multiplied in: handlers.scale refuses a weight of 0
+        log_fg = weights * log_fg
+    return log_fg
+
+
 def track_model(
     z: Float[Array, "N D"],
     /,
@@ -153,45 +207,38 @@ def track_model(
     """
     _require_numpyro()
     n, d = z.shape
-    tied, n_slack, n_mean = _layout(d, n_q, velocity_tie)
+    _, _, n_mean = _layout(d, n_q, velocity_tie)
     n_ch = n_mean + int(line_density) + int(width_varies)
 
-    sigma = numpyro.sample("sigma", numpyro.distributions.HalfNormal(0.5))
+    sites: dict[str, Array] = {
+        "sigma": numpyro.sample("sigma", numpyro.distributions.HalfNormal(0.5))
+    }
     with numpyro.plate("channel", n_ch, dim=-2):
-        alpha = numpyro.sample("alpha", numpyro.distributions.HalfNormal(1.0))
-        length = numpyro.sample(
+        sites["alpha"] = numpyro.sample("alpha", numpyro.distributions.HalfNormal(1.0))
+        sites["length"] = numpyro.sample(
             "length", numpyro.distributions.LogNormal(jnp.log(_L0), 0.7)
         )
         with numpyro.plate("basis", n_basis, dim=-1):
-            beta = numpyro.sample("beta", numpyro.distributions.Normal(0.0, 1.0))
-    x_all = _channels(jnp.linspace(-1.0, 1.0, n_grid), alpha, length, beta)
-    x, col = x_all[:, :n_mean], n_mean
-
-    if tied:
-        t = jnp.gradient(x[:, :n_q], axis=0)
-        t = t / jnp.linalg.norm(t, axis=-1, keepdims=True).clip(1e-12)
-        v = jnp.exp(x[:, n_q : n_q + 1]) * t
-        if n_slack:
-            v = v + (velocity_tie or 0.0) * x[:, n_q + 1 :]
-        x = jnp.concatenate([x[:, :n_q], v], -1)
-
-    log_pi: Array | float = -jnp.log(n_grid)
-    if line_density:
-        log_pi, col = jax.nn.log_softmax(x_all[:, col]), col + 1
-    if width_varies:
-        sigma = sigma * jnp.exp(x_all[:, col])
-
-    d2 = (z[:, None, :] - x[None]) ** 2  # (N, K, D)
-    ll = _log_normal_iso(jnp.sum(d2[..., :n_q], -1), sigma, n_q)
+            sites["beta"] = numpyro.sample(
+                "beta", numpyro.distributions.Normal(0.0, 1.0)
+            )
     if d > n_q:
-        sigma_p = numpyro.sample("sigma_p", numpyro.distributions.HalfNormal(0.5))
-        ll = ll + _log_normal_iso(jnp.sum(d2[..., n_q:], -1), sigma_p, d - n_q)
-    log_fg = jax.nn.logsumexp(ll + log_pi, -1)
+        sites["sigma_p"] = numpyro.sample(
+            "sigma_p", numpyro.distributions.HalfNormal(0.5)
+        )
     if log_rho_bg is not None:
-        f_bg = numpyro.sample("f_bg", numpyro.distributions.Beta(1.0, 9.0))
-        log_fg = jnp.logaddexp(jnp.log1p(-f_bg) + log_fg, jnp.log(f_bg) + log_rho_bg)
-    if weights is not None:  # multiplied in: handlers.scale refuses a weight of 0
-        log_fg = weights * log_fg
+        sites["f_bg"] = numpyro.sample("f_bg", numpyro.distributions.Beta(1.0, 9.0))
+    log_fg = _log_likelihood(
+        z,
+        sites,
+        weights,
+        log_rho_bg,
+        n_q,
+        n_grid,
+        line_density,
+        width_varies,
+        velocity_tie,
+    )
     with numpyro.plate("stars", n):
         numpyro.factor("loglik", log_fg)
 
