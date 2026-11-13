@@ -166,3 +166,35 @@ def test_quantities_round_trip():
         assert out[unit].unit == u.unit(unit)
     in_kpc = {k: np.asarray(u.ustrip("kpc", v)) for k, v in out.items()}
     np.testing.assert_allclose(in_kpc["pc"], in_kpc["kpc"], rtol=1e-3)
+
+
+def test_positions_only_model():
+    """With no velocity columns the model has no velocity width."""
+    pos, vel = _arc(40)
+    z, _, _ = posterior._scale(pos, vel)
+    zq = z[:, :2]
+    params = _params(zq, np.linspace(-1, 1, 40))
+    assert "sigma_p" not in params
+    assert np.isfinite(_density(zq, params))
+
+
+def test_plain_options_and_quiet_nuts(monkeypatch):
+    """Hard tie, no line density or width channel, a given ordering, NUTS."""
+    monkeypatch.setattr(posterior, "_RHAT_WARN", np.inf)
+    pos, vel = _arc(60)
+    ordering = pcf.orderers.default_pipeline(pos, vel)
+    post = pcf.sample_track(
+        pos,
+        vel,
+        key=jax.random.key(0),
+        method="nuts",
+        ordering=ordering,
+        n_warmup=5,
+        n_draws=8,
+        background=False,
+        line_density=False,
+        width_varies=False,
+        velocity_tie=0.0,
+    )
+    assert post.reference.track_range == (-1.0, 1.0)
+    assert "f_bg" not in post.samples

@@ -36,7 +36,7 @@ from phasecurvefit._src.track_draw import TrackDraw
 
 # Every use of numpyro below follows _require_numpyro().
 # pylint: disable=possibly-used-before-assignment
-if OptDeps.NUMPYRO.installed:
+if OptDeps.NUMPYRO.installed:  # pragma: no branch
     import numpyro
     import numpyro.contrib.hsgp.laplacian
     import numpyro.diagnostics
