@@ -41,6 +41,7 @@ def _setup(case, n):
     cfg = {
         "jump_cap": np.inf,
         "velocity_weight": 0.0,
+        "velocity_factor": 0.0,
         "sever_cos_threshold": None,
         "orient_by_velocity": True,
         "connect": False,

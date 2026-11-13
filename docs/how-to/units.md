@@ -67,7 +67,8 @@ result = pcf.order(
 
 {class}`~phasecurvefit.orderers.MSTOrderer` works on plain arrays internally. Its
 `jump_cap` and `velocity_weight` are plain numbers, read in the length unit of the
-unit system, and its `backbone` comes back in the position units.
+unit system, and its `backbone` comes back in the position units. `velocity_factor`
+is a multiple of the median neighbour distance, so it has no unit.
 
 ```{code-cell} python
 mst = pcf.orderers.MSTOrderer(k=2, jump_cap=3.0)  # 3 kpc in the galactic system

@@ -57,9 +57,13 @@ class TestDefaultPipeline:
     def _explicit_chain(n_prototypes):
         """Build the chain ``default_pipeline`` documents itself as running."""
         mst = pcf.orderers.MSTOrderer(
-            jump_cap=float("inf"), orient_by_velocity=True, on_disconnected="connect"
+            jump_cap=float("inf"),
+            velocity_factor=30.0,
+            orient_by_velocity=True,
+            on_disconnected="connect",
         )
-        return mst | pcf.orderers.SOMOrderer(n_prototypes=n_prototypes)
+        som = pcf.orderers.SOMOrderer(n_prototypes=n_prototypes, nan_policy="omit")
+        return mst | som
 
     def test_chains_the_mst_and_the_som(self, arc):
         """Enough tracers: the result is exactly the MST-then-SOM chain."""
@@ -143,6 +147,34 @@ class TestDefaultPipeline:
         # The MST stage records its backbone length; the SOM stage does not.
         assert below.backbone_size is not None
         assert at.backbone_size is None
+
+    def test_crosses_a_self_crossing_straight_over(self):
+        """On a loop that crosses itself, the ordering follows the true track.
+
+        A prolate trochoid crosses itself once. Ordered by position alone, the
+        tree turns onto the other branch at the crossing (rank correlation with
+        the true parameter 0.6 to 0.9); the velocity penalty keeps it on its own
+        branch.
+        """
+        rng = np.random.default_rng(0)
+        s = np.sort(rng.uniform(0.0, 1.0, 600))
+        t = (0.15 + 0.7 * s) * 4 * np.pi
+        x, y = t - 2.5 * np.sin(t), 2.5 * np.cos(t)
+        vx, vy = 1.0 - 2.5 * np.cos(t), -2.5 * np.sin(t)
+        norm = np.hypot(vx, vy)
+        shuffle = rng.permutation(s.size)
+        pos = {
+            "x": jnp.asarray((x + rng.normal(0.0, 0.15, s.size))[shuffle]),
+            "y": jnp.asarray((y + rng.normal(0.0, 0.15, s.size))[shuffle]),
+        }
+        vel = {
+            "x": jnp.asarray((vx / norm)[shuffle]),
+            "y": jnp.asarray((vy / norm)[shuffle]),
+        }
+        result = pcf.orderers.default_pipeline(pos, vel)
+        s_ordered = s[shuffle][np.asarray(result.ordering)]
+        rank = np.argsort(np.argsort(s_ordered))
+        assert np.corrcoef(rank, np.arange(s.size))[0, 1] > 0.99
 
     def test_som_kwargs_reach_the_som_stage(self, arc):
         """A caller can still tune the SOM through this entry point."""

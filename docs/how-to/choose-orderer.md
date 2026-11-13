@@ -74,11 +74,14 @@ assert int(res.n_visited) == 20
 
 ### Use velocities in the MST
 
-Three options bring velocity into the MST. All are off by default.
+Four options bring velocity into the MST. All are off in `MSTOrderer()` itself.
 
 - **`velocity_weight`** adds `velocity_weight * (1 - cos(v_i, v_j))` to each edge
   length, so arms that are close in position but move in opposite directions are not
   joined. Set it on the scale of the spacing between neighbouring samples.
+- **`velocity_factor`** is the same penalty in units of the median distance between
+  neighbours, so it needs no tuning to the data's scale. The default pipeline uses
+  `velocity_factor=30`.
 - **`sever_cos_threshold`** drops edges whose velocity cosine is below the
   threshold. This cuts the seam where a near-closed loop's velocity reverses, and the
   edges between branches at a crossing.
