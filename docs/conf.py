@@ -79,6 +79,11 @@ nb_execution_raise_on_error = True
 os.environ.setdefault("JAX_COMPILATION_CACHE_DIR", str(_docs_dir / "_build/jax_cache"))
 os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0")
 os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES", "0")
+# On Linux, XLA logs a machine-feature mismatch error for every program it loads
+# from that cache, and the pages would show them as cell output. Level 3 hides
+# XLA's C++ log messages below FATAL; Python errors still fail the cell. This is
+# set outright because Read the Docs' environment already sets it to 1.
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 pygments_lexers = {"ipython3": PythonLexer()}
 
 # -- Redirects for pages moved in the Diataxis restructure ------------------
