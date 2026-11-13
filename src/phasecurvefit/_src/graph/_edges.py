@@ -17,12 +17,14 @@ def knn_edges(
     velocity_weight: float,
     sever_cos_threshold: float | None,
     scale: float | Array = 1.0,
+    velocity_factor: float = 0.0,
 ) -> tuple[Array, Array, Array, Array, Array]:
     """Undirected edge list ``(lo, hi, d, w, valid)`` from kNN indices.
 
     ``nbr[i]`` lists ``i``'s neighbours; an index ``>= n`` is a missing
     neighbour. ``d`` is the spatial length, ``w`` the MST weight
-    ``max(d + velocity_weight * (1 - cos), tiny)``; ``valid`` drops missing and
+    ``max(d + (velocity_weight + velocity_factor * L) * (1 - cos), tiny)``,
+    with ``L`` the median length of the present edges; ``valid`` drops missing and
     padded neighbours, edges longer than ``jump_cap`` and (if set) edges with
     velocity cosine below ``sever_cos_threshold``.
 
@@ -30,7 +32,9 @@ def knn_edges(
     differences cannot overflow or underflow. ``d`` and ``w`` stay in those
     scaled units -- a common positive factor changes neither the MST nor the
     diameter, and scaling back could overflow (or flush to zero) -- while
-    ``jump_cap`` and ``velocity_weight`` are in the caller's units. The cosine
+    ``jump_cap`` and ``velocity_weight`` are in the caller's units
+    (``velocity_factor`` multiplies ``L``, which is already in scaled units).
+    The cosine
     is scale-free: each velocity is divided by its largest component first, so
     a tiny one keeps its direction; an end with no direction (zero, or NaN)
     gives ``cos = 1`` (no penalty, never severed).
@@ -43,17 +47,23 @@ def knn_edges(
     d = jnp.sqrt(jnp.sum(diff * diff, axis=-1))
     valid = (raw < n) & real[rows] & real[cols] & (d <= jump_cap / scale)
     w = d
-    if velocity_weight > 0.0 or sever_cos_threshold is not None:
+    if (
+        velocity_weight > 0.0
+        or velocity_factor > 0.0
+        or sever_cos_threshold is not None
+    ):
         big = jnp.max(jnp.abs(v), axis=-1, keepdims=True)  # NaN for NaN rows
         u = jnp.where(big > 0, v / jnp.where(big > 0, big, 1.0), 0.0)
         ui, uj = u[rows], u[cols]
         num = jnp.sum(ui * uj, axis=-1)
         den = jnp.linalg.norm(ui, axis=-1) * jnp.linalg.norm(uj, axis=-1)
         cos = jnp.where(den > 0, num / jnp.where(den > 0, den, 1.0), 1.0)
-        if velocity_weight > 0.0:
+        if velocity_weight > 0.0 or velocity_factor > 0.0:
+            present = (raw < n) & real[rows] & real[cols]
+            med = jnp.nanmedian(jnp.where(present, d, jnp.nan))
             # velocity_weight / scale may overflow: cap it, inf is not a weight
             w = jnp.minimum(
-                d + (velocity_weight / scale) * (1.0 - cos),
+                d + (velocity_weight / scale + velocity_factor * med) * (1.0 - cos),
                 jnp.finfo(d.dtype).max,  # type: ignore[no-untyped-call]  # untyped in jax
             )
         if sever_cos_threshold is not None:

@@ -45,13 +45,17 @@ def default_pipeline(
     The MST stage is configured to work on data of any scale and to lose
     nothing, not to be tuned: ``jump_cap=inf`` (the default ``jump_cap`` is an
     absolute length, which severs every edge of a sparse or large-scale
-    dataset), ``orient_by_velocity=True`` (so ``gamma`` increases along the flow
-    rather than in an arbitrary tip-to-tip direction), and
+    dataset), ``velocity_factor=30`` (an edge between tracers moving in
+    different directions costs up to 60 median kNN edge lengths more, so where a
+    stream crosses itself the tree crosses straight over instead of turning
+    onto the other branch), ``orient_by_velocity=True`` (so ``gamma`` increases
+    along the flow rather than in an arbitrary tip-to-tip direction), and
     ``on_disconnected="connect"`` (a gap in the stream splits the neighbour
     graph; the pieces are joined along their shortest links instead of keeping
-    only the largest). For anything else -- a finite ``jump_cap``,
-    velocity-aware edges, outlier clipping, a different ``k`` -- build the chain
-    yourself and pass it to :func:`~phasecurvefit.order`.
+    only the largest). Because the MST used velocities, the SOM does too (see
+    :class:`~phasecurvefit.orderers.SOMOrderer`). For anything else -- a finite
+    ``jump_cap``, other velocity settings, outlier clipping, a different ``k``
+    -- build the chain yourself and pass it to :func:`~phasecurvefit.order`.
 
     Falls back to the MST alone when fewer tracers were visited than
     ``n_prototypes`` -- the SOM's own minimum
@@ -108,11 +112,12 @@ def default_pipeline(
     Array([0, 1, 2], dtype=int32)
 
     """
-    # ``nan_policy="omit"``: this stage reads velocities only to orient the
-    # result, where skipping a missing one costs nothing, and the default entry
-    # point must not reject a catalogue for lacking some radial velocities.
+    # ``nan_policy="omit"``: the default entry point must not reject a
+    # catalogue for lacking some radial velocities. A tracer with a missing
+    # velocity joins the tree as a leaf and is skipped when orienting.
     mst = MSTOrderer(
         jump_cap=float("inf"),
+        velocity_factor=30.0,
         orient_by_velocity=True,
         on_disconnected="connect",
         nan_policy="omit",
@@ -127,6 +132,9 @@ def default_pipeline(
         n_visited = len(zeroth(positions.values()))  # type: ignore[arg-type]  # components are 1-D
     if n_visited < n_prototypes:
         return mst_result
+    # The MST used velocities, so the SOM follows them: it must omit a missing
+    # one too, unless the caller says otherwise.
+    som_kwargs.setdefault("nan_policy", "omit")
     som = SOMOrderer(n_prototypes=n_prototypes, **som_kwargs)  # type: ignore[arg-type]  # SOMOrderer validates its own keywords
     return som.order(
         positions, velocities, metadata=metadata, init=mst_result, weights=weights

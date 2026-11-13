@@ -98,12 +98,14 @@ _EDGE_CLIP_MAX_REJECT_FRAC = 0.5
 def _velocity_users(
     *,
     velocity_weight: float,
+    velocity_factor: float,
     sever_cos_threshold: float | None,
     orient_by_velocity: bool,
 ) -> str:
     """Name the enabled mechanisms that read velocities ("" if none)."""
     on = (
         ("velocity_weight", velocity_weight > 0.0),
+        ("velocity_factor", velocity_factor > 0.0),
         ("sever_cos_threshold", sever_cos_threshold is not None),
         ("orient_by_velocity", orient_by_velocity),
     )
@@ -116,6 +118,7 @@ def _check_velocities(
     *,
     nan_policy: str,
     velocity_weight: float,
+    velocity_factor: float,
     sever_cos_threshold: float | None,
     orient_by_velocity: bool,
 ) -> None:
@@ -134,6 +137,7 @@ def _check_velocities(
     """
     used = _velocity_users(
         velocity_weight=velocity_weight,
+        velocity_factor=velocity_factor,
         sever_cos_threshold=sever_cos_threshold,
         orient_by_velocity=orient_by_velocity,
     )
@@ -165,6 +169,7 @@ def _check_velocities_traceable(
     *,
     nan_policy: str,
     velocity_weight: float,
+    velocity_factor: float,
     sever_cos_threshold: float | None,
     orient_by_velocity: bool,
 ) -> jax.Array:
@@ -179,12 +184,14 @@ def _check_velocities_traceable(
             np.asarray(V),
             nan_policy=nan_policy,
             velocity_weight=velocity_weight,
+            velocity_factor=velocity_factor,
             sever_cos_threshold=sever_cos_threshold,
             orient_by_velocity=orient_by_velocity,
         )
         return V
     used = _velocity_users(
         velocity_weight=velocity_weight,
+        velocity_factor=velocity_factor,
         sever_cos_threshold=sever_cos_threshold,
         orient_by_velocity=orient_by_velocity,
     )
@@ -496,6 +503,7 @@ def _host_graph(
     k: int,
     jump_cap: float,
     velocity_weight: float,
+    velocity_factor: float,
     sever_cos_threshold: float | None,
     orient_by_velocity: bool,
     nan_policy: str,
@@ -527,11 +535,16 @@ def _host_graph(
         V,
         nan_policy=nan_policy,
         velocity_weight=velocity_weight,
+        velocity_factor=velocity_factor,
         sever_cos_threshold=sever_cos_threshold,
         orient_by_velocity=orient_by_velocity,
     )
     n, k_eff = nbr.shape
-    need_cos = velocity_weight > 0.0 or sever_cos_threshold is not None
+    need_cos = (
+        velocity_weight > 0.0
+        or velocity_factor > 0.0
+        or sever_cos_threshold is not None
+    )
     # Directionless tracers (stationary, or NaN under nan_policy="omit") join
     # only as leaves, using the backend's kNN among directed tracers.
     split = _directionless_as_leaves(V, nbr_dir, leaf) if need_cos else None
@@ -543,9 +556,11 @@ def _host_graph(
     d_edges = np.linalg.norm(P[rows] - P[cols], axis=1)
     cos = _edge_cosine(V, rows, cols) if need_cos else None
     weights = d_edges.copy()
-    if velocity_weight > 0.0:  # Mechanism 1: phase-space edge weights
+    if velocity_weight > 0.0 or velocity_factor > 0.0:  # Mechanism 1
         assert cos is not None  # noqa: S101  # need_cos
-        weights = d_edges + velocity_weight * (1.0 - cos)
+        # velocity_factor is in units of the median kNN edge length
+        penalty = velocity_weight + velocity_factor * float(np.median(d_edges))
+        weights = d_edges + penalty * (1.0 - cos)
     # scipy's csgraph treats zero weights as missing edges, which would cut
     # coincident points (repeat observations) out of the graph. Floor to the
     # smallest positive float: still "free", but a real edge.
@@ -718,6 +733,7 @@ def _jax_graph(
     *,
     jump_cap: float,
     velocity_weight: float,
+    velocity_factor: float,
     sever_cos_threshold: float | None,
     orient_by_velocity: bool,
     connect: bool,
@@ -742,7 +758,11 @@ def _jax_graph(
     ``velocity_weight`` are in the caller's.
     """
     n = P.shape[0]
-    if velocity_weight > 0.0 or sever_cos_threshold is not None:
+    if (
+        velocity_weight > 0.0
+        or velocity_factor > 0.0
+        or sever_cos_threshold is not None
+    ):
         directed = _has_direction(V, jnp)
         split = jnp.any(directed & real) & jnp.any(~directed & real)
         ok_col = directed[jnp.minimum(nbr_dir, n - 1)] & (nbr_dir < n)
@@ -756,6 +776,7 @@ def _jax_graph(
         real,
         jump_cap=jump_cap,
         velocity_weight=velocity_weight,
+        velocity_factor=velocity_factor,
         sever_cos_threshold=sever_cos_threshold,
         scale=scale,
     )
@@ -819,6 +840,7 @@ def _bridge(
 _GRAPH_STATIC = (
     "jump_cap",
     "velocity_weight",
+    "velocity_factor",
     "sever_cos_threshold",
     "orient_by_velocity",
     "connect",
@@ -889,6 +911,7 @@ def _graph_and_order(
         V,
         nan_policy=cfg["nan_policy"],
         velocity_weight=cfg["velocity_weight"],
+        velocity_factor=cfg["velocity_factor"],
         sever_cos_threshold=cfg["sever_cos_threshold"],
         orient_by_velocity=cfg["orient_by_velocity"],
     )
@@ -977,7 +1000,16 @@ class MSTOrderer(AbstractOrderer):
         Mechanism 1. If ``> 0``, edge weights become
         ``||dq|| + velocity_weight * (1 - cos(v_i, v_j))``. ``0`` (default) is
         pure spatial and never reads velocities. See ``nan_policy`` for
-        missing velocities.
+        missing velocities. ``velocity_weight`` is a length, in the units of
+        the positions; ``velocity_factor`` is the unit-free form.
+    velocity_factor
+        Mechanism 1 without units: the same penalty with
+        ``velocity_weight = velocity_factor * L``, where ``L`` is the median
+        length of the kNN edges. So it means the same at any scale and in any
+        unit. It adds to ``velocity_weight`` if both are set. ``0`` (default)
+        is off. At a crossing the edges between the branches can be much
+        shorter than ``L``; a penalty that adds a length, not one that
+        multiplies the edge's own length, is what keeps them out of the tree.
     sever_cos_threshold
         Mechanism 2. If not ``None``, edges with ``cos(v_i, v_j)`` below this are
         severed (e.g. ``0.0`` cuts anti-parallel arms).
@@ -1031,7 +1063,8 @@ class MSTOrderer(AbstractOrderer):
         that matters.
     nan_policy
         What to do with a NaN velocity when a mechanism reads velocities
-        (``velocity_weight > 0``, ``sever_cos_threshold`` or
+        (``velocity_weight > 0``, ``velocity_factor > 0``,
+        ``sever_cos_threshold`` or
         ``orient_by_velocity``). The pure-spatial default never reads them, so
         never raises.
 
@@ -1118,6 +1151,7 @@ class MSTOrderer(AbstractOrderer):
     k: int = eqx.field(static=True, default=10)
     jump_cap: float = eqx.field(static=True, default=3.0)
     velocity_weight: float = eqx.field(static=True, default=0.0)
+    velocity_factor: float = eqx.field(static=True, default=0.0)
     sever_cos_threshold: float | None = eqx.field(static=True, default=None)
     orient_by_velocity: bool = eqx.field(static=True, default=False)
     on_disconnected: OnDisconnected = eqx.field(static=True, default="raise")
@@ -1142,6 +1176,9 @@ class MSTOrderer(AbstractOrderer):
             # read False on an orderer the caller thought used velocity.
             msg = f"velocity_weight must be >= 0, got {self.velocity_weight}."
             raise ValueError(msg)
+        if self.velocity_factor < 0.0:  # same reasoning as velocity_weight
+            msg = f"velocity_factor must be >= 0, got {self.velocity_factor}."
+            raise ValueError(msg)
         if self.edge_clip_sigma is not None and self.edge_clip_sigma <= 0:
             msg = f"edge_clip_sigma must be positive, got {self.edge_clip_sigma}."
             raise ValueError(msg)
@@ -1160,7 +1197,11 @@ class MSTOrderer(AbstractOrderer):
     @property
     def _splits_directionless(self) -> bool:
         """Whether a velocity mechanism reads directions (mechanisms 1, 2)."""
-        return self.velocity_weight > 0.0 or self.sever_cos_threshold is not None
+        return (
+            self.velocity_weight > 0.0
+            or self.velocity_factor > 0.0
+            or self.sever_cos_threshold is not None
+        )
 
     @plum.dispatch
     def order(
@@ -1204,6 +1245,7 @@ class MSTOrderer(AbstractOrderer):
             "k": self.k,
             "jump_cap": self.jump_cap,
             "velocity_weight": self.velocity_weight,
+            "velocity_factor": self.velocity_factor,
             "sever_cos_threshold": self.sever_cos_threshold,
             "orient_by_velocity": self.orient_by_velocity,
             "nan_policy": self.nan_policy,

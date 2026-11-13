@@ -35,6 +35,10 @@ $\cos(v_i, v_j)$ between the two samples' velocities on an edge:
 
 - `velocity_weight` adds a penalty to the edge length that grows as the velocities
   turn apart, so close arms moving in opposite directions are not joined.
+  `velocity_factor` is the same penalty measured in median neighbour distances, so
+  it needs no units. The penalty is added, not multiplied: at a crossing the edges
+  between the branches can be far shorter than a typical edge, and multiplying a
+  short length still leaves it short.
 - `sever_cos_threshold` removes edges whose velocities point too far apart, cutting
   the seam where a near-closed loop's velocity reverses and the edges between
   branches at a crossing.
@@ -51,10 +55,21 @@ near-closed loops best.
 `MSTOrderer()` is a tool to tune: its default `jump_cap=3.0` is an absolute length,
 and by default a disconnected graph raises. The default pipeline instead has to work
 on any data without tuning. It sets `jump_cap=inf`, so no edge is cut whatever the
-data's scale; `orient_by_velocity=True`, so $\gamma$ follows the flow; and
+data's scale; `velocity_factor=30`, so where a stream crosses itself the tree
+crosses straight over instead of turning onto the other branch;
+`orient_by_velocity=True`, so $\gamma$ follows the flow; and
 `on_disconnected="connect"`, so a gap in a stream that splits the neighbour graph is
-bridged along the shortest links instead of losing one side. It also skips missing
-velocities, since it uses them only to orient the result.
+bridged along the shortest links instead of losing one side. Because the MST used
+velocities, the SOM after it does too ({doc}`som`). A sample with a missing velocity
+joins the tree as a leaf and is skipped when orienting.
+
+The value 30 was chosen on a looped test track that crosses itself once, drawn 8
+times with different noise. With positions alone the default turned onto the other
+branch at the crossing every time: the rank correlation between the ordering and
+the true position along the track was 0.60 to 0.91. With `velocity_factor=30` it
+was 0.997 to 1.000, and values from 10 to 100 all crossed correctly. On tracks that
+do not cross themselves (an arc, a helix, an arc with a gap, and the mock stream in
+the tutorials) the ordering did not change.
 
 ## Rejecting outliers
 

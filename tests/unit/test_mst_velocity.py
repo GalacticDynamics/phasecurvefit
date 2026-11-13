@@ -23,6 +23,7 @@ class _Mechanism(TypedDict, total=False):
     """One opt-in velocity mechanism of ``MSTOrderer``, as keyword arguments."""
 
     velocity_weight: float
+    velocity_factor: float
     sever_cos_threshold: float | None
     orient_by_velocity: bool
 
@@ -86,6 +87,41 @@ class TestPhaseSpaceEdgeWeights:
         )
         assert jnp.array_equal(a.indices, b.indices)
 
+    def test_velocity_factor_reduces_zigzag(self):
+        """The unit-free factor keeps the ordering on one arm, like the weight."""
+        pos, vel = _hairpin()
+        o_spatial = pcf.orderers.MSTOrderer(k=6, jump_cap=1.0).order(pos, vel)
+        o_vel = pcf.orderers.MSTOrderer(k=6, jump_cap=1.0, velocity_factor=5.0).order(
+            pos, vel
+        )
+        vx = np.asarray(vel["x"])
+        flips_spatial = _sign_flips(vx[np.asarray(o_spatial.ordering)])
+        flips_vel = _sign_flips(vx[np.asarray(o_vel.ordering)])
+        assert flips_vel < flips_spatial
+
+    @pytest.mark.parametrize("scale", [1e-3, 1e3])
+    def test_velocity_factor_is_scale_free(self, scale):
+        """Rescaling the positions does not change the factor's ordering."""
+        pos, vel = _tie_free_hairpin()
+        big = {c: x * scale for c, x in pos.items()}
+        a = pcf.orderers.MSTOrderer(k=6, jump_cap=1.0, velocity_factor=5.0)
+        b = pcf.orderers.MSTOrderer(k=6, jump_cap=1.0 * scale, velocity_factor=5.0)
+        assert jnp.array_equal(a.order(pos, vel).indices, b.order(big, vel).indices)
+
+    def test_velocity_factor_zero_is_spatial(self):
+        """Factor zero is spatial."""
+        pos, vel = _hairpin()
+        a = pcf.orderers.MSTOrderer(k=6, jump_cap=1.0).order(pos, vel)
+        b = pcf.orderers.MSTOrderer(k=6, jump_cap=1.0, velocity_factor=0.0).order(
+            pos, vel
+        )
+        assert jnp.array_equal(a.indices, b.indices)
+
+    def test_negative_velocity_factor_raises(self):
+        """A negative factor is rejected at construction."""
+        with pytest.raises(ValueError, match="velocity_factor must be >= 0"):
+            pcf.orderers.MSTOrderer(velocity_factor=-1.0)
+
 
 class TestVelocitySevering:
     """Mechanism 2: sever_cos_threshold cuts anti-parallel edges."""
@@ -131,6 +167,7 @@ class TestTipOrientation:
 
 _MECHANISMS: dict[str, _Mechanism] = {
     "velocity_weight": {"velocity_weight": 5.0},
+    "velocity_factor": {"velocity_factor": 5.0},
     "sever_cos_threshold": {"sever_cos_threshold": 0.0},
     "orient_by_velocity": {"orient_by_velocity": True},
 }
@@ -284,7 +321,9 @@ class TestMissingVelocities:
         assert sorted(rows.tolist()) == [1, 2, 3, 4, 5]  # one edge each...
         assert set(cols.tolist()) == {0}  # ...to the directed tracer
 
-    @pytest.mark.parametrize("mechanism", ["velocity_weight", "sever_cos_threshold"])
+    @pytest.mark.parametrize(
+        "mechanism", ["velocity_weight", "velocity_factor", "sever_cos_threshold"]
+    )
     def test_split_uses_the_selected_backend(self, mechanism):
         """Directionless tracers split off through the backend, not a host tree.
 
@@ -311,7 +350,9 @@ class TestMissingVelocities:
         np.testing.assert_array_equal(eager, want)
         np.testing.assert_array_equal(np.asarray(jitted), want)
 
-    @pytest.mark.parametrize("mechanism", ["velocity_weight", "sever_cos_threshold"])
+    @pytest.mark.parametrize(
+        "mechanism", ["velocity_weight", "velocity_factor", "sever_cos_threshold"]
+    )
     def test_a_stationary_tracer_does_not_raise(self, mechanism):
         """Under the default ``raise``, a zero velocity is accepted as data."""
         pos, vel = _hairpin()
@@ -448,7 +489,13 @@ class TestJaxGraphStageMatchesHost:
     """The pure-JAX graph stage carries the host stage's velocity semantics."""
 
     @pytest.mark.parametrize(
-        "mechanism", ["velocity_weight", "sever_cos_threshold", "orient_by_velocity"]
+        "mechanism",
+        [
+            "velocity_weight",
+            "velocity_factor",
+            "sever_cos_threshold",
+            "orient_by_velocity",
+        ],
     )
     def test_directionless_tracers(self, mechanism):
         """Stationary and (under omit) NaN tracers: leaves, same as the host."""

@@ -1194,6 +1194,7 @@ class TestMSTPureJax:
                 mst._jax_graph,
                 jump_cap=1.0,
                 velocity_weight=0.0,
+                velocity_factor=0.0,
                 sever_cos_threshold=None,
                 orient_by_velocity=False,
                 connect=connect,

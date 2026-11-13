@@ -33,14 +33,15 @@ options as keywords. The {doc}`api` has the full signatures, and the how-to guid
 
 {class}`~phasecurvefit.orderers.MSTOrderer`: the minimum-spanning-tree backbone
 ({doc}`../how-to/choose-orderer`). The default pipeline uses `jump_cap=inf`,
-`orient_by_velocity=True`, `on_disconnected="connect"` and `nan_policy="omit"`
-instead of the defaults below.
+`velocity_factor=30.0`, `orient_by_velocity=True`, `on_disconnected="connect"` and
+`nan_policy="omit"` instead of the defaults below.
 
 | Option | Default | Meaning |
 |---|---|---|
 | `k` | `10` | neighbours each sample links to |
 | `jump_cap` | `3.0` | cut edges longer than this, in position (in the unit system's length unit for Quantities) |
-| `velocity_weight` | `0.0` | weight of the velocity-alignment penalty added to edge lengths |
+| `velocity_weight` | `0.0` | weight of the velocity-alignment penalty added to edge lengths, in position |
+| `velocity_factor` | `0.0` | the same penalty in units of the median neighbour distance |
 | `sever_cos_threshold` | `None` | drop edges whose velocity cosine is below this |
 | `orient_by_velocity` | `False` | flip the ordering so $\gamma$ increases along the mean velocity |
 | `on_disconnected` | `"raise"` | for a disconnected graph: `"raise"`, `"warn"`, `"largest"` or `"connect"` |

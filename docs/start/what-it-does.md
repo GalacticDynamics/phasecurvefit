@@ -25,10 +25,11 @@ With no other arguments, `pcf.order(pos, vel)` runs two stages. A minimum spanni
 tree of the nearest-neighbour graph gives a backbone whose longest path runs from one
 end of the curve to the other, so no start point is needed. A one-dimensional
 self-organizing map then averages over many samples along that backbone, which
-smooths the ordering against local noise. Both stages order by position; the
-velocities only set the direction, so that $\gamma$ increases along the flow. On a
-curve that crosses itself this cuts across the crossings, and a velocity-aware
-orderer does better. {func}`~phasecurvefit.fit_track` adds the
+smooths the ordering against local noise. Both stages weigh position against
+velocity: two nearby samples moving in different directions are kept apart, so where
+a curve crosses itself the ordering crosses straight over. The velocities also set
+the direction, so that $\gamma$ increases along the flow. On a curve that crosses
+itself many times, a walk that follows the velocity does better. {func}`~phasecurvefit.fit_track` adds the
 autoencoder on top.
 
 Other orderers can replace either stage. The local-flow walk follows the velocity

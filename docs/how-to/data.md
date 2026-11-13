@@ -60,8 +60,9 @@ For a pandas DataFrame `df`, build each dictionary from its columns, for example
 
 ## Missing velocities
 
-The default pipeline accepts samples whose velocities are missing (NaN): it uses the
-velocities only to orient the ordering, and skips the missing ones.
+The default pipeline accepts samples whose velocities are missing (NaN). Such a
+sample joins the ordering by position alone, at its nearest neighbour, and is
+skipped when the ordering is oriented.
 
 ```{code-cell} python
 vel_missing = {k: v.at[1].set(jnp.nan) for k, v in velocity.items()}
