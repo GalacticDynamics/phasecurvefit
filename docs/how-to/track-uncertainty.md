@@ -8,10 +8,10 @@ kernelspec:
 
 # Put an uncertainty band on the track
 
-This guide shows how to fit a track together with fits to bootstrap resamples of the
-data, and draw a band whose width is the track's uncertainty.
-{doc}`../explanation/track-uncertainty` explains what the band includes, how well it
-is calibrated, and why it is a bootstrap and not a Bayesian neural network.
+This guide shows two ways to draw a band whose width is the track's uncertainty: fits
+to bootstrap resamples of the data, and draws from the posterior of a probabilistic
+model of the track. {doc}`../explanation/track-uncertainty` explains what each band
+includes and how well it is calibrated.
 
 ## Fit the ensemble
 
@@ -105,3 +105,37 @@ ensemble.offsets(gamma).shape
 weight. A bootstrap treats each sample as one independent draw. The band is then an
 honest uncertainty for stars, but not for the pixels of an image, which are not
 independent draws ({doc}`../explanation/density-fields`).
+
+## Sample a posterior instead
+
+{func}`~phasecurvefit.sample_track` fits a probabilistic model of the track and
+draws from its posterior with NumPyro. It needs the `numpyro` extra
+(`pip install "phasecurvefit[numpyro]"`). It starts from the same ordering as
+{func}`~phasecurvefit.fit_track` but doesn't train the autoencoder. The SVI steps and
+draws here are fewer than the defaults (4000 and 200) to keep the example fast.
+
+```{code-cell} python
+post = pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=2000, n_draws=50)
+len(post.members)
+```
+
+It returns a {class}`~phasecurvefit.TrackPosterior`. That is a
+{class}`~phasecurvefit.TrackEnsemble` whose members are posterior draws and whose
+reference is the track at the mean of the drawn parameters, so `radius` and `offsets` work as
+above. Each draw also has a width, the spread of the samples about the track.
+
+```{code-cell} python
+gamma = jnp.linspace(*post.reference.track_range, 5)
+post.radius(gamma, 0.68), post.reference.width(gamma)
+```
+
+By default it fits a full-rank Gaussian to the posterior with SVI. `method="nuts"`
+runs two NUTS chains instead. That is slower, and it warns when the chains disagree,
+which happens when they settle in different modes.
+
+`weights` act as counts here: a sample of weight 2 counts as two samples, so scaling
+every weight changes the band. Use counts, such as the number of stars in each pixel,
+and not a density normalised to some peak.
+
+With `unxt` Quantities the draws return Quantities. Pass the unit system as
+`metadata=pcf.StateMetadata(usys=...)`, as for the orderers.

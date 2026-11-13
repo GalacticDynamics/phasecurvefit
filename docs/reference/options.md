@@ -124,6 +124,32 @@ track's uncertainty ({doc}`../how-to/track-uncertainty`). It takes every option 
 | `offsets(gamma)` | `n_dense` | `1000` | points per member track searched for the nearest one |
 | `radius(gamma, level)` | `level` | `0.68` | fraction of members inside the tube |
 
+## `sample_track`
+
+{func}`~phasecurvefit.sample_track`: a posterior for the track, with NumPyro
+({doc}`../how-to/track-uncertainty`). Needs the `numpyro` extra.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `key` | required | random key, split for the inference and for drawing |
+| `method` | `"svi"` | `"svi"`: a full-rank Gaussian fitted to the posterior; `"nuts"`: two NUTS chains, with a warning when they disagree |
+| `metadata` | `None` | passed to the default pipeline; Quantity inputs need its unit system |
+| `weights` | `None` | per-sample weights, which act as counts |
+| `ordering` | `None` | the ordering to start from; `None` runs the default pipeline |
+| `n_draws` | `200` | posterior draws returned |
+| `n_steps` | `4000` | SVI steps |
+| `n_warmup` | `500` | NUTS warmup steps per chain |
+| `n_basis` | `16` | basis functions per Gaussian-process channel; a stream that crosses itself may need `32` |
+| `n_grid` | `256` | points of the $\gamma$ grid each sample's $\gamma$ is summed over; with `n_basis=32` use `512` |
+| `background` | `True` | a flat background over the samples' bounding box, with a latent fraction |
+| `line_density` | `True` | a latent density of samples along the track |
+| `width_varies` | `True` | a width that changes along the track |
+| `velocity_tie` | `0.05` | tie the velocities' mean to the track's tangent, with this much slack; `0` is a hard tie, `None` fits velocities freely |
+
+{class}`~phasecurvefit.TrackPosterior`, which it returns, is a
+{class}`~phasecurvefit.TrackEnsemble`, so it has `offsets` and `radius`. Its members
+are {class}`~phasecurvefit.TrackDraw`s, each with `width(gamma)`.
+
 ## `TrainingConfig`
 
 {class}`~phasecurvefit.nn.TrainingConfig`: autoencoder training

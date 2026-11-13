@@ -9,4 +9,5 @@ class OptDeps(OptionalDependencyEnum):  # pylint: disable=invalid-enum-extension
     """Optional dependency flags for phasecurvefit."""
 
     JAXKD = auto()
+    NUMPYRO = auto()
     UNXT = auto()
