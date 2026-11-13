@@ -249,7 +249,11 @@ membership = pcf.nn.MixtureMembershipConfig(
     sigma_ceiling=(1.0, 0.3),  # anneal the width ceiling down
     warmup_frac=0.4,  # fit the track before rejecting anything
 )
-config = pcf.nn.TrainingConfig(n_epochs_encoder=400, membership=membership)
+# Fewer epochs than the defaults (800 encoder, 200 joint) keep this page fast,
+# and reject the same interlopers.
+config = pcf.nn.TrainingConfig(
+    n_epochs_encoder=200, n_epochs_both=100, membership=membership
+)
 result, _, losses = pcf.nn.train_autoencoder(
     model, mstresult, config=config, key=train_key
 )
