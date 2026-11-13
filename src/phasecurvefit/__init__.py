@@ -96,6 +96,10 @@ __all__: tuple[str, ...] = (
     "fit_track",
     "bootstrap_track",
     "TrackEnsemble",
+    "sample_track",
+    "track_model",
+    "TrackPosterior",
+    "TrackDraw",
     # Query configuration
     "WalkConfig",
     # Result accessor
@@ -111,7 +115,9 @@ from ._src.algorithm import (
 )
 from ._src.orderers.base import order
 from ._src.pipeline import TrackEnsemble, bootstrap_track, fit_track
+from ._src.posterior import TrackPosterior, sample_track, track_model
 from ._src.query_config import WalkConfig
+from ._src.track_draw import TrackDraw
 from ._version import version as __version__
 
 # isort: split

@@ -1688,6 +1688,15 @@ wheels = [
 ]
 
 [[package]]
+name = "multipledispatch"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/fe/3e/a62c3b824c7dec33c4a1578bcc842e6c30300051033a4e5975ed86cc2536/multipledispatch-1.0.0.tar.gz", hash = "sha256:5c839915465c68206c3e9c473357908216c28383b425361e5d144594bf85a7e0", size = 12385, upload-time = "2023-06-27T16:45:11.074Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/c0/00c9809d8b9346eb238a6bbd5f83e846a4ce4503da94a4c08cb7284c325b/multipledispatch-1.0.0-py3-none-any.whl", hash = "sha256:0c53cd8b077546da4e48869f49b13164bebafd0c2a5afceb6bb6a316e7fb46e4", size = 12818, upload-time = "2023-06-27T16:45:09.418Z" },
+]
+
+[[package]]
 name = "mypy"
 version = "2.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1921,6 +1930,22 @@ wheels = [
 ]
 
 [[package]]
+name = "numpyro"
+version = "0.22.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "multipledispatch" },
+    { name = "numpy" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/02/da157d8fb360d89ea4a3d90af3ef07567c0c03e24eed18f65471c0383dcf/numpyro-0.22.0.tar.gz", hash = "sha256:d428b688f7c6d1f9089b730c242a3817452609e3672bd62bbc1b02ce17f069bb", size = 496904, upload-time = "2026-09-18T08:51:38.998Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ef/92/9ae7feac5d317e3b936ac61ff1695634df8dc28f928486e1490f74dcbab6/numpyro-0.22.0-py3-none-any.whl", hash = "sha256:0bbcd8e5319876306eaea595bc78c09201cbcde89bd5856f2867ab65e1dab0a5", size = 444911, upload-time = "2026-09-18T08:51:37.81Z" },
+]
+
+[[package]]
 name = "oncequinox"
 version = "0.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2058,6 +2083,7 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "jaxkd" },
+    { name = "numpyro" },
     { name = "unxt" },
 ]
 interop = [
@@ -2066,10 +2092,14 @@ interop = [
 kdtree = [
     { name = "jaxkd" },
 ]
+numpyro = [
+    { name = "numpyro" },
+]
 tutorials = [
     { name = "galax" },
     { name = "jaxkd" },
     { name = "matplotlib" },
+    { name = "numpyro" },
     { name = "unxt", extra = ["interop-mpl"] },
 ]
 
@@ -2088,6 +2118,7 @@ dev = [
     { name = "myst-nb" },
     { name = "nox" },
     { name = "nox-uv" },
+    { name = "numpyro" },
     { name = "prek" },
     { name = "pylint" },
     { name = "pytest" },
@@ -2119,6 +2150,7 @@ docs = [
     { name = "jaxkd" },
     { name = "matplotlib" },
     { name = "myst-nb" },
+    { name = "numpyro" },
     { name = "sphinx" },
     { name = "sphinx-autobuild" },
     { name = "sphinx-autodoc-typehints" },
@@ -2146,6 +2178,7 @@ test = [
     { name = "hypothesis", extra = ["numpy"] },
     { name = "jaxkd" },
     { name = "matplotlib" },
+    { name = "numpyro" },
     { name = "pytest" },
     { name = "pytest-arraydiff" },
     { name = "pytest-codspeed" },
@@ -2171,6 +2204,9 @@ requires-dist = [
     { name = "jaxmore", extras = ["tqdm"], specifier = ">=0.4.0" },
     { name = "jaxtyping", specifier = ">=0.3.5" },
     { name = "matplotlib", marker = "extra == 'tutorials'", specifier = ">=3.10.8" },
+    { name = "numpyro", marker = "extra == 'all'", specifier = ">=0.20" },
+    { name = "numpyro", marker = "extra == 'numpyro'", specifier = ">=0.20" },
+    { name = "numpyro", marker = "extra == 'tutorials'", specifier = ">=0.20" },
     { name = "optax", specifier = ">=0.2.4" },
     { name = "optional-dependencies", specifier = ">=0.4.0" },
     { name = "plum-dispatch", specifier = ">=2.6.1" },
@@ -2183,7 +2219,7 @@ requires-dist = [
     { name = "wadler-lindig-parts", specifier = ">=0.3.0" },
     { name = "zeroth", specifier = ">=1.0.1" },
 ]
-provides-extras = ["all", "interop", "kdtree", "tutorials"]
+provides-extras = ["all", "interop", "kdtree", "numpyro", "tutorials"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2202,6 +2238,7 @@ dev = [
     { name = "myst-nb", specifier = ">=1.3.0" },
     { name = "nox", specifier = ">=2024.10.9" },
     { name = "nox-uv", specifier = ">=0.6.3" },
+    { name = "numpyro", specifier = ">=0.20" },
     { name = "prek", specifier = ">=0.5.3" },
     { name = "pylint", specifier = ">=3.3.8" },
     { name = "pytest", specifier = ">=9.0.2" },
@@ -2234,6 +2271,7 @@ docs = [
     { name = "jaxkd", specifier = ">=0.0.5" },
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "myst-nb", specifier = ">=1.3.0" },
+    { name = "numpyro", specifier = ">=0.20" },
     { name = "sphinx", specifier = ">=8.1.3" },
     { name = "sphinx-autobuild", specifier = ">=2024.10.3" },
     { name = "sphinx-autodoc-typehints", specifier = ">=2.6.1" },
@@ -2261,6 +2299,7 @@ test = [
     { name = "hypothesis", extras = ["numpy"], specifier = ">=6.138.14" },
     { name = "jaxkd", specifier = ">=0.0.5" },
     { name = "matplotlib", specifier = ">=3.8" },
+    { name = "numpyro", specifier = ">=0.20" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-arraydiff", specifier = ">=0.6.1" },
     { name = "pytest-codspeed", specifier = ">=4.2.0" },
