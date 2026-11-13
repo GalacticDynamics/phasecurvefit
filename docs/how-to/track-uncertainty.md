@@ -111,10 +111,11 @@ independent draws ({doc}`../explanation/density-fields`).
 {func}`~phasecurvefit.sample_track` fits a probabilistic model of the track and
 draws from its posterior with NumPyro. It needs the `numpyro` extra
 (`pip install "phasecurvefit[numpyro]"`). It starts from the same ordering as
-{func}`~phasecurvefit.fit_track` but doesn't train the autoencoder.
+{func}`~phasecurvefit.fit_track` but doesn't train the autoencoder. The SVI steps and
+draws here are fewer than the defaults (4000 and 200) to keep the example fast.
 
 ```{code-cell} python
-post = pcf.sample_track(pos, vel, key=jax.random.key(0))
+post = pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=2000, n_draws=50)
 len(post.members)
 ```
 
