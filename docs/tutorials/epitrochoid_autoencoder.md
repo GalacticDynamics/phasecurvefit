@@ -300,7 +300,8 @@ strand would show up as a sudden colour change and a long dashed segment.
 The autoencoder's decoder has to bend sharply around five tight loops, so we give
 it more capacity and time than the defaults: one more hidden layer
 (`track_depth=4`, default 3) and twice as many decoder-only epochs
-(`n_epochs_decoder=200`, default 100).
+(`n_epochs_decoder=200`, default 100). To keep this page fast we halve the joint
+phase (`n_epochs_both=100`, default 200), which leaves the track the same.
 
 ```{code-cell} ipython3
 key, model_key, train_key = jr.split(key, 3)
@@ -308,7 +309,7 @@ normalizer = pcf.nn.StandardScalerNormalizer(qs, ps)
 ae_model = pcf.nn.PathAutoencoder.make(
     normalizer, track_depth=4, gamma_range=walkresult.gamma_range, key=model_key
 )
-train_config = pcf.nn.TrainingConfig(n_epochs_decoder=200, n_epochs_both=200)
+train_config = pcf.nn.TrainingConfig(n_epochs_decoder=200, n_epochs_both=100)
 result, opt_state, losses = pcf.nn.train_autoencoder(
     ae_model, walkresult, key=train_key, config=train_config
 )

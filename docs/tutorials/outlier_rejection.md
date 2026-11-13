@@ -435,7 +435,8 @@ membership = pcf.nn.MixtureMembershipConfig(
     sigma_ceiling=(0.5, 0.1),  # anneal the width ceiling down
     warmup_frac=0.3,  # fit the track before rejecting anything
 )
-config = pcf.nn.TrainingConfig(n_epochs_both=1000, membership=membership)
+# 500 joint epochs, down from 1000 to keep this page fast, flag the same stars.
+config = pcf.nn.TrainingConfig(n_epochs_both=500, membership=membership)
 result, opt_states, losses = pcf.nn.train_autoencoder(
     model, walkresult, config=config, key=train_key
 )
