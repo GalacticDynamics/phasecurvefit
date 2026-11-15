@@ -10,7 +10,7 @@ kernelspec:
 
 The local-flow walk orders samples by following the velocity field from a start
 point, one step at a time. It is the algorithm of Nibauer et al. (2022), and
-{class}`~phasecurvefit.orderers.LocalFlowOrderer` runs it. {doc}`../how-to/local-flow-walk`
+{class}`~phasecurvefit.orderers.LocalFlowOrderer` runs it. [](../how-to/local-flow-walk.md)
 shows how to set it up.
 
 ## The walk
@@ -24,7 +24,7 @@ one. From the start point it repeats four steps:
 4. Stop if a termination condition holds.
 
 The metric is pluggable, so the same walk can follow the flow, ignore velocities, or
-use a distance you write yourself ({doc}`../how-to/custom-metric`).
+use a distance you write yourself ([](../how-to/custom-metric.md)).
 
 ## The default metric
 
@@ -52,7 +52,7 @@ $\lambda = s$, a neighbour at $90°$ and distance $s$ costs $2s$, the same as a 
 straight ahead at $2s$. As $\lambda$ grows, direction dominates and the walk takes
 longer strides along the flow, skipping points off to the side. For a thin stream
 that is often what you want, since the autoencoder can order the skipped points
-afterwards ({doc}`autoencoder`).
+afterwards ([](autoencoder.md)).
 
 For a stellar stream the penalty encodes that member stars follow coherent orbits: the
 next star along the stream is likely to be close and to lie in the direction the
@@ -82,7 +82,7 @@ $\lambda = 0$ gives the same result.
 
 The MST's opt-in velocity options reuse the same alignment idea, applied to the
 cosine $\cos(v_i, v_j)$ between two samples' velocities on each graph edge
-({doc}`mst`).
+([](mst.md)).
 
 ## Why velocities matter where a curve crosses itself
 
@@ -168,7 +168,7 @@ progenitor in both directions.
 
 Because the walk follows the flow, it needs a start point at an end of the curve, or
 at the progenitor for a stream that flows both ways. When no start point is known,
-the MST orders the curve without one ({doc}`mst`).
+the MST orders the curve without one ([](mst.md)).
 
 ## References
 

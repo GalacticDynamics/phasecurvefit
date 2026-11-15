@@ -538,7 +538,7 @@ document.write(`
 plainly not on the stream survive as members, and because they survive they pull the
 fitted track towards themselves, worst at the ends, where there is least data to hold
 it in place. This page explains why, and how modelling the background fixes it.
-<a class="reference internal" href="../how-to/outliers.html"><span class="doc">Reject outliers with the mixture model</span></a> shows how to turn it on.</p>
+<a class="reference internal" href="../how-to/outliers.html"><span class="std std-doc">Reject outliers with the mixture model</span></a> shows how to turn it on.</p>
 <section id="why-the-default-membership-cannot-reject-anything">
 <h2>Why the default membership cannot reject anything<a class="headerlink" href="#why-the-default-membership-cannot-reject-anything" title="Link to this heading">#</a></h2>
 <section id="it-is-trained-to-keep-the-outliers">
@@ -601,7 +601,7 @@ self-referential label. The crossover is set by <span class="math notranslate no
 surface density with a physical meaning, rather than a hand-picked cut. Hogg et al.
 argue against sigma-clipping and hand-tuned cuts for the same reason.</p>
 <p>With per-sample weights, each sample’s term in the sum is multiplied by its weight,
-and its posterior membership doesn’t change. <a class="reference internal" href="density-fields.html"><span class="doc">Density fields</span></a> derives this.</p>
+and its posterior membership doesn’t change. <a class="reference internal" href="density-fields.html"><span class="std std-doc">Density fields</span></a> derives this.</p>
 <p>The encoder’s output is the prior <span class="math notranslate nohighlight">\(\pi_n\)</span>. The posterior membership, which
 <a class="reference internal" href="../reference/api.html#phasecurvefit.nn.posterior_membership" title="phasecurvefit.nn.posterior_membership"><code class="xref py py-func docutils literal notranslate"><span class="pre">posterior_membership()</span></code></a> returns, also accounts for how far the
 star landed from the track, and is the number to use. It uses the width capped at the

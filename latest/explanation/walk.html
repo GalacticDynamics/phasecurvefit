@@ -532,7 +532,7 @@ document.write(`
 <h1>The local-flow walk<a class="headerlink" href="#the-local-flow-walk" title="Link to this heading">#</a></h1>
 <p>The local-flow walk orders samples by following the velocity field from a start
 point, one step at a time. It is the algorithm of Nibauer et al. (2022), and
-<a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.LocalFlowOrderer" title="phasecurvefit.orderers.LocalFlowOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a> runs it. <a class="reference internal" href="../how-to/local-flow-walk.html"><span class="doc">Use the local-flow walk</span></a>
+<a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.LocalFlowOrderer" title="phasecurvefit.orderers.LocalFlowOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a> runs it. <a class="reference internal" href="../how-to/local-flow-walk.html"><span class="std std-doc">Use the local-flow walk</span></a>
 shows how to set it up.</p>
 <section id="the-walk">
 <h2>The walk<a class="headerlink" href="#the-walk" title="Link to this heading">#</a></h2>
@@ -545,7 +545,7 @@ one. From the start point it repeats four steps:</p>
 <li><p>Stop if a termination condition holds.</p></li>
 </ol>
 <p>The metric is pluggable, so the same walk can follow the flow, ignore velocities, or
-use a distance you write yourself (<a class="reference internal" href="../how-to/custom-metric.html"><span class="doc">Write a custom metric</span></a>).</p>
+use a distance you write yourself (<a class="reference internal" href="../how-to/custom-metric.html"><span class="std std-doc">Write a custom metric</span></a>).</p>
 </section>
 <section id="the-default-metric">
 <h2>The default metric<a class="headerlink" href="#the-default-metric" title="Link to this heading">#</a></h2>
@@ -572,7 +572,7 @@ points. At <span class="math notranslate nohighlight">\(\lambda = 0\)</span> the
 straight ahead at <span class="math notranslate nohighlight">\(2s\)</span>. As <span class="math notranslate nohighlight">\(\lambda\)</span> grows, direction dominates and the walk takes
 longer strides along the flow, skipping points off to the side. For a thin stream
 that is often what you want, since the autoencoder can order the skipped points
-afterwards (<a class="reference internal" href="autoencoder.html"><span class="doc">The autoencoder</span></a>).</p>
+afterwards (<a class="reference internal" href="autoencoder.html"><span class="std std-doc">The autoencoder</span></a>).</p>
 <p>For a stellar stream the penalty encodes that member stars follow coherent orbits: the
 next star along the stream is likely to be close and to lie in the direction the
 stream is moving.</p>
@@ -619,7 +619,7 @@ directions alike, with no preference for the direction of travel.</p>
 </div>
 <p>The MST’s opt-in velocity options reuse the same alignment idea, applied to the
 cosine <span class="math notranslate nohighlight">\(\cos(v_i, v_j)\)</span> between two samples’ velocities on each graph edge
-(<a class="reference internal" href="mst.html"><span class="doc">The MST backbone</span></a>).</p>
+(<a class="reference internal" href="mst.html"><span class="std std-doc">The MST backbone</span></a>).</p>
 </section>
 <section id="why-velocities-matter-where-a-curve-crosses-itself">
 <h2>Why velocities matter where a curve crosses itself<a class="headerlink" href="#why-velocities-matter-where-a-curve-crosses-itself" title="Link to this heading">#</a></h2>
@@ -713,7 +713,7 @@ through the start, to the forward end. That suits a stream flowing away from a c
 progenitor in both directions.</p>
 <p>Because the walk follows the flow, it needs a start point at an end of the curve, or
 at the progenitor for a stream that flows both ways. When no start point is known,
-the MST orders the curve without one (<a class="reference internal" href="mst.html"><span class="doc">The MST backbone</span></a>).</p>
+the MST orders the curve without one (<a class="reference internal" href="mst.html"><span class="std std-doc">The MST backbone</span></a>).</p>
 </section>
 <section id="references">
 <h2>References<a class="headerlink" href="#references" title="Link to this heading">#</a></h2>

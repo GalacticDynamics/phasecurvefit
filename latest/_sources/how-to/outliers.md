@@ -10,7 +10,7 @@ kernelspec:
 
 This guide shows how to train the autoencoder with a stream-plus-background mixture
 model, and read a calibrated membership probability for each sample.
-{doc}`../explanation/outliers` explains why the default membership cannot reject
+[](../explanation/outliers.md) explains why the default membership cannot reject
 outliers and how the mixture model fixes it. The
 [outlier-rejection tutorial](../tutorials/outlier_rejection.md) runs it end to end
 on a mock stream with injected interlopers.
@@ -98,7 +98,7 @@ Both settings below close off a way the fit can fail. Keep them on.
 
 With `membership` set, the encoder's $\gamma$ is also frozen during the joint phase,
 because an encoder that keeps training can make the same collapse happen. Leave
-`freeze_encoder_final_training` at its default ({doc}`../explanation/outliers`
+`freeze_encoder_final_training` at its default ([](../explanation/outliers.md)
 explains why).
 
 ## What to expect
@@ -121,13 +121,13 @@ displaced across the track, thresholding the posterior at 0.5 gave:
 The fitted width came out at 0.150, against a true 0.15.
 
 To reject outliers while ordering, before any training, use the MST's
-`edge_clip_sigma` or the SOM's `outlier_mixture` ({doc}`som`).
+`edge_clip_sigma` or the SOM's `outlier_mixture` ([](som.md)).
 
 ## Reject outliers in an image
 
 For an image, order the pixels with their values as weights
 ([order a density field](choose-orderer.md#order-a-density-field)), then train with
-the mixture and the two settings a wide curve needs ({doc}`autoencoder`):
+the mixture and the two settings a wide curve needs ([](autoencoder.md)):
 
 ```{code-cell} python
 config = pcf.nn.TrainingConfig(
@@ -141,7 +141,7 @@ config = pcf.nn.TrainingConfig(
 Pass the weighted ordering to `train_autoencoder` as above, and it reads the weights
 from there. A weight sets how much a pixel counts in the fit, not whether it is a
 member, so the faint pixels at the edges of the curve stay members
-({doc}`../explanation/density-fields` derives why).
+([](../explanation/density-fields.md) derives why).
 
 On the density-field tutorial's image, with pixels of 0.1 and three bright blobs
 added, ordered with `RidgeOrderer() | SOMOrderer(n_prototypes=30)` and trained with

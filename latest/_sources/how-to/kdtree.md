@@ -10,7 +10,7 @@ kernelspec:
 
 This guide shows how to make the local-flow walk consider only the spatially nearest
 points at each step, with a KD-tree. It needs the `kdtree` extra
-({doc}`../start/install`).
+([](../start/install.md)).
 
 By default the walk uses {class}`~phasecurvefit.strats.BruteForce`, which scores
 every unvisited point at each step. {class}`~phasecurvefit.strats.KDTree` first

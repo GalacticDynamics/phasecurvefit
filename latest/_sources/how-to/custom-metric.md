@@ -99,4 +99,4 @@ result = pcf.order(
 ```
 
 A metric used inside {class}`~phasecurvefit.orderers.SOMOrderer` must be symmetric in
-the two points it compares ({doc}`../explanation/som`).
+the two points it compares ([](../explanation/som.md)).

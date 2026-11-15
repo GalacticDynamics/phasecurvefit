@@ -530,7 +530,7 @@ document.write(`
 <h1>Reject outliers with the mixture model<a class="headerlink" href="#reject-outliers-with-the-mixture-model" title="Link to this heading">#</a></h1>
 <p>This guide shows how to train the autoencoder with a stream-plus-background mixture
 model, and read a calibrated membership probability for each sample.
-<a class="reference internal" href="../explanation/outliers.html"><span class="doc">Outlier rejection with a mixture model</span></a> explains why the default membership cannot reject
+<a class="reference internal" href="../explanation/outliers.html"><span class="std std-doc">Outlier rejection with a mixture model</span></a> explains why the default membership cannot reject
 outliers and how the mixture model fixes it. The
 <a class="reference internal" href="../tutorials/outlier_rejection.html"><span class="std std-doc">outlier-rejection tutorial</span></a> runs it end to end
 on a mock stream with injected interlopers.</p>
@@ -627,7 +627,7 @@ whole dataset background and never recover.</p></li>
 </ul>
 <p>With <code class="docutils literal notranslate"><span class="pre">membership</span></code> set, the encoder’s <span class="math notranslate nohighlight">\(\gamma\)</span> is also frozen during the joint phase,
 because an encoder that keeps training can make the same collapse happen. Leave
-<code class="docutils literal notranslate"><span class="pre">freeze_encoder_final_training</span></code> at its default (<a class="reference internal" href="../explanation/outliers.html"><span class="doc">Outlier rejection with a mixture model</span></a>
+<code class="docutils literal notranslate"><span class="pre">freeze_encoder_final_training</span></code> at its default (<a class="reference internal" href="../explanation/outliers.html"><span class="std std-doc">Outlier rejection with a mixture model</span></a>
 explains why).</p>
 </section>
 <section id="what-to-expect">
@@ -679,13 +679,13 @@ membership, since the stream has Gaussian tails.</p></li>
 </ul>
 <p>The fitted width came out at 0.150, against a true 0.15.</p>
 <p>To reject outliers while ordering, before any training, use the MST’s
-<code class="docutils literal notranslate"><span class="pre">edge_clip_sigma</span></code> or the SOM’s <code class="docutils literal notranslate"><span class="pre">outlier_mixture</span></code> (<a class="reference internal" href="som.html"><span class="doc">Refine an ordering with a self-organizing map</span></a>).</p>
+<code class="docutils literal notranslate"><span class="pre">edge_clip_sigma</span></code> or the SOM’s <code class="docutils literal notranslate"><span class="pre">outlier_mixture</span></code> (<a class="reference internal" href="som.html"><span class="std std-doc">Refine an ordering with a self-organizing map</span></a>).</p>
 </section>
 <section id="reject-outliers-in-an-image">
 <h2>Reject outliers in an image<a class="headerlink" href="#reject-outliers-in-an-image" title="Link to this heading">#</a></h2>
 <p>For an image, order the pixels with their values as weights
 (<a class="reference internal" href="choose-orderer.html#order-a-density-field"><span class="std std-ref">order a density field</span></a>), then train with
-the mixture and the two settings a wide curve needs (<a class="reference internal" href="autoencoder.html"><span class="doc">Fill gaps and fit a track with the autoencoder</span></a>):</p>
+the mixture and the two settings a wide curve needs (<a class="reference internal" href="autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a>):</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">config</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">TrainingConfig</span><span class="p">(</span>
@@ -701,7 +701,7 @@ the mixture and the two settings a wide curve needs (<a class="reference interna
 <p>Pass the weighted ordering to <code class="docutils literal notranslate"><span class="pre">train_autoencoder</span></code> as above, and it reads the weights
 from there. A weight sets how much a pixel counts in the fit, not whether it is a
 member, so the faint pixels at the edges of the curve stay members
-(<a class="reference internal" href="../explanation/density-fields.html"><span class="doc">Density fields</span></a> derives why).</p>
+(<a class="reference internal" href="../explanation/density-fields.html"><span class="std std-doc">Density fields</span></a> derives why).</p>
 <p>On the density-field tutorial’s image, with pixels of 0.1 and three bright blobs
 added, ordered with <code class="docutils literal notranslate"><span class="pre">RidgeOrderer()</span> <span class="pre">|</span> <span class="pre">SOMOrderer(n_prototypes=30)</span></code> and trained with
 these settings, thresholding the posterior at 0.5 kept every pixel on the curve. It

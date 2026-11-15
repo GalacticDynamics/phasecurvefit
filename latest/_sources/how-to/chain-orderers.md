@@ -61,7 +61,7 @@ assert result.gamma_range == (-1.0, 1.0)
 It falls back to the MST alone when the MST visited fewer samples than
 `n_prototypes` (15 by default), instead of raising, and it cannot run under `jit` or
 `vmap`. Its MST stage uses different settings from `MSTOrderer()`'s defaults so that
-it works on any data without tuning ({doc}`../explanation/mst`). A gap in a stream wider than the neighbours reach does not lose either side:
+it works on any data without tuning ([](../explanation/mst.md)). A gap in a stream wider than the neighbours reach does not lose either side:
 
 ```{code-cell} python
 t = jnp.concatenate([jnp.linspace(0.0, 1.0, 60), jnp.linspace(1.2, 2.2, 60)])

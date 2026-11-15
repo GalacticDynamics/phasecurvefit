@@ -527,7 +527,7 @@ document.write(`
   <section class="tex2jax_ignore mathjax_ignore" id="choose-and-tune-the-walks-metric">
 <h1>Choose and tune the walk’s metric<a class="headerlink" href="#choose-and-tune-the-walks-metric" title="Link to this heading">#</a></h1>
 <p>This guide shows how to pick the distance metric the local-flow walk uses, and how to
-set its <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>. <a class="reference internal" href="../explanation/walk.html"><span class="doc">The local-flow walk</span></a> explains what each metric
+set its <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>. <a class="reference internal" href="../explanation/walk.html"><span class="std std-doc">The local-flow walk</span></a> explains what each metric
 computes.</p>
 <section id="pick-a-metric">
 <h2>Pick a metric<a class="headerlink" href="#pick-a-metric" title="Link to this heading">#</a></h2>
@@ -564,7 +564,7 @@ no preferred direction.</p></li>
 unreliable, or as a position-only baseline to compare against. It ignores
 <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>.</p></li>
 </ul>
-<p>To write your own metric, see <a class="reference internal" href="custom-metric.html"><span class="doc">Write a custom metric</span></a>.</p>
+<p>To write your own metric, see <a class="reference internal" href="custom-metric.html"><span class="std std-doc">Write a custom metric</span></a>.</p>
 </section>
 <section id="set-metric-scale">
 <h2>Set <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code><a class="headerlink" href="#set-metric-scale" title="Link to this heading">#</a></h2>
@@ -624,8 +624,8 @@ metric_scale=5.0: 100 visited
 <h2>Check the result<a class="headerlink" href="#check-the-result" title="Link to this heading">#</a></h2>
 <p>Look at the ordering after every change. If it jumps between strands, the velocity
 term is too weak: raise <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>. If the walk stops early or skips most points,
-the term may be too strong, or <code class="docutils literal notranslate"><span class="pre">max_dist</span></code> too small (<a class="reference internal" href="local-flow-walk.html"><span class="doc">Use the local-flow walk</span></a>).</p>
-<p>To use physical units for <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>, see <a class="reference internal" href="units.html"><span class="doc">Use physical units</span></a>.</p>
+the term may be too strong, or <code class="docutils literal notranslate"><span class="pre">max_dist</span></code> too small (<a class="reference internal" href="local-flow-walk.html"><span class="std std-doc">Use the local-flow walk</span></a>).</p>
+<p>To use physical units for <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>, see <a class="reference internal" href="units.html"><span class="std std-doc">Use physical units</span></a>.</p>
 </section>
 </section>
 

@@ -76,4 +76,4 @@ Unvisited samples, marked `-1` in `result.indices`, are masked out without chang
 array shapes, so the interpolation keeps working inside `jit`.
 
 For a smooth track rather than a piecewise-linear one, fit the autoencoder
-({doc}`autoencoder`).
+([](autoencoder.md)).

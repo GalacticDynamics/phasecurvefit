@@ -533,7 +533,7 @@ document.write(`
 <h1>Fill gaps and fit a track with the autoencoder<a class="headerlink" href="#fill-gaps-and-fit-a-track-with-the-autoencoder" title="Link to this heading">#</a></h1>
 <p>This guide shows how to give every sample a value of <span class="math notranslate nohighlight">\(\gamma\)</span>, including samples an
 orderer left out, and fit a smooth mean track through them.
-<a class="reference internal" href="../explanation/autoencoder.html"><span class="doc">The autoencoder</span></a> explains how the network is trained.</p>
+<a class="reference internal" href="../explanation/autoencoder.html"><span class="std std-doc">The autoencoder</span></a> explains how the network is trained.</p>
 <section id="in-one-call">
 <h2>In one call<a class="headerlink" href="#in-one-call" title="Link to this heading">#</a></h2>
 <p><a class="reference internal" href="../reference/api.html#phasecurvefit.fit_track" title="phasecurvefit.fit_track"><code class="xref py py-func docutils literal notranslate"><span class="pre">fit_track()</span></code></a> runs the default pipeline, builds an autoencoder,
@@ -561,7 +561,7 @@ and trains it:</p>
 epoch.</p>
 <p>By default <code class="docutils literal notranslate"><span class="pre">fit_track</span></code> leaves out of the ordering the samples its outlier mixture
 calls background, so the track does not bend out to interlopers at its ends
-(<a class="reference internal" href="../explanation/autoencoder.html"><span class="doc">The autoencoder</span></a> explains how). Left-out samples have <code class="docutils literal notranslate"><span class="pre">-1</span></code> in
+(<a class="reference internal" href="../explanation/autoencoder.html"><span class="std std-doc">The autoencoder</span></a> explains how). Left-out samples have <code class="docutils literal notranslate"><span class="pre">-1</span></code> in
 <code class="docutils literal notranslate"><span class="pre">ordering.indices</span></code>. Pass <code class="docutils literal notranslate"><span class="pre">outlier_mixture=None</span></code> to keep every sample in the ordering:</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -657,11 +657,11 @@ phase. A higher stop value, 100 to 150, enforces stronger alignment.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">n_epochs_encoder</span></code> defaults to 800. A few hundred gives a quicker, rougher fit.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">batch_size</span></code>: larger batches are more stable but use more memory.</p></li>
 </ul>
-<p><a class="reference internal" href="../reference/options.html"><span class="doc">Options and defaults</span></a> lists every setting with its default.</p>
+<p><a class="reference internal" href="../reference/options.html"><span class="std std-doc">Options and defaults</span></a> lists every setting with its default.</p>
 <section id="train-on-an-image-or-a-wide-curve">
 <h3>Train on an image or a wide curve<a class="headerlink" href="#train-on-an-image-or-a-wide-curve" title="Link to this heading">#</a></h3>
 <p>When the samples spread wide across the track, as the pixels of an image do, freeze
-the encoder in the joint phase and use large batches (<a class="reference internal" href="../explanation/density-fields.html"><span class="doc">Density fields</span></a>
+the encoder in the joint phase and use large batches (<a class="reference internal" href="../explanation/density-fields.html"><span class="std std-doc">Density fields</span></a>
 explains why):</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -698,7 +698,7 @@ every step of an MCMC, a <a class="reference internal" href="../reference/api.ht
 the trained decoder. The
 <a class="reference internal" href="../tutorials/stream_runningmean.html"><span class="std std-doc">stream running-mean tutorial</span></a> shows how, and
 when it is accurate enough.</p>
-<p>To reject interlopers while training, see <a class="reference internal" href="outliers.html"><span class="doc">Reject outliers with the mixture model</span></a>.</p>
+<p>To reject interlopers while training, see <a class="reference internal" href="outliers.html"><span class="std std-doc">Reject outliers with the mixture model</span></a>.</p>
 </section>
 </section>
 

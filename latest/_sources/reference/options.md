@@ -1,17 +1,17 @@
 # Options and defaults
 
 Every option of the orderers and of autoencoder training, with its default. Pass
-options as keywords. The {doc}`api` has the full signatures, and the how-to guides
-({doc}`../how-to/index`) show how to choose values.
+options as keywords. The [](api.md) has the full signatures, and the how-to guides
+([](../how-to/index.md)) show how to choose values.
 
 ## `LocalFlowOrderer`
 
 {class}`~phasecurvefit.orderers.LocalFlowOrderer`: the local-flow walk
-({doc}`../how-to/local-flow-walk`).
+([](../how-to/local-flow-walk.md)).
 
 | Option | Default | Meaning |
 |---|---|---|
-| `metric_scale` | `1.0` | the metric's scale: a length for the default metric, a time for `FullPhaseSpaceDistanceMetric`, ignored by `SpatialDistanceMetric` ({doc}`../how-to/tune-metric`) |
+| `metric_scale` | `1.0` | the metric's scale: a length for the default metric, a time for `FullPhaseSpaceDistanceMetric`, ignored by `SpatialDistanceMetric` ([](../how-to/tune-metric.md)) |
 | `config` | `WalkConfig()` | the distance metric and neighbour-query strategy, see below |
 | `start_idx` | `None` | index of the first sample; `None` takes it from a previous chained stage, or else uses 0 |
 | `direction` | `"forward"` | `"forward"` follows the velocities, `"backward"` goes against them, `"both"` walks each way from `start_idx` and joins the two |
@@ -26,13 +26,13 @@ options as keywords. The {doc}`api` has the full signatures, and the how-to guid
 
 | Option | Default | Meaning |
 |---|---|---|
-| `metric` | `AlignedMomentumDistanceMetric()` | how candidate points are scored ({doc}`../explanation/walk`) |
-| `strategy` | `BruteForce()` | which candidates are scored: all of them, or the `k` nearest with `KDTree(k=...)` ({doc}`../how-to/kdtree`) |
+| `metric` | `AlignedMomentumDistanceMetric()` | how candidate points are scored ([](../explanation/walk.md)) |
+| `strategy` | `BruteForce()` | which candidates are scored: all of them, or the `k` nearest with `KDTree(k=...)` ([](../how-to/kdtree.md)) |
 
 ## `MSTOrderer`
 
 {class}`~phasecurvefit.orderers.MSTOrderer`: the minimum-spanning-tree backbone
-({doc}`../how-to/choose-orderer`). The default pipeline uses `jump_cap=inf`,
+([](../how-to/choose-orderer.md)). The default pipeline uses `jump_cap=inf`,
 `velocity_factor=30.0`, `orient_by_velocity=True`, `on_disconnected="connect"` and
 `nan_policy="omit"` instead of the defaults below.
 
@@ -47,13 +47,13 @@ options as keywords. The {doc}`api` has the full signatures, and the how-to guid
 | `on_disconnected` | `"raise"` | for a disconnected graph: `"raise"`, `"warn"`, `"largest"` or `"connect"` |
 | `edge_clip_sigma` | `None` | clip edges whose length is an outlier at this many sigma |
 | `edge_clip_max_iters` | `5` | most rounds of edge clipping |
-| `neighbors` | `None` | the nearest-neighbour backend; `None` picks SciPy for concrete inputs and `BucketKDTree` for traced ones ({doc}`../how-to/jax`) |
+| `neighbors` | `None` | the nearest-neighbour backend; `None` picks SciPy for concrete inputs and `BucketKDTree` for traced ones ([](../how-to/jax.md)) |
 | `nan_policy` | `"raise"` | what to do with NaN inputs |
 
 ## `RidgeOrderer`
 
 {class}`~phasecurvefit.orderers.RidgeOrderer`: a backbone along the ridge of the
-weighted sample density ({doc}`../how-to/choose-orderer`). It does not use
+weighted sample density ([](../how-to/choose-orderer.md)). It does not use
 velocities, and it runs on the host, so it can't be traced under `jit`.
 
 | Option | Default | Meaning |
@@ -66,7 +66,7 @@ velocities, and it runs on the host, so it can't be traced under `jit`.
 ## `SOMOrderer`
 
 {class}`~phasecurvefit.orderers.SOMOrderer`: the self-organizing map
-({doc}`../how-to/som`). The default pipeline uses `n_prototypes=15`.
+([](../how-to/som.md)). The default pipeline uses `n_prototypes=15`.
 
 | Option | Default | Meaning |
 |---|---|---|
@@ -84,7 +84,7 @@ velocities, and it runs on the host, so it can't be traced under `jit`.
 ### `SOMMixture`
 
 {class}`~phasecurvefit.som.SOMMixture`: outlier rejection for the SOM, a curve
-or background mixture ({doc}`../how-to/som`).
+or background mixture ([](../how-to/som.md)).
 
 | Option | Default | Meaning |
 |---|---|---|
@@ -94,7 +94,7 @@ or background mixture ({doc}`../how-to/som`).
 ## `fit_track`
 
 {func}`~phasecurvefit.fit_track`: order, then train an autoencoder, in one call
-({doc}`../how-to/autoencoder`).
+([](../how-to/autoencoder.md)).
 
 | Option | Default | Meaning |
 |---|---|---|
@@ -102,13 +102,13 @@ or background mixture ({doc}`../how-to/som`).
 | `metadata` | `None` | passed to the default pipeline |
 | `weights` | `None` | per-sample weights, passed to the default pipeline and on to training |
 | `n_prototypes` | `15` | SOM lattice points; with fewer samples the SOM stage is skipped |
-| `outlier_mixture` | `SOMMixture()` | a `SOMMixture` for the SOM stage, to leave out of the ordering samples it calls background; `None` keeps every sample ({doc}`../explanation/autoencoder`) |
+| `outlier_mixture` | `SOMMixture()` | a `SOMMixture` for the SOM stage, to leave out of the ordering samples it calls background; `None` keeps every sample ([](../explanation/autoencoder.md)) |
 | `training_config` | `None` | a `TrainingConfig`; `None` uses its defaults |
 
 ## `bootstrap_track`
 
 {func}`~phasecurvefit.bootstrap_track`: a fit and fits to bootstrap resamples, for the
-track's uncertainty ({doc}`../how-to/track-uncertainty`). It takes every option of
+track's uncertainty ([](../how-to/track-uncertainty.md)). It takes every option of
 `fit_track` and passes it to each fit.
 
 | Option | Default | Meaning |
@@ -127,8 +127,8 @@ track's uncertainty ({doc}`../how-to/track-uncertainty`). It takes every option 
 ## `TrainingConfig`
 
 {class}`~phasecurvefit.nn.TrainingConfig`: autoencoder training
-({doc}`../how-to/autoencoder`). Phase 1 trains the encoder, phase 2 the decoder,
-phase 3 both ({doc}`../explanation/autoencoder`).
+([](../how-to/autoencoder.md)). Phase 1 trains the encoder, phase 2 the decoder,
+phase 3 both ([](../explanation/autoencoder.md)).
 
 | Option | Default | Meaning |
 |---|---|---|
@@ -145,12 +145,12 @@ phase 3 both ({doc}`../explanation/autoencoder`).
 | `weight_by_density` | `False` | weight samples by inverse density: `True`, or a mapping of keyword arguments passed to the density estimate; use with care |
 | `freeze_encoder_final_training` | `None` | freeze the encoder during phase 3; `None` freezes it when `membership` is set, and then its membership head still trains |
 | `membership` | `None` | a `MixtureMembershipConfig` to turn on outlier rejection, see below |
-| `track_ends` | `"half_max"` | how `track_range` finds the ends: `"half_max"` where the line density falls to half, or `"mask"` from the caps of a mask made by thickening a curve ({doc}`../explanation/density-fields`) |
+| `track_ends` | `"half_max"` | how `track_range` finds the ends: `"half_max"` where the line density falls to half, or `"mask"` from the caps of a mask made by thickening a curve ([](../explanation/density-fields.md)) |
 
 ## `MixtureMembershipConfig`
 
 {class}`~phasecurvefit.nn.MixtureMembershipConfig`: the stream-plus-background
-mixture model ({doc}`../how-to/outliers`).
+mixture model ([](../how-to/outliers.md)).
 
 | Option | Default | Meaning |
 |---|---|---|

@@ -541,7 +541,7 @@ document.write(`
 <h1>The self-organizing map<a class="headerlink" href="#the-self-organizing-map" title="Link to this heading">#</a></h1>
 <p><a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.SOMOrderer" title="phasecurvefit.orderers.SOMOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a> refines an ordering with a
 one-dimensional self-organizing map (SOM), following Starkman et al. (2023). It is
-the second stage of the default pipeline. <a class="reference internal" href="../how-to/som.html"><span class="doc">Refine an ordering with a self-organizing map</span></a> shows how to use and
+the second stage of the default pipeline. <a class="reference internal" href="../how-to/som.html"><span class="std std-doc">Refine an ordering with a self-organizing map</span></a> shows how to use and
 tune it.</p>
 <section id="a-string-of-beads">
 <h2>A string of beads<a class="headerlink" href="#a-string-of-beads" title="Link to this heading">#</a></h2>
@@ -630,11 +630,11 @@ backbone towards the contaminants. More prototypes make this worse, because they
 the interlopers. The failure is silent: the ordering’s rank correlation against the
 truth stays above 0.99 even at 20% contamination, while the reconstructed track, which
 is what you use downstream, degrades up to four times. Turning on <code class="docutils literal notranslate"><span class="pre">outlier_mixture</span></code>
-keeps the backbone on the curve (<a class="reference internal" href="../how-to/som.html"><span class="doc">Refine an ordering with a self-organizing map</span></a>).</p>
+keeps the backbone on the curve (<a class="reference internal" href="../how-to/som.html"><span class="std std-doc">Refine an ordering with a self-organizing map</span></a>).</p>
 </section>
 <section id="the-outlier-mixture">
 <h2>The outlier mixture<a class="headerlink" href="#the-outlier-mixture" title="Link to this heading">#</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">outlier_mixture</span></code> uses the model <a class="reference internal" href="outliers.html"><span class="doc">Outlier rejection with a mixture model</span></a> describes for the autoencoder, after
+<p><code class="docutils literal notranslate"><span class="pre">outlier_mixture</span></code> uses the model <a class="reference internal" href="outliers.html"><span class="std std-doc">Outlier rejection with a mixture model</span></a> describes for the autoencoder, after
 Hogg, Bovy &amp; Lang (2010), §3. Each sample’s position comes either from the curve or
 from a flat background:</p>
 <div class="math notranslate nohighlight">
@@ -690,7 +690,7 @@ among 540 drag the backbone off at 20 epochs.</p>
 <section id="weights">
 <h3>Weights<a class="headerlink" href="#weights" title="Link to this heading">#</a></h3>
 <p>A weight multiplies a sample’s terms in every sum, the M-steps included, and never
-enters its membership, the rule <a class="reference internal" href="density-fields.html"><span class="doc">Density fields</span></a> derives for the autoencoder. A
+enters its membership, the rule <a class="reference internal" href="density-fields.html"><span class="std std-doc">Density fields</span></a> derives for the autoencoder. A
 sample of weight 2 trains exactly as two coincident copies of it.</p>
 </section>
 <section id="limits">
@@ -698,7 +698,7 @@ sample of weight 2 trains exactly as two coincident copies of it.</p>
 <p>At 240 background samples among 540, the backbone stayed within 0.16 of the arc for
 10 epochs, and failed at 40 epochs, keeping almost all the background. Chained after
 another orderer the SOM’s neighbourhood stays narrow, so it can’t move a lattice the
-earlier stage started in the background; <a class="reference internal" href="../how-to/som.html"><span class="doc">Refine an ordering with a self-organizing map</span></a> shows the setting that
+earlier stage started in the background; <a class="reference internal" href="../how-to/som.html"><span class="std std-doc">Refine an ordering with a self-organizing map</span></a> shows the setting that
 helps.</p>
 <p>The background is flat over the samples’ bounding box, so it needs room outside the
 curve. When the samples fill that box, as the pixels of a mask or an image do, the
@@ -709,8 +709,8 @@ ended with a member fraction of 0.33, calling 974 of the 1071 pixels background.
 mixture were off. The SOM’s input is meant to be a sample of a curve, and a fit that
 calls most of it background has fitted the box instead. On the mask this keeps all
 1071 pixels. The contaminated arc ended with <span class="math notranslate nohighlight">\(\pi\)</span> between 0.76 and 1 at every level
-of background in the table of <a class="reference internal" href="../how-to/som.html"><span class="doc">Refine an ordering with a self-organizing map</span></a>, and the four streams of
-<a class="reference internal" href="autoencoder.html"><span class="doc">The autoencoder</span></a> between 0.96 and 1, so none of them changed. I tried two other
+of background in the table of <a class="reference internal" href="../how-to/som.html"><span class="std std-doc">Refine an ordering with a self-organizing map</span></a>, and the four streams of
+<a class="reference internal" href="autoencoder.html"><span class="std std-doc">The autoencoder</span></a> between 0.96 and 1, so none of them changed. I tried two other
 fixes. A flat background over a field 1.5 times wider on each axis kept every pixel
 of the mask, but at 120 and 240 background samples the arc’s backbone error grew from
 0.038 to 0.14 and from 0.16 to 0.71. Holding <span class="math notranslate nohighlight">\(\pi\)</span> at 0.5 or more in the M-step still
@@ -770,7 +770,7 @@ principal axis of the positions.</p></li>
 Fast Track: Rapid construction of stellar stream paths.</em> MNRAS <strong>522</strong>(4), 5022–5036.
 <a class="reference external" href="https://arxiv.org/abs/2212.00949">arXiv:2212.00949</a>,
 doi:<a class="reference external" href="https://doi.org/10.1093/mnras/stad1166">10.1093/mnras/stad1166</a>. The BibTeX entry
-is on the <a class="reference internal" href="../reference/citation.html"><span class="doc">Citation</span></a> page.</p>
+is on the <a class="reference internal" href="../reference/citation.html"><span class="std std-doc">Citation</span></a> page.</p>
 <p>Hogg, D. W., Bovy, J., &amp; Lang, D. (2010). <em>Data analysis recipes: Fitting a model to
 data.</em> <a class="reference external" href="https://arxiv.org/abs/1008.4686">arXiv:1008.4686</a>.</p>
 <p>Gepperth, A., &amp; Pfülb, B. (2020). <em>A Rigorous Link Between Self-Organizing Maps and

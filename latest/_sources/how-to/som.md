@@ -10,7 +10,7 @@ kernelspec:
 
 This guide shows how to use {class}`~phasecurvefit.orderers.SOMOrderer`: chained
 after another orderer, on its own, with outlier rejection, under `jit`, and as an
-ensemble. {doc}`../explanation/som` explains how the map is trained and projected.
+ensemble. [](../explanation/som.md) explains how the map is trained and projected.
 
 ## Chain it after another orderer
 
@@ -111,7 +111,7 @@ assert result.chord.shape == (120,)
   metric must be symmetric, so
   {class}`~phasecurvefit.metrics.AlignedMomentumDistanceMetric` does not work here.
 
-{doc}`../reference/options` lists the defaults.
+[](../reference/options.md) lists the defaults.
 
 If the SOM's ordering disagrees strongly with the one it was given, it warns. Either
 the earlier ordering was poor, or the lattice is too coarse and has tangled a good
@@ -161,7 +161,7 @@ doesn't change whether it is a member.
 On a mask or an image whose samples fill their own bounding box, the background
 explains the samples better than the curve does, and the fit ends with most of them
 called background. A fit like that keeps every sample, so there the mixture does
-nothing ({doc}`../explanation/som`).
+nothing ([](../explanation/som.md)).
 
 The background density defaults to one over the area (or volume) of the positions'
 bounding box. If the samples don't fill the field, set `background_inflate` above 1
@@ -241,4 +241,4 @@ sample is absent, and `k` means it appears `k` times, so 0/1 weights give a
 subsample.
 
 Perturbing the initial lattice does not give an ensemble: the members converge to the
-same answer within a few epochs ({doc}`../explanation/som`).
+same answer within a few epochs ([](../explanation/som.md)).

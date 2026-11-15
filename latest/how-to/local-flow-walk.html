@@ -529,8 +529,8 @@ document.write(`
   <section class="tex2jax_ignore mathjax_ignore" id="use-the-local-flow-walk">
 <h1>Use the local-flow walk<a class="headerlink" href="#use-the-local-flow-walk" title="Link to this heading">#</a></h1>
 <p>This guide shows how to set up the local-flow walk: where it starts, which way it
-goes, and when it stops. <a class="reference internal" href="../explanation/walk.html"><span class="doc">The local-flow walk</span></a> explains how the walk chooses
-each step, and <a class="reference internal" href="tune-metric.html"><span class="doc">Choose and tune the walk’s metric</span></a> covers <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>.</p>
+goes, and when it stops. <a class="reference internal" href="../explanation/walk.html"><span class="std std-doc">The local-flow walk</span></a> explains how the walk chooses
+each step, and <a class="reference internal" href="tune-metric.html"><span class="std std-doc">Choose and tune the walk’s metric</span></a> covers <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>.</p>
 <p>The examples use 100 shuffled points on a three-dimensional helix:</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -572,7 +572,7 @@ the curve. Here that is the bottom of the helix:</p>
 </div>
 <p>If you know neither end, chain an <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.MSTOrderer" title="phasecurvefit.orderers.MSTOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a> in
 front of the walk and leave <code class="docutils literal notranslate"><span class="pre">start_idx</span></code> unset; the walk then starts at an end the
-MST found (<a class="reference internal" href="chain-orderers.html"><span class="doc">Chain orderers</span></a>).</p>
+MST found (<a class="reference internal" href="chain-orderers.html"><span class="std std-doc">Chain orderers</span></a>).</p>
 </section>
 <section id="walk-backwards">
 <h2>Walk backwards<a class="headerlink" href="#walk-backwards" title="Link to this heading">#</a></h2>
@@ -639,7 +639,7 @@ run the two walks separately and join them with <a class="reference internal" hr
 position, so it does not jump across a gap onto an unrelated part of the data. Set
 it to several times the typical spacing between neighbouring points. The points the
 walk never reaches are reported as skipped, and the autoencoder can give them a
-value of <span class="math notranslate nohighlight">\(\gamma\)</span> afterwards (<a class="reference internal" href="autoencoder.html"><span class="doc">Fill gaps and fit a track with the autoencoder</span></a>).</p>
+value of <span class="math notranslate nohighlight">\(\gamma\)</span> afterwards (<a class="reference internal" href="autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a>).</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
@@ -678,7 +678,7 @@ value of <span class="math notranslate nohighlight">\(\gamma\)</span> afterwards
 </div>
 </div>
 </div>
-<p><a class="reference internal" href="../reference/options.html"><span class="doc">Options and defaults</span></a> lists every option with its default.</p>
+<p><a class="reference internal" href="../reference/options.html"><span class="std std-doc">Options and defaults</span></a> lists every option with its default.</p>
 </section>
 </section>
 

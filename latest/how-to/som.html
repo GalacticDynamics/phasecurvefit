@@ -532,7 +532,7 @@ document.write(`
 <h1>Refine an ordering with a self-organizing map<a class="headerlink" href="#refine-an-ordering-with-a-self-organizing-map" title="Link to this heading">#</a></h1>
 <p>This guide shows how to use <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.SOMOrderer" title="phasecurvefit.orderers.SOMOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a>: chained
 after another orderer, on its own, with outlier rejection, under <code class="docutils literal notranslate"><span class="pre">jit</span></code>, and as an
-ensemble. <a class="reference internal" href="../explanation/som.html"><span class="doc">The self-organizing map</span></a> explains how the map is trained and projected.</p>
+ensemble. <a class="reference internal" href="../explanation/som.html"><span class="std std-doc">The self-organizing map</span></a> explains how the map is trained and projected.</p>
 <section id="chain-it-after-another-orderer">
 <h2>Chain it after another orderer<a class="headerlink" href="#chain-it-after-another-orderer" title="Link to this heading">#</a></h2>
 <p>The SOM smooths an ordering it is handed, so it works best after another orderer.
@@ -645,7 +645,7 @@ from the data, and otherwise it uses position alone. Set either to override. The
 metric must be symmetric, so
 <a class="reference internal" href="../reference/api.html#phasecurvefit.metrics.AlignedMomentumDistanceMetric" title="phasecurvefit.metrics.AlignedMomentumDistanceMetric"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlignedMomentumDistanceMetric</span></code></a> does not work here.</p></li>
 </ul>
-<p><a class="reference internal" href="../reference/options.html"><span class="doc">Options and defaults</span></a> lists the defaults.</p>
+<p><a class="reference internal" href="../reference/options.html"><span class="std std-doc">Options and defaults</span></a> lists the defaults.</p>
 <p>If the SOM’s ordering disagrees strongly with the one it was given, it warns. Either
 the earlier ordering was poor, or the lattice is too coarse and has tangled a good
 ordering. If the earlier stage was doing well, raise <code class="docutils literal notranslate"><span class="pre">n_prototypes</span></code>.</p>
@@ -733,7 +733,7 @@ doesn’t change whether it is a member.</p>
 <p>On a mask or an image whose samples fill their own bounding box, the background
 explains the samples better than the curve does, and the fit ends with most of them
 called background. A fit like that keeps every sample, so there the mixture does
-nothing (<a class="reference internal" href="../explanation/som.html"><span class="doc">The self-organizing map</span></a>).</p>
+nothing (<a class="reference internal" href="../explanation/som.html"><span class="std std-doc">The self-organizing map</span></a>).</p>
 <p>The background density defaults to one over the area (or volume) of the positions’
 bounding box. If the samples don’t fill the field, set <code class="docutils literal notranslate"><span class="pre">background_inflate</span></code> above 1
 or give <code class="docutils literal notranslate"><span class="pre">background_density</span></code> directly, in your position units.</p>
@@ -820,7 +820,7 @@ returns how often each sample came up. A weight is a multiplicity: zero means th
 sample is absent, and <code class="docutils literal notranslate"><span class="pre">k</span></code> means it appears <code class="docutils literal notranslate"><span class="pre">k</span></code> times, so 0/1 weights give a
 subsample.</p>
 <p>Perturbing the initial lattice does not give an ensemble: the members converge to the
-same answer within a few epochs (<a class="reference internal" href="../explanation/som.html"><span class="doc">The self-organizing map</span></a>).</p>
+same answer within a few epochs (<a class="reference internal" href="../explanation/som.html"><span class="std std-doc">The self-organizing map</span></a>).</p>
 </section>
 </section>
 

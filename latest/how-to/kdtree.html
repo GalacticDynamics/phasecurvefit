@@ -514,7 +514,7 @@ document.write(`
 <h1>Restrict the walk to nearby points<a class="headerlink" href="#restrict-the-walk-to-nearby-points" title="Link to this heading">#</a></h1>
 <p>This guide shows how to make the local-flow walk consider only the spatially nearest
 points at each step, with a KD-tree. It needs the <code class="docutils literal notranslate"><span class="pre">kdtree</span></code> extra
-(<a class="reference internal" href="../start/install.html"><span class="doc">Install</span></a>).</p>
+(<a class="reference internal" href="../start/install.html"><span class="std std-doc">Install</span></a>).</p>
 <p>By default the walk uses <a class="reference internal" href="../reference/api.html#phasecurvefit.strats.BruteForce" title="phasecurvefit.strats.BruteForce"><code class="xref py py-class docutils literal notranslate"><span class="pre">BruteForce</span></code></a>, which scores
 every unvisited point at each step. <a class="reference internal" href="../reference/api.html#phasecurvefit.strats.KDTree" title="phasecurvefit.strats.KDTree"><code class="xref py py-class docutils literal notranslate"><span class="pre">KDTree</span></code></a> first
 finds the <code class="docutils literal notranslate"><span class="pre">k</span></code> spatially nearest points with a KD-tree (from

@@ -514,24 +514,24 @@ document.write(`
                   
   <section class="tex2jax_ignore mathjax_ignore" id="how-to-guides">
 <h1>How-to guides<a class="headerlink" href="#how-to-guides" title="Link to this heading">#</a></h1>
-<p>Each guide shows how to do one task. The <a class="reference internal" href="../tutorials/index.html"><span class="doc">Tutorials</span></a> show whole
-analyses, <a class="reference internal" href="../explanation/index.html"><span class="doc">How it works</span></a> explains why the methods work, and the
-<a class="reference internal" href="../reference/index.html"><span class="doc">Reference</span></a> lists every option.</p>
+<p>Each guide shows how to do one task. The <a class="reference internal" href="../tutorials/index.html"><span class="std std-doc">Tutorials</span></a> show whole
+analyses, <a class="reference internal" href="../explanation/index.html"><span class="std std-doc">How it works</span></a> explains why the methods work, and the
+<a class="reference internal" href="../reference/index.html"><span class="std std-doc">Reference</span></a> lists every option.</p>
 <p>An analysis has five steps, and each has its guides:</p>
 <ol class="arabic simple">
 <li><p>Prepare your data: put positions and velocities in the dictionary format
-(<a class="reference internal" href="data.html"><span class="doc">Prepare your data</span></a>), with physical units if you have them (<a class="reference internal" href="units.html"><span class="doc">Use physical units</span></a>).</p></li>
-<li><p>Order the samples: choose an orderer (<a class="reference internal" href="choose-orderer.html"><span class="doc">Choose an orderer</span></a>), chain stages
-(<a class="reference internal" href="chain-orderers.html"><span class="doc">Chain orderers</span></a>), and tune the one you chose, either the local-flow walk
-(<a class="reference internal" href="local-flow-walk.html"><span class="doc">Use the local-flow walk</span></a>, <a class="reference internal" href="tune-metric.html"><span class="doc">Choose and tune the walk’s metric</span></a>, <a class="reference internal" href="custom-metric.html"><span class="doc">Write a custom metric</span></a>, <a class="reference internal" href="kdtree.html"><span class="doc">Restrict the walk to nearby points</span></a>)
-or the self-organizing map (<a class="reference internal" href="som.html"><span class="doc">Refine an ordering with a self-organizing map</span></a>).</p></li>
+(<a class="reference internal" href="data.html"><span class="std std-doc">Prepare your data</span></a>), with physical units if you have them (<a class="reference internal" href="units.html"><span class="std std-doc">Use physical units</span></a>).</p></li>
+<li><p>Order the samples: choose an orderer (<a class="reference internal" href="choose-orderer.html"><span class="std std-doc">Choose an orderer</span></a>), chain stages
+(<a class="reference internal" href="chain-orderers.html"><span class="std std-doc">Chain orderers</span></a>), and tune the one you chose, either the local-flow walk
+(<a class="reference internal" href="local-flow-walk.html"><span class="std std-doc">Use the local-flow walk</span></a>, <a class="reference internal" href="tune-metric.html"><span class="std std-doc">Choose and tune the walk’s metric</span></a>, <a class="reference internal" href="custom-metric.html"><span class="std std-doc">Write a custom metric</span></a>, <a class="reference internal" href="kdtree.html"><span class="std std-doc">Restrict the walk to nearby points</span></a>)
+or the self-organizing map (<a class="reference internal" href="som.html"><span class="std std-doc">Refine an ordering with a self-organizing map</span></a>).</p></li>
 <li><p>Fit a track: give every sample a value of <span class="math notranslate nohighlight">\(\gamma\)</span> and fit a smooth track
-(<a class="reference internal" href="autoencoder.html"><span class="doc">Fill gaps and fit a track with the autoencoder</span></a>), or interpolate along an ordering (<a class="reference internal" href="interpolate.html"><span class="doc">Interpolate positions along an ordering</span></a>).</p></li>
+(<a class="reference internal" href="autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a>), or interpolate along an ordering (<a class="reference internal" href="interpolate.html"><span class="std std-doc">Interpolate positions along an ordering</span></a>).</p></li>
 <li><p>Reject outliers: give each sample a calibrated membership probability
-(<a class="reference internal" href="outliers.html"><span class="doc">Reject outliers with the mixture model</span></a>), and put an uncertainty band on the track
-(<a class="reference internal" href="track-uncertainty.html"><span class="doc">Put an uncertainty band on the track</span></a>).</p></li>
-<li><p>Scale up: compile, batch and differentiate with JAX (<a class="reference internal" href="jax.html"><span class="doc">Compile, batch and differentiate with JAX</span></a>), and run on a
-GPU (<a class="reference internal" href="gpu.html"><span class="doc">Run on a GPU</span></a>).</p></li>
+(<a class="reference internal" href="outliers.html"><span class="std std-doc">Reject outliers with the mixture model</span></a>), and put an uncertainty band on the track
+(<a class="reference internal" href="track-uncertainty.html"><span class="std std-doc">Put an uncertainty band on the track</span></a>).</p></li>
+<li><p>Scale up: compile, batch and differentiate with JAX (<a class="reference internal" href="jax.html"><span class="std std-doc">Compile, batch and differentiate with JAX</span></a>), and run on a
+GPU (<a class="reference internal" href="gpu.html"><span class="std std-doc">Run on a GPU</span></a>).</p></li>
 </ol>
 <div class="toctree-wrapper compound">
 </div>

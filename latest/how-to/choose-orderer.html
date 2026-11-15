@@ -531,8 +531,8 @@ document.write(`
                   
   <section class="tex2jax_ignore mathjax_ignore" id="choose-an-orderer">
 <h1>Choose an orderer<a class="headerlink" href="#choose-an-orderer" title="Link to this heading">#</a></h1>
-<p>This guide shows how to pick the orderer that suits your curve. <a class="reference internal" href="../explanation/mst.html"><span class="doc">The MST backbone</span></a>,
-<a class="reference internal" href="../explanation/walk.html"><span class="doc">The local-flow walk</span></a> and <a class="reference internal" href="../explanation/som.html"><span class="doc">The self-organizing map</span></a> explain how each one works.</p>
+<p>This guide shows how to pick the orderer that suits your curve. <a class="reference internal" href="../explanation/mst.html"><span class="std std-doc">The MST backbone</span></a>,
+<a class="reference internal" href="../explanation/walk.html"><span class="std std-doc">The local-flow walk</span></a> and <a class="reference internal" href="../explanation/som.html"><span class="std std-doc">The self-organizing map</span></a> explain how each one works.</p>
 <section id="start-with-the-default">
 <h2>Start with the default<a class="headerlink" href="#start-with-the-default" title="Link to this heading">#</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel)</span></code> with no orderer runs the default pipeline, an
@@ -569,12 +569,12 @@ its mechanism fits your data better:</p>
 </div>
 <p>The walk and the MST complement each other. The walk needs a start point and
 follows the flow. Where the velocity reverses at a progenitor it has to start at the
-progenitor and walk both ways (<a class="reference internal" href="local-flow-walk.html"><span class="doc">Use the local-flow walk</span></a>). The MST needs no start point,
+progenitor and walk both ways (<a class="reference internal" href="local-flow-walk.html"><span class="std std-doc">Use the local-flow walk</span></a>). The MST needs no start point,
 because the longest path of the tree finds the two ends itself.</p>
 </section>
 <section id="order-with-the-local-flow-walk">
 <h2>Order with the local-flow walk<a class="headerlink" href="#order-with-the-local-flow-walk" title="Link to this heading">#</a></h2>
-<p>Give the walk a start index and a <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code> (<a class="reference internal" href="tune-metric.html"><span class="doc">Choose and tune the walk’s metric</span></a>):</p>
+<p>Give the walk a start index and a <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code> (<a class="reference internal" href="tune-metric.html"><span class="std std-doc">Choose and tune the walk’s metric</span></a>):</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
@@ -591,7 +591,7 @@ because the longest path of the tree finds the two ends itself.</p>
 </div>
 </div>
 </div>
-<p><a class="reference internal" href="local-flow-walk.html"><span class="doc">Use the local-flow walk</span></a> covers its options: direction, gaps and stopping conditions.</p>
+<p><a class="reference internal" href="local-flow-walk.html"><span class="std std-doc">Use the local-flow walk</span></a> covers its options: direction, gaps and stopping conditions.</p>
 </section>
 <section id="order-with-the-mst-alone">
 <h2>Order with the MST alone<a class="headerlink" href="#order-with-the-mst-alone" title="Link to this heading">#</a></h2>
@@ -646,19 +646,19 @@ mean velocity.</p></li>
 </div>
 <p>On a curve that crosses itself many times, the MST needs these options to stay on
 its own branch, and the local-flow walk is usually the better choice
-(<a class="reference internal" href="../tutorials/epitrochoid_mst.html"><span class="doc">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</span></a>).</p>
+(<a class="reference internal" href="../tutorials/epitrochoid_mst.html"><span class="std std-doc">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</span></a>).</p>
 </section>
 </section>
 <section id="refine-with-the-som">
 <h2>Refine with the SOM<a class="headerlink" href="#refine-with-the-som" title="Link to this heading">#</a></h2>
 <p>A <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.SOMOrderer" title="phasecurvefit.orderers.SOMOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a> smooths an ordering it is handed.
-Chain it after another orderer (<a class="reference internal" href="chain-orderers.html"><span class="doc">Chain orderers</span></a>); <a class="reference internal" href="som.html"><span class="doc">Refine an ordering with a self-organizing map</span></a> covers its
+Chain it after another orderer (<a class="reference internal" href="chain-orderers.html"><span class="std std-doc">Chain orderers</span></a>); <a class="reference internal" href="som.html"><span class="std std-doc">Refine an ordering with a self-organizing map</span></a> covers its
 options.</p>
 </section>
 <section id="order-a-density-field">
 <h2>Order a density field<a class="headerlink" href="#order-a-density-field" title="Link to this heading">#</a></h2>
 <p>For an image of a stream, make each pixel a sample weighted by its density
-(<a class="reference internal" href="data.html"><span class="doc">Prepare your data</span></a>) and order with a <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.RidgeOrderer" title="phasecurvefit.orderers.RidgeOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">RidgeOrderer</span></code></a>. It
+(<a class="reference internal" href="data.html"><span class="std std-doc">Prepare your data</span></a>) and order with a <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.RidgeOrderer" title="phasecurvefit.orderers.RidgeOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">RidgeOrderer</span></code></a>. It
 follows the ridge of the weighted density, so it finds the middle of a wide or
 blurred stream where the MST’s longest path wanders across it. It works out the
 stream’s width from the data. Chain a SOM to refine it:</p>

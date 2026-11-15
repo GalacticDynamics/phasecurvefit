@@ -9,8 +9,8 @@ kernelspec:
 # Use the local-flow walk
 
 This guide shows how to set up the local-flow walk: where it starts, which way it
-goes, and when it stops. {doc}`../explanation/walk` explains how the walk chooses
-each step, and {doc}`tune-metric` covers `metric_scale`.
+goes, and when it stops. [](../explanation/walk.md) explains how the walk chooses
+each step, and [](tune-metric.md) covers `metric_scale`.
 
 The examples use 100 shuffled points on a three-dimensional helix:
 
@@ -49,7 +49,7 @@ assert jnp.all(jnp.diff(ordered_pos["z"]) > 0)  # the helix climbs once ordered
 
 If you know neither end, chain an {class}`~phasecurvefit.orderers.MSTOrderer` in
 front of the walk and leave `start_idx` unset; the walk then starts at an end the
-MST found ({doc}`chain-orderers`).
+MST found ([](chain-orderers.md)).
 
 ## Walk backwards
 
@@ -108,7 +108,7 @@ result = pcf.combine_results(result_forward, result_backward)
 position, so it does not jump across a gap onto an unrelated part of the data. Set
 it to several times the typical spacing between neighbouring points. The points the
 walk never reaches are reported as skipped, and the autoencoder can give them a
-value of $\gamma$ afterwards ({doc}`autoencoder`).
+value of $\gamma$ afterwards ([](autoencoder.md)).
 
 ```{code-cell} python
 result = pcf.order(
@@ -137,4 +137,4 @@ result = pcf.order(
 print(int(result.n_visited))
 ```
 
-{doc}`../reference/options` lists every option with its default.
+[](../reference/options.md) lists every option with its default.

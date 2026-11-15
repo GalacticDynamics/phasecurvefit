@@ -530,7 +530,7 @@ document.write(`
 <h1>The MST backbone<a class="headerlink" href="#the-mst-backbone" title="Link to this heading">#</a></h1>
 <p><a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.MSTOrderer" title="phasecurvefit.orderers.MSTOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a> orders samples along the backbone of a
 minimum spanning tree. It is the first stage of the default pipeline, and it needs no
-start point. <a class="reference internal" href="../how-to/choose-orderer.html"><span class="doc">Choose an orderer</span></a> shows how to set it up.</p>
+start point. <a class="reference internal" href="../how-to/choose-orderer.html"><span class="std std-doc">Choose an orderer</span></a> shows how to set it up.</p>
 <section id="from-a-graph-to-an-ordering">
 <h2>From a graph to an ordering<a class="headerlink" href="#from-a-graph-to-an-ordering" title="Link to this heading">#</a></h2>
 <ol class="arabic simple">
@@ -574,7 +574,7 @@ velocity, giving it a physically meaningful direction.</p></li>
 </ul>
 <p>On a curve that crosses itself many times these options are necessary, but a walk
 that follows the velocity is usually the better tool there
-(<a class="reference internal" href="walk.html"><span class="doc">The local-flow walk</span></a>, <a class="reference internal" href="../tutorials/epitrochoid_mst.html"><span class="doc">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</span></a>). The MST suits single,
+(<a class="reference internal" href="walk.html"><span class="std std-doc">The local-flow walk</span></a>, <a class="reference internal" href="../tutorials/epitrochoid_mst.html"><span class="std std-doc">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</span></a>). The MST suits single,
 near-closed loops best.</p>
 </section>
 <section id="why-the-default-pipeline-configures-it-differently">
@@ -587,7 +587,7 @@ crosses straight over instead of turning onto the other branch;
 <code class="docutils literal notranslate"><span class="pre">orient_by_velocity=True</span></code>, so <span class="math notranslate nohighlight">\(\gamma\)</span> follows the flow; and
 <code class="docutils literal notranslate"><span class="pre">on_disconnected=&quot;connect&quot;</span></code>, so a gap in a stream that splits the neighbour graph is
 bridged along the shortest links instead of losing one side. Because the MST used
-velocities, the SOM after it does too (<a class="reference internal" href="som.html"><span class="doc">The self-organizing map</span></a>). A sample with a missing velocity
+velocities, the SOM after it does too (<a class="reference internal" href="som.html"><span class="std std-doc">The self-organizing map</span></a>). A sample with a missing velocity
 joins the tree as a leaf and is skipped when orienting.</p>
 <p>The value 30 was chosen on a looped test track that crosses itself once, drawn 8
 times with different noise. With positions alone the default turned onto the other
@@ -603,7 +603,7 @@ the tutorials) the ordering did not change.</p>
 cheapest edge. <code class="docutils literal notranslate"><span class="pre">edge_clip_sigma</span></code> clips edges whose length is an outlier among the
 tree’s edges, iterating up to <code class="docutils literal notranslate"><span class="pre">edge_clip_max_iters</span></code> times, and leaves the samples it
 cuts off unvisited. A <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.SOMOrderer" title="phasecurvefit.orderers.SOMOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a> chained after it
-works only on the samples the MST kept (<a class="reference internal" href="som.html"><span class="doc">The self-organizing map</span></a>).</p>
+works only on the samples the MST kept (<a class="reference internal" href="som.html"><span class="std std-doc">The self-organizing map</span></a>).</p>
 </section>
 <section id="running-under-jax">
 <h2>Running under JAX<a class="headerlink" href="#running-under-jax" title="Link to this heading">#</a></h2>
@@ -612,7 +612,7 @@ bridging) runs in pure JAX, so the MST works under <code class="docutils literal
 calling back to the host. The neighbour search uses SciPy on concrete inputs, which
 is fastest on CPU but cannot be traced, and the JAX-native
 <a class="reference internal" href="../reference/api.html#phasecurvefit.neighbors.BucketKDTree" title="phasecurvefit.neighbors.BucketKDTree"><code class="xref py py-class docutils literal notranslate"><span class="pre">BucketKDTree</span></code></a> on traced inputs
-(<a class="reference internal" href="../how-to/jax.html"><span class="doc">Compile, batch and differentiate with JAX</span></a>).</p>
+(<a class="reference internal" href="../how-to/jax.html"><span class="std std-doc">Compile, batch and differentiate with JAX</span></a>).</p>
 </section>
 </section>
 

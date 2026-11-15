@@ -34,7 +34,7 @@ autoencoder on top.
 
 Other orderers can replace either stage. The local-flow walk follows the velocity
 field from a start point, step by step, and is the better choice when a curve
-crosses itself. {doc}`is-it-right` matches your data to an orderer.
+crosses itself. [](is-it-right.md) matches your data to an orderer.
 
 ## Built on JAX
 
@@ -45,6 +45,6 @@ Inputs may carry physical units through [`unxt`](https://unxt.readthedocs.io).
 
 ## Read next
 
-- {doc}`is-it-right`: which call suits your data.
-- {doc}`quickstart`: a first ordering and track, step by step.
-- {doc}`../explanation/index`: how each stage works.
+- [](is-it-right.md): which call suits your data.
+- [](quickstart.md): a first ordering and track, step by step.
+- [](../explanation/index.md): how each stage works.

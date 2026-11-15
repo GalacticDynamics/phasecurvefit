@@ -548,7 +548,7 @@ weighted density and the autoencoder weights its fit to the track. Taking that r
 literally also settles how the weights enter membership.</p>
 <section id="in-the-mixture-model">
 <h3>In the mixture model<a class="headerlink" href="#in-the-mixture-model" title="Link to this heading">#</a></h3>
-<p>The mixture model of <a class="reference internal" href="outliers.html"><span class="doc">Outlier rejection with a mixture model</span></a> gives each sample the likelihood</p>
+<p>The mixture model of <a class="reference internal" href="outliers.html"><span class="std std-doc">Outlier rejection with a mixture model</span></a> gives each sample the likelihood</p>
 <div class="math notranslate nohighlight">
 \[
 \mathcal{L}_n = \pi_n \mathcal{N}_n + (1 - \pi_n)\,\rho_{\mathrm{bg}} ,
@@ -585,7 +585,7 @@ mass of members at that sample.</p>
 <p>The SOM’s outlier mixture follows the same rule: a weight multiplies a sample’s terms
 in the prototype update and in the fits of the member fraction and the curve’s width,
 and doesn’t appear in the sample’s membership, which depends on where the sample is
-and on the model (<a class="reference internal" href="som.html"><span class="doc">The self-organizing map</span></a>).</p>
+and on the model (<a class="reference internal" href="som.html"><span class="std std-doc">The self-organizing map</span></a>).</p>
 <p>For an image the sum has a continuum limit. With each pixel weighted by the image
 <span class="math notranslate nohighlight">\(I(q)\)</span>, the loss tends, as the pixels shrink, to</p>
 <div class="math notranslate nohighlight">
@@ -614,7 +614,7 @@ log-likelihood <span class="math notranslate nohighlight">\(\sum_n p_n \log \mat
 <h3>In the encoder<a class="headerlink" href="#in-the-encoder" title="Link to this heading">#</a></h3>
 <p>The encoder’s first training phase learns its membership as a classifier, pushing
 the ordered samples towards 1 and uniform random points towards 0
-(<a class="reference internal" href="outliers.html"><span class="doc">Outlier rejection with a mixture model</span></a>). Its membership term is left unweighted. Weighting only the ordered
+(<a class="reference internal" href="outliers.html"><span class="std std-doc">Outlier rejection with a mixture model</span></a>). Its membership term is left unweighted. Weighting only the ordered
 samples would let a faint pixel count less against the same random points around
 it, and its membership would drop below the threshold. That comes from the random
 points, which have no weights of their own; weighting consistently would mean
@@ -682,7 +682,7 @@ than the error the decoder has left to fix, so small batches keep the optimizer
 jittering around the track. On a uniform tube of half-width 0.5, batches of 1000
 brought the track’s largest error away from its ends from 0.11 to 0.04.</p></li>
 </ul>
-<p><a class="reference internal" href="../how-to/autoencoder.html"><span class="doc">Fill gaps and fit a track with the autoencoder</span></a> shows the two settings.</p>
+<p><a class="reference internal" href="../how-to/autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a> shows the two settings.</p>
 </section>
 <section id="where-the-track-ends">
 <h2>Where the track ends<a class="headerlink" href="#where-the-track-ends" title="Link to this heading">#</a></h2>

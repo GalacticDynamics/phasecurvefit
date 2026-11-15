@@ -542,31 +542,31 @@ you have and what you want to the call to use and the page to read.</p>
 <tbody>
 <tr class="row-even"><td><p>positions and velocities along a curve, and no known start point</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel)</span></code>, the default pipeline</p></td>
-<td><p><a class="reference internal" href="quickstart.html"><span class="doc">Quick start</span></a>, <a class="reference internal" href="../tutorials/stream_mst.html"><span class="doc">Ordering a Mock Stream with the MST Backbone</span></a></p></td>
+<td><p><a class="reference internal" href="quickstart.html"><span class="std std-doc">Quick start</span></a>, <a class="reference internal" href="../tutorials/stream_mst.html"><span class="std std-doc">Ordering a Mock Stream with the MST Backbone</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p>a known start point, such as a stream’s progenitor</p></td>
 <td><p><a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.LocalFlowOrderer" title="phasecurvefit.orderers.LocalFlowOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a> with <code class="docutils literal notranslate"><span class="pre">start_idx</span></code>, and <code class="docutils literal notranslate"><span class="pre">direction=&quot;both&quot;</span></code> if the curve flows away from it both ways</p></td>
-<td><p><a class="reference internal" href="../how-to/local-flow-walk.html"><span class="doc">Use the local-flow walk</span></a>, <a class="reference internal" href="../tutorials/stream_autoencoder.html"><span class="doc">Learning a Stream with an Autoencoder</span></a></p></td>
+<td><p><a class="reference internal" href="../how-to/local-flow-walk.html"><span class="std std-doc">Use the local-flow walk</span></a>, <a class="reference internal" href="../tutorials/stream_autoencoder.html"><span class="std std-doc">Learning a Stream with an Autoencoder</span></a></p></td>
 </tr>
 <tr class="row-even"><td><p>a curve that crosses itself</p></td>
 <td><p>once: the default pipeline, whose MST weighs edges by velocity and crosses straight over. Many times: <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.LocalFlowOrderer" title="phasecurvefit.orderers.LocalFlowOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a>, or <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.MSTOrderer" title="phasecurvefit.orderers.MSTOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a> with <code class="docutils literal notranslate"><span class="pre">sever_cos_threshold</span></code>.</p></td>
-<td><p><a class="reference internal" href="../how-to/choose-orderer.html"><span class="doc">Choose an orderer</span></a>, <a class="reference internal" href="../tutorials/epitrochoid_autoencoder.html"><span class="doc">Learning an Epitrochoid with an Autoencoder</span></a>, <a class="reference internal" href="../tutorials/epitrochoid_mst.html"><span class="doc">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</span></a></p></td>
+<td><p><a class="reference internal" href="../how-to/choose-orderer.html"><span class="std std-doc">Choose an orderer</span></a>, <a class="reference internal" href="../tutorials/epitrochoid_autoencoder.html"><span class="std std-doc">Learning an Epitrochoid with an Autoencoder</span></a>, <a class="reference internal" href="../tutorials/epitrochoid_mst.html"><span class="std std-doc">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p>samples with some missing velocities (NaN)</p></td>
 <td><p>the default pipeline, which joins a sample with a missing velocity by position alone and skips it when orienting the ordering</p></td>
-<td><p><a class="reference internal" href="../how-to/data.html"><span class="doc">Prepare your data</span></a></p></td>
+<td><p><a class="reference internal" href="../how-to/data.html"><span class="std std-doc">Prepare your data</span></a></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">unxt</span></code> Quantities with physical units</p></td>
 <td><p>any orderer, with <code class="docutils literal notranslate"><span class="pre">metadata=pcf.StateMetadata(usys=...)</span></code></p></td>
-<td><p><a class="reference internal" href="../how-to/units.html"><span class="doc">Use physical units</span></a></p></td>
+<td><p><a class="reference internal" href="../how-to/units.html"><span class="std std-doc">Use physical units</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p>a dataset where background points mix with the curve</p></td>
 <td><p>an MST with <code class="docutils literal notranslate"><span class="pre">edge_clip_sigma</span></code>, then the mixture membership model</p></td>
-<td><p><a class="reference internal" href="../how-to/outliers.html"><span class="doc">Reject outliers with the mixture model</span></a>, <a class="reference internal" href="../tutorials/outlier_rejection.html"><span class="doc">Outlier rejection with mixture-model membership</span></a></p></td>
+<td><p><a class="reference internal" href="../how-to/outliers.html"><span class="std std-doc">Reject outliers with the mixture model</span></a>, <a class="reference internal" href="../tutorials/outlier_rejection.html"><span class="std std-doc">Outlier rejection with mixture-model membership</span></a></p></td>
 </tr>
 <tr class="row-even"><td><p>an ordering to run inside <code class="docutils literal notranslate"><span class="pre">jit</span></code>, <code class="docutils literal notranslate"><span class="pre">vmap</span></code> or <code class="docutils literal notranslate"><span class="pre">grad</span></code></p></td>
 <td><p>any orderer, the default pipeline included, except the ones that run on the host: <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.RidgeOrderer" title="phasecurvefit.orderers.RidgeOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">RidgeOrderer</span></code></a> and <code class="docutils literal notranslate"><span class="pre">MSTOrderer(neighbors=SciPy())</span></code></p></td>
-<td><p><a class="reference internal" href="../how-to/jax.html"><span class="doc">Compile, batch and differentiate with JAX</span></a></p></td>
+<td><p><a class="reference internal" href="../how-to/jax.html"><span class="std std-doc">Compile, batch and differentiate with JAX</span></a></p></td>
 </tr>
 </tbody>
 </table>
@@ -584,27 +584,27 @@ you have and what you want to the call to use and the page to read.</p>
 <tbody>
 <tr class="row-even"><td><p>the order of the samples along the curve</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">result.ordering</span></code>, or <code class="docutils literal notranslate"><span class="pre">pcf.order_w(result)</span></code> for the reordered arrays</p></td>
-<td><p><a class="reference internal" href="quickstart.html"><span class="doc">Quick start</span></a>, <a class="reference internal" href="../reference/result.html"><span class="doc">The ordering result</span></a></p></td>
+<td><p><a class="reference internal" href="quickstart.html"><span class="std std-doc">Quick start</span></a>, <a class="reference internal" href="../reference/result.html"><span class="std std-doc">The ordering result</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p>an ordering coordinate <span class="math notranslate nohighlight">\(\gamma\)</span> for every sample</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">fitted.gamma</span></code> from <a class="reference internal" href="../reference/api.html#phasecurvefit.fit_track" title="phasecurvefit.fit_track"><code class="xref py py-func docutils literal notranslate"><span class="pre">fit_track()</span></code></a> or <a class="reference internal" href="../reference/api.html#phasecurvefit.nn.train_autoencoder" title="phasecurvefit.nn.train_autoencoder"><code class="xref py py-func docutils literal notranslate"><span class="pre">train_autoencoder()</span></code></a></p></td>
-<td><p><a class="reference internal" href="../how-to/autoencoder.html"><span class="doc">Fill gaps and fit a track with the autoencoder</span></a></p></td>
+<td><p><a class="reference internal" href="../how-to/autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a></p></td>
 </tr>
 <tr class="row-even"><td><p>a smooth mean track <span class="math notranslate nohighlight">\(x(\gamma)\)</span></p></td>
 <td><p>calling the fitted result, <code class="docutils literal notranslate"><span class="pre">fitted(gamma)</span></code></p></td>
-<td><p><a class="reference internal" href="../how-to/autoencoder.html"><span class="doc">Fill gaps and fit a track with the autoencoder</span></a>, <a class="reference internal" href="../how-to/interpolate.html"><span class="doc">Interpolate positions along an ordering</span></a></p></td>
+<td><p><a class="reference internal" href="../how-to/autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a>, <a class="reference internal" href="../how-to/interpolate.html"><span class="std std-doc">Interpolate positions along an ordering</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p>a track fast enough for every step of an MCMC</p></td>
 <td><p><a class="reference internal" href="../reference/api.html#phasecurvefit.nn.RunningMeanDecoder" title="phasecurvefit.nn.RunningMeanDecoder"><code class="xref py py-class docutils literal notranslate"><span class="pre">RunningMeanDecoder</span></code></a>, which needs no training</p></td>
-<td><p><a class="reference internal" href="../tutorials/stream_runningmean.html"><span class="doc">Learning a Stream with a Running Mean</span></a></p></td>
+<td><p><a class="reference internal" href="../tutorials/stream_runningmean.html"><span class="std std-doc">Learning a Stream with a Running Mean</span></a></p></td>
 </tr>
 <tr class="row-even"><td><p>a probability that each sample belongs to the curve</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">fitted.membership_prob</span></code>, or <a class="reference internal" href="../reference/api.html#phasecurvefit.nn.posterior_membership" title="phasecurvefit.nn.posterior_membership"><code class="xref py py-func docutils literal notranslate"><span class="pre">posterior_membership()</span></code></a> with the mixture model</p></td>
-<td><p><a class="reference internal" href="../how-to/outliers.html"><span class="doc">Reject outliers with the mixture model</span></a></p></td>
+<td><p><a class="reference internal" href="../how-to/outliers.html"><span class="std std-doc">Reject outliers with the mixture model</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p>positions at given values of <span class="math notranslate nohighlight">\(\gamma\)</span> from an ordering alone</p></td>
 <td><p>calling the ordering result, <code class="docutils literal notranslate"><span class="pre">result(gamma)</span></code></p></td>
-<td><p><a class="reference internal" href="../how-to/interpolate.html"><span class="doc">Interpolate positions along an ordering</span></a></p></td>
+<td><p><a class="reference internal" href="../how-to/interpolate.html"><span class="std std-doc">Interpolate positions along an ordering</span></a></p></td>
 </tr>
 </tbody>
 </table>
@@ -619,7 +619,7 @@ one ordering, so separate distinct streams in a catalogue before you order them.
 phase space, and phasecurvefit fits no orbit, potential or progenitor.</p></li>
 <li><p>The local-flow walk does not choose its own start point. Chaining an
 <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.MSTOrderer" title="phasecurvefit.orderers.MSTOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a> in front of it supplies an end of the
-curve (<a class="reference internal" href="../how-to/chain-orderers.html"><span class="doc">Chain orderers</span></a>).</p></li>
+curve (<a class="reference internal" href="../how-to/chain-orderers.html"><span class="std std-doc">Chain orderers</span></a>).</p></li>
 </ul>
 </section>
 </section>

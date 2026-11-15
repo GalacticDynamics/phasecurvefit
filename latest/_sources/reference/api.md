@@ -313,7 +313,7 @@ Neural network for interpolating skipped tracers. See [Autoencoder Guide](../how
 ### Membership & Outlier Rejection
 
 Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
-{doc}`/explanation/outliers`.
+[](/explanation/outliers.md).
 
 ```{autoclass} phasecurvefit.nn.MixtureMembershipConfig
 :members:
@@ -345,7 +345,7 @@ Mixture-model membership, after Hogg, Bovy & Lang (2010), §3. See
 ## SOM Module
 
 Self-Organizing Map ordering, after Starkman et al. (2023). See
-{doc}`/explanation/som`.
+[](/explanation/som.md).
 
 {class}`~phasecurvefit.orderers.SOMOrderer` is listed under [Orderers](#orderers).
 

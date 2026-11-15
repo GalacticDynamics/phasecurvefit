@@ -536,7 +536,7 @@ in the <a class="reference internal" href="../tutorials/stream_autoencoder.html"
 orders 248 of 8000 stars. An outlier-rejecting chain also leaves samples out on
 purpose. And any orderer gives only an order, not a curve you can evaluate. The
 autoencoder, from Appendix A.2 of Nibauer et al. (2022), fills both gaps.
-<a class="reference internal" href="../how-to/autoencoder.html"><span class="doc">Fill gaps and fit a track with the autoencoder</span></a> shows how to train it.</p>
+<a class="reference internal" href="../how-to/autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a> shows how to train it.</p>
 <section id="two-networks">
 <h2>Two networks<a class="headerlink" href="#two-networks" title="Link to this heading">#</a></h2>
 <ul class="simple">
@@ -577,7 +577,7 @@ every step of an MCMC. It cuts inside tight bends, by an amount set by the windo
 <h2>Membership<a class="headerlink" href="#membership" title="Link to this heading">#</a></h2>
 <p>The encoder’s membership probability is trained as a classifier against random
 points, and on its own it cannot reject interlopers that the orderer threaded into the
-ordering. <a class="reference internal" href="outliers.html"><span class="doc">Outlier rejection with a mixture model</span></a> explains why, and the mixture model that fixes it.</p>
+ordering. <a class="reference internal" href="outliers.html"><span class="std std-doc">Outlier rejection with a mixture model</span></a> explains why, and the mixture model that fixes it.</p>
 </section>
 <section id="interlopers-at-the-tips">
 <h2>Interlopers at the tips<a class="headerlink" href="#interlopers-at-the-tips" title="Link to this heading">#</a></h2>
@@ -594,7 +594,7 @@ needs the few bins of line density just inside it to be non-empty. A track that
 bends out to a handful of interlopers passes them one at a time, with empty bins
 in between, and that stretch is cut. This applies to every trained result.</p></li>
 <li><p><a class="reference internal" href="../reference/api.html#phasecurvefit.fit_track" title="phasecurvefit.fit_track"><code class="xref py py-func docutils literal notranslate"><span class="pre">fit_track()</span></code></a> can order with the SOM’s outlier mixture,
-<code class="docutils literal notranslate"><span class="pre">outlier_mixture=SOMMixture()</span></code> (<a class="reference internal" href="som.html"><span class="doc">The self-organizing map</span></a>). A sample the mixture calls background
+<code class="docutils literal notranslate"><span class="pre">outlier_mixture=SOMMixture()</span></code> (<a class="reference internal" href="som.html"><span class="std std-doc">The self-organizing map</span></a>). A sample the mixture calls background
 is left out of the ordering, so the encoder learns it as a non-member and the track
 has no reason to reach for it. On the gapped stream this left out 13 of the 16
 interlopers and none of the 404 members. It is on by default. Samples that fill
@@ -642,7 +642,7 @@ one sine-shaped stream of 420 samples with 4% interlopers, at three widths.</p>
 member of the sine streams except one on the widest. On the widest stream the
 interlopers sit among the members, the mixture left out only 4, and the track strayed
 further than without it.</p>
-<p>The mixture model of <a class="reference internal" href="outliers.html"><span class="doc">Outlier rejection with a mixture model</span></a> also removes the hook, but it is not on by
+<p>The mixture model of <a class="reference internal" href="outliers.html"><span class="std std-doc">Outlier rejection with a mixture model</span></a> also removes the hook, but it is not on by
 default. On the clean loop it rejected between a quarter and three fifths of the
 genuine members on three of six seeds (issue #257).</p>
 </section>

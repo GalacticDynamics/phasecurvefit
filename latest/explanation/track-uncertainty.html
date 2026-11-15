@@ -533,7 +533,7 @@ document.write(`
 stream would give a slightly different track. This page explains where that
 uncertainty comes from, why phasecurvefit estimates it with a bootstrap of the whole
 pipeline, and how well the resulting bands are calibrated.
-<a class="reference internal" href="../how-to/track-uncertainty.html"><span class="doc">Put an uncertainty band on the track</span></a> shows how to compute them.</p>
+<a class="reference internal" href="../how-to/track-uncertainty.html"><span class="std std-doc">Put an uncertainty band on the track</span></a> shows how to compute them.</p>
 <section id="where-the-uncertainty-enters">
 <h2>Where the uncertainty enters<a class="headerlink" href="#where-the-uncertainty-enters" title="Link to this heading">#</a></h2>
 <p>The track passes through four stages, and each adds its own uncertainty.</p>
@@ -615,10 +615,10 @@ holds them fixed.</p>
 ordering, one membership and one set of <span class="math notranslate nohighlight">\(\gamma\)</span>. A posterior also needs a likelihood.
 The default joint loss is a weighted sum of a squared distance and a velocity-alignment
 term, with no noise model, so a Gaussian noise level has to be added for any of them.
-The mixture model of <a class="reference internal" href="outliers.html"><span class="doc">Outlier rejection with a mixture model</span></a> supplies one, <span class="math notranslate nohighlight">\(\sigma(\gamma)\)</span>, but only when it
+The mixture model of <a class="reference internal" href="outliers.html"><span class="std std-doc">Outlier rejection with a mixture model</span></a> supplies one, <span class="math notranslate nohighlight">\(\sigma(\gamma)\)</span>, but only when it
 is turned on. With per-sample weights that are not counts, such as image intensities,
 the weighted loss is a pseudo-likelihood and its curvature isn’t an uncertainty
-(<a class="reference internal" href="density-fields.html"><span class="doc">Density fields</span></a>).</p>
+(<a class="reference internal" href="density-fields.html"><span class="std std-doc">Density fields</span></a>).</p>
 <p>The decoder’s last layer is linear, so with a Gaussian likelihood and prior the
 posterior over it is Gaussian, and the Laplace approximation is exact. HMC on the
 last layer would sample the same distribution, so it was not run separately.

@@ -2,7 +2,7 @@
 
 {class}`~phasecurvefit.orderers.SOMOrderer` refines an ordering with a
 one-dimensional self-organizing map (SOM), following Starkman et al. (2023). It is
-the second stage of the default pipeline. {doc}`../how-to/som` shows how to use and
+the second stage of the default pipeline. [](../how-to/som.md) shows how to use and
 tune it.
 
 ## A string of beads
@@ -98,11 +98,11 @@ backbone towards the contaminants. More prototypes make this worse, because they
 the interlopers. The failure is silent: the ordering's rank correlation against the
 truth stays above 0.99 even at 20% contamination, while the reconstructed track, which
 is what you use downstream, degrades up to four times. Turning on `outlier_mixture`
-keeps the backbone on the curve ({doc}`../how-to/som`).
+keeps the backbone on the curve ([](../how-to/som.md)).
 
 ## The outlier mixture
 
-`outlier_mixture` uses the model {doc}`outliers` describes for the autoencoder, after
+`outlier_mixture` uses the model [](outliers.md) describes for the autoencoder, after
 Hogg, Bovy & Lang (2010), §3. Each sample's position comes either from the curve or
 from a flat background:
 
@@ -163,7 +163,7 @@ among 540 drag the backbone off at 20 epochs.
 ### Weights
 
 A weight multiplies a sample's terms in every sum, the M-steps included, and never
-enters its membership, the rule {doc}`density-fields` derives for the autoencoder. A
+enters its membership, the rule [](density-fields.md) derives for the autoencoder. A
 sample of weight 2 trains exactly as two coincident copies of it.
 
 ### Limits
@@ -171,7 +171,7 @@ sample of weight 2 trains exactly as two coincident copies of it.
 At 240 background samples among 540, the backbone stayed within 0.16 of the arc for
 10 epochs, and failed at 40 epochs, keeping almost all the background. Chained after
 another orderer the SOM's neighbourhood stays narrow, so it can't move a lattice the
-earlier stage started in the background; {doc}`../how-to/som` shows the setting that
+earlier stage started in the background; [](../how-to/som.md) shows the setting that
 helps.
 
 The background is flat over the samples' bounding box, so it needs room outside the
@@ -184,8 +184,8 @@ So a fit whose member fraction $\pi$ ends below 0.5 keeps every sample, as if th
 mixture were off. The SOM's input is meant to be a sample of a curve, and a fit that
 calls most of it background has fitted the box instead. On the mask this keeps all
 1071 pixels. The contaminated arc ended with $\pi$ between 0.76 and 1 at every level
-of background in the table of {doc}`../how-to/som`, and the four streams of
-{doc}`autoencoder` between 0.96 and 1, so none of them changed. I tried two other
+of background in the table of [](../how-to/som.md), and the four streams of
+[](autoencoder.md) between 0.96 and 1, so none of them changed. I tried two other
 fixes. A flat background over a field 1.5 times wider on each axis kept every pixel
 of the mask, but at 120 and 240 background samples the arc's backbone error grew from
 0.038 to 0.14 and from 0.16 to 0.71. Holding $\pi$ at 0.5 or more in the M-step still
@@ -243,7 +243,7 @@ Starkman, N., Bovy, J., Webb, J. J., Calvetti, D., & Somersalo, E. (2023). *On t
 Fast Track: Rapid construction of stellar stream paths.* MNRAS **522**(4), 5022–5036.
 [arXiv:2212.00949](https://arxiv.org/abs/2212.00949),
 doi:[10.1093/mnras/stad1166](https://doi.org/10.1093/mnras/stad1166). The BibTeX entry
-is on the {doc}`../reference/citation` page.
+is on the [](../reference/citation.md) page.
 
 Hogg, D. W., Bovy, J., & Lang, D. (2010). *Data analysis recipes: Fitting a model to
 data.* [arXiv:1008.4686](https://arxiv.org/abs/1008.4686).
