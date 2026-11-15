@@ -4,7 +4,7 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/phasecurvefit.svg)](https://pypi.org/project/phasecurvefit/)
 [![CI](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/ci.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/GalacticDynamics/phasecurvefit/branch/main/graph/badge.svg)](https://codecov.io/gh/GalacticDynamics/phasecurvefit)
-[![Documentation Status](https://readthedocs.org/projects/phasecurvefit/badge/?version=latest)](https://phasecurvefit.readthedocs.io/en/latest/?badge=latest)
+[![Docs](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/docs.yml/badge.svg)](https://galacticdynamics.github.io/phasecurvefit/)
 [![CITATION.cff](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml/badge.svg)](https://github.com/GalacticDynamics/phasecurvefit/actions/workflows/cff-validator.yml)
 [![pyOpenSci Peer-Reviewed](https://pyopensci.org/badges/peer-reviewed.svg)](https://github.com/pyOpenSci/software-submission/issues/285)
 
@@ -22,25 +22,25 @@ breaks down in exactly the cases that matter:
 - **Curves that cross or fold back on themselves.** Where two strands meet, the
   nearest point is often on the wrong strand. phasecurvefit uses velocities as
   well as positions, so the ordering stays on the right strand (see the
-  [epitrochoid tutorials](https://phasecurvefit.readthedocs.io/en/latest/tutorials/epitrochoid_autoencoder.html)).
+  [epitrochoid tutorials](https://galacticdynamics.github.io/phasecurvefit/latest/tutorials/epitrochoid_autoencoder.html)).
 - **No known starting point.** The default MST | SOM pipeline finds the two ends
   of the curve itself, so no progenitor position or hand-picked start index is
   needed
-  ([MST tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_mst.html)).
+  ([MST tutorial](https://galacticdynamics.github.io/phasecurvefit/latest/tutorials/stream_mst.html)).
 - **Incomplete orderings.** An orderer may order only a reliable subset (the
   local-flow walk does); an autoencoder then assigns an ordering coordinate γ to
   every sample and learns a smooth mean track through them
-  ([stream autoencoder tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_autoencoder.html)).
+  ([stream autoencoder tutorial](https://galacticdynamics.github.io/phasecurvefit/latest/tutorials/stream_autoencoder.html)).
 - **Contamination.** A stream-plus-background mixture model gives each sample a
   calibrated membership probability, so interlopers can be down-weighted or
   removed
-  ([outlier-rejection tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/outlier_rejection.html)).
+  ([outlier-rejection tutorial](https://galacticdynamics.github.io/phasecurvefit/latest/tutorials/outlier_rejection.html)).
 - **Use inside larger models.** phasecurvefit is built on JAX: the walk, the
   distance metrics and the neural networks work with `jit`, `vmap` and `grad`
   and run on CPU or GPU. A training-free running-mean track is available when
   speed matters more than accuracy, for example inside a likelihood evaluated at
   every step of an MCMC
-  ([running-mean tutorial](https://phasecurvefit.readthedocs.io/en/latest/tutorials/stream_runningmean.html)).
+  ([running-mean tutorial](https://galacticdynamics.github.io/phasecurvefit/latest/tutorials/stream_runningmean.html)).
 
 phasecurvefit is a reusable, tested library for ordering samples along a curve
 in phase space, by default with an MST backbone refined by a Self-Organizing
@@ -129,7 +129,7 @@ uv add phasecurvefit --extra kdtree
 ### Running the Tutorials
 
 The
-[tutorial notebooks](https://phasecurvefit.readthedocs.io/en/latest/tutorials/index.html)
+[tutorial notebooks](https://galacticdynamics.github.io/phasecurvefit/latest/tutorials/index.html)
 need packages beyond the runtime `[all]` extra — `matplotlib` for plotting and
 `galax` for the mock-stream examples. Install them with the `tutorials` extra:
 
@@ -314,9 +314,9 @@ print(result.gamma_range)  # (-1.0, 1.0)
 `MSTOrderer` also has opt-in velocity mechanisms (`velocity_weight`,
 `sever_cos_threshold`, `orient_by_velocity`) for self-overlapping streams. See
 the
-[orderer guide](https://phasecurvefit.readthedocs.io/en/latest/how-to/choose-orderer.html)
+[orderer guide](https://galacticdynamics.github.io/phasecurvefit/latest/how-to/choose-orderer.html)
 and the
-[v0.3 → v0.4 Migration Guide](https://phasecurvefit.readthedocs.io/en/latest/reference/migration/v0.3-to-v0.4.html),
+[v0.3 → v0.4 Migration Guide](https://galacticdynamics.github.io/phasecurvefit/latest/reference/migration/v0.3-to-v0.4.html),
 which covers the change of default from the walk to MST | SOM.
 
 ## Distance Metrics
@@ -398,7 +398,7 @@ result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
 
 See the
-[metric guide](https://phasecurvefit.readthedocs.io/en/latest/how-to/tune-metric.html)
+[metric guide](https://galacticdynamics.github.io/phasecurvefit/latest/how-to/tune-metric.html)
 for more details and examples.
 
 ## Query Strategies
@@ -512,7 +512,7 @@ DOI, together with the paper behind whichever component you used.
 Machine-readable metadata for all of these is in
 [`CITATION.cff`](https://github.com/GalacticDynamics/phasecurvefit/blob/main/CITATION.cff);
 what to cite for which component, with BibTeX entries, is on the
-[Citation page](https://phasecurvefit.readthedocs.io/en/latest/reference/citation.html).
+[Citation page](https://galacticdynamics.github.io/phasecurvefit/latest/reference/citation.html).
 
 </details>
 

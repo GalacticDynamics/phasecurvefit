@@ -92,6 +92,14 @@ jobs:
       - name: Build the docs
         run: uv run --frozen nox -s docs
 
+      # A preview of the built site: download it from the run's summary page.
+      - name: Upload the built docs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: docs-html
+          path: docs/_build/html
+          retention-days: 14
+
   tests:
     name: Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
     runs-on: ${{ matrix.runs-on }}

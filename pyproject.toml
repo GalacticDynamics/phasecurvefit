@@ -186,6 +186,8 @@ ignore = [
 "docs/**" = ["N803", "T201"]
 "docs/conf.py" = ["A001", "INP001", "T201"]
 "noxfile.py" = ["A001", "T20"]
+# CI helper scripts, run as `python script.py`.
+".github/scripts/**" = ["INP001", "PLC0415", "S101", "T20"]
 # Throwaway research scripts, not library code.
 "prototypes/**" = [
   "ANN",

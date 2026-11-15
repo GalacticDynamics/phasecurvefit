@@ -268,6 +268,30 @@ html_theme_options: dict[str, Any] = {
     ],
 }
 
+# -- Versions on GitHub Pages ----------------------------------------------
+# .github/workflows/docs.yml builds each version into its own folder of the
+# gh-pages branch ("latest" for main, "v0.3" for v0.3.* tags and the
+# versions/v0.3.x branch) and lists the folders in switcher.json at the root.
+
+_pages_url = "https://galacticdynamics.github.io/phasecurvefit/"
+_docs_version = os.environ.get("DOCS_VERSION", "latest")
+html_baseurl = f"{_pages_url}{_docs_version}/"
+html_theme_options["switcher"] = {
+    "json_url": f"{_pages_url}switcher.json",
+    "version_match": _docs_version,
+}
+# A local build or a PR's build has no switcher.json to check against.
+html_theme_options["check_switcher"] = False
+html_sidebars = {
+    "**": [
+        "navbar-logo.html",
+        "version-switcher.html",
+        "icon-links.html",
+        "search-button-field.html",
+        "sbt-sidebar-nav.html",
+    ]
+}
+
 
 # -- autodoc inside MyST ---------------------------------------------------
 
