@@ -52,7 +52,6 @@ repos:
     hooks:
       - id: check-dependabot
       - id: check-github-workflows
-      - id: check-readthedocs
 
   # The tutorials' source is MyST Markdown (docs/tutorials/*.md). Each .ipynb
   # is generated from it, with no outputs and numbered cell ids, only so the

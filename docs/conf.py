@@ -59,16 +59,16 @@ extensions = [
 
 python_use_unqualified_type_names = True
 
-# Execute every guide and tutorial on every build, here and on ReadTheDocs. No
+# Execute every guide and tutorial on every build, here and in CI. No
 # outputs are stored in the sources, so each page shows what the current code
 # produces.
 nb_execution_mode = "force"
 # Except pages whose code cells only assert and display nothing. Each executed
-# page costs a kernel start and an `import phasecurvefit`, and the build has to
-# fit Read the Docs' time limit. Sybil still runs these cells in the doc tests.
+# page costs a kernel start and an `import phasecurvefit`. Sybil still runs these
+# cells in the doc tests.
 nb_execution_excludepatterns = ["contributing.md", "reference/migration/*"]
-# A cell that hangs fails the build here, with a log, instead of running into
-# Read the Docs' build limit, which kills the build and throws its log away.
+# A cell that hangs fails the build, with a traceback that names the page and the
+# cell, instead of running until the CI job's own time limit.
 nb_execution_timeout = 300
 nb_execution_raise_on_error = True
 # Share JAX's compiled programs between the pages' kernels, which inherit this
@@ -81,8 +81,8 @@ os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0")
 os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES", "0")
 # On Linux, XLA logs a machine-feature mismatch error for every program it loads
 # from that cache, and the pages would show them as cell output. Level 3 hides
-# XLA's C++ log messages below FATAL; Python errors still fail the cell. This is
-# set outright because Read the Docs' environment already sets it to 1.
+# XLA's C++ log messages below FATAL; Python errors still fail the cell. It is set
+# outright, since a build environment may already set it lower.
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 pygments_lexers = {"ipython3": PythonLexer()}
 
