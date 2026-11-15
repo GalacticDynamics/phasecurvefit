@@ -1,0 +1,1160 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Learning an Epitrochoid with a Running Mean" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="tutorials/epitrochoid_runningmean.html" />
+<meta property="og:site_name" content="phasecurvefit" />
+<meta property="og:description" content="Open In Colab This tutorial fits the same self-intersecting epitrochoid as the epitrochoid autoencoder tutorial, with one change: the mean path comes from a running mean instead of a trained decode..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_tutorials_epitrochoid_runningmean_4eb378f7.png" />
+<meta property="og:image:alt" content="Open In Colab This tutorial fits the same self-intersecting epitrochoid as the epitrochoid autoencoder tutorial, with one change: the mean path comes from a running mean instead of a trained decode..." />
+<meta name="description" content="Open In Colab This tutorial fits the same self-intersecting epitrochoid as the epitrochoid autoencoder tutorial, with one change: the mean path comes from a running mean instead of a trained decode..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Learning an Epitrochoid with a Running Mean &#8212; phasecurvefit</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=1ae7504c"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script type="application/vnd.jupyter.widget-state+json">{"state": {"dbb1c682858c4587a326e16a6de62c58": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": "2", "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "791b9fcb659d4680beebc1860e9ff20d": {"model_name": "ProgressStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "ProgressStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "bar_color": null, "description_width": ""}}, "8231701238d145df8360ea14b7b09182": {"model_name": "FloatProgressModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "FloatProgressModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "ProgressView", "bar_style": "success", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_dbb1c682858c4587a326e16a6de62c58", "max": 800.0, "min": 0.0, "orientation": "horizontal", "style": "IPY_MODEL_791b9fcb659d4680beebc1860e9ff20d", "tabbable": null, "tooltip": null, "value": 800.0}}, "3d067f4d14154c0eac51950be19b4049": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "b019c8d1ef8e4ee99c36ae2c0c97f03a": {"model_name": "HTMLStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "background": null, "description_width": "", "font_size": null, "text_color": null}}, "800d87a992584341a9b33e3bad21a2be": {"model_name": "HTMLModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HTMLView", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_3d067f4d14154c0eac51950be19b4049", "placeholder": "\u200b", "style": "IPY_MODEL_b019c8d1ef8e4ee99c36ae2c0c97f03a", "tabbable": null, "tooltip": null, "value": "Training:\u2007100%"}}, "7536df6295d340bcb0b7340abc05c64a": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "2f5c734277864b03a0f4ddbaf8fd2b6d": {"model_name": "HTMLStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "background": null, "description_width": "", "font_size": null, "text_color": null}}, "88a726bf9ace47d1b4e8dd6fe6a3c37d": {"model_name": "HTMLModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HTMLView", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_7536df6295d340bcb0b7340abc05c64a", "placeholder": "\u200b", "style": "IPY_MODEL_2f5c734277864b03a0f4ddbaf8fd2b6d", "tabbable": null, "tooltip": null, "value": "\u2007800/800\u2007[00:02&lt;00:00,\u2007297.82epoch/s]"}}, "c51f396d76874455be03a8a2d8a9f85d": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": "inline-flex", "flex": null, "flex_flow": "row wrap", "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": "100%"}}, "a691d037deb84455937ab490e0250e7c": {"model_name": "HBoxModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HBoxModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HBoxView", "box_style": "", "children": ["IPY_MODEL_800d87a992584341a9b33e3bad21a2be", "IPY_MODEL_8231701238d145df8360ea14b7b09182", "IPY_MODEL_88a726bf9ace47d1b4e8dd6fe6a3c37d"], "layout": "IPY_MODEL_c51f396d76874455be03a8a2d8a9f85d", "tabbable": null, "tooltip": null}}}, "version_major": 2, "version_minor": 0}</script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script crossorigin="anonymous" data-jupyter-widgets-cdn="https://cdn.jsdelivr.net/npm/" src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@1.0.6/dist/embed-amd.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/epitrochoid_runningmean';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'latest';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/latest/tutorials/epitrochoid_runningmean.html" />
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Outlier rejection with mixture-model membership" href="outlier_rejection.html" />
+    <link rel="prev" title="Learning an Epitrochoid with an Autoencoder" href="epitrochoid_autoencoder.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/favicon.png" class="logo__image only-light" alt="phasecurvefit - Home"/>
+    <script>document.write(`<img src="../_static/favicon.png" class="logo__image only-dark" alt="phasecurvefit - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/GalacticDynamics/phasecurvefit" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/phasecurvefit/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/pypi/v/phasecurvefit" class="icon-link-image" alt="PyPI"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    phasecurvefit
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Start</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../start/what-it-does.html">What phasecurvefit does</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/is-it-right.html">Is phasecurvefit right for my data?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/install.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/quickstart.html">Quick start</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Tutorials</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Learning an Epitrochoid with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="density_fields.html">Fitting a Track Through a Density Image</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How-to guides</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../how-to/index.html">How-to guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/data.html">Prepare your data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/units.html">Use physical units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/choose-orderer.html">Choose an orderer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/chain-orderers.html">Chain orderers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/local-flow-walk.html">Use the local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/tune-metric.html">Choose and tune the walk’s metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/custom-metric.html">Write a custom metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/kdtree.html">Restrict the walk to nearby points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/som.html">Refine an ordering with a self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/autoencoder.html">Fill gaps and fit a track with the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/interpolate.html">Interpolate positions along an ordering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/outliers.html">Reject outliers with the mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/track-uncertainty.html">Put an uncertainty band on the track</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/jax.html">Compile, batch and differentiate with JAX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/gpu.html">Run on a GPU</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How it works</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../explanation/index.html">How it works</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/walk.html">The local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/mst.html">The MST backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/som.html">The self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/autoencoder.html">The autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/outliers.html">Outlier rejection with a mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/track-uncertainty.html">Track uncertainty</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/density-fields.html">Density fields</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/api.html">API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/options.html">Options and defaults</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/result.html">The ordering result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.3-to-v0.4.html">Migrating from v0.3 to v0.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.2-to-v0.3.html">Migrating from v0.2 to v0.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.1-to-v0.2.html">Migrating from v0.1 to v0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/citation.html">Citation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to phasecurvefit</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit/issues/new?title=Issue%20on%20page%20%2Ftutorials/epitrochoid_runningmean.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/tutorials/epitrochoid_runningmean.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Learning an Epitrochoid with a Running Mean</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#data-self-intersecting-epitrochoid-curve">Data: Self-Intersecting Epitrochoid Curve</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#where-does-the-walk-start">Where does the walk start?</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#refining-the-ordering-with-a-self-organizing-map">Refining the ordering with a Self-Organizing Map</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#training-the-encoder-building-the-running-mean">Training the encoder; building the running mean</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#result">Result</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-is-the-running-mean-path-offset">Why is the running-mean path offset?</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#takeaways">Takeaways</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="learning-an-epitrochoid-with-a-running-mean">
+<h1>Learning an Epitrochoid with a Running Mean<a class="headerlink" href="#learning-an-epitrochoid-with-a-running-mean" title="Link to this heading">#</a></h1>
+<p><a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_runningmean.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
+<p>This tutorial fits the same self-intersecting epitrochoid as the
+<a class="reference internal" href="epitrochoid_autoencoder.html"><span class="std std-doc">epitrochoid autoencoder tutorial</span></a>, with one change:
+the mean path comes from a <strong>running mean</strong> instead of a trained decoder network.</p>
+<p>The running mean has nothing to train. For any ordering coordinate <span class="math notranslate nohighlight">\(\gamma\)</span>, it
+averages the positions of the member stars whose <span class="math notranslate nohighlight">\(\gamma\)</span> falls within a small
+window around it. Only the encoder is trained, which makes this approach much
+faster: useful when the fit sits inside a loop, such as a likelihood evaluated at
+every step of an MCMC.</p>
+<p>The price is accuracy. The final figure shows the running-mean path sitting
+visibly <em>inside</em> the curve, and the last section explains why and how the window
+size controls it.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># On Colab, clone the repository, install the locked tutorial dependencies, and run</span>
+<span class="c1"># from docs/tutorials. Elsewhere it does nothing: run from docs/tutorials with the</span>
+<span class="c1"># `tutorials` extra.</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="n">repo</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/content/phasecurvefit&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="s2">&quot;google.colab&quot;</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">:</span>
+    <span class="o">%</span><span class="k">pip</span> install -q uv
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">repo</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="o">!</span>git<span class="w"> </span>clone<span class="w"> </span>-q<span class="w"> </span>--depth<span class="w"> </span><span class="m">1</span><span class="w"> </span>https://github.com/GalacticDynamics/phasecurvefit<span class="w"> </span><span class="o">{</span>repo<span class="o">}</span>
+    <span class="o">%</span><span class="k">cd</span> {repo}
+    <span class="o">!</span>uv<span class="w"> </span><span class="nb">export</span><span class="w"> </span>-q<span class="w"> </span>--frozen<span class="w"> </span>--extra<span class="w"> </span>tutorials<span class="w"> </span>--no-dev<span class="w"> </span>--no-editable<span class="w"> </span>--no-hashes<span class="w"> </span>-o<span class="w"> </span>r.txt
+    <span class="o">!</span>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-q<span class="w"> </span>--system<span class="w"> </span>--python<span class="w"> </span><span class="o">{</span>sys.executable<span class="o">}</span><span class="w"> </span>-r<span class="w"> </span>r.txt
+    <span class="o">%</span><span class="k">cd</span> docs/tutorials
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.spatial</span><span class="w"> </span><span class="kn">import</span> <span class="n">cKDTree</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">quaxed.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">unxt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">u</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">key</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">201030</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="data-self-intersecting-epitrochoid-curve">
+<h2>Data: Self-Intersecting Epitrochoid Curve<a class="headerlink" href="#data-self-intersecting-epitrochoid-curve" title="Link to this heading">#</a></h2>
+<p>We build a single stream that self-intersects using an <strong>epitrochoid curve</strong> that traces one continuous loop from 5° to 355°, leaving a 10° gap so the curve doesn’t close back on itself. The epitrochoid’s internal structure (5 loops within one outer rotation) creates multiple self-intersections along the path.</p>
+<p>At the crossings, a purely spatial walk can jump to the other branch: the nearest neighbour may lie on a different strand. Including velocities in the distance fixes this: the strands cross in position but move in different directions, so with <code class="docutils literal notranslate"><span class="pre">FullPhaseSpaceDistanceMetric</span></code> (where <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>, a time, converts a velocity difference into an equivalent distance) a star on the other strand is far away in phase space, and the walk stays on its own strand.</p>
+<p>The curve is parameterized by a scalar <code class="docutils literal notranslate"><span class="pre">t</span></code>, which we keep as ground truth but never show to the ordering.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">usys</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">unitsystems</span><span class="o">.</span><span class="n">si</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">make_self_intersecting_stream</span><span class="p">(</span>
+    <span class="n">key</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">noise_sigma</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">scale</span><span class="o">=</span><span class="mf">120.0</span><span class="p">,</span>
+    <span class="n">R</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span>
+    <span class="n">r</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">d</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">4.5</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return (t, pos, vel) for an OPEN curve with self-intersections.&quot;&quot;&quot;</span>
+    <span class="c1"># Epitrochoid parameters: ratio=5 means 5 internal loops per outer rotation</span>
+
+    <span class="c1"># Single outer rotation: 5° to 355° with 10° gap</span>
+    <span class="n">t_start</span> <span class="o">=</span> <span class="mf">5.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">180.0</span>
+    <span class="n">t_end</span> <span class="o">=</span> <span class="mf">355.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">180.0</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">t_start</span><span class="p">,</span> <span class="n">t_end</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+
+    <span class="n">ratio</span> <span class="o">=</span> <span class="p">(</span><span class="n">R</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span> <span class="o">/</span> <span class="n">r</span>  <span class="c1"># = 5 internal rotations per outer rotation</span>
+    <span class="n">x0</span> <span class="o">=</span> <span class="n">scale</span> <span class="o">*</span> <span class="p">((</span><span class="n">R</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">-</span> <span class="n">d</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">ratio</span> <span class="o">*</span> <span class="n">t</span><span class="p">))</span> <span class="o">/</span> <span class="mf">5.0</span>
+    <span class="n">y0</span> <span class="o">=</span> <span class="n">scale</span> <span class="o">*</span> <span class="p">((</span><span class="n">R</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">-</span> <span class="n">d</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">ratio</span> <span class="o">*</span> <span class="n">t</span><span class="p">))</span> <span class="o">/</span> <span class="mf">5.0</span>
+
+    <span class="c1"># Derivatives for velocity</span>
+    <span class="n">dx0</span> <span class="o">=</span> <span class="n">scale</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">R</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">+</span> <span class="n">d</span> <span class="o">*</span> <span class="n">ratio</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">ratio</span> <span class="o">*</span> <span class="n">t</span><span class="p">))</span> <span class="o">/</span> <span class="mf">5.0</span>
+    <span class="n">dy0</span> <span class="o">=</span> <span class="n">scale</span> <span class="o">*</span> <span class="p">((</span><span class="n">R</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">-</span> <span class="n">d</span> <span class="o">*</span> <span class="n">ratio</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">ratio</span> <span class="o">*</span> <span class="n">t</span><span class="p">))</span> <span class="o">/</span> <span class="mf">5.0</span>
+
+    <span class="c1"># Optional small positional noise</span>
+    <span class="n">kx</span><span class="p">,</span> <span class="n">ky</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">x0</span> <span class="o">+</span> <span class="n">noise_sigma</span> <span class="o">*</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">kx</span><span class="p">,</span> <span class="p">(</span><span class="n">n</span><span class="p">,))</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">y0</span> <span class="o">+</span> <span class="n">noise_sigma</span> <span class="o">*</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">ky</span><span class="p">,</span> <span class="p">(</span><span class="n">n</span><span class="p">,))</span>
+
+    <span class="c1"># Pack into unitful quantities</span>
+    <span class="n">pos</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">usys</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">]),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">usys</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">])}</span>
+    <span class="n">vel</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="n">dx0</span><span class="p">,</span> <span class="n">usys</span><span class="p">[</span><span class="s2">&quot;speed&quot;</span><span class="p">]),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="n">dy0</span><span class="p">,</span> <span class="n">usys</span><span class="p">[</span><span class="s2">&quot;speed&quot;</span><span class="p">])}</span>
+    <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">pos</span><span class="p">,</span> <span class="n">vel</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">key</span><span class="p">,</span> <span class="n">subkey</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+<span class="n">t</span><span class="p">,</span> <span class="n">pos</span><span class="p">,</span> <span class="n">vel</span> <span class="o">=</span> <span class="n">make_self_intersecting_stream</span><span class="p">(</span>
+    <span class="n">subkey</span><span class="p">,</span>
+    <span class="n">n</span><span class="o">=</span><span class="mi">2048</span><span class="p">,</span>
+    <span class="n">noise_sigma</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">pos</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Curve&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+<span class="c1"># Add velocity arrows every 10th point</span>
+<span class="n">every</span> <span class="o">=</span> <span class="mi">12</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">quiver</span><span class="p">(</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">pos</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][::</span><span class="n">every</span><span class="p">]),</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">pos</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][::</span><span class="n">every</span><span class="p">]),</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">vel</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][::</span><span class="n">every</span><span class="p">]),</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">vel</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][::</span><span class="n">every</span><span class="p">]),</span>
+    <span class="n">scale</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span>
+    <span class="n">width</span><span class="o">=</span><span class="mf">0.006</span><span class="p">,</span>
+    <span class="n">alpha</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][:</span><span class="mi">1</span><span class="p">],</span> <span class="n">pos</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][:</span><span class="mi">1</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Start&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">:],</span> <span class="n">pos</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">:],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;End&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;equal&quot;</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Epitrochoid with Self-Intersections&quot;</span><span class="p">,</span>
+    <span class="n">xlabel</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;x [</span><span class="si">{</span><span class="n">ax</span><span class="o">.</span><span class="n">get_xlabel</span><span class="p">()</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">,</span>
+    <span class="n">ylabel</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;y [</span><span class="si">{</span><span class="n">ax</span><span class="o">.</span><span class="n">get_ylabel</span><span class="p">()</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/4fc484d38551d66785e3e0d8043b98a75f00ca0db42de3559e933e7c937bfca7.png" src="../_images/4fc484d38551d66785e3e0d8043b98a75f00ca0db42de3559e933e7c937bfca7.png" />
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Shuffle the data</span>
+<span class="n">key</span><span class="p">,</span> <span class="n">subkey</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+<span class="n">order</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">subkey</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">)))</span>
+
+<span class="n">qs</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="n">order</span><span class="p">],</span> <span class="n">pos</span><span class="p">)</span>
+<span class="n">ps</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="n">order</span><span class="p">],</span> <span class="n">vel</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="where-does-the-walk-start">
+<h3>Where does the walk start?<a class="headerlink" href="#where-does-the-walk-start" title="Link to this heading">#</a></h3>
+<p>The local-flow walk follows the velocity field from one observation to the next,
+so it has to begin at an <strong>end</strong> of the curve. Naming that index by hand means
+knowing the answer before you have ordered anything.</p>
+<p>An <code class="docutils literal notranslate"><span class="pre">MSTOrderer</span></code> finds it instead: it orders along the graph diameter, tip to
+tip, so its first observation is a genuine endpoint. Chaining with <code class="docutils literal notranslate"><span class="pre">|</span></code> hands
+that index to the walk, which uses it when <code class="docutils literal notranslate"><span class="pre">start_idx</span></code> is left at its default
+of <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<p>On this curve the MST has to sever anti-parallel edges (<code class="docutils literal notranslate"><span class="pre">sever_cos_threshold</span></code>)
+or it short-circuits across the self-crossings and nominates the wrong tip.</p>
+</section>
+<section id="refining-the-ordering-with-a-self-organizing-map">
+<h3>Refining the ordering with a Self-Organizing Map<a class="headerlink" href="#refining-the-ordering-with-a-self-organizing-map" title="Link to this heading">#</a></h3>
+<p>The walk orders the tracers, but its path is the greedy route through the
+observations themselves, so it carries their scatter. Chaining a <code class="docutils literal notranslate"><span class="pre">SOMOrderer</span></code>
+fits a lattice of prototypes — each an average over many tracers — and re-orders
+by arc length along a smooth backbone through them. That backbone, not a
+polyline through noisy points, is what the fit below consumes.</p>
+<p>The SOM picks up the walk’s velocity-awareness automatically: <code class="docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code>
+steps along the flow, so its result is marked velocity-aware and the SOM uses a
+phase-space metric rather than position alone. <code class="docutils literal notranslate"><span class="pre">n_prototypes</span></code> is raised to 60
+because the smoothing length <code class="docutils literal notranslate"><span class="pre">sigma_end</span> <span class="pre">*</span> <span class="pre">L</span> <span class="pre">/</span> <span class="pre">(n_prototypes</span> <span class="pre">-</span> <span class="pre">1)</span></code> must sit below
+the petal structure; the default 25 is coarser than the petals and tangles the
+ordering (<code class="docutils literal notranslate"><span class="pre">SOMOrderer</span></code> warns when it does).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># The walk needs to begin at an end of the curve. Rather than pick that index by</span>
+<span class="c1"># hand, let an MSTOrderer find it: it orders along the graph diameter, tip to</span>
+<span class="c1"># tip, so its first observation is an endpoint. Severing anti-parallel edges is</span>
+<span class="c1"># what keeps it from short-circuiting across the crossings.</span>
+<span class="n">P</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="n">c</span><span class="p">]))</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">)],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">med</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">cKDTree</span><span class="p">(</span><span class="n">P</span><span class="p">)</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">2</span><span class="p">)[</span><span class="mi">0</span><span class="p">][:,</span> <span class="mi">1</span><span class="p">]))</span>
+<span class="n">tipfinder</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">MSTOrderer</span><span class="p">(</span>
+    <span class="n">k</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+    <span class="n">jump_cap</span><span class="o">=</span><span class="mf">8.0</span> <span class="o">*</span> <span class="n">med</span><span class="p">,</span>
+    <span class="n">sever_cos_threshold</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+    <span class="n">orient_by_velocity</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">on_disconnected</span><span class="o">=</span><span class="s2">&quot;largest&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Walk configuration</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">WalkConfig</span><span class="p">(</span>
+    <span class="n">strategy</span><span class="o">=</span><span class="n">pcf</span><span class="o">.</span><span class="n">strats</span><span class="o">.</span><span class="n">KDTree</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">60</span><span class="p">),</span>
+    <span class="n">metric</span><span class="o">=</span><span class="n">pcf</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">FullPhaseSpaceDistanceMetric</span><span class="p">(),</span>
+<span class="p">)</span>
+<span class="n">metric_scale</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">)</span>
+<span class="n">max_dist</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="s2">&quot;m&quot;</span><span class="p">)</span>
+
+<span class="c1"># Perform walk</span>
+<span class="n">walkresult</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
+    <span class="n">qs</span><span class="p">,</span>
+    <span class="n">ps</span><span class="p">,</span>
+    <span class="n">tipfinder</span>
+    <span class="o">|</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span>
+        <span class="n">metric_scale</span><span class="o">=</span><span class="n">metric_scale</span><span class="p">,</span>
+        <span class="n">max_dist</span><span class="o">=</span><span class="n">max_dist</span><span class="p">,</span>
+        <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+        <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;forward&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="o">|</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">SOMOrderer</span><span class="p">(</span><span class="n">n_prototypes</span><span class="o">=</span><span class="mi">60</span><span class="p">),</span>
+    <span class="n">metadata</span><span class="o">=</span><span class="n">pcf</span><span class="o">.</span><span class="n">StateMetadata</span><span class="p">(</span><span class="n">usys</span><span class="o">=</span><span class="n">usys</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="c1"># The tip the chain picked, for the plots below.</span>
+<span class="n">start_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">walkresult</span><span class="o">.</span><span class="n">ordering</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">s</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">)</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">])[</span><span class="kc">None</span><span class="p">],</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">])[</span><span class="kc">None</span><span class="p">],</span>
+    <span class="n">c</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">,</span>
+    <span class="n">s</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Start Point&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">quiver</span><span class="p">(</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">])[</span><span class="kc">None</span><span class="p">],</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">])[</span><span class="kc">None</span><span class="p">],</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">ps</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">])[</span><span class="kc">None</span><span class="p">],</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">ps</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">])[</span><span class="kc">None</span><span class="p">],</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">ordering</span> <span class="o">=</span> <span class="n">walkresult</span><span class="o">.</span><span class="n">ordering</span>
+<span class="n">walk_qs</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="n">ordering</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">walkresult</span><span class="o">.</span><span class="n">positions</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+<span class="n">timeline</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ordering</span><span class="p">))</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">walk_qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">walk_qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">s</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">timeline</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">walk_qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">walk_qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;data order&quot;</span><span class="p">)</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;equal&quot;</span><span class="p">,</span>
+    <span class="n">xlabel</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;x [</span><span class="si">{</span><span class="n">ax</span><span class="o">.</span><span class="n">get_xlabel</span><span class="p">()</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">,</span>
+    <span class="n">ylabel</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;y [</span><span class="si">{</span><span class="n">ax</span><span class="o">.</span><span class="n">get_ylabel</span><span class="p">()</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Local Flow Walk Ordering&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/7f1ec16807ebaa2bbd5cdfa0e384b2e78d5e286bd90652e9f5e88a885012cb35.png" src="../_images/7f1ec16807ebaa2bbd5cdfa0e384b2e78d5e286bd90652e9f5e88a885012cb35.png" />
+</div>
+</div>
+<p><strong>What to look for:</strong> the dashed line should follow one strand at a time
+through every crossing, without jumping to the strand it crosses.</p>
+</section>
+</section>
+<section id="training-the-encoder-building-the-running-mean">
+<h2>Training the encoder; building the running mean<a class="headerlink" href="#training-the-encoder-building-the-running-mean" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">EncoderExternalDecoder</span></code> pairs a trainable encoder with a decoder that is <em>not</em> a
+network:</p>
+<ul class="simple">
+<li><p>The <strong>encoder</strong> (<code class="docutils literal notranslate"><span class="pre">OrderingNet</span></code>) maps each star’s position and velocity to an
+ordering coordinate <span class="math notranslate nohighlight">\(\gamma\)</span> and a membership probability <span class="math notranslate nohighlight">\(p\)</span>. It is trained on
+the walk’s ordering, exactly as in phase 1 of the full autoencoder.</p></li>
+<li><p>The <strong>decoder</strong> (<code class="docutils literal notranslate"><span class="pre">RunningMeanDecoder</span></code>) is filled in once training finishes. It
+stores every star’s encoder <span class="math notranslate nohighlight">\(\gamma\)</span> and position, and answers a query <span class="math notranslate nohighlight">\(\gamma\)</span>
+with the mean position of the member stars (<span class="math notranslate nohighlight">\(p &gt; 0.5\)</span>) within <code class="docutils literal notranslate"><span class="pre">window_size</span> <span class="pre">/</span> <span class="pre">2</span></code>
+of it. Here <span class="math notranslate nohighlight">\(\gamma\)</span> runs from 0 to 1, so <code class="docutils literal notranslate"><span class="pre">window_size=0.05</span></code> averages over 5% of
+the curve’s length.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">in_size=4</span></code> is the number of phase-space coordinates: 2 positions + 2 velocities.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">key</span><span class="p">,</span> <span class="n">model_key</span><span class="p">,</span> <span class="n">train_key</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+<span class="n">normalizer</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">StandardScalerNormalizer</span><span class="p">(</span><span class="n">qs</span><span class="p">,</span> <span class="n">ps</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">EncoderExternalDecoder</span><span class="p">(</span>
+    <span class="n">encoder</span><span class="o">=</span><span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">OrderingNet</span><span class="p">(</span><span class="n">in_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">model_key</span><span class="p">),</span>
+    <span class="n">decoder</span><span class="o">=</span><span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">RunningMeanDecoder</span><span class="p">(</span><span class="n">window_size</span><span class="o">=</span><span class="mf">0.05</span><span class="p">),</span>
+    <span class="n">normalizer</span><span class="o">=</span><span class="n">normalizer</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">result</span><span class="p">,</span> <span class="n">opt_state</span><span class="p">,</span> <span class="n">losses</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">train_autoencoder</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">walkresult</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">train_key</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"version_major": 2, "version_minor": 0, "model_id": "a691d037deb84455937ab490e0250e7c"}</script></div>
+</div>
+<p>Only the encoder trains, so the loss curve has a single phase with a single
+objective (compare the three-phase curve in the
+<a class="reference internal" href="stream_autoencoder.html"><span class="std std-doc">stream autoencoder tutorial</span></a>).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Plot training losses</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">losses</span><span class="p">),</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Epoch&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Loss&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Training Loss Over Epochs&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final loss: </span><span class="si">{</span><span class="n">losses</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/6604e9825b0715114142d7a6012294dee4fec7b149900d0525db3076a2b98ef1.png" src="../_images/6604e9825b0715114142d7a6012294dee4fec7b149900d0525db3076a2b98ef1.png" />
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Final loss: 0.007954
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="result">
+<h2>Result<a class="headerlink" href="#result" title="Link to this heading">#</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">running_mean_path</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">window_size</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2_000</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluate the running-mean path with a given window, away from the tips.</span>
+
+<span class="sd">    Within half a window of either end the window is one-sided, so we stop there.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">result_w</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">tree_at</span><span class="p">(</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">decoder</span><span class="o">.</span><span class="n">window_size</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">window_size</span><span class="p">)</span>
+    <span class="n">g_train</span> <span class="o">=</span> <span class="n">result_w</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">decoder</span><span class="o">.</span><span class="n">gamma_train</span>
+    <span class="n">lo</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">g_train</span><span class="o">.</span><span class="n">min</span><span class="p">())</span> <span class="o">+</span> <span class="n">window_size</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="n">hi</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">g_train</span><span class="o">.</span><span class="n">max</span><span class="p">())</span> <span class="o">-</span> <span class="n">window_size</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="k">return</span> <span class="n">result_w</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+
+<span class="n">all_gamma</span><span class="p">,</span> <span class="n">all_probs</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">positions</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">velocities</span><span class="p">)</span>
+<span class="n">rejected_membership</span> <span class="o">=</span> <span class="n">all_probs</span> <span class="o">&lt;</span> <span class="mf">0.5</span>  <span class="c1"># the running mean&#39;s member threshold</span>
+<span class="n">qs_pred</span> <span class="o">=</span> <span class="n">running_mean_path</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
+
+<span class="c1"># Plot all points with gradient coloring</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]),</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">]),</span>
+    <span class="n">s</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+    <span class="n">c</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">all_gamma</span><span class="p">),</span>
+    <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span>
+    <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Stream members&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Plot predicted mean path</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs_pred</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]),</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs_pred</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">]),</span>
+    <span class="n">c</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span>
+    <span class="n">lw</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Predicted mean path&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Mark rejected samples in cyan</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][</span><span class="n">rejected_membership</span><span class="p">]),</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][</span><span class="n">rejected_membership</span><span class="p">]),</span>
+    <span class="n">s</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">c</span><span class="o">=</span><span class="s2">&quot;cyan&quot;</span><span class="p">,</span>
+    <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;o&quot;</span><span class="p">,</span>
+    <span class="n">edgecolors</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span>
+    <span class="n">linewidths</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Rejected samples&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Mark start point</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">]),</span>
+    <span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="n">usys</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">]),</span>
+    <span class="n">s</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+    <span class="n">c</span><span class="o">=</span><span class="s2">&quot;tab:green&quot;</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Start point&quot;</span><span class="p">,</span>
+    <span class="n">linewidths</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">zorder</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$x$ [m]&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$y$ [m]&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Epitrochoid: Learned Ordering and Mean Path&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Gamma (ordering parameter)&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper right&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/11008bf6fbdcdf17fffb9e245a9860b5edee692f0546c9ffdb139fa39160f326.png" src="../_images/11008bf6fbdcdf17fffb9e245a9860b5edee692f0546c9ffdb139fa39160f326.png" />
+</div>
+</div>
+<p><strong>What to look for:</strong> the colour (the encoder’s <span class="math notranslate nohighlight">\(\gamma\)</span>) should change
+smoothly along the curve, and the path should follow every loop. It does, but it
+runs visibly <em>inside</em> the stars, most of all around the tight inner loops.</p>
+</section>
+<section id="why-is-the-running-mean-path-offset">
+<h2>Why is the running-mean path offset?<a class="headerlink" href="#why-is-the-running-mean-path-offset" title="Link to this heading">#</a></h2>
+<p>The offset is built into averaging along a curve. The stars within one window lie
+on a short arc, and the average of points on an arc sits on the inside of the
+bend, not on the arc itself. The more the arc bends within the window, the further
+inside its average falls. The inward pull therefore grows with:</p>
+<ul class="simple">
+<li><p><strong>the window size</strong>: a wider window spans a longer, more strongly bent arc, and</p></li>
+<li><p><strong>the curvature</strong>: the tight inner loops of the epitrochoid pull the path in far
+more than the gently curving outer arcs.</p></li>
+</ul>
+<p>Shrinking the window reduces the offset, but only up to a point: a smaller window
+averages over fewer stars, so the path starts to follow the noise in individual
+stars instead. The running mean doesn’t need to be retrained to try a different
+window, so we can compare several directly.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># The true curve, without noise, for reference.</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">pos_true</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">make_self_intersecting_stream</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">4_000</span><span class="p">,</span> <span class="n">noise_sigma</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="n">window_sizes</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.002</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">]</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axs</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">12</span><span class="p">),</span> <span class="n">sharex</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">w</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axs</span><span class="o">.</span><span class="n">flat</span><span class="p">,</span> <span class="n">window_sizes</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">running_mean_path</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">s</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;0.75&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+        <span class="n">pos_true</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">pos_true</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;tab:red&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;true curve&quot;</span>
+    <span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">path</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;running mean&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;equal&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;window_size = </span><span class="si">{</span><span class="n">w</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper right&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">axs</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$x$ [m]&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">axs</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]:</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$y$ [m]&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/d1a90ac6b95e2672902ddd3e87e8799be0b176d869318a1b00ba569304349e23.png" src="../_images/d1a90ac6b95e2672902ddd3e87e8799be0b176d869318a1b00ba569304349e23.png" />
+</div>
+</div>
+<p>With the smallest window (about four stars per window) the path is jagged: it
+chases the noise. Worse, some windows contain no member stars at all. The running
+mean then has nothing to average and returns NaN, which shows up as gaps in the
+path. (<code class="docutils literal notranslate"><span class="pre">RunningMeanDecoder(...,</span> <span class="pre">empty_window=&quot;nearest&quot;)</span></code> instead falls back to the
+member stars nearest in <span class="math notranslate nohighlight">\(\gamma\)</span>.) At <code class="docutils literal notranslate"><span class="pre">0.01</span></code> the path tracks the true curve closely. At <code class="docutils literal notranslate"><span class="pre">0.05</span></code>, the value
+used above, it cuts inside the inner loops, and at <code class="docutils literal notranslate"><span class="pre">0.1</span></code> it misses them badly.</p>
+<p>A good window is small compared with the tightest bend in the curve, but still
+holds enough stars to average away their scatter. Where that balance falls
+depends on the curve’s shape and how densely it is sampled, so it needs choosing
+for each dataset. A trained decoder, as in the
+<a class="reference internal" href="epitrochoid_autoencoder.html"><span class="std std-doc">epitrochoid autoencoder tutorial</span></a>, doesn’t face
+this trade-off: it fits a smooth curve <em>through</em> the stars. That is what the
+extra training time buys.</p>
+<p><strong>The tips.</strong> The window is a hard cut in <span class="math notranslate nohighlight">\(\gamma\)</span>. Within half a window of
+either end there are stars on one side only, so the average is pulled back
+towards the interior. This is why <code class="docutils literal notranslate"><span class="pre">running_mean_path</span></code> stops half a window short
+of each end.</p>
+</section>
+<section id="takeaways">
+<h2>Takeaways<a class="headerlink" href="#takeaways" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>The running mean replaces decoder training with a windowed average, so it is
+much faster than the full autoencoder.</p></li>
+<li><p>Averaging along a curve pulls the path inside the bends. The offset grows with
+the window size and the curvature; too small a window makes the path noisy
+instead.</p></li>
+<li><p>Changing <code class="docutils literal notranslate"><span class="pre">window_size</span></code> needs no retraining, so it is cheap to compare a few
+values against the data.</p></li>
+</ul>
+<p><strong>See also:</strong> the <a class="reference internal" href="stream_runningmean.html"><span class="std std-doc">stream running-mean tutorial</span></a>, where
+the gentler curvature of a real stream keeps the offset small.</p>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="epitrochoid_autoencoder.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Learning an Epitrochoid with an Autoencoder</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="outlier_rejection.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Outlier rejection with mixture-model membership</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#data-self-intersecting-epitrochoid-curve">Data: Self-Intersecting Epitrochoid Curve</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#where-does-the-walk-start">Where does the walk start?</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#refining-the-ordering-with-a-self-organizing-map">Refining the ordering with a Self-Organizing Map</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#training-the-encoder-building-the-running-mean">Training the encoder; building the running mean</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#result">Result</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-is-the-running-mean-path-offset">Why is the running-mean path offset?</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#takeaways">Takeaways</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By phasecurvefit Developers
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, phasecurvefit Developers.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

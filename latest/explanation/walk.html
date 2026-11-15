@@ -1,0 +1,833 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="The local-flow walk" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="explanation/walk.html" />
+<meta property="og:site_name" content="phasecurvefit" />
+<meta property="og:description" content="The local-flow walk orders samples by following the velocity field from a start point, one step at a time. It is the algorithm of Nibauer et al. (2022), and LocalFlowOrderer runs it. Use the local-..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_explanation_walk_a08a7d12.png" />
+<meta property="og:image:alt" content="The local-flow walk orders samples by following the velocity field from a start point, one step at a time. It is the algorithm of Nibauer et al. (2022), and LocalFlowOrderer runs it. Use the local-..." />
+<meta name="description" content="The local-flow walk orders samples by following the velocity field from a start point, one step at a time. It is the algorithm of Nibauer et al. (2022), and LocalFlowOrderer runs it. Use the local-..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>The local-flow walk &#8212; phasecurvefit</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=1ae7504c"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'explanation/walk';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'latest';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/latest/explanation/walk.html" />
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="The MST backbone" href="mst.html" />
+    <link rel="prev" title="How it works" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/favicon.png" class="logo__image only-light" alt="phasecurvefit - Home"/>
+    <script>document.write(`<img src="../_static/favicon.png" class="logo__image only-dark" alt="phasecurvefit - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/GalacticDynamics/phasecurvefit" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/phasecurvefit/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/pypi/v/phasecurvefit" class="icon-link-image" alt="PyPI"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    phasecurvefit
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Start</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../start/what-it-does.html">What phasecurvefit does</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/is-it-right.html">Is phasecurvefit right for my data?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/install.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/quickstart.html">Quick start</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/density_fields.html">Fitting a Track Through a Density Image</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How-to guides</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../how-to/index.html">How-to guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/data.html">Prepare your data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/units.html">Use physical units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/choose-orderer.html">Choose an orderer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/chain-orderers.html">Chain orderers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/local-flow-walk.html">Use the local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/tune-metric.html">Choose and tune the walk’s metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/custom-metric.html">Write a custom metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/kdtree.html">Restrict the walk to nearby points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/som.html">Refine an ordering with a self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/autoencoder.html">Fill gaps and fit a track with the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/interpolate.html">Interpolate positions along an ordering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/outliers.html">Reject outliers with the mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/track-uncertainty.html">Put an uncertainty band on the track</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/jax.html">Compile, batch and differentiate with JAX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/gpu.html">Run on a GPU</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How it works</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">How it works</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">The local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mst.html">The MST backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="som.html">The self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoencoder.html">The autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="outliers.html">Outlier rejection with a mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="track-uncertainty.html">Track uncertainty</a></li>
+<li class="toctree-l2"><a class="reference internal" href="density-fields.html">Density fields</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/api.html">API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/options.html">Options and defaults</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/result.html">The ordering result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.3-to-v0.4.html">Migrating from v0.3 to v0.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.2-to-v0.3.html">Migrating from v0.2 to v0.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.1-to-v0.2.html">Migrating from v0.1 to v0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/citation.html">Citation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to phasecurvefit</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit/issues/new?title=Issue%20on%20page%20%2Fexplanation/walk.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/explanation/walk.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>The local-flow walk</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-walk">The walk</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-default-metric">The default metric</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-other-metrics">The other metrics</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-velocities-matter-where-a-curve-crosses-itself">Why velocities matter where a curve crosses itself</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#stopping">Stopping</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#walking-backwards-and-both-ways">Walking backwards and both ways</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#references">References</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="the-local-flow-walk">
+<h1>The local-flow walk<a class="headerlink" href="#the-local-flow-walk" title="Link to this heading">#</a></h1>
+<p>The local-flow walk orders samples by following the velocity field from a start
+point, one step at a time. It is the algorithm of Nibauer et al. (2022), and
+<a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.LocalFlowOrderer" title="phasecurvefit.orderers.LocalFlowOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a> runs it. <a class="reference internal" href="../how-to/local-flow-walk.html"><span class="doc">Use the local-flow walk</span></a>
+shows how to set it up.</p>
+<section id="the-walk">
+<h2>The walk<a class="headerlink" href="#the-walk" title="Link to this heading">#</a></h2>
+<p>The walk only needs a way to score how close each candidate point is to the current
+one. From the start point it repeats four steps:</p>
+<ol class="arabic simple">
+<li><p>Score every unvisited point against the current point with the distance metric.</p></li>
+<li><p>Pick the point with the lowest score.</p></li>
+<li><p>Step to it and mark it visited.</p></li>
+<li><p>Stop if a termination condition holds.</p></li>
+</ol>
+<p>The metric is pluggable, so the same walk can follow the flow, ignore velocities, or
+use a distance you write yourself (<a class="reference internal" href="../how-to/custom-metric.html"><span class="doc">Write a custom metric</span></a>).</p>
+</section>
+<section id="the-default-metric">
+<h2>The default metric<a class="headerlink" href="#the-default-metric" title="Link to this heading">#</a></h2>
+<p>The default, <a class="reference internal" href="../reference/api.html#phasecurvefit.metrics.AlignedMomentumDistanceMetric" title="phasecurvefit.metrics.AlignedMomentumDistanceMetric"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlignedMomentumDistanceMetric</span></code></a>, is the
+“nearest neighbours with momentum” (NN+p) metric. It combines distance with a penalty
+for stepping away from the direction of travel:</p>
+<div class="math notranslate nohighlight">
+\[d = d_0 + \lambda \, (1 - \cos\theta)\]</div>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(d_0 = \lVert \mathbf{q}_{\text{candidate}} - \mathbf{q}_{\text{current}} \rVert\)</span> is
+the distance in position.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\cos\theta = \hat{\mathbf{u}} \cdot \hat{\mathbf{v}}\)</span> is the cosine of the angle
+between the current point’s velocity <span class="math notranslate nohighlight">\(\hat{\mathbf{v}}\)</span> and the direction
+<span class="math notranslate nohighlight">\(\hat{\mathbf{u}} = (\mathbf{q}_{\text{candidate}} - \mathbf{q}_{\text{current}}) / d_0\)</span>
+to the candidate.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\lambda \ge 0\)</span> is <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>.</p></li>
+</ul>
+<p>A candidate straight ahead costs nothing extra, one at right angles costs <span class="math notranslate nohighlight">\(\lambda\)</span>,
+and one straight behind costs <span class="math notranslate nohighlight">\(2\lambda\)</span>. So the walk favours points that are close
+and roughly ahead of it, but a much closer point off to the side can still win.</p>
+<p><span class="math notranslate nohighlight">\(\lambda\)</span> is a length, so its effect depends on the spacing <span class="math notranslate nohighlight">\(s\)</span> between neighbouring
+points. At <span class="math notranslate nohighlight">\(\lambda = 0\)</span> the walk is a plain nearest-neighbour search. At
+<span class="math notranslate nohighlight">\(\lambda = s\)</span>, a neighbour at <span class="math notranslate nohighlight">\(90°\)</span> and distance <span class="math notranslate nohighlight">\(s\)</span> costs <span class="math notranslate nohighlight">\(2s\)</span>, the same as a point
+straight ahead at <span class="math notranslate nohighlight">\(2s\)</span>. As <span class="math notranslate nohighlight">\(\lambda\)</span> grows, direction dominates and the walk takes
+longer strides along the flow, skipping points off to the side. For a thin stream
+that is often what you want, since the autoencoder can order the skipped points
+afterwards (<a class="reference internal" href="autoencoder.html"><span class="doc">The autoencoder</span></a>).</p>
+<p>For a stellar stream the penalty encodes that member stars follow coherent orbits: the
+next star along the stream is likely to be close and to lie in the direction the
+stream is moving.</p>
+</section>
+<section id="the-other-metrics">
+<h2>The other metrics<a class="headerlink" href="#the-other-metrics" title="Link to this heading">#</a></h2>
+<p><a class="reference internal" href="../reference/api.html#phasecurvefit.metrics.FullPhaseSpaceDistanceMetric" title="phasecurvefit.metrics.FullPhaseSpaceDistanceMetric"><code class="xref py py-class docutils literal notranslate"><span class="pre">FullPhaseSpaceDistanceMetric</span></code></a> is the Euclidean distance
+in phase space,</p>
+<div class="math notranslate nohighlight">
+\[d = \sqrt{d_0^2 + (\tau \, d_v)^2},\]</div>
+<p>where <span class="math notranslate nohighlight">\(d_v\)</span> is the distance in velocity and <span class="math notranslate nohighlight">\(\tau\)</span>, the <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>, is a time that
+converts velocity into position units. If positions are in kpc and velocities in
+kpc/Myr, <span class="math notranslate nohighlight">\(\tau\)</span> in Myr makes the phase space uniformly scaled. It treats all
+directions alike, with no preference for the direction of travel.</p>
+<p><a class="reference internal" href="../reference/api.html#phasecurvefit.metrics.SpatialDistanceMetric" title="phasecurvefit.metrics.SpatialDistanceMetric"><code class="xref py py-class docutils literal notranslate"><span class="pre">SpatialDistanceMetric</span></code></a> is the distance in position,
+<span class="math notranslate nohighlight">\(d = d_0\)</span>, and ignores velocity and <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>. The default metric with
+<span class="math notranslate nohighlight">\(\lambda = 0\)</span> gives the same result.</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Metric</p></th>
+<th class="head text-center"><p>Uses position</p></th>
+<th class="head text-center"><p>Uses velocity</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">metric_scale</span></code> is</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">SpatialDistanceMetric</span></code></p></td>
+<td class="text-center"><p>yes</p></td>
+<td class="text-center"><p>no</p></td>
+<td><p>ignored</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">AlignedMomentumDistanceMetric</span></code></p></td>
+<td class="text-center"><p>yes</p></td>
+<td class="text-center"><p>its direction</p></td>
+<td><p>a length: the penalty for a right-angle step</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">FullPhaseSpaceDistanceMetric</span></code></p></td>
+<td class="text-center"><p>yes</p></td>
+<td class="text-center"><p>its magnitude and direction</p></td>
+<td><p>a time: converts velocity to position units</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The MST’s opt-in velocity options reuse the same alignment idea, applied to the
+cosine <span class="math notranslate nohighlight">\(\cos(v_i, v_j)\)</span> between two samples’ velocities on each graph edge
+(<a class="reference internal" href="mst.html"><span class="doc">The MST backbone</span></a>).</p>
+</section>
+<section id="why-velocities-matter-where-a-curve-crosses-itself">
+<h2>Why velocities matter where a curve crosses itself<a class="headerlink" href="#why-velocities-matter-where-a-curve-crosses-itself" title="Link to this heading">#</a></h2>
+<p>The metrics differ most where a curve crosses itself. At a crossing the nearest point
+is often on the other branch, and only a metric that uses velocity keeps the walk on
+its own branch. An epitrochoid crosses itself many times:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phasecurvefit.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlignedMomentumDistanceMetric</span><span class="p">,</span> <span class="n">SpatialDistanceMetric</span>
+
+<span class="c1"># An epitrochoid, stored in order along t, with an open 10-degree gap</span>
+<span class="n">t</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="mi">5</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="mi">355</span><span class="p">),</span> <span class="mi">300</span><span class="p">)</span>
+<span class="n">R</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">d</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">4.5</span>
+<span class="n">k</span> <span class="o">=</span> <span class="p">(</span><span class="n">R</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span> <span class="o">/</span> <span class="n">r</span>
+<span class="n">pos</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">R</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">-</span> <span class="n">d</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">k</span> <span class="o">*</span> <span class="n">t</span><span class="p">),</span>
+    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">R</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">-</span> <span class="n">d</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">k</span> <span class="o">*</span> <span class="n">t</span><span class="p">),</span>
+<span class="p">}</span>
+<span class="n">vel</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="o">-</span><span class="p">(</span><span class="n">R</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">+</span> <span class="n">d</span> <span class="o">*</span> <span class="n">k</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">k</span> <span class="o">*</span> <span class="n">t</span><span class="p">),</span>
+    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">R</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">-</span> <span class="n">d</span> <span class="o">*</span> <span class="n">k</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">k</span> <span class="o">*</span> <span class="n">t</span><span class="p">),</span>
+<span class="p">}</span>
+
+<span class="c1"># metric_scale is about 20 times the point spacing (~0.57) for the momentum</span>
+<span class="c1"># metric, and ignored by the spatial one.</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;Spatial&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">SpatialDistanceMetric</span><span class="p">(),</span> <span class="mf">0.0</span><span class="p">),</span>
+    <span class="s2">&quot;Aligned momentum&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">AlignedMomentumDistanceMetric</span><span class="p">(),</span> <span class="mf">12.0</span><span class="p">),</span>
+<span class="p">}</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axs</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">),</span> <span class="n">sharex</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="p">(</span><span class="n">metric</span><span class="p">,</span> <span class="n">scale</span><span class="p">))</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axs</span><span class="p">,</span> <span class="n">metrics</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">WalkConfig</span><span class="p">(</span><span class="n">metric</span><span class="o">=</span><span class="n">metric</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
+        <span class="n">pos</span><span class="p">,</span>
+        <span class="n">vel</span><span class="p">,</span>
+        <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span> <span class="n">start_idx</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metric_scale</span><span class="o">=</span><span class="n">scale</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="c1"># Steps that jump more than 5 places along the true curve</span>
+    <span class="n">n_jumps</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">ordering</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">n_jumps</span><span class="si">}</span><span class="s2"> jumps between branches&quot;</span><span class="p">)</span>
+
+    <span class="n">ordered_pos</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order_w</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">pos</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;0.75&quot;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ordered_pos</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">ordered_pos</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">n_jumps</span><span class="si">}</span><span class="s2"> jumps&quot;</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;equal&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Spatial: 56 jumps between branches
+</pre></div>
+</div>
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Aligned momentum: 3 jumps between branches
+</pre></div>
+</div>
+<img alt="../_images/09a083e6459b8326b709fcfd15bae2b910be9e5b7dfb74fbb94ed220ae8ee943.png" src="../_images/09a083e6459b8326b709fcfd15bae2b910be9e5b7dfb74fbb94ed220ae8ee943.png" />
+</div>
+</div>
+<p>The spatial walk cuts across the crossings, and the momentum walk follows the loops.</p>
+</section>
+<section id="stopping">
+<h2>Stopping<a class="headerlink" href="#stopping" title="Link to this heading">#</a></h2>
+<p>The walk stops when no unvisited point remains, or earlier when one of its stopping
+conditions holds: the next step would be longer than <code class="docutils literal notranslate"><span class="pre">max_dist</span></code> in position, the walk
+reached one of <code class="docutils literal notranslate"><span class="pre">terminate_indices</span></code>, or it has taken <code class="docutils literal notranslate"><span class="pre">n_max</span></code> points. Points it never
+reaches are reported as skipped, with <code class="docutils literal notranslate"><span class="pre">-1</span></code> in the padded <code class="docutils literal notranslate"><span class="pre">indices</span></code>.</p>
+<p>In pseudocode:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>visited ← {start};  order ← [start];  current ← start
+while len(order) &lt; n_max and current ∉ terminate_indices:
+    score[i] ← metric(current, i)  for every unvisited i
+    best ← argmin(score)
+    if no unvisited point remains: stop
+    if spatial distance from current to best &gt; max_dist: stop    # a gap
+    append best to order;  mark best visited;  current ← best
+skipped ← every point not visited
+</pre></div>
+</div>
+</section>
+<section id="walking-backwards-and-both-ways">
+<h2>Walking backwards and both ways<a class="headerlink" href="#walking-backwards-and-both-ways" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">direction=&quot;backward&quot;</span></code> negates the velocities, which is the same as reversing time,
+so the walk traces the flow in the opposite direction. <code class="docutils literal notranslate"><span class="pre">direction=&quot;both&quot;</span></code> runs a
+forward and a backward walk from the same start and joins them with
+<a class="reference internal" href="../reference/api.html#phasecurvefit.combine_results" title="phasecurvefit.combine_results"><code class="xref py py-func docutils literal notranslate"><span class="pre">combine_results()</span></code></a>, so the ordering runs from the backward end,
+through the start, to the forward end. That suits a stream flowing away from a central
+progenitor in both directions.</p>
+<p>Because the walk follows the flow, it needs a start point at an end of the curve, or
+at the progenitor for a stream that flows both ways. When no start point is known,
+the MST orders the curve without one (<a class="reference internal" href="mst.html"><span class="doc">The MST backbone</span></a>).</p>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading">#</a></h2>
+<p>Nibauer, J., Belokurov, V., Cranmer, M., Goodman, J., &amp; Ho, S. (2022). “Charting
+Galactic Accelerations with Stellar Streams and Machine Learning.” ApJ 940, 22.
+<a class="reference external" href="https://arxiv.org/abs/2205.11767">arXiv:2205.11767</a>,
+doi:<a class="reference external" href="https://doi.org/10.3847/1538-4357/ac93ee">10.3847/1538-4357/ac93ee</a>.</p>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">How it works</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="mst.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">The MST backbone</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-walk">The walk</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-default-metric">The default metric</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-other-metrics">The other metrics</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-velocities-matter-where-a-curve-crosses-itself">Why velocities matter where a curve crosses itself</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#stopping">Stopping</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#walking-backwards-and-both-ways">Walking backwards and both ways</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#references">References</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By phasecurvefit Developers
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, phasecurvefit Developers.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
