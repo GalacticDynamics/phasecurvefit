@@ -15,10 +15,10 @@ This guide shows how to use the orderers under `jit`, `vmap` and `grad`.
 - {class}`~phasecurvefit.orderers.LocalFlowOrderer`,
   {class}`~phasecurvefit.orderers.MSTOrderer` and
   {class}`~phasecurvefit.orderers.SOMOrderer` work under `jit`, `vmap` and `grad`,
-  on their own and chained ({doc}`som`).
+  on their own and chained ([](som.md)).
 - So does the default pipeline, `pcf.order(pos, vel)` with no orderer.
 - Calling any result to interpolate along it, `result(gamma)`, traces whichever
-  orderer produced it ({doc}`interpolate`).
+  orderer produced it ([](interpolate.md)).
 
 The examples below use the local-flow walk.
 
@@ -173,4 +173,4 @@ with jax.disable_jit():
     )
 ```
 
-To run the same code on a GPU, see {doc}`gpu`.
+To run the same code on a GPU, see [](gpu.md).

@@ -27,10 +27,10 @@ uv add phasecurvefit --extra all
 | Extra | Adds | Needed for |
 |---|---|---|
 | (none) | the core library | ordering and fitting plain JAX arrays |
-| `interop` | `unxt` | inputs with physical units ({doc}`../how-to/units`) |
-| `kdtree` | `jaxkd` | the {class}`~phasecurvefit.strats.KDTree` query strategy ({doc}`../how-to/kdtree`) |
+| `interop` | `unxt` | inputs with physical units ([](../how-to/units.md)) |
+| `kdtree` | `jaxkd` | the {class}`~phasecurvefit.strats.KDTree` query strategy ([](../how-to/kdtree.md)) |
 | `all` | `interop` and `kdtree` | all optional runtime features |
-| `tutorials` | `all`, plus `matplotlib` and `galax` | running the {doc}`tutorial notebooks <../tutorials/index>` |
+| `tutorials` | `all`, plus `matplotlib` and `galax` | running the [tutorial notebooks](../tutorials/index.md) |
 
 `all` leaves out `tutorials` on purpose: `all` is for optional features of the
 library, while `tutorials` holds packages that only the example notebooks need.
@@ -80,7 +80,7 @@ CUDA toolkit installed system-wide, but you do need a
 [compatible NVIDIA driver](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu).
 The [JAX installation guide](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu)
 covers other CUDA versions, TPUs and ROCm. Your code needs no changes to run on the
-GPU; {doc}`../how-to/gpu` shows how to check which device JAX is using.
+GPU; [](../how-to/gpu.md) shows how to check which device JAX is using.
 
 ## Install the development version
 
@@ -101,4 +101,4 @@ cd phasecurvefit
 uv pip install -e .
 ```
 
-{doc}`../contributing` describes the development setup and how to run the tests.
+[](../contributing.md) describes the development setup and how to run the tests.

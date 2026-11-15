@@ -16,7 +16,7 @@ literally also settles how the weights enter membership.
 
 ### In the mixture model
 
-The mixture model of {doc}`outliers` gives each sample the likelihood
+The mixture model of [](outliers.md) gives each sample the likelihood
 
 $$
 \mathcal{L}_n = \pi_n \mathcal{N}_n + (1 - \pi_n)\,\rho_{\mathrm{bg}} ,
@@ -59,7 +59,7 @@ mass of members at that sample.
 The SOM's outlier mixture follows the same rule: a weight multiplies a sample's terms
 in the prototype update and in the fits of the member fraction and the curve's width,
 and doesn't appear in the sample's membership, which depends on where the sample is
-and on the model ({doc}`som`).
+and on the model ([](som.md)).
 
 For an image the sum has a continuum limit. With each pixel weighted by the image
 $I(q)$, the loss tends, as the pixels shrink, to
@@ -91,7 +91,7 @@ log-likelihood $\sum_n p_n \log \mathcal{L}_n$, the same loss as above.
 
 The encoder's first training phase learns its membership as a classifier, pushing
 the ordered samples towards 1 and uniform random points towards 0
-({doc}`outliers`). Its membership term is left unweighted. Weighting only the ordered
+([](outliers.md)). Its membership term is left unweighted. Weighting only the ordered
 samples would let a faint pixel count less against the same random points around
 it, and its membership would drop below the threshold. That comes from the random
 points, which have no weights of their own; weighting consistently would mean
@@ -162,7 +162,7 @@ $\gamma$ to vary across it. A wide field leaves that room, and two things go wro
   jittering around the track. On a uniform tube of half-width 0.5, batches of 1000
   brought the track's largest error away from its ends from 0.11 to 0.04.
 
-{doc}`../how-to/autoencoder` shows the two settings.
+[](../how-to/autoencoder.md) shows the two settings.
 
 ## Where the track ends
 

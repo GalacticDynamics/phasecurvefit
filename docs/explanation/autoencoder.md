@@ -7,7 +7,7 @@ in the [stream autoencoder tutorial](../tutorials/stream_autoencoder.md), the wa
 orders 248 of 8000 stars. An outlier-rejecting chain also leaves samples out on
 purpose. And any orderer gives only an order, not a curve you can evaluate. The
 autoencoder, from Appendix A.2 of Nibauer et al. (2022), fills both gaps.
-{doc}`../how-to/autoencoder` shows how to train it.
+[](../how-to/autoencoder.md) shows how to train it.
 
 ## Two networks
 
@@ -46,7 +46,7 @@ every step of an MCMC. It cuts inside tight bends, by an amount set by the windo
 
 The encoder's membership probability is trained as a classifier against random
 points, and on its own it cannot reject interlopers that the orderer threaded into the
-ordering. {doc}`outliers` explains why, and the mixture model that fixes it.
+ordering. [](outliers.md) explains why, and the mixture model that fixes it.
 
 ## Interlopers at the tips
 
@@ -64,7 +64,7 @@ Two things guard against this.
   bends out to a handful of interlopers passes them one at a time, with empty bins
   in between, and that stretch is cut. This applies to every trained result.
 - {func}`~phasecurvefit.fit_track` can order with the SOM's outlier mixture,
-  `outlier_mixture=SOMMixture()` ({doc}`som`). A sample the mixture calls background
+  `outlier_mixture=SOMMixture()` ([](som.md)). A sample the mixture calls background
   is left out of the ordering, so the encoder learns it as a non-member and the track
   has no reason to reach for it. On the gapped stream this left out 13 of the 16
   interlopers and none of the 404 members. It is on by default. Samples that fill
@@ -89,7 +89,7 @@ member of the sine streams except one on the widest. On the widest stream the
 interlopers sit among the members, the mixture left out only 4, and the track strayed
 further than without it.
 
-The mixture model of {doc}`outliers` also removes the hook, but it is not on by
+The mixture model of [](outliers.md) also removes the hook, but it is not on by
 default. On the clean loop it rejected between a quarter and three fifths of the
 genuine members on three of six seeds (issue #257).
 

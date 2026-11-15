@@ -2,7 +2,7 @@
 
 {class}`~phasecurvefit.orderers.MSTOrderer` orders samples along the backbone of a
 minimum spanning tree. It is the first stage of the default pipeline, and it needs no
-start point. {doc}`../how-to/choose-orderer` shows how to set it up.
+start point. [](../how-to/choose-orderer.md) shows how to set it up.
 
 ## From a graph to an ordering
 
@@ -47,7 +47,7 @@ $\cos(v_i, v_j)$ between the two samples' velocities on an edge:
 
 On a curve that crosses itself many times these options are necessary, but a walk
 that follows the velocity is usually the better tool there
-({doc}`walk`, {doc}`../tutorials/epitrochoid_mst`). The MST suits single,
+([](walk.md), [](../tutorials/epitrochoid_mst.md)). The MST suits single,
 near-closed loops best.
 
 ## Why the default pipeline configures it differently
@@ -60,7 +60,7 @@ crosses straight over instead of turning onto the other branch;
 `orient_by_velocity=True`, so $\gamma$ follows the flow; and
 `on_disconnected="connect"`, so a gap in a stream that splits the neighbour graph is
 bridged along the shortest links instead of losing one side. Because the MST used
-velocities, the SOM after it does too ({doc}`som`). A sample with a missing velocity
+velocities, the SOM after it does too ([](som.md)). A sample with a missing velocity
 joins the tree as a leaf and is skipped when orienting.
 
 The value 30 was chosen on a looped test track that crosses itself once, drawn 8
@@ -77,7 +77,7 @@ An MST threads every sample into the tree, including interlopers, along their
 cheapest edge. `edge_clip_sigma` clips edges whose length is an outlier among the
 tree's edges, iterating up to `edge_clip_max_iters` times, and leaves the samples it
 cuts off unvisited. A {class}`~phasecurvefit.orderers.SOMOrderer` chained after it
-works only on the samples the MST kept ({doc}`som`).
+works only on the samples the MST kept ([](som.md)).
 
 ## Running under JAX
 
@@ -86,4 +86,4 @@ bridging) runs in pure JAX, so the MST works under `jit`, `vmap` and `grad` with
 calling back to the host. The neighbour search uses SciPy on concrete inputs, which
 is fastest on CPU but cannot be traced, and the JAX-native
 {class}`~phasecurvefit.neighbors.BucketKDTree` on traced inputs
-({doc}`../how-to/jax`).
+([](../how-to/jax.md)).
