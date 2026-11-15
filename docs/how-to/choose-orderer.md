@@ -8,8 +8,8 @@ kernelspec:
 
 # Choose an orderer
 
-This guide shows how to pick the orderer that suits your curve. {doc}`../explanation/mst`,
-{doc}`../explanation/walk` and {doc}`../explanation/som` explain how each one works.
+This guide shows how to pick the orderer that suits your curve. [](../explanation/mst.md),
+[](../explanation/walk.md) and [](../explanation/som.md) explain how each one works.
 
 ## Start with the default
 
@@ -28,12 +28,12 @@ its mechanism fits your data better:
 
 The walk and the MST complement each other. The walk needs a start point and
 follows the flow. Where the velocity reverses at a progenitor it has to start at the
-progenitor and walk both ways ({doc}`local-flow-walk`). The MST needs no start point,
+progenitor and walk both ways ([](local-flow-walk.md)). The MST needs no start point,
 because the longest path of the tree finds the two ends itself.
 
 ## Order with the local-flow walk
 
-Give the walk a start index and a `metric_scale` ({doc}`tune-metric`):
+Give the walk a start index and a `metric_scale` ([](tune-metric.md)):
 
 ```{code-cell} python
 import jax.numpy as jnp
@@ -48,7 +48,7 @@ res = pcf.order(pos, vel, walk)
 assert int(res.n_visited) == 20
 ```
 
-{doc}`local-flow-walk` covers its options: direction, gaps and stopping conditions.
+[](local-flow-walk.md) covers its options: direction, gaps and stopping conditions.
 
 ## Order with the MST alone
 
@@ -97,18 +97,18 @@ res = pcf.order(pos, vel, mst)
 
 On a curve that crosses itself many times, the MST needs these options to stay on
 its own branch, and the local-flow walk is usually the better choice
-({doc}`../tutorials/epitrochoid_mst`).
+([](../tutorials/epitrochoid_mst.md)).
 
 ## Refine with the SOM
 
 A {class}`~phasecurvefit.orderers.SOMOrderer` smooths an ordering it is handed.
-Chain it after another orderer ({doc}`chain-orderers`); {doc}`som` covers its
+Chain it after another orderer ([](chain-orderers.md)); [](som.md) covers its
 options.
 
 ## Order a density field
 
 For an image of a stream, make each pixel a sample weighted by its density
-({doc}`data`) and order with a {class}`~phasecurvefit.orderers.RidgeOrderer`. It
+([](data.md)) and order with a {class}`~phasecurvefit.orderers.RidgeOrderer`. It
 follows the ridge of the weighted density, so it finds the middle of a wide or
 blurred stream where the MST's longest path wanders across it. It works out the
 stream's width from the data. Chain a SOM to refine it:

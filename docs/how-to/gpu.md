@@ -10,7 +10,7 @@ kernelspec:
 
 This guide shows how to check that phasecurvefit runs on your GPU.
 
-First install JAX's CUDA-enabled build ({doc}`../start/install`). A plain install
+First install JAX's CUDA-enabled build ([](../start/install.md)). A plain install
 runs on the CPU and warns that a CUDA-enabled `jaxlib` is not installed.
 
 Your code needs no changes. JAX places arrays and computations on the first
@@ -32,7 +32,7 @@ print(result.indices.devices())
 ```
 
 The MST's SciPy neighbour search runs on the host. Under `jit` the MST switches to
-the JAX kd-tree, which runs on the device ({doc}`jax`).
+the JAX kd-tree, which runs on the device ([](jax.md)).
 
 The [JAX installation guide](https://docs.jax.dev/en/latest/installation.html)
 covers other CUDA versions, TPUs and ROCm.

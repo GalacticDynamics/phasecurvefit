@@ -10,7 +10,7 @@ kernelspec:
 
 This guide shows how to give every sample a value of $\gamma$, including samples an
 orderer left out, and fit a smooth mean track through them.
-{doc}`../explanation/autoencoder` explains how the network is trained.
+[](../explanation/autoencoder.md) explains how the network is trained.
 
 ## In one call
 
@@ -38,7 +38,7 @@ epoch.
 
 By default `fit_track` leaves out of the ordering the samples its outlier mixture
 calls background, so the track does not bend out to interlopers at its ends
-({doc}`../explanation/autoencoder` explains how). Left-out samples have `-1` in
+([](../explanation/autoencoder.md) explains how). Left-out samples have `-1` in
 `ordering.indices`. Pass `outlier_mixture=None` to keep every sample in the ordering:
 
 ```{code-cell} python
@@ -120,12 +120,12 @@ result, _, losses = pcf.nn.train_autoencoder(
 - `n_epochs_encoder` defaults to 800. A few hundred gives a quicker, rougher fit.
 - `batch_size`: larger batches are more stable but use more memory.
 
-{doc}`../reference/options` lists every setting with its default.
+[](../reference/options.md) lists every setting with its default.
 
 ### Train on an image or a wide curve
 
 When the samples spread wide across the track, as the pixels of an image do, freeze
-the encoder in the joint phase and use large batches ({doc}`../explanation/density-fields`
+the encoder in the joint phase and use large batches ([](../explanation/density-fields.md)
 explains why):
 
 ```{code-cell} python
@@ -157,4 +157,4 @@ the trained decoder. The
 [stream running-mean tutorial](../tutorials/stream_runningmean.md) shows how, and
 when it is accurate enough.
 
-To reject interlopers while training, see {doc}`outliers`.
+To reject interlopers while training, see [](outliers.md).

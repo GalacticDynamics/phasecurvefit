@@ -37,7 +37,7 @@ indices = [3, 7, 1, 5, -1, -1]
 | `all_visited` | whether every sample was visited |
 | `skipped_indices` | the indices of the samples not visited |
 | `ordered` | positions and velocities reordered along the ordering |
-| `result(gamma)` | positions interpolated at $\gamma$ in `gamma_range` ({doc}`../how-to/interpolate`) |
+| `result(gamma)` | positions interpolated at $\gamma$ in `gamma_range` ([](../how-to/interpolate.md)) |
 
 {func}`~phasecurvefit.order_w` also returns the positions and velocities in order.
 
@@ -55,4 +55,4 @@ return an {class}`~phasecurvefit.nn.AutoencoderResult`. It has `positions`,
 | `model` | the trained network |
 | `track_range` | the range of $\gamma$ the track covers, for drawing it. By default each end is where the weighted number of members per unit length along the track falls below half its value just inside; with `TrainingConfig(track_ends="mask")` each end is read from the cap of a mask. Inside `gamma_range`, which still accepts every sample's $\gamma$ |
 
-Calling it, `result(gamma)`, evaluates the fitted track ({doc}`../how-to/autoencoder`).
+Calling it, `result(gamma)`, evaluates the fitted track ([](../how-to/autoencoder.md)).

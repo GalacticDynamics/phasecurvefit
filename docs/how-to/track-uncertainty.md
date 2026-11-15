@@ -10,7 +10,7 @@ kernelspec:
 
 This guide shows how to fit a track together with fits to bootstrap resamples of the
 data, and draw a band whose width is the track's uncertainty.
-{doc}`../explanation/track-uncertainty` explains what the band includes, how well it
+[](../explanation/track-uncertainty.md) explains what the band includes, how well it
 is calibrated, and why it is a bootstrap and not a Bayesian neural network.
 
 ## Fit the ensemble
@@ -104,4 +104,4 @@ ensemble.offsets(gamma).shape
 `weights` are resampled along with the samples, so a resampled sample keeps its
 weight. A bootstrap treats each sample as one independent draw. The band is then an
 honest uncertainty for stars, but not for the pixels of an image, which are not
-independent draws ({doc}`../explanation/density-fields`).
+independent draws ([](../explanation/density-fields.md)).

@@ -37,7 +37,7 @@ result = pcf.order(position, velocity)
 The keys must match: `pcf.order` raises a `ValueError` naming the keys that are
 missing or extra. Dictionaries are JAX PyTrees, so `jax.tree.map` applies a function
 to every coordinate at once, and the orderers work under `jit` and `vmap`
-({doc}`jax`).
+([](jax.md)).
 
 ## Convert NumPy or pandas data
 
@@ -103,4 +103,4 @@ Every array in both dictionaries must have the same length:
 print(jax.tree.map(lambda a: a.shape, position))
 ```
 
-To attach physical units, see {doc}`units`.
+To attach physical units, see [](units.md).

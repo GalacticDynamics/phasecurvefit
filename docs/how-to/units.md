@@ -10,7 +10,7 @@ kernelspec:
 
 This guide shows how to order data that carries physical units, as
 [`unxt`](https://unxt.readthedocs.io) Quantities. It needs the `interop` extra
-({doc}`../start/install`).
+([](../start/install.md)).
 
 ## Pass a unit system
 
@@ -38,7 +38,7 @@ Parameters that are lengths or times take a Quantity too. For the local-flow wal
 `metric_scale` has the units its metric expects: a length for the default
 {class}`~phasecurvefit.metrics.AlignedMomentumDistanceMetric`, and a time for
 {class}`~phasecurvefit.metrics.FullPhaseSpaceDistanceMetric`
-({doc}`tune-metric`).
+([](tune-metric.md)).
 
 ```{code-cell} python
 from phasecurvefit.metrics import FullPhaseSpaceDistanceMetric

@@ -4,7 +4,7 @@ The autoencoder's default membership is bad at finding outliers. Stars that are
 plainly not on the stream survive as members, and because they survive they pull the
 fitted track towards themselves, worst at the ends, where there is least data to hold
 it in place. This page explains why, and how modelling the background fixes it.
-{doc}`../how-to/outliers` shows how to turn it on.
+[](../how-to/outliers.md) shows how to turn it on.
 
 ## Why the default membership cannot reject anything
 
@@ -72,7 +72,7 @@ surface density with a physical meaning, rather than a hand-picked cut. Hogg et 
 argue against sigma-clipping and hand-tuned cuts for the same reason.
 
 With per-sample weights, each sample's term in the sum is multiplied by its weight,
-and its posterior membership doesn't change. {doc}`density-fields` derives this.
+and its posterior membership doesn't change. [](density-fields.md) derives this.
 
 The encoder's output is the prior $\pi_n$. The posterior membership, which
 {func}`~phasecurvefit.nn.posterior_membership` returns, also accounts for how far the

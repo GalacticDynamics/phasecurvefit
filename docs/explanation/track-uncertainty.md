@@ -4,7 +4,7 @@ A fitted track comes from one draw of the data, and a different draw from the sa
 stream would give a slightly different track. This page explains where that
 uncertainty comes from, why phasecurvefit estimates it with a bootstrap of the whole
 pipeline, and how well the resulting bands are calibrated.
-{doc}`../how-to/track-uncertainty` shows how to compute them.
+[](../how-to/track-uncertainty.md) shows how to compute them.
 
 ## Where the uncertainty enters
 
@@ -42,10 +42,10 @@ Every method below the bootstrap puts a posterior on the decoder only, given one
 ordering, one membership and one set of $\gamma$. A posterior also needs a likelihood.
 The default joint loss is a weighted sum of a squared distance and a velocity-alignment
 term, with no noise model, so a Gaussian noise level has to be added for any of them.
-The mixture model of {doc}`outliers` supplies one, $\sigma(\gamma)$, but only when it
+The mixture model of [](outliers.md) supplies one, $\sigma(\gamma)$, but only when it
 is turned on. With per-sample weights that are not counts, such as image intensities,
 the weighted loss is a pseudo-likelihood and its curvature isn't an uncertainty
-({doc}`density-fields`).
+([](density-fields.md)).
 
 The decoder's last layer is linear, so with a Gaussian likelihood and prior the
 posterior over it is Gaussian, and the Laplace approximation is exact. HMC on the

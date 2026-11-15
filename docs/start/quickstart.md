@@ -10,7 +10,7 @@ kernelspec:
 
 This page takes you from positions and velocities in an unknown order to an ordering
 and a smooth track through them. It needs phasecurvefit and `matplotlib`
-({doc}`install`). It takes about a minute to run.
+([](install.md)). It takes about a minute to run.
 
 ## Your data
 
@@ -124,7 +124,7 @@ print(abs(np.corrcoef(rank(fitted.gamma), rank(t))[0, 1]))
 You ordered 400 shuffled points without a start point, gave each a value of
 $\gamma$, and fitted a smooth track you can evaluate anywhere along the curve.
 
-- {doc}`../tutorials/index`: complete analyses of simulated stellar streams and of a
+- [](../tutorials/index.md): complete analyses of simulated stellar streams and of a
   curve that crosses itself.
-- {doc}`is-it-right`: which orderer suits your data.
-- {doc}`../how-to/index`: tune the ordering, the metric and the training.
+- [](is-it-right.md): which orderer suits your data.
+- [](../how-to/index.md): tune the ordering, the metric and the training.

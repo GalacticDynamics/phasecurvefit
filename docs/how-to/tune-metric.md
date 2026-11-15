@@ -9,7 +9,7 @@ kernelspec:
 # Choose and tune the walk's metric
 
 This guide shows how to pick the distance metric the local-flow walk uses, and how to
-set its `metric_scale`. {doc}`../explanation/walk` explains what each metric
+set its `metric_scale`. [](../explanation/walk.md) explains what each metric
 computes.
 
 ## Pick a metric
@@ -44,7 +44,7 @@ result = pcf.order(
   unreliable, or as a position-only baseline to compare against. It ignores
   `metric_scale`.
 
-To write your own metric, see {doc}`custom-metric`.
+To write your own metric, see [](custom-metric.md).
 
 ## Set `metric_scale`
 
@@ -94,6 +94,6 @@ for scale in (0.0, 1.0, 5.0):
 
 Look at the ordering after every change. If it jumps between strands, the velocity
 term is too weak: raise `metric_scale`. If the walk stops early or skips most points,
-the term may be too strong, or `max_dist` too small ({doc}`local-flow-walk`).
+the term may be too strong, or `max_dist` too small ([](local-flow-walk.md)).
 
-To use physical units for `metric_scale`, see {doc}`units`.
+To use physical units for `metric_scale`, see [](units.md).
