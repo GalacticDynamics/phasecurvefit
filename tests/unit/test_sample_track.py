@@ -540,3 +540,20 @@ def test_divergence_raises(monkeypatch):
     pos, vel = _arc(40)
     with pytest.raises(RuntimeError, match="diverged"):
         pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=50, n_draws=2)
+
+
+# ---- ninth review -------------------------------------------------------------
+
+
+def test_array_tracks_give_array_bands(post):
+    g = _interior(post, 3)
+    assert isinstance(post.radius(g), jax.Array)
+    assert isinstance(post.offsets(g), jax.Array)
+
+
+def test_one_dimensional_band_is_zero():
+    """With one position component there is no direction across the track."""
+    x = jnp.linspace(0.0, 10.0, 60) + 0.05 * jax.random.normal(jax.random.key(2), (60,))
+    pos, vel = {"x": x}, {"x": jnp.ones(60)}
+    post = pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=200, n_draws=4)
+    np.testing.assert_array_equal(post.radius(jnp.array([0.0])), 0.0)

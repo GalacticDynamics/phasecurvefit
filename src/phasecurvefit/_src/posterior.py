@@ -355,7 +355,7 @@ class TrackPosterior(TrackEnsemble):
     Compare draws in space, as ``offsets`` does, and not at equal $\gamma$.
     With the latent line density a draw's $\gamma$ can shift along the track,
     and on test arcs the central 68% of the draws' points at one $\gamma$
-    spanned 3.6 to 5 times the 68% radius along it.
+    spanned 3.6 to 5.1 times the 68% radius along it.
 
     Attributes
     ----------
@@ -573,6 +573,16 @@ def _model_options(
         )
         raise ValueError(msg)
     return ints["n_q"], ints["n_basis"], ints["n_grid"], flags[0], flags[1], tie
+
+
+def _require_finite(samples: dict[str, Array], method: str, /) -> None:
+    """Raise when any posterior draw is not finite."""
+    if not all(bool(jnp.all(jnp.isfinite(v))) for v in samples.values()):
+        msg = (
+            f"{method} returned draws that are not finite; try more tracers "
+            "or another key."
+        )
+        raise RuntimeError(msg)
 
 
 def _check_options(
@@ -814,6 +824,7 @@ def sample_track(
         samples = {k: v[:n_draws] for k, v in mcmc.get_samples().items()}
 
     samples = {k: v for k, v in samples.items() if k != "loglik"}
+    _require_finite(samples, method)
     _, _, n_mean = _layout(z.shape[1], n_q, velocity_tie)
     build: dict[str, Any] = {
         "n_q": n_q,
