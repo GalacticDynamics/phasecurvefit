@@ -237,15 +237,15 @@ cases, 8 seeds each, 200 draws. Loop uses `n_basis=32, n_grid=512`.
 
 | case  | 68%  | 95%  | hw68  | centre rms | time |
 | ----- | ---- | ---- | ----- | ---------- | ---- |
-| helix | 0.72 | 0.97 | 0.019 | 0.025      | 42 s |
+| helix | 0.72 | 0.97 | 0.019 | 0.018      | 42 s |
 | gap   | 0.68 | 0.95 | 0.023 | 0.023      | 49 s |
 | loop  | 0.73 | 0.96 | 0.018 | 0.017      | 71 s |
 | vary  | 0.85 | 0.99 | 0.015 | 0.015      | 31 s |
 
-Centre rms is the distance from the truth; for the 3-D helix that is √2 times
-the per-direction rms (0.018). Vary: width ratio 1.01, true width inside the
-draws' 68% at 0.63 of points, tail (s > 0.8) 68% coverage 0.75. `f_bg`
-0.001–0.003. Times on a shared machine.
+hw68 and centre rms are per direction across the track; for the 3-D helix the
+centre's rms distance from the truth is √2 times larger (0.025). Vary: width
+ratio 1.01, true width inside the draws' 68% at 0.63 of points, tail (s > 0.8)
+68% coverage 0.75. `f_bg` 0.001–0.003. Times on a shared machine.
 
 These are with `f_bg` started at 0.05 and the learning rate falling from 2e-2 to
 2e-4. An earlier run with a constant 2e-3 and `f_bg` started at random had not

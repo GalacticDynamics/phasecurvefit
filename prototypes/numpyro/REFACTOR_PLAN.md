@@ -58,8 +58,8 @@ pcf.track_model  # the NumPyro model, to use inside a user's own model
   own γ range. `TrackEnsemble`'s `offsets` and `radius` are reused by typing
   their members as anything callable on γ, not by copying them.
 - **Line density and γ-dependent width**: needed on the mock stream to reach the
-  sparse tails. Not yet tested against a known truth, so they ship off by
-  default until that test passes (below).
+  sparse tails. They passed the known-truth test (the `vary` case), so they ship
+  on by default.
 - **Weights**: documented as counts. Scaling them changes the band.
 - **Units**: decided at PR B, from the unxt investigation (`unxt-numpyro.md` in
   the shared notes). Each position's mean and one length scale stay Quantities;
@@ -71,9 +71,10 @@ pcf.track_model  # the NumPyro model, to use inside a user's own model
   only a Gaussian and `uniform_background_density`, which is reused); Bayesian
   NN decoders (NUTS did not mix at 338 weights); `AutoLaplaceApproximation`
   (silently zero width).
-- **Tests**: weights equal repeated rows; SVI band covers a known arc; tied
-  velocities fix a small loop; Quantity round trip; R̂ warning; missing-extra
-  error.
+- **Tests**: weights equal repeated rows; SVI band covers a known arc; the tie
+  prefers the velocities' direction; Quantity round trip; R̂ warning;
+  missing-extra error. A loop test was dropped: since #270 the default ordering
+  crosses straight over, so the tie has no bad start to fix.
 - **Docs**: `how-to/track-uncertainty.md` gets a posterior section next to the
   bootstrap; `explanation/track-uncertainty.md` gets the model; API reference
   and migration note.

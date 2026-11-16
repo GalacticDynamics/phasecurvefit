@@ -123,10 +123,10 @@ def test_nuts_warns_when_chains_disagree():
     pos, vel = _arc(60)
     with pytest.warns(RuntimeWarning, match="R-hat"):
         post = pcf.sample_track(
-            pos, vel, key=jax.random.key(0), method="nuts", n_warmup=5, n_draws=10
+            pos, vel, key=jax.random.key(0), method="nuts", n_warmup=5, n_draws=7
         )
     assert post.losses is None
-    assert len(post.members) == 10
+    assert len(post.members) == 7  # the fewest NUTS allows: 4 per chain
 
 
 def test_unknown_method_raises():
@@ -557,3 +557,55 @@ def test_one_dimensional_band_is_zero():
     pos, vel = {"x": x}, {"x": jnp.ones(60)}
     post = pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=200, n_draws=4)
     np.testing.assert_array_equal(post.radius(jnp.array([0.0])), 0.0)
+
+
+# ---- tenth review -------------------------------------------------------------
+
+
+def test_mixed_units_match_one_unit():
+    """Components in kpc and pc give the same track as all kpc."""
+    pos, vel = _arc(60)
+    meta = pcf.StateMetadata(usys=u.unitsystems.galactic)
+    vq = {k: u.Q(v, "km/s") for k, v in vel.items()}
+    kpc = {k: u.Q(v, "kpc") for k, v in pos.items()}
+    mixed = {"x": kpc["x"], "y": u.Q(1000 * pos["y"], "pc")}
+    run = {"key": jax.random.key(0), "metadata": meta, "n_steps": 200, "n_draws": 3}
+    a = pcf.sample_track(kpc, vq, **run).reference(jnp.asarray(0.2))
+    b = pcf.sample_track(mixed, vq, **run).reference(jnp.asarray(0.2))
+    for k in ("x", "y"):
+        np.testing.assert_allclose(
+            u.ustrip("kpc", b[k]), u.ustrip("kpc", a[k]), rtol=1e-3
+        )
+
+
+def test_track_range_holds_the_central_line_density(monkeypatch):
+    """A line density bunched near gamma = 0.8 gives a range that stops short of -1."""
+    grid = jnp.linspace(-1.0, 1.0, 64)
+    channels = jnp.zeros((1, 64, 4)).at[0, :, 2].set(-((grid - 0.8) ** 2) / 0.01)
+    monkeypatch.setattr(posterior, "_channels", lambda *_a: channels)
+    samples = {"alpha": jnp.ones((1, 4, 1)), "length": jnp.ones((1, 4, 1))}
+    samples |= {"beta": jnp.zeros((1, 4, 16)), "sigma": jnp.ones(1)}
+    (draw,) = posterior._draws(
+        samples,
+        n_q=2,
+        n_grid=64,
+        mean_channels=2,
+        line_density=True,
+        width_varies=True,
+        centre={"x": 0.0, "y": 0.0},
+        scale=1.0,
+    )
+    lo, hi = draw.track_range
+    assert 0.5 < lo < 0.8
+    assert 0.8 < hi <= 1.0
+
+
+def test_ordering_far_from_the_origin_in_other_units_is_accepted():
+    pos, vel = _arc(60)
+    meta = pcf.StateMetadata(usys=u.unitsystems.galactic)
+    vq = {k: u.Q(v, "km/s") for k, v in vel.items()}
+    pk = {"x": u.Q(8000.0 + pos["x"], "kpc"), "y": u.Q(pos["y"], "kpc")}
+    pp = {k: u.Q(1000 * u.ustrip("kpc", v), "pc") for k, v in pk.items()}
+    o = pcf.orderers.default_pipeline(pp, vq, metadata=meta)
+    z, centre, scale = posterior._scale(pk, vq)
+    posterior._check_ordering(z[:, :2], centre, scale, o)

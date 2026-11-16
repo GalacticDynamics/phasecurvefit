@@ -142,8 +142,8 @@ turned to run along the velocities. On a stream that crosses itself, a start tha
 turns onto the other branch stays there in the untied model. NUTS from such a start,
 on two seeds, covered the truth only 0.46 and 0.57 of the time at 68% and 95% with
 velocities untied, and 0.60 and 0.78 with positions only. In the prototypes, on a loop where every orderer then turned at the
-crossing, a hard velocity tie (`velocity_tie=0`) brought 5 of 8 such starts back to
-the right branch. That rescue wasn't measured for the default loose tie. Since the
+crossing, a hard velocity tie (`velocity_tie=0`) got the right branch on 5 of the 8
+seeds. That rescue wasn't measured for the default loose tie. Since the
 default pipeline now crosses straight over, the start is usually right. In the
 prototypes NUTS chains often settled in different modes, so SVI with a full-rank Gaussian is the
 default, and `method="nuts"` warns when its two chains disagree.
@@ -171,12 +171,14 @@ plus Gaussian noise of 0.1 per component.
 
 Coverage is counted at the same 46 points along the true curve, from each draw's
 offset in the plane normal to it, averaged over the plane's two directions for the
-helix. A point that half the draws or fewer reach counts as not covered. This measures the spread of the draws about the truth. The tube that
+helix. The half-width (the median over the points) and the centre's offset are per
+direction too, so for the helix the centre's distance from the truth is about √2
+times the value in the table (0.025). A point that half the draws or fewer reach counts as not covered. This measures the spread of the draws about the truth. The tube that
 `radius` draws about the reference wasn't measured.
 
-| case | 68% coverage | 95% coverage | 68% half-width | distance of the band's centre from the truth (rms) | time per fit |
+| case | 68% coverage | 95% coverage | 68% half-width | rms offset of the band's centre from the truth | time per fit |
 |---|---|---|---|---|---|
-| helix | 0.72 | 0.97 | 0.019 | 0.025 | 42 s |
+| helix | 0.72 | 0.97 | 0.019 | 0.018 | 42 s |
 | gap | 0.68 | 0.95 | 0.023 | 0.023 | 49 s |
 | loop | 0.73 | 0.96 | 0.018 | 0.017 | 71 s |
 | varying | 0.85 | 0.99 | 0.015 | 0.015 | 31 s |

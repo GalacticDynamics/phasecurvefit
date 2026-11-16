@@ -62,5 +62,5 @@ class TrackDraw(ReprMixin, eqx.Module):
         }
 
     def width(self, gamma: ArrayLike, /) -> Any:
-        r"""Evaluate the track's width at ``gamma``, in the units of the positions."""
+        r"""Evaluate the track's width at ``gamma``, in the first position's unit."""
         return jnp.interp(jnp.asarray(gamma), self.gamma, self.sigma) * self.scale

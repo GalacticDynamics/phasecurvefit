@@ -476,7 +476,10 @@ def _check_ordering(
     except (TypeError, ValueError) as err:  # astropy's unit errors are ValueErrors
         msg = "ordering is of other tracers: its positions have other units."
         raise ValueError(msg) from err
-    if not np.allclose(np.asarray(zo), np.asarray(zq), rtol=1e-4, atol=1e-4):
+    # float32 rounds a unit conversion to about 1e-7 of the value, and the
+    # scaled positions sit up to |centre| / scale from 0.
+    far = max(float(np.abs(_ratio(c / scale))) for c in centre.values())
+    if not np.allclose(np.asarray(zo), np.asarray(zq), rtol=0, atol=1e-4 + 1e-6 * far):
         msg = "ordering is of other tracers: its positions differ from these."
         raise ValueError(msg)
 
@@ -672,8 +675,8 @@ def sample_track(
         chains disagree (split $\hat R$ above 1.05). The posterior often has
         more than one mode, and then NUTS chains stay in different ones.
     metadata
-        Passed to :func:`~phasecurvefit.orderers.default_pipeline`. Quantity
-        inputs need its unit system.
+        Passed to :func:`~phasecurvefit.orderers.default_pipeline` when there
+        is no ``ordering``; Quantity inputs then need its unit system.
     weights
         Per-tracer weights. They act as counts: the band of a weight-2 star is
         that of two stars, so scaling every weight changes the band.
@@ -688,7 +691,7 @@ def sample_track(
         SVI optimisation steps. The learning rate falls from 2e-2 to 2e-4
         over them, so ``losses`` flattens at the end even when the fit could
         still improve. On the helix test case the loss at 4000 steps was 16
-        nats short of a 12000-step run, with the same band.
+        nats short of a 12000-step run, and its band was within 7%.
     n_warmup
         NUTS warmup steps per chain. Each chain then keeps half the draws,
         rounded up.
