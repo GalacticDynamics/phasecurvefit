@@ -7,13 +7,14 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from numpyro import handlers
-from numpyro.infer.util import log_density
-
-import unxt as u
 
 import phasecurvefit as pcf
 from phasecurvefit._src import posterior
+
+numpyro = pytest.importorskip("numpyro")
+u = pytest.importorskip("unxt")
+handlers = numpyro.handlers
+log_density = pytest.importorskip("numpyro.infer.util").log_density
 
 N = 160
 
@@ -512,3 +513,30 @@ def test_sample_track_checks_flags():
     pos, vel = _arc(40)
     with pytest.raises(ValueError, match="background"):
         pcf.sample_track(pos, vel, key=jax.random.key(0), background="yes")
+
+
+# ---- eighth review ------------------------------------------------------------
+
+
+def test_huge_velocity_tie_raises():
+    pos, vel = _arc(40)
+    with pytest.raises(ValueError, match="finite"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), velocity_tie=10**400)
+
+
+def test_tied_three_dimensional_run_with_reordered_velocity_keys():
+    pos, vel = _arc(60)
+    pos = {**pos, "z": 0.3 * pos["x"]}
+    vel = {"z": 0.3 * vel["x"], "y": vel["y"], "x": vel["x"]}
+    post = pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=300, n_draws=5)
+    assert post.samples["beta"].shape == (5, 9, 16)  # 3 + speed + 3 offsets, 2 more
+
+
+def test_divergence_raises(monkeypatch):
+    """A loss that isn't finite stops the fit with a clear error."""
+    import optax  # noqa: PLC0415
+
+    monkeypatch.setattr(optax, "exponential_decay", lambda *_a, **_k: lambda _: 1e30)
+    pos, vel = _arc(40)
+    with pytest.raises(RuntimeError, match="diverged"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=50, n_draws=2)

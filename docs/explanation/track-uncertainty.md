@@ -139,8 +139,8 @@ The model, {func}`~phasecurvefit.track_model`:
 
 The fit starts from the ordering of {func}`~phasecurvefit.orderers.default_pipeline`,
 turned to run along the velocities. On a stream that crosses itself, a start that
-turns onto the other branch stays there in the untied model, and NUTS chains don't
-leave it either. In the prototypes, on a loop where every orderer then turned at the
+turns onto the other branch stays there in the untied model. NUTS from such a start,
+on two seeds, covered the truth only 0.60 and 0.78 of the time at 68% and 95%. In the prototypes, on a loop where every orderer then turned at the
 crossing, a hard velocity tie (`velocity_tie=0`) brought 5 of 8 such starts back to
 the right branch. That rescue wasn't measured for the default loose tie. Since the
 default pipeline now crosses straight over, the start is usually right. In the

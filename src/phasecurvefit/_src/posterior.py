@@ -563,7 +563,15 @@ def _model_options(
             f"velocity_tie must be None or a finite number >= 0, got {velocity_tie!r}."
         )
         raise ValueError(msg)
-    tie = None if tie is None else float(tie)
+    try:
+        tie = None if tie is None else float(tie)
+    except OverflowError:
+        tie = np.inf
+    if tie is not None and not tie < np.inf:
+        msg = (
+            f"velocity_tie must be None or a finite number >= 0, got {velocity_tie!r}."
+        )
+        raise ValueError(msg)
     return ints["n_q"], ints["n_basis"], ints["n_grid"], flags[0], flags[1], tie
 
 
@@ -579,7 +587,7 @@ def _check_options(
     Returns the counts as Python ints. They may be Python, NumPy or JAX
     integers; a bool is refused.
     """
-    if method not in ("svi", "nuts"):
+    if not isinstance(method, str) or method not in ("svi", "nuts"):  # type: ignore[redundant-expr]  # runtime guard on a mistyped argument
         msg = f"method must be 'svi' or 'nuts', got {method!r}."
         raise ValueError(msg)
     # Each NUTS chain keeps half the draws, rounded up, and split R-hat needs 4.
@@ -643,6 +651,9 @@ def sample_track(
         positions alone, for example the pixels of an image; it needs an
         ``ordering``, which you can make by ordering the positions with zero
         velocities (e.g. with :class:`~phasecurvefit.orderers.RidgeOrderer`).
+        With one position component the track has no direction across it,
+        so ``radius`` is 0 everywhere; use the draws' ``width`` and their
+        spread along the track instead.
     key
         Split for the inference and for drawing.
     method
