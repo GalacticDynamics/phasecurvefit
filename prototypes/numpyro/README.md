@@ -249,3 +249,22 @@ These are with `f_bg` started at 0.05 and the learning rate falling from 2e-2 to
 2e-4. An earlier run with a constant 2e-3 and `f_bg` started at random had not
 converged in 4000 steps: its bands were 30–80% wider (helix 0.75 / 0.97, gap
 0.68 / 0.99, loop 0.85 / 0.98, vary 0.88 / 1.00).
+
+### Other numbers quoted in the library's docs
+
+These were measured during review of PR B, on `sample_track` as shipped.
+
+- Convergence: on helix seed 0, key 0, the loss at the default 4000 steps was 16
+  nats short of a 12000-step run (measured twice: 16 and 16.1), with the same
+  68% half-width (0.0187 against 0.0187, and in a second run 0.030 against 0.032
+  at the median of the radius).
+- Along-track spread of the draws at one gamma: the central 68% spanned 3.6 to
+  5.1 times the 68% radius (how-to arc) and 3.7 to 4.9 (the tests' 160-star arc,
+  at 4000 and 12000 steps).
+- The old setting (constant learning rate 2e-3, `f_bg` started at random) had
+  68% half-widths of 0.025, 0.030, 0.026 and 0.027 (helix, gap, loop, vary),
+  against 0.019, 0.023, 0.018 and 0.015 now: 30-80% wider.
+- `out_lib` provenance: helix seed 0 and vary seed 7 re-run at commit e336940
+  reproduced the saved offsets bit for bit.
+- A subset of `tests/unit/test_sample_track.py` passes on numpyro 0.20.0, the
+  lowest version `pyproject.toml` allows.

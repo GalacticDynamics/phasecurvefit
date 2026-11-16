@@ -415,3 +415,60 @@ def test_ordering_in_other_units_raises():
     o = pcf.orderers.default_pipeline(pos, vel)  # plain arrays
     with pytest.raises(ValueError, match="other units"):
         pcf.sample_track(pq, vq, key=jax.random.key(0), metadata=meta, ordering=o)
+
+
+# ---- sixth review -------------------------------------------------------------
+
+
+def test_draws_stack_into_one_pytree():
+    """Every draw has the same tree structure, so the draws stack and vmap."""
+    pos, vel = _arc(40)
+    post = pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=100, n_draws=3)
+    stacked = jax.tree.map(lambda *a: jnp.stack(a), *post.members)
+    xs = jax.vmap(lambda m: m(0.0)["x"])(stacked)
+    assert xs.shape == (3,)
+
+
+def test_jax_scalar_options_are_accepted():
+    pos, vel = _arc(40)
+    post = pcf.sample_track(
+        pos,
+        vel,
+        key=jax.random.key(0),
+        n_steps=jnp.array(50),
+        n_draws=jnp.int32(3),
+        velocity_tie=jnp.float32(0.05),
+    )
+    assert len(post.members) == 3
+
+
+def test_infinite_velocity_tie_raises():
+    pos, vel = _arc(40)
+    with pytest.raises(ValueError, match="finite"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), velocity_tie=float("inf"))
+
+
+def test_ordering_in_compatible_units_is_accepted():
+    """The same tracers in pc order the kpc data."""
+    pos, vel = _arc(40)
+    meta = pcf.StateMetadata(usys=u.unitsystems.galactic)
+    vq = {k: u.Q(v, "km/s") for k, v in vel.items()}
+    pkpc = {k: u.Q(v, "kpc") for k, v in pos.items()}
+    ppc = {k: u.Q(1000 * v, "pc") for k, v in pos.items()}
+    o = pcf.orderers.default_pipeline(ppc, vq, metadata=meta)
+    post = pcf.sample_track(
+        pkpc,
+        vq,
+        key=jax.random.key(0),
+        metadata=meta,
+        ordering=o,
+        n_steps=50,
+        n_draws=2,
+    )
+    assert len(post.members) == 2
+
+
+def test_track_model_rejects_too_many_position_columns():
+    z = jnp.zeros((10, 2))
+    with pytest.raises(ValueError, match="n_q"):
+        log_density(posterior.track_model, (z,), {"n_q": 3}, {})

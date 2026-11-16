@@ -49,7 +49,7 @@ class TrackDraw(ReprMixin, eqx.Module):
     sigma: Float[Array, " K"]
     centre: dict[str, Any]
     scale: Any
-    track_range: tuple[float, float] = eqx.field(static=True)
+    track_range: tuple[float, float]
     keys: tuple[str, ...] = eqx.field(static=True)
 
     def __call__(self, gamma: ArrayLike, /) -> dict[str, Any]:

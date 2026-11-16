@@ -14,7 +14,6 @@ Needs NumPyro, the ``phasecurvefit[numpyro]`` extra.
 __all__: tuple[str, ...] = ("TrackPosterior", "sample_track", "track_model")
 
 import functools
-import numbers
 import warnings
 from typing import Any, Literal
 
@@ -209,6 +208,14 @@ def track_model(
     """
     _require_numpyro()
     n, d = z.shape
+    if not 1 <= n_q <= d:
+        msg = f"n_q must be between 1 and z's {d} columns, got {n_q}."
+        raise ValueError(msg)
+    if velocity_tie is not None and not 0 <= velocity_tie < np.inf:
+        msg = (
+            f"velocity_tie must be None or a finite number >= 0, got {velocity_tie!r}."
+        )
+        raise ValueError(msg)
     _, _, n_mean = _layout(d, n_q, velocity_tie)
     n_ch = n_mean + int(line_density) + int(width_varies)
 
@@ -346,8 +353,8 @@ class TrackPosterior(TrackEnsemble):
 
     Compare draws in space, as ``offsets`` does, and not at equal $\gamma$.
     With the latent line density a draw's $\gamma$ can shift along the track,
-    and on test arcs the draws' points at one $\gamma$ spread 3 to 5 times
-    the 68% radius along it.
+    and on test arcs the central 68% of the draws' points at one $\gamma$
+    spanned 3.6 to 5 times the 68% radius along it.
 
     Attributes
     ----------
@@ -498,37 +505,46 @@ def _start_gamma(
     return idx, -1 + 2 * (cw - cw[0]) / (cw[-1] - cw[0])
 
 
-def _is_int(x: object, /) -> bool:
-    return isinstance(x, numbers.Integral) and not isinstance(x, bool)
-
-
-def _is_real(x: object, /) -> bool:
-    return isinstance(x, numbers.Real) and not isinstance(x, bool)
+def _scalar(x: object, kinds: str, /) -> Any:
+    """``x`` as a Python number if it is a scalar of a NumPy dtype kind in ``kinds``."""
+    try:
+        a = np.asarray(x)
+    except (TypeError, ValueError):
+        return None
+    return a.item() if a.ndim == 0 and a.dtype.kind in kinds else None
 
 
 def _check_options(
     positions: VectorComponents,
     velocities: VectorComponents | None,
     method: str,
-    velocity_tie: float | None,
-    counts: dict[str, int],
+    velocity_tie: object,
+    counts: dict[str, object],
     /,
-) -> None:
-    """Raise on options :func:`sample_track` can't use."""
+) -> tuple[float | None, dict[str, int]]:
+    """Raise on options :func:`sample_track` can't use; return them as numbers.
+
+    Integers and reals may be Python, NumPy or JAX scalars; bools are refused.
+    """
     if method not in ("svi", "nuts"):
         msg = f"method must be 'svi' or 'nuts', got {method!r}."
         raise ValueError(msg)
     # Each NUTS chain keeps half the draws, rounded up, and split R-hat needs 4.
     least = {"n_draws": 7 if method == "nuts" else 1, "n_basis": 1, "n_grid": 2}
     least |= {"n_steps": 1} if method == "svi" else {"n_warmup": 1}
+    out = {}
     for name, low in least.items():
-        value = counts[name]
-        if not _is_int(value) or value < low:
-            msg = f"{name} must be an integer >= {low} for {method}, got {value!r}."
+        value = _scalar(counts[name], "iu")
+        if value is None or value < low:
+            where = f" for {method}" if name == "n_draws" else ""
+            msg = f"{name} must be an integer >= {low}{where}, got {counts[name]!r}."
             raise ValueError(msg)
-    tie_ok = velocity_tie is None or (_is_real(velocity_tie) and velocity_tie >= 0)
-    if not tie_ok:
-        msg = f"velocity_tie must be None or a number >= 0, got {velocity_tie!r}."
+        out[name] = int(value)
+    tie = None if velocity_tie is None else _scalar(velocity_tie, "iuf")
+    if velocity_tie is not None and (tie is None or not 0 <= tie < np.inf):
+        msg = (
+            f"velocity_tie must be None or a finite number >= 0, got {velocity_tie!r}."
+        )
         raise ValueError(msg)
     if velocities is not None and set(velocities) != set(positions):
         msg = (
@@ -536,6 +552,7 @@ def _check_options(
             f"got {sorted(velocities)}."
         )
         raise ValueError(msg)
+    return (None if tie is None else float(tie)), out
 
 
 def sample_track(
@@ -636,10 +653,19 @@ def sample_track(
 
     """
     _require_numpyro()
-    counts = {"n_draws": n_draws, "n_steps": n_steps, "n_warmup": n_warmup}
+    counts: dict[str, object] = {
+        "n_draws": n_draws,
+        "n_steps": n_steps,
+        "n_warmup": n_warmup,
+    }
     counts |= {"n_basis": n_basis, "n_grid": n_grid}
-    _check_options(positions, velocities, method, velocity_tie, counts)
-    velocity_tie = None if velocity_tie is None else float(velocity_tie)
+    velocity_tie, checked = _check_options(
+        positions, velocities, method, velocity_tie, counts
+    )
+    n_draws = checked["n_draws"]
+    n_basis, n_grid = checked["n_basis"], checked["n_grid"]
+    n_steps = checked.get("n_steps", n_steps)
+    n_warmup = checked.get("n_warmup", n_warmup)
     z, centre, scale = _scale(positions, velocities)
     if not bool(jnp.all(jnp.isfinite(z))):
         msg = (
