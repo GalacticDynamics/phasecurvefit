@@ -237,7 +237,7 @@ def test_positions_only_needs_an_ordering():
         pcf.sample_track(pos, None, key=jax.random.key(0))
 
 
-@pytest.mark.parametrize(("method", "n_draws"), [("svi", 0), ("nuts", 7)])
+@pytest.mark.parametrize(("method", "n_draws"), [("svi", 0), ("nuts", 6)])
 def test_too_few_draws_raises(method, n_draws):
     pos, vel = _arc(40)
     with pytest.raises(ValueError, match="n_draws"):
@@ -340,7 +340,7 @@ def test_zero_velocities_point_to_velocities_none():
         pcf.sample_track(pos, zero, key=jax.random.key(0))
 
 
-@pytest.mark.parametrize("tie", [-0.1, float("nan")])
+@pytest.mark.parametrize("tie", [-0.1, float("nan"), "loose"])
 def test_bad_velocity_tie_raises(tie):
     pos, vel = _arc(40)
     with pytest.raises(ValueError, match="velocity_tie"):
@@ -374,3 +374,44 @@ def test_bad_counts_name_the_option(option, value):
     pos, vel = _arc(40)
     with pytest.raises(ValueError, match=option):
         pcf.sample_track(pos, vel, key=jax.random.key(0), **{option: value})
+
+
+# ---- fifth review -------------------------------------------------------------
+
+
+def test_draws_survive_jax_tree_operations_with_unsorted_keys():
+    """JAX re-sorts dict keys; each component must keep its own column."""
+    pos, vel = _arc(60)
+    pos = {"y": pos["y"], "x": pos["x"]}
+    vel = {"y": vel["y"], "x": vel["x"]}
+    post = pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=300, n_draws=5)
+    g = jnp.asarray(0.3)
+    direct = post.reference(g)
+    jitted = eqx.filter_jit(lambda p, gg: p.reference(gg))(post, g)
+    mapped = jax.tree.map(lambda a: a, post.reference)(g)
+    for out in (jitted, mapped):
+        for k in ("x", "y"):
+            np.testing.assert_allclose(out[k], direct[k], rtol=1e-5)
+
+
+def test_numpy_counts_and_unused_options_are_accepted():
+    pos, vel = _arc(40)
+    post = pcf.sample_track(
+        pos,
+        vel,
+        key=jax.random.key(0),
+        n_steps=np.int64(50),
+        n_draws=np.int32(3),
+        n_warmup=0,  # NUTS only, so SVI doesn't check it
+    )
+    assert len(post.members) == 3
+
+
+def test_ordering_in_other_units_raises():
+    pos, vel = _arc(40)
+    meta = pcf.StateMetadata(usys=u.unitsystems.galactic)
+    pq = {k: u.Q(v, "kpc") for k, v in pos.items()}
+    vq = {k: u.Q(v, "km/s") for k, v in vel.items()}
+    o = pcf.orderers.default_pipeline(pos, vel)  # plain arrays
+    with pytest.raises(ValueError, match="other units"):
+        pcf.sample_track(pq, vq, key=jax.random.key(0), metadata=meta, ordering=o)

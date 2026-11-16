@@ -65,8 +65,8 @@ pcf.track_model  # the NumPyro model, to use inside a user's own model
   the shared notes). Each position's mean and one length scale stay Quantities;
   the model sees only dimensionless ratios, stripped with `ustrip("", ...)`, and
   draws return Quantities. No unxt change needed.
-- **Dependency**: `phasecurvefit[numpyro]`, imported lazily; `sample_track`
-  raises a clear error without it.
+- **Dependency**: `phasecurvefit[numpyro]`, imported when installed;
+  `sample_track` raises a clear error without it.
 - **Not doing**: a shared likelihood with `mixture_membership_loss` (they share
   only a Gaussian and `uniform_background_density`, which is reused); Bayesian
   NN decoders (NUTS did not mix at 338 weights); `AutoLaplaceApproximation`

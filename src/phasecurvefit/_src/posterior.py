@@ -14,6 +14,7 @@ Needs NumPyro, the ``phasecurvefit[numpyro]`` extra.
 __all__: tuple[str, ...] = ("TrackPosterior", "sample_track", "track_model")
 
 import functools
+import numbers
 import warnings
 from typing import Any, Literal
 
@@ -398,6 +399,7 @@ def _draws(
                 centre=centre,
                 scale=scale,
                 track_range=(lo, hi),
+                keys=tuple(centre),
             )
         )
     return out
@@ -457,10 +459,14 @@ def _check_ordering(
         msg = "ordering is of tracers with other position components."
         raise ValueError(msg)
     # Scaled like these tracers, so the ratio is dimensionless for Quantities.
-    zo = jnp.stack(
-        [_ratio((ordering.positions[k] - c) / scale) for k, c in centre.items()],
-        axis=1,
-    )
+    try:
+        zo = jnp.stack(
+            [_ratio((ordering.positions[k] - c) / scale) for k, c in centre.items()],
+            axis=1,
+        )
+    except (TypeError, ValueError) as err:  # astropy's unit errors are ValueErrors
+        msg = "ordering is of other tracers: its positions have other units."
+        raise ValueError(msg) from err
     if not np.allclose(np.asarray(zo), np.asarray(zq), rtol=1e-4, atol=1e-4):
         msg = "ordering is of other tracers: its positions differ from these."
         raise ValueError(msg)
@@ -492,6 +498,14 @@ def _start_gamma(
     return idx, -1 + 2 * (cw - cw[0]) / (cw[-1] - cw[0])
 
 
+def _is_int(x: object, /) -> bool:
+    return isinstance(x, numbers.Integral) and not isinstance(x, bool)
+
+
+def _is_real(x: object, /) -> bool:
+    return isinstance(x, numbers.Real) and not isinstance(x, bool)
+
+
 def _check_options(
     positions: VectorComponents,
     velocities: VectorComponents | None,
@@ -504,13 +518,16 @@ def _check_options(
     if method not in ("svi", "nuts"):
         msg = f"method must be 'svi' or 'nuts', got {method!r}."
         raise ValueError(msg)
-    least = {"n_draws": 8 if method == "nuts" else 1, "n_steps": 1, "n_warmup": 1}
-    least |= {"n_basis": 1, "n_grid": 2}
-    for name, value in counts.items():
-        if not isinstance(value, int) or value < least[name]:  # type: ignore[redundant-expr]  # runtime guard on a mistyped argument
-            msg = f"{name} must be an int >= {least[name]} for {method}, got {value!r}."
+    # Each NUTS chain keeps half the draws, rounded up, and split R-hat needs 4.
+    least = {"n_draws": 7 if method == "nuts" else 1, "n_basis": 1, "n_grid": 2}
+    least |= {"n_steps": 1} if method == "svi" else {"n_warmup": 1}
+    for name, low in least.items():
+        value = counts[name]
+        if not _is_int(value) or value < low:
+            msg = f"{name} must be an integer >= {low} for {method}, got {value!r}."
             raise ValueError(msg)
-    if velocity_tie is not None and not velocity_tie >= 0:
+    tie_ok = velocity_tie is None or (_is_real(velocity_tie) and velocity_tie >= 0)
+    if not tie_ok:
         msg = f"velocity_tie must be None or a number >= 0, got {velocity_tie!r}."
         raise ValueError(msg)
     if velocities is not None and set(velocities) != set(positions):
@@ -578,8 +595,8 @@ def sample_track(
         :func:`~phasecurvefit.orderers.default_pipeline`. When there are
         velocities, the start is turned to run along them.
     n_draws
-        Number of posterior draws to return. NUTS needs at least 8, so that
-        each chain has the 4 draws its split $\hat R$ needs.
+        Number of posterior draws to return. NUTS needs at least 7, so that
+        each chain keeps the 4 draws its split $\hat R$ needs.
     n_steps
         SVI optimisation steps. The learning rate falls from 2e-2 to 2e-4
         over them, so ``losses`` flattens at the end even when the fit could
@@ -679,6 +696,12 @@ def sample_track(
             key_fit, n_steps, progress_bar=False
         )
         losses = res.losses
+        if not bool(jnp.isfinite(losses[-1])):
+            msg = (
+                "SVI diverged (the loss is not finite). Try more tracers, a "
+                "smaller n_basis, or another key."
+            )
+            raise RuntimeError(msg)
         samples = guide.sample_posterior(key_draw, res.params, sample_shape=(n_draws,))
     else:
         n_chains = 2

@@ -34,6 +34,10 @@ class TrackDraw(ReprMixin, eqx.Module):
         Each position component's mean, which the scaling subtracted.
     scale : Array or Quantity
         The one length the scaling divided by.
+    keys : tuple[str, ...]
+        The position components, in the order of the columns of ``x``. JAX
+        re-sorts a dict's keys when it rebuilds one, so the columns are matched
+        by these and not by the order of ``centre``.
     track_range : tuple[float, float]
         The $\gamma$ range the stars cover. With a latent line density it holds
         the central 99% of it; otherwise it is ``(-1, 1)``.
@@ -46,14 +50,15 @@ class TrackDraw(ReprMixin, eqx.Module):
     centre: dict[str, Any]
     scale: Any
     track_range: tuple[float, float] = eqx.field(static=True)
+    keys: tuple[str, ...] = eqx.field(static=True)
 
     def __call__(self, gamma: ArrayLike, /) -> dict[str, Any]:
         r"""Evaluate the track's position components at ``gamma``."""
         g = jnp.asarray(gamma)
         return {
             # centre first, so each component keeps its own unit
-            k: c + jnp.interp(g, self.gamma, self.x[:, i]) * self.scale
-            for i, (k, c) in enumerate(self.centre.items())
+            k: self.centre[k] + jnp.interp(g, self.gamma, self.x[:, i]) * self.scale
+            for i, k in enumerate(self.keys)
         }
 
     def width(self, gamma: ArrayLike, /) -> Any:

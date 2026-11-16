@@ -169,8 +169,8 @@ plus Gaussian noise of 0.1 per component.
   tails, and a width that grows from 0.06 to 0.36 along it.
 
 Coverage is counted at the same 46 points along the true curve, from each draw's
-offset in the plane normal to it. A point that fewer than half the draws reach counts
-as not covered. This measures the spread of the draws about the truth. The tube that
+offset in the plane normal to it, averaged over the plane's two directions for the
+helix. A point that half the draws or fewer reach counts as not covered. This measures the spread of the draws about the truth. The tube that
 `radius` draws about the reference wasn't measured.
 
 | case | 68% coverage | 95% coverage | 68% half-width | error of the band's centre (rms) | time per fit |
