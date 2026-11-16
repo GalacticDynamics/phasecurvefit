@@ -208,12 +208,13 @@ def track_model(
     """
     _require_numpyro()
     n, d = z.shape
-    if not 1 <= n_q <= d:
-        msg = f"n_q must be between 1 and z's {d} columns, got {n_q}."
-        raise ValueError(msg)
-    if velocity_tie is not None and not 0 <= velocity_tie < np.inf:
+    n_q, n_basis, n_grid, line_density, width_varies, velocity_tie = _model_options(
+        d, n_q, n_basis, n_grid, line_density, width_varies, velocity_tie
+    )
+    if weights is not None and jnp.shape(weights) != (n,):
         msg = (
-            f"velocity_tie must be None or a finite number >= 0, got {velocity_tie!r}."
+            f"weights must have shape ({n},), one per row of z; "
+            f"got {jnp.shape(weights)}."
         )
         raise ValueError(msg)
     _, _, n_mean = _layout(d, n_q, velocity_tie)
@@ -425,7 +426,8 @@ def _warn_if_chains_disagree(by_chain: dict[str, Array], /) -> None:
         warnings.warn(
             f"NUTS chains disagree (max split R-hat {worst:.2f}, above {_RHAT_WARN} "
             "or not computable); they may sit in different modes or be stuck. "
-            "Compare with method='svi'.",
+            "The reference, at the mean of the draws, may then match neither "
+            "mode. Compare with method='svi'.",
             RuntimeWarning,
             stacklevel=3,
         )
@@ -507,6 +509,8 @@ def _start_gamma(
 
 def _scalar(x: object, kinds: str, /) -> Any:
     """``x`` as a Python number if it is a scalar of a NumPy dtype kind in ``kinds``."""
+    if isinstance(x, int) and not isinstance(x, bool):  # NumPy can't hold huge ones
+        return x if "i" in kinds else None
     try:
         a = np.asarray(x)
     except (TypeError, ValueError):
@@ -514,23 +518,72 @@ def _scalar(x: object, kinds: str, /) -> Any:
     return a.item() if a.ndim == 0 and a.dtype.kind in kinds else None
 
 
+def _model_options(
+    d: int,
+    n_q: object,
+    n_basis: object,
+    n_grid: object,
+    line_density: object,
+    width_varies: object,
+    velocity_tie: object,
+    /,
+) -> tuple[int, int, int, bool, bool, float | None]:
+    """Check :func:`track_model`'s options and return them as Python values.
+
+    Integers and reals may be Python, NumPy or JAX scalars, and flags Python,
+    NumPy or JAX bools; a bool is not accepted as a number.
+    """
+    ints = {}
+    for name, value, low in (
+        ("n_q", n_q, 1),
+        ("n_basis", n_basis, 1),
+        ("n_grid", n_grid, 2),
+    ):
+        v = _scalar(value, "iu")
+        if v is None or v < low:
+            msg = f"{name} must be an integer >= {low}, got {value!r}."
+            raise ValueError(msg)
+        ints[name] = int(v)
+    if d not in (ints["n_q"], 2 * ints["n_q"]):
+        msg = (
+            f"z needs n_q = {ints['n_q']} position columns, or those and as many "
+            f"velocity columns; it has {d}."
+        )
+        raise ValueError(msg)
+    flags = []
+    for name, value in (("line_density", line_density), ("width_varies", width_varies)):
+        v = _scalar(value, "b")
+        if v is None:
+            msg = f"{name} must be True or False, got {value!r}."
+            raise ValueError(msg)
+        flags.append(bool(v))
+    tie = None if velocity_tie is None else _scalar(velocity_tie, "iuf")
+    if velocity_tie is not None and (tie is None or not 0 <= tie < np.inf):
+        msg = (
+            f"velocity_tie must be None or a finite number >= 0, got {velocity_tie!r}."
+        )
+        raise ValueError(msg)
+    tie = None if tie is None else float(tie)
+    return ints["n_q"], ints["n_basis"], ints["n_grid"], flags[0], flags[1], tie
+
+
 def _check_options(
     positions: VectorComponents,
     velocities: VectorComponents | None,
     method: str,
-    velocity_tie: object,
     counts: dict[str, object],
     /,
-) -> tuple[float | None, dict[str, int]]:
-    """Raise on options :func:`sample_track` can't use; return them as numbers.
+) -> dict[str, int]:
+    """Raise on the inference options :func:`sample_track` can't use.
 
-    Integers and reals may be Python, NumPy or JAX scalars; bools are refused.
+    Returns the counts as Python ints. They may be Python, NumPy or JAX
+    integers; a bool is refused.
     """
     if method not in ("svi", "nuts"):
         msg = f"method must be 'svi' or 'nuts', got {method!r}."
         raise ValueError(msg)
     # Each NUTS chain keeps half the draws, rounded up, and split R-hat needs 4.
-    least = {"n_draws": 7 if method == "nuts" else 1, "n_basis": 1, "n_grid": 2}
+    least = {"n_draws": 7 if method == "nuts" else 1}
     least |= {"n_steps": 1} if method == "svi" else {"n_warmup": 1}
     out = {}
     for name, low in least.items():
@@ -540,19 +593,13 @@ def _check_options(
             msg = f"{name} must be an integer >= {low}{where}, got {counts[name]!r}."
             raise ValueError(msg)
         out[name] = int(value)
-    tie = None if velocity_tie is None else _scalar(velocity_tie, "iuf")
-    if velocity_tie is not None and (tie is None or not 0 <= tie < np.inf):
-        msg = (
-            f"velocity_tie must be None or a finite number >= 0, got {velocity_tie!r}."
-        )
-        raise ValueError(msg)
     if velocities is not None and set(velocities) != set(positions):
         msg = (
             f"velocities need the positions' components {sorted(positions)}, "
             f"got {sorted(velocities)}."
         )
         raise ValueError(msg)
-    return (None if tie is None else float(tie)), out
+    return out
 
 
 def sample_track(
@@ -590,7 +637,9 @@ def sample_track(
         Phase-space tracers, arrays or `unxt` Quantities, with matching
         component names. Values must be finite. Every position component
         needs the same dimension, since one length scales them all, and the
-        velocities are their time derivatives. ``velocities=None`` fits the
+        velocities are their time derivatives. A catalogue with some missing
+        velocities, which the default ordering accepts, needs those tracers
+        left out here, or ``velocities=None``. ``velocities=None`` fits the
         positions alone, for example the pixels of an image; it needs an
         ``ordering``, which you can make by ordering the positions with zero
         velocities (e.g. with :class:`~phasecurvefit.orderers.RidgeOrderer`).
@@ -658,14 +707,18 @@ def sample_track(
         "n_steps": n_steps,
         "n_warmup": n_warmup,
     }
-    counts |= {"n_basis": n_basis, "n_grid": n_grid}
-    velocity_tie, checked = _check_options(
-        positions, velocities, method, velocity_tie, counts
-    )
+    checked = _check_options(positions, velocities, method, counts)
     n_draws = checked["n_draws"]
-    n_basis, n_grid = checked["n_basis"], checked["n_grid"]
     n_steps = checked.get("n_steps", n_steps)
     n_warmup = checked.get("n_warmup", n_warmup)
+    d = len(positions) * (1 if velocities is None else 2)
+    _, n_basis, n_grid, line_density, width_varies, velocity_tie = _model_options(
+        d, len(positions), n_basis, n_grid, line_density, width_varies, velocity_tie
+    )
+    if _scalar(background, "b") is None:
+        msg = f"background must be True or False, got {background!r}."
+        raise ValueError(msg)
+    background = bool(background)
     z, centre, scale = _scale(positions, velocities)
     if not bool(jnp.all(jnp.isfinite(z))):
         msg = (
@@ -715,7 +768,8 @@ def sample_track(
             model, init_loc_fn=numpyro.infer.init_to_value(values=init)
         )
         # From 2e-2 down to 2e-4: big early steps, little gradient noise at the
-        # end. A constant 2e-3 gave bands 30-80% wider at 4000 steps.
+        # end. A constant 2e-3, with f_bg started at random, gave bands 30-80%
+        # wider at 4000 steps.
         rate = optax.exponential_decay(2e-2, max(n_steps, 1), 1e-2)
         opt = optax.chain(optax.clip_by_global_norm(10.0), optax.adam(rate))
         res = numpyro.infer.SVI(model, guide, opt, numpyro.infer.Trace_ELBO()).run(

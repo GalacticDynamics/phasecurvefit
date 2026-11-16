@@ -212,7 +212,8 @@ uv run pre-commit run -a # Run all pre-commit hooks
 - Add unit tests for every new function or class
 - Test JAX compatibility (`jit`, `vmap`, `grad`) where applicable
 - Tests for Quantity support in `tests/unit/test_quantity_support.py`,
-  `tests/unit/test_interop_unxt.py`, and `tests/unit/test_orderers_unxt.py`
+  `tests/unit/test_interop_unxt.py`, `tests/unit/test_orderers_unxt.py`, and
+  (for `sample_track`) `tests/unit/test_sample_track.py`
 - Tests run with beartype runtime type checking and warnings as errors
 - Assertions should be atomic (no `assert a and b`, use separate asserts)
 

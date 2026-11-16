@@ -3,6 +3,7 @@
 Usage: python validate_lib.py <case> <seed>. Writes out_lib/<case>_ds<seed>.npz.
 """
 
+import os
 import sys
 import time
 
@@ -49,6 +50,7 @@ if case == "vary":  # width along the true curve, against the truth
             )
         )
     out["wid"] = np.array(wid)
+os.makedirs("out_lib", exist_ok=True)
 np.savez(f"out_lib/{case}_ds{seed}.npz", **out)
 c = cases.coverage(offs[None])
 print(

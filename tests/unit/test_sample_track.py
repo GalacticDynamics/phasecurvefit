@@ -472,3 +472,43 @@ def test_track_model_rejects_too_many_position_columns():
     z = jnp.zeros((10, 2))
     with pytest.raises(ValueError, match="n_q"):
         log_density(posterior.track_model, (z,), {"n_q": 3}, {})
+
+
+# ---- seventh review -----------------------------------------------------------
+
+
+@pytest.mark.parametrize(("d", "n_q"), [(4, 3), (4, 1), (5, 2)])
+def test_track_model_needs_positions_and_matching_velocities(d, n_q):
+    z = jnp.zeros((10, d))
+    with pytest.raises(ValueError, match="velocity columns"):
+        log_density(posterior.track_model, (z,), {"n_q": n_q}, {})
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {"velocity_tie": True},
+        {"line_density": "no"},
+        {"n_grid": 1},
+        {"n_basis": 0},
+        {"weights": jnp.ones(3)},
+    ],
+)
+def test_track_model_checks_its_options(kw):
+    z = jnp.zeros((10, 4))
+    with pytest.raises(ValueError, match=next(iter(kw))):
+        log_density(posterior.track_model, (z,), {"n_q": 2, **kw}, {})
+
+
+def test_track_model_takes_jax_scalars():
+    pos, vel = _arc(20)
+    z, _, _ = posterior._scale(pos, vel)
+    params = _params(z, np.linspace(-1, 1, 20))
+    kw = {"velocity_tie": jnp.float32(0.05), "line_density": jnp.array(True)}  # noqa: FBT003
+    assert np.isfinite(_density(z, params, **kw))
+
+
+def test_sample_track_checks_flags():
+    pos, vel = _arc(40)
+    with pytest.raises(ValueError, match="background"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), background="yes")
