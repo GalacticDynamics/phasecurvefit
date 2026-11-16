@@ -237,11 +237,15 @@ cases, 8 seeds each, 200 draws. Loop uses `n_basis=32, n_grid=512`.
 
 | case  | 68%  | 95%  | hw68  | centre rms | time |
 | ----- | ---- | ---- | ----- | ---------- | ---- |
-| helix | 0.75 | 0.97 | 0.025 | 0.022      | 29 s |
-| gap   | 0.68 | 0.99 | 0.030 | 0.028      | 37 s |
-| loop  | 0.85 | 0.98 | 0.026 | 0.018      | 42 s |
-| vary  | 0.88 | 1.00 | 0.027 | 0.018      | 76 s |
+| helix | 0.72 | 0.97 | 0.019 | 0.018      | 42 s |
+| gap   | 0.68 | 0.95 | 0.023 | 0.023      | 49 s |
+| loop  | 0.73 | 0.96 | 0.018 | 0.017      | 71 s |
+| vary  | 0.85 | 0.99 | 0.015 | 0.015      | 31 s |
 
 Vary: width ratio 1.01, true width inside the draws' 68% at 0.63 of points, tail
-(s > 0.8) 68% coverage 0.84. Times on a shared machine; the later vary seeds ran
-alongside the test suite.
+(s > 0.8) 68% coverage 0.75. `f_bg` 0.001–0.003. Times on a shared machine.
+
+These are with `f_bg` started at 0.05 and the learning rate falling from 2e-2 to
+2e-4. An earlier run with a constant 2e-3 and `f_bg` started at random had not
+converged in 4000 steps: its bands were 30–80% wider (helix 0.75 / 0.97, gap
+0.68 / 0.99, loop 0.85 / 0.98, vary 0.88 / 1.00).

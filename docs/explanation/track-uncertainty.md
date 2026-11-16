@@ -175,20 +175,20 @@ as not covered.
 
 | case | 68% coverage | 95% coverage | 68% half-width | error of the band's centre (rms) | time per fit |
 |---|---|---|---|---|---|
-| helix | 0.75 | 0.97 | 0.025 | 0.022 | 29 s |
-| gap | 0.68 | 0.99 | 0.030 | 0.028 | 37 s |
-| loop | 0.85 | 0.98 | 0.026 | 0.018 | 42 s |
-| varying | 0.88 | 1.00 | 0.027 | 0.018 | 76 s |
+| helix | 0.72 | 0.97 | 0.019 | 0.018 | 42 s |
+| gap | 0.68 | 0.95 | 0.023 | 0.023 | 49 s |
+| loop | 0.73 | 0.96 | 0.018 | 0.017 | 71 s |
+| varying | 0.85 | 0.99 | 0.015 | 0.015 | 31 s |
 
 On the varying case the fitted width matched the true one with a median ratio of
 1.01, and the true width lay inside the draws' central 68% at 0.63 of the points. The
-68% coverage in the sparse far tail ($s > 0.8$) was 0.84. The times are on a shared
+68% coverage in the sparse far tail ($s > 0.8$) was 0.75. The times are on a shared
 machine and include the ordering. The scripts are in `prototypes/numpyro/` in the
 repository.
 
 The bootstrap was measured on the arc alone and the posterior on the helix, which adds
 a third component to it, so the two aren't the same test. On them the posterior
-covered 0.75 and 0.97 and the bootstrap 0.56 and 0.84.
+covered 0.72 and 0.97 and the bootstrap 0.56 and 0.84.
 
 ## References
 
