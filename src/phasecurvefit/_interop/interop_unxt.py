@@ -64,7 +64,7 @@ from phasecurvefit._src.orderers.mst import MSTOrderer
 from phasecurvefit._src.orderers.result import OrderingResult
 from phasecurvefit._src.orderers.ridge import RidgeOrderer
 from phasecurvefit._src.orderers.som import SOMOrderer
-from phasecurvefit._src.posterior import _scale_positions, _scale_velocities
+from phasecurvefit._src.posterior import _ratio, _scale_positions, _scale_velocities
 from phasecurvefit._src.query_config import WalkConfig
 
 RQSz0: TypeAlias = Real[AbcQ, " "]  # noqa: UP040
@@ -396,6 +396,11 @@ def transform(
     vs = qnp.stack([ps[k] for k in self.p_comps], axis=1)  # type: ignore[misc]  # quaxed takes Quantities
     norm_ps = (vs - self.p_mean) / self.p_std
     return norm_qs.ustrip(""), norm_ps.ustrip("")  # type: ignore[attr-defined]  # quaxed returns Quantities
+
+
+@_ratio.dispatch  # type: ignore[attr-defined, untyped-decorator]  # plum Function, typed as the def
+def _ratio_quantity(x: AbcQ, /) -> Array:
+    return u.ustrip("", x)  # type: ignore[return-value]  # raises unless dimensionless
 
 
 @_scale_positions.dispatch  # type: ignore[attr-defined, untyped-decorator]  # plum Function, typed as the def

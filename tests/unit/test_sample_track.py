@@ -260,6 +260,10 @@ def test_ordering_of_other_tracers_raises():
     o = pcf.orderers.default_pipeline(*_arc(50))
     with pytest.raises(ValueError, match="ordering is of 50"):
         pcf.sample_track(pos, vel, key=jax.random.key(0), ordering=o)
+    shifted = {k: v + 100.0 for k, v in pos.items()}
+    o = pcf.orderers.default_pipeline(shifted, vel)
+    with pytest.raises(ValueError, match="other tracers"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), ordering=o)
 
 
 def test_quantity_band_and_mixed_units():
@@ -360,3 +364,13 @@ def test_degenerate_orderings_raise():
         posterior._start_gamma(z, 2, one, None)
     with pytest.raises(ValueError, match="weight 0"):
         posterior._start_gamma(z, 2, o, jnp.zeros(40))
+
+
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [("n_steps", 0), ("n_grid", 1), ("n_basis", 0), ("n_draws", 3.0)],
+)
+def test_bad_counts_name_the_option(option, value):
+    pos, vel = _arc(40)
+    with pytest.raises(ValueError, match=option):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), **{option: value})

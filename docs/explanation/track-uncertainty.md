@@ -141,19 +141,18 @@ The fit starts from the ordering of {func}`~phasecurvefit.orderers.default_pipel
 turned to run along the velocities. On a stream that crosses itself, a start that
 turns onto the other branch stays there in the untied model, and NUTS chains don't
 leave it either. In the prototypes, on a loop where every orderer then turned at the
-crossing, the velocity tie brought 5 of 8 such starts back to the right branch. Since
-the default pipeline now crosses straight over, the start is usually right. In the
-prototypes
-NUTS chains often settled in different modes, so SVI with a full-rank Gaussian is the
+crossing, a hard velocity tie (`velocity_tie=0`) brought 5 of 8 such starts back to
+the right branch. That rescue wasn't measured for the default loose tie. Since the
+default pipeline now crosses straight over, the start is usually right. In the
+prototypes NUTS chains often settled in different modes, so SVI with a full-rank Gaussian is the
 default, and `method="nuts"` warns when its two chains disagree.
 
 `weights` act as counts in the likelihood, so they should be counts and not a density
 scaled to some peak ([](density-fields.md)). Pixels have no velocities, so an image is
-fitted with `velocities=None`. In the prototypes, on the sine arc binned into pixels
-with the counts as weights, the SVI band covered the truth 0.89 and 0.99 of the time
-at 68% and 95%, so it was somewhat too wide. NUTS's band was half as wide but covered
-only 0.55 and 0.88. Dividing the weights by their peak widened the SVI band, as it
-should.
+fitted with `velocities=None`. The band for an image hasn't been calibrated with
+`sample_track`'s defaults. An earlier prototype, with a constant learning rate and
+without the line density, the varying width or the background, measured that dividing
+the weights by their peak widened the band, as it should for counts.
 
 ### Measured calibration of the posterior
 
@@ -171,7 +170,8 @@ plus Gaussian noise of 0.1 per component.
 
 Coverage is counted at the same 46 points along the true curve, from each draw's
 offset in the plane normal to it. A point that fewer than half the draws reach counts
-as not covered.
+as not covered. This measures the spread of the draws about the truth. The tube that
+`radius` draws about the reference wasn't measured.
 
 | case | 68% coverage | 95% coverage | 68% half-width | error of the band's centre (rms) | time per fit |
 |---|---|---|---|---|---|

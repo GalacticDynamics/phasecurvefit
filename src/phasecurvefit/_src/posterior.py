@@ -345,8 +345,8 @@ class TrackPosterior(TrackEnsemble):
 
     Compare draws in space, as ``offsets`` does, and not at equal $\gamma$.
     With the latent line density a draw's $\gamma$ can shift along the track,
-    and on a test arc the draws' points at one $\gamma$ spread about three
-    times the 68% radius along it.
+    and on test arcs the draws' points at one $\gamma$ spread 3 to 5 times
+    the 68% radius along it.
 
     Attributes
     ----------
@@ -439,6 +439,33 @@ def _runs_backwards(zo: np.ndarray, n_q: int, /) -> bool:
     return bool(np.sum(np.sign(np.sum(step * v, axis=1))[typical]) < 0)
 
 
+@plum.dispatch
+def _ratio(x: Array, /) -> Array:
+    """Return a dimensionless ratio as a bare array (a Quantity one is converted)."""
+    return x
+
+
+def _check_ordering(
+    zq: Array, centre: dict[str, Any], scale: Any, ordering: OrderingResult, /
+) -> None:
+    """Raise unless ``ordering`` is of these tracers, in this order."""
+    n = zq.shape[0]
+    if ordering.indices.shape[0] != n:
+        msg = f"ordering is of {ordering.indices.shape[0]} tracers, not these {n}."
+        raise ValueError(msg)
+    if set(ordering.positions) != set(centre):
+        msg = "ordering is of tracers with other position components."
+        raise ValueError(msg)
+    # Scaled like these tracers, so the ratio is dimensionless for Quantities.
+    zo = jnp.stack(
+        [_ratio((ordering.positions[k] - c) / scale) for k, c in centre.items()],
+        axis=1,
+    )
+    if not np.allclose(np.asarray(zo), np.asarray(zq), rtol=1e-4, atol=1e-4):
+        msg = "ordering is of other tracers: its positions differ from these."
+        raise ValueError(msg)
+
+
 def _start_gamma(
     z: Array, n_q: int, ordering: OrderingResult, weights: Array | None, /
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -469,17 +496,20 @@ def _check_options(
     positions: VectorComponents,
     velocities: VectorComponents | None,
     method: str,
-    n_draws: int,
     velocity_tie: float | None,
+    counts: dict[str, int],
     /,
 ) -> None:
     """Raise on options :func:`sample_track` can't use."""
     if method not in ("svi", "nuts"):
         msg = f"method must be 'svi' or 'nuts', got {method!r}."
         raise ValueError(msg)
-    if n_draws < (8 if method == "nuts" else 1):
-        msg = f"n_draws must be >= {8 if method == 'nuts' else 1} for {method}."
-        raise ValueError(msg)
+    least = {"n_draws": 8 if method == "nuts" else 1, "n_steps": 1, "n_warmup": 1}
+    least |= {"n_basis": 1, "n_grid": 2}
+    for name, value in counts.items():
+        if not isinstance(value, int) or value < least[name]:  # type: ignore[redundant-expr]  # runtime guard on a mistyped argument
+            msg = f"{name} must be an int >= {least[name]} for {method}, got {value!r}."
+            raise ValueError(msg)
     if velocity_tie is not None and not velocity_tie >= 0:
         msg = f"velocity_tie must be None or a number >= 0, got {velocity_tie!r}."
         raise ValueError(msg)
@@ -517,7 +547,8 @@ def sample_track(
     is fitted to that by least squares. Then SVI with a full-rank Gaussian
     guide, or NUTS, samples the posterior. The ordering matters: without the
     velocity tie, a start that takes a wrong turn where the stream crosses
-    itself stays wrong, and the tie gets only some of those back.
+    itself stays wrong. A hard tie got some of those back in the prototypes;
+    the default loose tie wasn't measured from such a start.
 
     Parameters
     ----------
@@ -551,7 +582,9 @@ def sample_track(
         each chain has the 4 draws its split $\hat R$ needs.
     n_steps
         SVI optimisation steps. The learning rate falls from 2e-2 to 2e-4
-        over them. Check that ``losses`` has flattened by the end.
+        over them, so ``losses`` flattens at the end even when the fit could
+        still improve. On the helix test case the loss at 4000 steps was 16
+        nats short of a 12000-step run, with the same band.
     n_warmup
         NUTS warmup steps per chain. Each chain then keeps half the draws,
         rounded up.
@@ -586,7 +619,9 @@ def sample_track(
 
     """
     _require_numpyro()
-    _check_options(positions, velocities, method, n_draws, velocity_tie)
+    counts = {"n_draws": n_draws, "n_steps": n_steps, "n_warmup": n_warmup}
+    counts |= {"n_basis": n_basis, "n_grid": n_grid}
+    _check_options(positions, velocities, method, velocity_tie, counts)
     velocity_tie = None if velocity_tie is None else float(velocity_tie)
     z, centre, scale = _scale(positions, velocities)
     if not bool(jnp.all(jnp.isfinite(z))):
@@ -606,6 +641,8 @@ def sample_track(
         ordering = default_pipeline(
             positions, velocities, metadata=metadata, weights=weights
         )
+    else:
+        _check_ordering(z[:, :n_q], centre, scale, ordering)
     idx, gamma0 = _start_gamma(z, n_q, ordering, weights)
 
     opts: dict[str, Any] = {
@@ -635,7 +672,7 @@ def sample_track(
             model, init_loc_fn=numpyro.infer.init_to_value(values=init)
         )
         # From 2e-2 down to 2e-4: big early steps, little gradient noise at the
-        # end. A constant 2e-3 was still 25 nats short of converged at 4000.
+        # end. A constant 2e-3 gave bands 30-80% wider at 4000 steps.
         rate = optax.exponential_decay(2e-2, max(n_steps, 1), 1e-2)
         opt = optax.chain(optax.clip_by_global_norm(10.0), optax.adam(rate))
         res = numpyro.infer.SVI(model, guide, opt, numpyro.infer.Trace_ELBO()).run(
