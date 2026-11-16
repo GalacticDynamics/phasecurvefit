@@ -121,7 +121,7 @@ from.
 The model, {func}`~phasecurvefit.track_model`:
 
 - The track is a Gaussian process in $\gamma \in [-1, 1]$, one per position
-  component, in the Hilbert-space approximation (Solin & Särkkä 2014;
+  component, in the Hilbert-space approximation (Solin & Särkkä 2020;
   Riutort-Mayol et al. 2020). Its amplitude and length scale are latent.
 - Each sample's $\gamma$ is summed out on a grid, so no sample is pinned to one
   $\gamma$.
@@ -130,20 +130,22 @@ The model, {func}`~phasecurvefit.track_model`:
   isn't squeezed into a sliver of $\gamma$.
 - A flat background over the samples' bounding box takes interlopers, with a latent
   fraction (Hogg, Bovy & Lang 2010, sec. 3).
-- The velocities' mean is the speed times the track's unit tangent, plus an offset of
-  up to about 0.05 of the speed. A track that runs the wrong way, or turns the wrong
+- The velocities' mean is the speed times the track's unit tangent, plus a small
+  offset: `velocity_tie` (0.05 by default) times a Gaussian process per component,
+  in units of the samples' rms speed. A track that runs the wrong way, or turns the wrong
   way round a loop, then misfits every velocity. Stream stars move a few degrees off
   their track, and a hard tie (`velocity_tie=0`) pulled the track of a mock stream
   away from its stars.
 
-The fit starts from the ordering of {func}`~phasecurvefit.orderers.default_pipeline`
-and keeps its topology. On a stream that crosses itself, a start that turns onto the
+The fit starts from the ordering of {func}`~phasecurvefit.orderers.default_pipeline`,
+turned to run along the velocities, and keeps its topology. On a stream that crosses itself, a start that turns onto the
 other branch stays there, and NUTS chains don't leave it either. In the prototypes
 NUTS chains often settled in different modes, so SVI with a full-rank Gaussian is the
 default, and `method="nuts"` warns when its two chains disagree.
 
-`weights` act as counts in the likelihood. A band from image pixels is right when the
-weights are the counts in each pixel, and too wide or too narrow when they are a
+`weights` act as counts in the likelihood. Pixels have no velocities, so an image is
+fitted with `velocities=None`. Its band is right when the weights are the counts in
+each pixel, and too wide or too narrow when they are a
 density scaled to some peak ([](density-fields.md)).
 
 ### Measured calibration of the posterior
@@ -226,6 +228,7 @@ Riutort-Mayol, G., Bürkner, P.-C., Andersen, M. R., Solin, A., & Vehtari, A. (2
 "Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic
 programming." [arXiv:2004.11408](https://arxiv.org/abs/2004.11408).
 
-Solin, A., & Särkkä, S. (2014). "Hilbert Space Methods for Reduced-Rank Gaussian
-Process Regression." [doi:10.1007/s11222-019-09886-w](https://doi.org/10.1007/s11222-019-09886-w),
+Solin, A., & Särkkä, S. (2020). "Hilbert Space Methods for Reduced-Rank Gaussian
+Process Regression." Statistics and Computing 30, 419–446.
+[doi:10.1007/s11222-019-09886-w](https://doi.org/10.1007/s11222-019-09886-w),
 [arXiv:1401.5508](https://arxiv.org/abs/1401.5508).

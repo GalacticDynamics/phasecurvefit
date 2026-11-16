@@ -25,12 +25,13 @@ import optax
 import plum
 from jaxtyping import Array, Float, PRNGKeyArray
 
-from phasecurvefit._src.abstract_result import AbstractResult
 from phasecurvefit._src.algorithm import StateMetadata
+from phasecurvefit._src.checks import check_weights
 from phasecurvefit._src.custom_types import VectorComponents
 from phasecurvefit._src.nn.membership import uniform_background_density
 from phasecurvefit._src.optional_deps import OptDeps
 from phasecurvefit._src.orderers.default_pipeline import default_pipeline
+from phasecurvefit._src.orderers.result import OrderingResult
 from phasecurvefit._src.pipeline import TrackEnsemble
 from phasecurvefit._src.track_draw import TrackDraw
 
@@ -299,23 +300,38 @@ def _start(
 
 
 @plum.dispatch
-def _scale(
-    positions: VectorComponents, velocities: VectorComponents, /
+def _scale_positions(
+    positions: VectorComponents, /
 ) -> tuple[Array, dict[str, Any], Any]:
-    """Scale to the model's units: ``z``, each position's mean, and one length.
+    """Scale positions: ``z``, each component's mean, and one length.
 
     Positions lose their means and are divided by one length, so an isotropic
-    width stays isotropic. Velocities are divided by their rms speed and keep
-    their sign, which the velocity tie needs. Velocity columns follow the
-    positions' component order.
+    width stays isotropic.
     """
     q = jnp.stack([jnp.asarray(positions[k]) for k in positions], axis=1)
-    p = jnp.stack([jnp.asarray(velocities[k]) for k in positions], axis=1)
     mu = jnp.mean(q, axis=0)
     s = jnp.sqrt(jnp.mean(jnp.var(q, axis=0)))
-    sv = jnp.sqrt(jnp.mean(jnp.sum(p**2, axis=1)))
-    z = jnp.concatenate([(q - mu) / s, p / sv], axis=1)
-    return z, dict(zip(positions, mu, strict=True)), s
+    return (q - mu) / s, dict(zip(positions, mu, strict=True)), s
+
+
+@plum.dispatch
+def _scale_velocities(velocities: VectorComponents, keys: tuple[str, ...], /) -> Array:
+    """Divide velocities by their rms speed, in the positions' component order.
+
+    They keep their sign and are not centred, which the velocity tie needs.
+    """
+    p = jnp.stack([jnp.asarray(velocities[k]) for k in keys], axis=1)
+    return p / jnp.sqrt(jnp.mean(jnp.sum(p**2, axis=1)))
+
+
+def _scale(
+    positions: VectorComponents, velocities: VectorComponents | None, /
+) -> tuple[Array, dict[str, Any], Any]:
+    """Scale to the model's units: ``z``, each position's mean, and one length."""
+    z, centre, s = _scale_positions(positions)
+    if velocities is not None:
+        z = jnp.concatenate([z, _scale_velocities(velocities, tuple(positions))], 1)
+    return z, centre, s
 
 
 class TrackPosterior(TrackEnsemble):
@@ -385,15 +401,40 @@ def _draws(
     return out
 
 
+def _start_gamma(
+    z: Array, n_q: int, ordering: OrderingResult, weights: Array | None, /
+) -> tuple[np.ndarray, np.ndarray]:
+    """Order the start, and give each tracer a gamma by cumulative weight.
+
+    With velocities, the start is turned to run along them, since a reversed
+    start predicts every velocity backwards and the fit does not recover.
+    """
+    n = z.shape[0]
+    if ordering.indices.shape[0] != n:
+        msg = f"ordering is of {ordering.indices.shape[0]} tracers, not these {n}."
+        raise ValueError(msg)
+    idx = np.asarray(ordering.ordering)
+    if n_q < z.shape[1]:
+        step = np.diff(np.asarray(z)[idx, :n_q], axis=0)
+        if np.sum(step * np.asarray(z)[idx[:-1], n_q:]) < 0:
+            idx = idx[::-1]
+    w = np.ones(n) if weights is None else np.asarray(weights)
+    cw = np.cumsum(w[idx]) - 0.5 * w[idx]
+    if cw[-1] - cw[0] <= 0:
+        msg = "the ordering's tracers need positive weights."
+        raise ValueError(msg)
+    return idx, -1 + 2 * (cw - cw[0]) / (cw[-1] - cw[0])
+
+
 def sample_track(
     positions: VectorComponents,
-    velocities: VectorComponents,
+    velocities: VectorComponents | None,
     *,
     key: PRNGKeyArray,
     method: Literal["svi", "nuts"] = "svi",
     metadata: StateMetadata | None = None,
     weights: Float[Array, " N"] | None = None,
-    ordering: AbstractResult | None = None,
+    ordering: OrderingResult | None = None,
     n_draws: int = 200,
     n_steps: int = 4000,
     n_warmup: int = 500,
@@ -416,7 +457,10 @@ def sample_track(
     ----------
     positions, velocities
         Phase-space tracers, arrays or `unxt` Quantities, with matching
-        component names. Values must be finite.
+        component names. Values must be finite. ``velocities=None`` fits the
+        positions alone, for example the pixels of an image; it needs an
+        ``ordering``, which you can make by ordering the positions with zero
+        velocities (e.g. with :class:`~phasecurvefit.orderers.RidgeOrderer`).
     key
         Split for the inference and for drawing.
     method
@@ -431,14 +475,17 @@ def sample_track(
         Per-tracer weights. They act as counts: the band of a weight-2 star is
         that of two stars, so scaling every weight changes the band.
     ordering
-        The ordering to start from. ``None`` runs
-        :func:`~phasecurvefit.orderers.default_pipeline`.
+        The ordering of these tracers to start from. ``None`` runs
+        :func:`~phasecurvefit.orderers.default_pipeline`. When there are
+        velocities, the start is turned to run along them.
     n_draws
-        Number of posterior draws to return.
+        Number of posterior draws to return. NUTS needs at least 8, so that
+        each chain has the 4 draws its split $\hat R$ needs.
     n_steps
         SVI optimisation steps.
     n_warmup
-        NUTS warmup steps per chain. Each chain then keeps ``n_draws / 2``.
+        NUTS warmup steps per chain. Each chain then keeps half the draws,
+        rounded up.
     n_basis, n_grid, line_density, width_varies, velocity_tie
         Passed to :func:`track_model`. A stream that crosses itself may need
         ``n_basis=32, n_grid=512``.
@@ -473,19 +520,27 @@ def sample_track(
     if method not in ("svi", "nuts"):
         msg = f"method must be 'svi' or 'nuts', got {method!r}."
         raise ValueError(msg)
+    if n_draws < (8 if method == "nuts" else 1):
+        msg = f"n_draws must be >= {8 if method == 'nuts' else 1} for {method}."
+        raise ValueError(msg)
     z, centre, scale = _scale(positions, velocities)
     if not bool(jnp.all(jnp.isfinite(z))):
-        msg = "sample_track needs finite positions and velocities."
+        msg = (
+            "sample_track needs finite positions and velocities, and positions "
+            "and velocities that are not all equal."
+        )
         raise ValueError(msg)
-    n_q = len(positions)
+    n, n_q = z.shape[0], len(positions)
+    if weights is not None:
+        weights = check_weights(weights, n)
     if ordering is None:
+        if velocities is None:
+            msg = "sample_track(velocities=None) needs an ordering of the positions."
+            raise ValueError(msg)
         ordering = default_pipeline(
             positions, velocities, metadata=metadata, weights=weights
         )
-    idx = np.asarray(ordering.ordering)
-    w = np.ones(z.shape[0]) if weights is None else np.asarray(weights)
-    cw = np.cumsum(w[idx]) - 0.5 * w[idx]
-    gamma0 = -1 + 2 * (cw - cw[0]) / (cw[-1] - cw[0])
+    idx, gamma0 = _start_gamma(z, n_q, ordering, weights)
 
     opts: dict[str, Any] = {
         "n_q": n_q,

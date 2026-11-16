@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -198,3 +199,79 @@ def test_plain_options_and_quiet_nuts(monkeypatch):
     )
     assert post.reference.track_range == (-1.0, 1.0)
     assert "f_bg" not in post.samples
+
+
+# ---- audit fixes ----------------------------------------------------------------
+
+
+def _radius_err(post, n=9):
+    r = post.reference(_interior(post, n))
+    return np.abs(np.hypot(np.asarray(r["x"]), np.asarray(r["y"])) - 5.0)
+
+
+def test_reversed_ordering_is_turned_along_the_velocities():
+    """A start that runs against the velocities is flipped, not fitted backwards."""
+    pos, vel = _arc(80)
+    o = pcf.orderers.default_pipeline(pos, vel)
+    rev = eqx.tree_at(lambda r: r.indices, o, o.indices[::-1])
+    post = pcf.sample_track(
+        pos, vel, key=jax.random.key(0), ordering=rev, n_steps=1500, n_draws=10
+    )
+    assert np.median(_radius_err(post)) < 0.05
+
+
+def test_positions_only_with_an_ordering():
+    pos, _ = _arc(80)
+    zero = {k: jnp.zeros(80) for k in pos}
+    o = pcf.order(pos, zero, pcf.orderers.RidgeOrderer())
+    post = pcf.sample_track(
+        pos, None, key=jax.random.key(0), ordering=o, n_steps=1500, n_draws=10
+    )
+    assert "sigma_p" not in post.samples
+    assert np.median(_radius_err(post)) < 0.05
+
+
+def test_positions_only_needs_an_ordering():
+    pos, _ = _arc(40)
+    with pytest.raises(ValueError, match="needs an ordering"):
+        pcf.sample_track(pos, None, key=jax.random.key(0))
+
+
+@pytest.mark.parametrize(("method", "n_draws"), [("svi", 0), ("nuts", 7)])
+def test_too_few_draws_raises(method, n_draws):
+    pos, vel = _arc(40)
+    with pytest.raises(ValueError, match="n_draws"):
+        pcf.sample_track(
+            pos, vel, key=jax.random.key(0), method=method, n_draws=n_draws
+        )
+
+
+def test_bad_weights_raise_with_an_ordering():
+    pos, vel = _arc(40)
+    o = pcf.orderers.default_pipeline(pos, vel)
+    with pytest.raises(ValueError, match="non-negative"):
+        pcf.sample_track(
+            pos, vel, key=jax.random.key(0), ordering=o, weights=-jnp.ones(40)
+        )
+
+
+def test_ordering_of_other_tracers_raises():
+    pos, vel = _arc(40)
+    o = pcf.orderers.default_pipeline(*_arc(50))
+    with pytest.raises(ValueError, match="ordering is of 50"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), ordering=o)
+
+
+def test_quantity_band_and_mixed_units():
+    """The band carries a unit, and each component keeps its own unit."""
+    pos, vel = _arc(60)
+    meta = pcf.StateMetadata(usys=u.unitsystems.galactic)
+    pq = {"x": u.Q(pos["x"], "kpc"), "y": u.Q(1000 * pos["y"], "pc")}
+    vq = {k: u.Q(v, "km/s") for k, v in vel.items()}
+    p = pcf.sample_track(
+        pq, vq, key=jax.random.key(0), metadata=meta, n_steps=300, n_draws=10
+    )
+    g = _interior(p, 3)
+    assert u.unit_of(p.reference(g)["y"]) == u.unit("pc")
+    assert u.unit_of(p.radius(g)) == u.unit("kpc")
+    assert u.unit_of(p.offsets(g)) == u.unit("kpc")

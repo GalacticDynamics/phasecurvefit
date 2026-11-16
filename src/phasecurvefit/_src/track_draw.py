@@ -51,7 +51,8 @@ class TrackDraw(ReprMixin, eqx.Module):
         r"""Evaluate the track's position components at ``gamma``."""
         g = jnp.asarray(gamma)
         return {
-            k: jnp.interp(g, self.gamma, self.x[:, i]) * self.scale + c
+            # centre first, so each component keeps its own unit
+            k: c + jnp.interp(g, self.gamma, self.x[:, i]) * self.scale
             for i, (k, c) in enumerate(self.centre.items())
         }
 

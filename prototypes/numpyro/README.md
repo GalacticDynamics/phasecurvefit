@@ -226,8 +226,6 @@ ordering of #270 the untied model already gets 8 of 8 (0.78 / 0.96).
 
 ## Not measured
 
-- A known-truth test of the line-density and varying-width channels.
-- The mock stream with velocities tied to the tangent.
 - Scaling with N: the marginal likelihood costs N × K per evaluation (400 × 256
   here).
 

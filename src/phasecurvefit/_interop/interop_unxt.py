@@ -64,7 +64,7 @@ from phasecurvefit._src.orderers.mst import MSTOrderer
 from phasecurvefit._src.orderers.result import OrderingResult
 from phasecurvefit._src.orderers.ridge import RidgeOrderer
 from phasecurvefit._src.orderers.som import SOMOrderer
-from phasecurvefit._src.posterior import _scale
+from phasecurvefit._src.posterior import _scale_positions, _scale_velocities
 from phasecurvefit._src.query_config import WalkConfig
 
 RQSz0: TypeAlias = Real[AbcQ, " "]  # noqa: UP040
@@ -398,20 +398,25 @@ def transform(
     return norm_qs.ustrip(""), norm_ps.ustrip("")  # type: ignore[attr-defined]  # quaxed returns Quantities
 
 
-@_scale.dispatch  # type: ignore[attr-defined, untyped-decorator]  # plum Function, typed as the def
-def _scale_quantity(
-    positions: VectorQComponents, velocities: VectorQComponents, /
+@_scale_positions.dispatch  # type: ignore[attr-defined, untyped-decorator]  # plum Function, typed as the def
+def _scale_positions_quantity(
+    positions: VectorQComponents, /
 ) -> tuple[Array, dict[str, Any], AbcQ]:
     # The means and the length stay Quantities; only dimensionless ratios are
     # stripped, so a unit mismatch raises instead of passing silently.
     q = qnp.stack([positions[k] for k in positions], axis=1)  # type: ignore[misc]  # quaxed takes Quantities
-    p = qnp.stack([velocities[k] for k in positions], axis=1)  # type: ignore[misc]  # quaxed takes Quantities
     s = qnp.sqrt(qnp.mean(qnp.var(q, axis=0)))
-    sv = qnp.sqrt(qnp.mean(qnp.sum(p**2, axis=1)))
     centre = {k: qnp.mean(v) for k, v in positions.items()}
     zq = qnp.stack([(positions[k] - centre[k]) / s for k in positions], axis=1)
-    z = jnp.concatenate([u.ustrip("", zq), u.ustrip("", p / sv)], axis=1)  # type: ignore[list-item]  # ustrip of a Quantity is an Array
-    return z, centre, s  # type: ignore[return-value]  # quaxed returns Quantities
+    return u.ustrip("", zq), centre, s  # type: ignore[return-value]  # quaxed returns Quantities
+
+
+@_scale_velocities.dispatch  # type: ignore[attr-defined, untyped-decorator]  # plum Function, typed as the def
+def _scale_velocities_quantity(
+    velocities: VectorQComponents, keys: tuple[str, ...], /
+) -> Array:
+    p = qnp.stack([velocities[k] for k in keys], axis=1)  # type: ignore[misc]  # quaxed takes Quantities
+    return u.ustrip("", p / qnp.sqrt(qnp.mean(qnp.sum(p**2, axis=1))))  # type: ignore[return-value]  # ustrip of a Quantity is an Array
 
 
 @_chord_values.dispatch  # type: ignore[attr-defined, untyped-decorator]  # plum Function, typed as the def

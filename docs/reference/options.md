@@ -135,8 +135,8 @@ track's uncertainty ([](../how-to/track-uncertainty.md)). It takes every option 
 | `method` | `"svi"` | `"svi"`: a full-rank Gaussian fitted to the posterior; `"nuts"`: two NUTS chains, with a warning when they disagree |
 | `metadata` | `None` | passed to the default pipeline; Quantity inputs need its unit system |
 | `weights` | `None` | per-sample weights, which act as counts |
-| `ordering` | `None` | the ordering to start from; `None` runs the default pipeline |
-| `n_draws` | `200` | posterior draws returned |
+| `ordering` | `None` | the ordering to start from, turned to run along the velocities; `None` runs the default pipeline. Needed with `velocities=None` |
+| `n_draws` | `200` | posterior draws returned; at least 8 for NUTS |
 | `n_steps` | `4000` | SVI steps |
 | `n_warmup` | `500` | NUTS warmup steps per chain |
 | `n_basis` | `16` | basis functions per Gaussian-process channel; a stream that crosses itself may need `32` |

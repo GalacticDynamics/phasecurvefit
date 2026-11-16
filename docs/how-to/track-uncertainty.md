@@ -135,7 +135,9 @@ which happens when they settle in different modes.
 
 `weights` act as counts here: a sample of weight 2 counts as two samples, so scaling
 every weight changes the band. Use counts, such as the number of stars in each pixel,
-and not a density normalised to some peak.
+and not a density normalised to some peak. Pixels have no velocities: pass
+`velocities=None`, and an `ordering` of the pixels, for example from
+{class}`~phasecurvefit.orderers.RidgeOrderer` run with zero velocities.
 
-With `unxt` Quantities the draws return Quantities. Pass the unit system as
-`metadata=pcf.StateMetadata(usys=...)`, as for the orderers.
+With `unxt` Quantities the draws, `radius` and `offsets` return Quantities. Pass the
+unit system as `metadata=pcf.StateMetadata(usys=...)`, as for the orderers.
