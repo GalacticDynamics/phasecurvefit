@@ -138,8 +138,12 @@ The model, {func}`~phasecurvefit.track_model`:
   away from its stars.
 
 The fit starts from the ordering of {func}`~phasecurvefit.orderers.default_pipeline`,
-turned to run along the velocities, and keeps its topology. On a stream that crosses itself, a start that turns onto the
-other branch stays there, and NUTS chains don't leave it either. In the prototypes
+turned to run along the velocities. On a stream that crosses itself, a start that
+turns onto the other branch stays there in the untied model, and NUTS chains don't
+leave it either. In the prototypes, on a loop where every orderer then turned at the
+crossing, the velocity tie brought 5 of 8 such starts back to the right branch. Since
+the default pipeline now crosses straight over, the start is usually right. In the
+prototypes
 NUTS chains often settled in different modes, so SVI with a full-rank Gaussian is the
 default, and `method="nuts"` warns when its two chains disagree.
 

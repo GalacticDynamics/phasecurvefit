@@ -18,7 +18,7 @@ from phasecurvefit._src import posterior
 N = 160
 
 
-def _arc(n=N, seed=1):
+def _arc(n=N, seed=1, /):
     ang = jnp.linspace(0.0, jnp.pi, n)
     noise = 0.05 * jax.random.normal(jax.random.key(seed), (2, n))
     pos = {"x": 5 * jnp.cos(ang) + noise[0], "y": 5 * jnp.sin(ang) + noise[1]}
@@ -32,7 +32,7 @@ def post():
     return pcf.sample_track(pos, vel, key=jax.random.key(0), n_draws=50)
 
 
-def _interior(p, n=11):
+def _interior(p, n=11, /):
     lo, hi = p.reference.track_range
     pad = 0.1 * (hi - lo)
     return jnp.linspace(lo + pad, hi - pad, n)
@@ -72,12 +72,12 @@ def test_members_differ(post):
 # ---- the model ------------------------------------------------------------------
 
 
-def _density(z, params, **kw):
+def _density(z, params, /, **kw):
     model = handlers.substitute(posterior.track_model, data=params)
     return float(log_density(model, (z,), {"n_q": 2, **kw}, {})[0])
 
 
-def _params(z, gamma, **kw):
+def _params(z, gamma, /, **kw):
     opts: dict[str, Any] = {"n_basis": 16, "line_density": True}
     opts["width_varies"] = True
     opts |= {"velocity_tie": 0.05} | kw
@@ -204,7 +204,7 @@ def test_plain_options_and_quiet_nuts(monkeypatch):
 # ---- audit fixes ----------------------------------------------------------------
 
 
-def _radius_err(post, n=9):
+def _radius_err(post, n=9, /):
     r = post.reference(_interior(post, n))
     return np.abs(np.hypot(np.asarray(r["x"]), np.asarray(r["y"])) - 5.0)
 
@@ -324,3 +324,39 @@ def test_untied_three_dimensional_run():
     )
     assert post.samples["beta"].shape == (5, 8, 16)  # 6 free channels, density, width
     assert set(post.reference(0.0)) == {"x", "y", "z"}
+
+
+# ---- third review -------------------------------------------------------------
+
+
+def test_zero_velocities_point_to_velocities_none():
+    pos, _ = _arc(40)
+    zero = {k: jnp.zeros(40) for k in pos}
+    with pytest.raises(ValueError, match="velocities=None"):
+        pcf.sample_track(pos, zero, key=jax.random.key(0))
+
+
+@pytest.mark.parametrize("tie", [-0.1, float("nan")])
+def test_bad_velocity_tie_raises(tie):
+    pos, vel = _arc(40)
+    with pytest.raises(ValueError, match="velocity_tie"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), velocity_tie=tie)
+
+
+def test_vote_ignores_repeated_positions():
+    """Steps of zero length carry no direction, even when they are most steps."""
+    q = np.array([[0.0, 0.0]] * 5 + [[1.0, 0.0], [2.0, 0.0]])
+    zo = np.concatenate([q, np.tile([[1.0, 0.0]], (7, 1))], axis=1)
+    assert not posterior._runs_backwards(zo, 2)
+    assert posterior._runs_backwards(zo[::-1], 2)
+
+
+def test_degenerate_orderings_raise():
+    pos, vel = _arc(40)
+    z, _, _ = posterior._scale(pos, vel)
+    o = pcf.orderers.default_pipeline(pos, vel)
+    one = eqx.tree_at(lambda r: r.indices, o, jnp.full(40, -1).at[0].set(0))
+    with pytest.raises(ValueError, match="at least 2"):
+        posterior._start_gamma(z, 2, one, None)
+    with pytest.raises(ValueError, match="weight 0"):
+        posterior._start_gamma(z, 2, o, jnp.zeros(40))

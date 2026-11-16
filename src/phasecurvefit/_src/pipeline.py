@@ -152,10 +152,11 @@ class TrackEnsemble(ReprMixin, eqx.Module):
 
     Attributes
     ----------
-    reference : AutoencoderResult
-        The track fitted to all the data.
-    members : tuple[AutoencoderResult, ...]
-        The tracks fitted to the resamples.
+    reference : AutoencoderResult or TrackDraw
+        The track fitted to all the data, or for a posterior the track at the
+        mean of the drawn parameters.
+    members : tuple[AutoencoderResult or TrackDraw, ...]
+        The tracks fitted to the resamples, or the posterior draws.
 
     The methods :meth:`offsets` and :meth:`radius` only call each track on
     $\gamma$ and read its ``track_range``, so they work the same for the

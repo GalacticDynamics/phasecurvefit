@@ -183,7 +183,7 @@ def track_model(
         same component order.
     weights
         Per-star weights. They act as counts: a weight of 2 is two stars, so
-        scaling every weight narrows the band.
+        scaling every weight up narrows the band.
     log_rho_bg
         Log of the flat background density, in the units of ``z``. ``None``
         leaves out the background.
@@ -428,12 +428,14 @@ def _runs_backwards(zo: np.ndarray, n_q: int, /) -> bool:
     Each step between neighbours votes with the sign of its dot product with
     the mean velocity of its two ends. Only steps up to 3 times the median
     step vote, so long jumps out to interlopers, whose velocities are random,
-    don't decide it. Reversing the order flips every vote.
+    don't decide it, and steps of zero length don't vote. Reversing the order
+    flips every vote.
     """
     step = np.diff(zo[:, :n_q], axis=0)
     v = 0.5 * (zo[1:, n_q:] + zo[:-1, n_q:])
     length = np.linalg.norm(step, axis=1)
-    typical = length <= 3 * np.median(length)
+    moved = length > 0  # repeated positions carry no direction
+    typical = moved & (length <= 3 * np.median(length[moved] if moved.any() else 0))
     return bool(np.sum(np.sign(np.sum(step * v, axis=1))[typical]) < 0)
 
 
@@ -458,9 +460,35 @@ def _start_gamma(
     w = np.ones(n) if weights is None else np.asarray(weights)
     cw = np.cumsum(w[idx]) - 0.5 * w[idx]
     if cw[-1] - cw[0] <= 0:
-        msg = "the ordering's tracers need positive weights, at least 2 of them."
+        msg = "the tracers in the ordering all have weight 0."
         raise ValueError(msg)
     return idx, -1 + 2 * (cw - cw[0]) / (cw[-1] - cw[0])
+
+
+def _check_options(
+    positions: VectorComponents,
+    velocities: VectorComponents | None,
+    method: str,
+    n_draws: int,
+    velocity_tie: float | None,
+    /,
+) -> None:
+    """Raise on options :func:`sample_track` can't use."""
+    if method not in ("svi", "nuts"):
+        msg = f"method must be 'svi' or 'nuts', got {method!r}."
+        raise ValueError(msg)
+    if n_draws < (8 if method == "nuts" else 1):
+        msg = f"n_draws must be >= {8 if method == 'nuts' else 1} for {method}."
+        raise ValueError(msg)
+    if velocity_tie is not None and not velocity_tie >= 0:
+        msg = f"velocity_tie must be None or a number >= 0, got {velocity_tie!r}."
+        raise ValueError(msg)
+    if velocities is not None and set(velocities) != set(positions):
+        msg = (
+            f"velocities need the positions' components {sorted(positions)}, "
+            f"got {sorted(velocities)}."
+        )
+        raise ValueError(msg)
 
 
 def sample_track(
@@ -487,8 +515,9 @@ def sample_track(
     The model is :func:`track_model`. It starts from an ordering: the stars'
     rank in it, counted by weight, gives each a starting $\gamma$, and the track
     is fitted to that by least squares. Then SVI with a full-rank Gaussian
-    guide, or NUTS, samples the posterior. The ordering matters: a start that
-    takes a wrong turn where the stream crosses itself stays wrong.
+    guide, or NUTS, samples the posterior. The ordering matters: without the
+    velocity tie, a start that takes a wrong turn where the stream crosses
+    itself stays wrong, and the tie gets only some of those back.
 
     Parameters
     ----------
@@ -521,7 +550,8 @@ def sample_track(
         Number of posterior draws to return. NUTS needs at least 8, so that
         each chain has the 4 draws its split $\hat R$ needs.
     n_steps
-        SVI optimisation steps.
+        SVI optimisation steps. The learning rate falls from 2e-2 to 2e-4
+        over them. Check that ``losses`` has flattened by the end.
     n_warmup
         NUTS warmup steps per chain. Each chain then keeps half the draws,
         rounded up.
@@ -556,23 +586,14 @@ def sample_track(
 
     """
     _require_numpyro()
-    if method not in ("svi", "nuts"):
-        msg = f"method must be 'svi' or 'nuts', got {method!r}."
-        raise ValueError(msg)
-    if n_draws < (8 if method == "nuts" else 1):
-        msg = f"n_draws must be >= {8 if method == 'nuts' else 1} for {method}."
-        raise ValueError(msg)
-    if velocities is not None and set(velocities) != set(positions):
-        msg = (
-            f"velocities need the positions' components {sorted(positions)}, "
-            f"got {sorted(velocities)}."
-        )
-        raise ValueError(msg)
+    _check_options(positions, velocities, method, n_draws, velocity_tie)
+    velocity_tie = None if velocity_tie is None else float(velocity_tie)
     z, centre, scale = _scale(positions, velocities)
     if not bool(jnp.all(jnp.isfinite(z))):
         msg = (
-            "sample_track needs finite positions and velocities, and positions "
-            "and velocities that are not all equal."
+            "sample_track needs finite positions that are not all equal, and "
+            "finite velocities that are not all zero (pass velocities=None to "
+            "fit positions alone)."
         )
         raise ValueError(msg)
     n, n_q = z.shape[0], len(positions)
@@ -597,6 +618,8 @@ def sample_track(
     }
     init = _start(z, gamma0, idx, **opts)
     log_rho = float(jnp.log(uniform_background_density(z))) if background else None
+    if background:  # NumPyro would otherwise start it anywhere in (0.12, 0.88)
+        init["f_bg"] = jnp.asarray(0.05)
     data: dict[str, Any] = {
         "weights": None if weights is None else jnp.asarray(weights),
         "log_rho_bg": log_rho,
@@ -611,7 +634,10 @@ def sample_track(
         guide = numpyro.infer.autoguide.AutoMultivariateNormal(
             model, init_loc_fn=numpyro.infer.init_to_value(values=init)
         )
-        opt = optax.chain(optax.clip_by_global_norm(10.0), optax.adam(2e-3))
+        # From 2e-2 down to 2e-4: big early steps, little gradient noise at the
+        # end. A constant 2e-3 was still 25 nats short of converged at 4000.
+        rate = optax.exponential_decay(2e-2, max(n_steps, 1), 1e-2)
+        opt = optax.chain(optax.clip_by_global_norm(10.0), optax.adam(rate))
         res = numpyro.infer.SVI(model, guide, opt, numpyro.infer.Trace_ELBO()).run(
             key_fit, n_steps, progress_bar=False
         )

@@ -28,6 +28,9 @@ using a variety of tools.
     as `init`. Built with `|`, e.g. `MSTOrderer(k=10) | LocalFlowOrderer()`.
 - `fit_track(positions, velocities, key=...)`: end to end — runs the default
   pipeline, then builds and trains a `PathAutoencoder`.
+- `bootstrap_track(...)` returns a `TrackEnsemble`; `sample_track(...)` (the
+  `numpyro` extra) returns a `TrackPosterior`, a `TrackEnsemble` of
+  `TrackDraw`s, from the NumPyro model `track_model`.
 - `walk_local_flow` was **removed** in v0.4; use `order()` with
   `LocalFlowOrderer`.
 - `WalkConfig(metric=..., strategy=...)` composes a distance metric and a query
@@ -103,7 +106,9 @@ without it the orderers raise.
     `OrderingResult`
   - `algorithm.py`: Local-flow walk implementation, `StateMetadata`
   - `som.py`: SOM implementation
-  - `pipeline.py`: `fit_track`
+  - `pipeline.py`: `fit_track`, `bootstrap_track`, `TrackEnsemble`
+  - `posterior.py`: `track_model`, `sample_track`, `TrackPosterior`
+  - `track_draw.py`: `TrackDraw`
   - `nn/`: Neural networks, training, and membership (Equinox)
   - `metrics.py`: Metric base classes and implementations
   - `strategies.py`: Query strategy classes
