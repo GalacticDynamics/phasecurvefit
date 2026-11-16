@@ -493,9 +493,6 @@ def _start_gamma(
     start predicts every velocity backwards and the fit does not recover.
     """
     n = z.shape[0]
-    if ordering.indices.shape[0] != n:
-        msg = f"ordering is of {ordering.indices.shape[0]} tracers, not these {n}."
-        raise ValueError(msg)
     idx = np.asarray(ordering.ordering)
     if idx.size < 2:
         msg = f"the ordering visits {idx.size} tracers; it needs at least 2."

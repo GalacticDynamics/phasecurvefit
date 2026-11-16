@@ -609,3 +609,26 @@ def test_ordering_far_from_the_origin_in_other_units_is_accepted():
     o = pcf.orderers.default_pipeline(pp, vq, metadata=meta)
     z, centre, scale = posterior._scale(pk, vq)
     posterior._check_ordering(z[:, :2], centre, scale, o)
+
+
+# ---- coverage of the remaining error paths -------------------------------------
+
+
+def test_ordering_with_other_components_raises():
+    pos, vel = _arc(40)
+    pos3 = {**pos, "z": 0.1 * pos["x"]}
+    vel3 = {**vel, "z": 0.1 * vel["x"]}
+    o = pcf.orderers.default_pipeline(pos3, vel3)
+    with pytest.raises(ValueError, match="other position components"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), ordering=o)
+
+
+def test_dimensionful_count_raises():
+    pos, vel = _arc(40)
+    with pytest.raises(ValueError, match="n_steps"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=u.Q(50, "kpc"))
+
+
+def test_draws_that_are_not_finite_raise():
+    with pytest.raises(RuntimeError, match="not finite"):
+        posterior._require_finite({"a": jnp.array([1.0, jnp.nan])}, "nuts")
