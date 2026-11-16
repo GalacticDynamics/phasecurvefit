@@ -275,3 +275,52 @@ def test_quantity_band_and_mixed_units():
     assert u.unit_of(p.reference(g)["y"]) == u.unit("pc")
     assert u.unit_of(p.radius(g)) == u.unit("kpc")
     assert u.unit_of(p.offsets(g)) == u.unit("kpc")
+
+
+# ---- second review ------------------------------------------------------------
+
+
+def test_direction_vote_ignores_interlopers():
+    """60 interlopers with random velocities don't turn the start the wrong way."""
+    rng = np.random.default_rng(3)
+    ang = np.linspace(0.0, np.pi, 300)
+    q = np.stack([5 * np.cos(ang), 5 * np.sin(ang)], 1) + rng.normal(0, 0.05, (300, 2))
+    p = np.stack([-np.sin(ang), np.cos(ang)], 1)
+    q = np.vstack([q, rng.uniform(-5, 5, (60, 2))])
+    p = np.vstack([p, rng.normal(0, 1, (60, 2))])
+    pos = {k: jnp.asarray(q[:, i]) for i, k in enumerate("xy")}
+    vel = {k: jnp.asarray(p[:, i]) for i, k in enumerate("xy")}
+    z, _, _ = posterior._scale(pos, vel)
+    o = pcf.orderers.default_pipeline(pos, vel)
+    rev = eqx.tree_at(lambda r: r.indices, o, o.indices[::-1])
+    for start in (o, rev):
+        idx, _ = posterior._start_gamma(z, 2, start, None)
+        members = idx[idx < 300]
+        step = np.diff(np.asarray(z)[members, :2], axis=0)
+        along = np.sum(step * np.asarray(z)[members[1:], 2:], axis=1)
+        assert np.mean(np.sign(along)) > 0.5
+
+
+def test_stuck_chains_warn():
+    """A chain stuck at one value has no R-hat; that counts as disagreeing."""
+    with pytest.warns(RuntimeWarning, match="not computable"):
+        posterior._warn_if_chains_disagree({"a": jnp.ones((2, 4, 3))})
+
+
+def test_mismatched_velocity_keys_raise():
+    pos, vel = _arc(40)
+    vel = {"vx": vel["x"], "vy": vel["y"]}
+    with pytest.raises(ValueError, match="components"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0))
+
+
+def test_untied_three_dimensional_run():
+    """End to end in 3-D with free velocity channels."""
+    pos, vel = _arc(60)
+    pos = {**pos, "z": 0.3 * pos["x"]}
+    vel = {**vel, "z": 0.3 * vel["x"]}
+    post = pcf.sample_track(
+        pos, vel, key=jax.random.key(0), n_steps=300, n_draws=5, velocity_tie=None
+    )
+    assert post.samples["beta"].shape == (5, 8, 16)  # 6 free channels, density, width
+    assert set(post.reference(0.0)) == {"x", "y", "z"}

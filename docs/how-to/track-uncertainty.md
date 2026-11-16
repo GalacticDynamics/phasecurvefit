@@ -129,6 +129,8 @@ gamma = jnp.linspace(*post.reference.track_range, 5)
 post.radius(gamma, 0.68), post.reference.width(gamma)
 ```
 
+As with the bootstrap, the radius is NaN at the two ends, where some draws stop short.
+
 By default it fits a full-rank Gaussian to the posterior with SVI. `method="nuts"`
 runs two NUTS chains instead. That is slower, and it warns when the chains disagree,
 which happens when they settle in different modes.

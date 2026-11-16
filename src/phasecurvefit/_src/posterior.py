@@ -96,12 +96,12 @@ def _layout(d: int, n_q: int, velocity_tie: float | None, /) -> tuple[bool, int,
     return tied, n_slack, (n_q + 1 + n_slack if tied else d)
 
 
-@functools.partial(jax.jit, static_argnums=(3, 4, 5, 6, 7, 8))
+@functools.partial(jax.jit, static_argnums=(4, 5, 6, 7, 8))
 def _log_likelihood(
     z: Array,
     sites: dict[str, Array],
     weights: Array | None,
-    log_rho_bg: float | None,
+    log_rho_bg: Array | float | None,
     n_q: int,
     n_grid: int,
     line_density: bool,  # noqa: FBT001  # positional, as jit's static args
@@ -343,8 +343,10 @@ class TrackPosterior(TrackEnsemble):
     :meth:`~phasecurvefit.TrackEnsemble.offsets` and
     :meth:`~phasecurvefit.TrackEnsemble.radius` work as they do for a bootstrap.
 
-    The draws share the model's $\gamma$, so they can also be compared at equal
-    $\gamma$.
+    Compare draws in space, as ``offsets`` does, and not at equal $\gamma$.
+    With the latent line density a draw's $\gamma$ can shift along the track,
+    and on a test arc the draws' points at one $\gamma$ spread about three
+    times the 68% radius along it.
 
     Attributes
     ----------
@@ -401,6 +403,40 @@ def _draws(
     return out
 
 
+def _warn_if_chains_disagree(by_chain: dict[str, Array], /) -> None:
+    """Warn when the largest split R-hat is above 1.05, or can't be computed.
+
+    A chain stuck at one value gives a NaN R-hat, which counts as disagreeing.
+    """
+    with np.errstate(invalid="ignore", divide="ignore"):  # a stuck chain: 0 / 0
+        stats = numpyro.diagnostics.summary(by_chain).values()
+    rhat = np.concatenate([np.ravel(v["r_hat"]) for v in stats])
+    worst = float(np.nan if np.isnan(rhat).any() else rhat.max())
+    if np.isnan(worst) or worst > _RHAT_WARN:
+        warnings.warn(
+            f"NUTS chains disagree (max split R-hat {worst:.2f}, above {_RHAT_WARN} "
+            "or not computable); they may sit in different modes or be stuck. "
+            "Compare with method='svi'.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+
+
+def _runs_backwards(zo: np.ndarray, n_q: int, /) -> bool:
+    """Whether an ordered start runs against its velocities, by a vote of steps.
+
+    Each step between neighbours votes with the sign of its dot product with
+    the mean velocity of its two ends. Only steps up to 3 times the median
+    step vote, so long jumps out to interlopers, whose velocities are random,
+    don't decide it. Reversing the order flips every vote.
+    """
+    step = np.diff(zo[:, :n_q], axis=0)
+    v = 0.5 * (zo[1:, n_q:] + zo[:-1, n_q:])
+    length = np.linalg.norm(step, axis=1)
+    typical = length <= 3 * np.median(length)
+    return bool(np.sum(np.sign(np.sum(step * v, axis=1))[typical]) < 0)
+
+
 def _start_gamma(
     z: Array, n_q: int, ordering: OrderingResult, weights: Array | None, /
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -414,14 +450,15 @@ def _start_gamma(
         msg = f"ordering is of {ordering.indices.shape[0]} tracers, not these {n}."
         raise ValueError(msg)
     idx = np.asarray(ordering.ordering)
-    if n_q < z.shape[1]:
-        step = np.diff(np.asarray(z)[idx, :n_q], axis=0)
-        if np.sum(step * np.asarray(z)[idx[:-1], n_q:]) < 0:
-            idx = idx[::-1]
+    if idx.size < 2:
+        msg = f"the ordering visits {idx.size} tracers; it needs at least 2."
+        raise ValueError(msg)
+    if n_q < z.shape[1] and _runs_backwards(np.asarray(z)[idx], n_q):
+        idx = idx[::-1]
     w = np.ones(n) if weights is None else np.asarray(weights)
     cw = np.cumsum(w[idx]) - 0.5 * w[idx]
     if cw[-1] - cw[0] <= 0:
-        msg = "the ordering's tracers need positive weights."
+        msg = "the ordering's tracers need positive weights, at least 2 of them."
         raise ValueError(msg)
     return idx, -1 + 2 * (cw - cw[0]) / (cw[-1] - cw[0])
 
@@ -457,7 +494,9 @@ def sample_track(
     ----------
     positions, velocities
         Phase-space tracers, arrays or `unxt` Quantities, with matching
-        component names. Values must be finite. ``velocities=None`` fits the
+        component names. Values must be finite. Every position component
+        needs the same dimension, since one length scales them all, and the
+        velocities are their time derivatives. ``velocities=None`` fits the
         positions alone, for example the pixels of an image; it needs an
         ``ordering``, which you can make by ordering the positions with zero
         velocities (e.g. with :class:`~phasecurvefit.orderers.RidgeOrderer`).
@@ -522,6 +561,12 @@ def sample_track(
         raise ValueError(msg)
     if n_draws < (8 if method == "nuts" else 1):
         msg = f"n_draws must be >= {8 if method == 'nuts' else 1} for {method}."
+        raise ValueError(msg)
+    if velocities is not None and set(velocities) != set(positions):
+        msg = (
+            f"velocities need the positions' components {sorted(positions)}, "
+            f"got {sorted(velocities)}."
+        )
         raise ValueError(msg)
     z, centre, scale = _scale(positions, velocities)
     if not bool(jnp.all(jnp.isfinite(z))):
@@ -588,19 +633,7 @@ def sample_track(
             progress_bar=False,
         )
         mcmc.run(key_fit)
-        rhat = max(
-            float(np.nanmax(v["r_hat"]))
-            for v in numpyro.diagnostics.summary(
-                mcmc.get_samples(group_by_chain=True)
-            ).values()
-        )
-        if rhat > _RHAT_WARN:
-            warnings.warn(
-                f"NUTS chains disagree (max split R-hat {rhat:.2f} > {_RHAT_WARN}); "
-                "they may sit in different modes. Compare with method='svi'.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
+        _warn_if_chains_disagree(mcmc.get_samples(group_by_chain=True))
         samples = {k: v[:n_draws] for k, v in mcmc.get_samples().items()}
 
     samples = {k: v for k, v in samples.items() if k != "loglik"}

@@ -143,10 +143,13 @@ other branch stays there, and NUTS chains don't leave it either. In the prototyp
 NUTS chains often settled in different modes, so SVI with a full-rank Gaussian is the
 default, and `method="nuts"` warns when its two chains disagree.
 
-`weights` act as counts in the likelihood. Pixels have no velocities, so an image is
-fitted with `velocities=None`. Its band is right when the weights are the counts in
-each pixel, and too wide or too narrow when they are a
-density scaled to some peak ([](density-fields.md)).
+`weights` act as counts in the likelihood, so they should be counts and not a density
+scaled to some peak ([](density-fields.md)). Pixels have no velocities, so an image is
+fitted with `velocities=None`. In the prototypes, on the sine arc binned into pixels
+with the counts as weights, the SVI band covered the truth 0.89 and 0.99 of the time
+at 68% and 95%, so it was somewhat too wide. NUTS's band was half as wide but covered
+only 0.55 and 0.88. Dividing the weights by their peak widened the SVI band, as it
+should.
 
 ### Measured calibration of the posterior
 
@@ -162,8 +165,9 @@ plus Gaussian noise of 0.1 per component.
 - varying: the sine arc with 800 samples, a dense clump near $s = 0.35$ and sparse
   tails, and a width that grows from 0.06 to 0.36 along it.
 
-Coverage is counted as above, at 46 points along the true curve, from the draws'
-offsets across it.
+Coverage is counted at the same 46 points along the true curve, from each draw's
+offset in the plane normal to it. A point that fewer than half the draws reach counts
+as not covered.
 
 | case | 68% coverage | 95% coverage | 68% half-width | error of the band's centre (rms) | time per fit |
 |---|---|---|---|---|---|
