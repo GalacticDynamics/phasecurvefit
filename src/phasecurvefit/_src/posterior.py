@@ -722,8 +722,8 @@ def sample_track(
         still improve. On the helix test case the loss at 4000 steps was 16
         nats short of a 12000-step run, and its band was within 7%.
     n_warmup
-        NUTS warmup steps per chain. Each chain then keeps half the draws,
-        rounded up.
+        NUTS warmup steps per chain. Each chain then draws half of
+        ``n_draws``, rounded up, and the first ``n_draws`` are kept.
     n_basis, n_grid, line_density, width_varies, velocity_tie
         Passed to :func:`track_model`. A stream that crosses itself may need
         ``n_basis=32, n_grid=512``.

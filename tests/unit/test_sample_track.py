@@ -669,3 +669,45 @@ def test_angle_positions_scale():
     z, centre, scale = posterior._scale(angles, None)
     assert z.shape == (40, 2)
     assert u.unit_of(scale) == u.unit("deg")
+
+
+# ---- twelfth review -----------------------------------------------------------
+
+
+def test_import_leaves_numpyro_unloaded():
+    import subprocess  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+
+    code = "import sys, phasecurvefit; print('numpyro' in sys.modules)"
+    out = subprocess.run(  # noqa: S603  # our own interpreter, a fixed command
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    )
+    assert out.stdout.strip() == "False"
+
+
+def test_columns_follow_their_keys():
+    """With keys in (y, x) order, the arc's top is still at y = 5."""
+    pos, vel = _arc(80)
+    pos = {"y": pos["y"], "x": pos["x"]}
+    vel = {"y": vel["y"], "x": vel["x"]}
+    post = pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=500, n_draws=4)
+    assert post.reference.track_range is not None
+    lo, hi = post.reference.track_range
+    top = post.reference(jnp.asarray(0.5 * (lo + hi)))
+    np.testing.assert_allclose(top["y"], 5.0, atol=0.3)
+    np.testing.assert_allclose(top["x"], 0.0, atol=0.6)
+
+
+def test_mixed_quantity_and_array_positions_raise():
+    pos, vel = _arc(40)
+    mixed = {"x": u.Q(pos["x"], "kpc"), "y": pos["y"]}
+    with pytest.raises(ValueError, match="mixes Quantities"):
+        posterior._scale(mixed, None)
+
+
+def test_mixed_quantity_and_array_velocities_raise():
+    pos, vel = _arc(40)
+    pq = {k: u.Q(v, "kpc") for k, v in pos.items()}
+    mixed = {"x": u.Q(vel["x"], "km/s"), "y": vel["y"]}
+    with pytest.raises(ValueError, match="mixes Quantities"):
+        posterior._scale(pq, mixed)

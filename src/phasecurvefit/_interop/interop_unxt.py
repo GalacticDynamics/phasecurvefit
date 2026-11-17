@@ -410,6 +410,11 @@ def _scale_positions_quantity(
     # The means and the length stay Quantities; only dimensionless ratios are
     # stripped, so a unit mismatch raises instead of passing silently. Plain
     # Quantities, since an Angle can't be squared for the variance.
+    if not all(isinstance(v, AbcQ) for v in positions.values()):
+        msg = (
+            "positions mixes Quantities and plain arrays; give every component a unit."
+        )
+        raise ValueError(msg)
     positions = {k: u.Quantity(v.value, v.unit) for k, v in positions.items()}
     q = qnp.stack([positions[k] for k in positions], axis=1)  # type: ignore[misc]  # quaxed takes Quantities
     s = qnp.sqrt(qnp.mean(qnp.var(q, axis=0)))
@@ -422,6 +427,11 @@ def _scale_positions_quantity(
 def _scale_velocities_quantity(
     velocities: VectorQComponents, keys: tuple[str, ...], /
 ) -> Array:
+    if not all(isinstance(velocities[k], AbcQ) for k in keys):
+        msg = (
+            "velocities mixes Quantities and plain arrays; give every component a unit."
+        )
+        raise ValueError(msg)
     p = qnp.stack([velocities[k] for k in keys], axis=1)  # type: ignore[misc]  # quaxed takes Quantities
     return u.ustrip("", p / qnp.sqrt(qnp.mean(qnp.sum(p**2, axis=1))))  # type: ignore[return-value]  # ustrip of a Quantity is an Array
 
