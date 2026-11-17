@@ -268,9 +268,9 @@ These were measured during review of PR B, on `sample_track` as shipped.
 - The old setting (constant learning rate 2e-3, `f_bg` started at random) had
   68% half-widths of 0.025, 0.030, 0.026 and 0.027 (helix, gap, loop, vary),
   against 0.019, 0.023, 0.018 and 0.015 now: 30-80% wider.
-- `out_lib` provenance: the saved outputs were re-run in full at commit e2053e1
-  (the weighted, flat-density start); every statistic in the table matched the
-  run before it, and only the times changed (17-34 s per run).
+- `out_lib` provenance: the saved outputs were re-run in full with the code of
+  commit c57d8b0 (the weighted, flat-density start); every statistic in the
+  table matched the run before it, and only the times changed (17-34 s per run).
 - A subset of `tests/unit/test_sample_track.py` passes on numpyro 0.20.0, the
   lowest version `pyproject.toml` allows.
 - Velocity frame: on a radius-5 arc (200 tracers, noise 0.05, 2000 steps, the
