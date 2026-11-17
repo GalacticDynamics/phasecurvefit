@@ -237,15 +237,17 @@ cases, 8 seeds each, 200 draws. Loop uses `n_basis=32, n_grid=512`.
 
 | case  | 68%  | 95%  | hw68  | centre rms | time |
 | ----- | ---- | ---- | ----- | ---------- | ---- |
-| helix | 0.72 | 0.97 | 0.019 | 0.018      | 42 s |
-| gap   | 0.68 | 0.95 | 0.023 | 0.023      | 49 s |
-| loop  | 0.73 | 0.96 | 0.018 | 0.017      | 71 s |
-| vary  | 0.85 | 0.99 | 0.015 | 0.015      | 31 s |
+| helix | 0.72 | 0.97 | 0.019 | 0.018      | 23 s |
+| gap   | 0.68 | 0.95 | 0.023 | 0.023      | 18 s |
+| loop  | 0.73 | 0.96 | 0.018 | 0.017      | 23 s |
+| vary  | 0.85 | 0.99 | 0.015 | 0.015      | 25 s |
 
 hw68 and centre rms are per direction across the track; for the 3-D helix the
 centre's rms distance from the truth is √2 times larger (0.025). Vary: width
 ratio 1.01, true width inside the draws' 68% at 0.63 of points, tail (s > 0.8)
-68% coverage 0.75. `f_bg` 0.001–0.003. Times on a shared machine.
+68% coverage 0.75. `f_bg` 0.001–0.003. Times on a shared machine. Re-run after
+the start was weighted and its line density made flat: every statistic above was
+unchanged.
 
 These are with `f_bg` started at 0.05 and the learning rate falling from 2e-2 to
 2e-4. An earlier run with a constant 2e-3 and `f_bg` started at random had not
@@ -266,8 +268,9 @@ These were measured during review of PR B, on `sample_track` as shipped.
 - The old setting (constant learning rate 2e-3, `f_bg` started at random) had
   68% half-widths of 0.025, 0.030, 0.026 and 0.027 (helix, gap, loop, vary),
   against 0.019, 0.023, 0.018 and 0.015 now: 30-80% wider.
-- `out_lib` provenance: helix seed 0 and vary seed 7 re-run at commit e336940
-  reproduced the saved offsets bit for bit.
+- `out_lib` provenance: the saved outputs were re-run in full at commit e2053e1
+  (the weighted, flat-density start); every statistic in the table matched the
+  run before it, and only the times changed (17-34 s per run).
 - A subset of `tests/unit/test_sample_track.py` passes on numpyro 0.20.0, the
   lowest version `pyproject.toml` allows.
 - Velocity frame: on a radius-5 arc (200 tracers, noise 0.05, 2000 steps, the

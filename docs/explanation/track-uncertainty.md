@@ -143,7 +143,7 @@ The model, {func}`~phasecurvefit.track_model`:
 The fit starts from the ordering of {func}`~phasecurvefit.orderers.default_pipeline`,
 turned to run along the velocities. On a stream that crosses itself, a start that
 turns onto the other branch stays there in the untied model. In an earlier prototype
-(uniform $\gamma$, a fixed width, no background and a constant learning rate), NUTS
+(uniform $\gamma$, a fixed width and no background), NUTS
 from such a start, on two seeds, covered the truth only 0.46 and 0.57 of the time at
 68% and 95% with velocities untied, and 0.60 and 0.78 with positions only. In the
 prototypes, on a loop where every orderer then turned at the
@@ -183,10 +183,10 @@ times the value in the table (0.025). A point that half the draws or fewer reach
 
 | case | 68% coverage | 95% coverage | 68% half-width | rms offset of the band's centre from the truth | time per fit |
 |---|---|---|---|---|---|
-| helix | 0.72 | 0.97 | 0.019 | 0.018 | 42 s |
-| gap | 0.68 | 0.95 | 0.023 | 0.023 | 49 s |
-| loop | 0.73 | 0.96 | 0.018 | 0.017 | 71 s |
-| varying | 0.85 | 0.99 | 0.015 | 0.015 | 31 s |
+| helix | 0.72 | 0.97 | 0.019 | 0.018 | 23 s |
+| gap | 0.68 | 0.95 | 0.023 | 0.023 | 18 s |
+| loop | 0.73 | 0.96 | 0.018 | 0.017 | 23 s |
+| varying | 0.85 | 0.99 | 0.015 | 0.015 | 25 s |
 
 On the varying case the fitted width matched the true one with a median ratio of
 1.01, and the true width lay inside the draws' central 68% at 0.63 of the points. The

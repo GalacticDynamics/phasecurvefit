@@ -259,13 +259,15 @@ def track_model(
         numpyro.factor("loglik", log_fg)
 
 
-def _basis_fit(gamma: np.ndarray, y: np.ndarray, n_basis: int, /) -> np.ndarray:
-    """Ridge fit of ``y(gamma)`` on the basis: non-centred ``beta``, ``(C, M)``."""
+def _basis_fit(
+    gamma: np.ndarray, y: np.ndarray, n_basis: int, w: np.ndarray, /
+) -> np.ndarray:
+    """Weighted ridge fit of ``y(gamma)`` on the basis: non-centred ``beta``."""
     x = np.asarray(_basis(jnp.asarray(gamma), n_basis)) * np.asarray(
         _sqrt_spd(jnp.asarray(_A0), jnp.asarray(_L0), n_basis)
     )
-    a = x.T @ x + 0.1 * np.eye(n_basis)
-    return np.linalg.solve(a, x.T @ np.asarray(y)).T
+    a = (x * w[:, None]).T @ x + 0.1 * np.eye(n_basis)
+    return np.linalg.solve(a, (x * w[:, None]).T @ np.asarray(y)).T
 
 
 def _start(
@@ -279,23 +281,22 @@ def _start(
     line_density: bool,
     width_varies: bool,
     velocity_tie: float | None,
+    weights: np.ndarray | None = None,
     **_unused: object,
 ) -> dict[str, Array]:
-    """Fit the track to the ordering by least squares, for the starting latents."""
+    """Fit the track to the ordering by least squares, for the starting latents.
+
+    ``weights`` are the ordered tracers' weights. Their start is spaced by
+    cumulative weight, so its line density is flat and starts at 0.
+    """
     d = z.shape[1]
     tied, _, n_mean = _layout(d, n_q, velocity_tie)
     zo = np.asarray(z)[idx]
     target = np.zeros((len(idx), n_mean))  # tied: log-speed and offsets start at 0
     target[:, : (n_q if tied else d)] = zo[:, : (n_q if tied else d)]
-    rows = [_basis_fit(gamma0, target, n_basis)]
-    if line_density:  # the log histogram of the start's gamma
-        h, e = np.histogram(gamma0, bins=32, range=(-1, 1))
-        logh = np.log(h + 1.0)
-        rows.append(
-            _basis_fit(0.5 * (e[1:] + e[:-1]), logh - logh.mean(), n_basis)[None]
-        )
-    if width_varies:
-        rows.append(np.zeros((1, n_basis)))
+    w = np.ones(len(idx)) if weights is None else np.asarray(weights, dtype=float)
+    rows = [_basis_fit(gamma0, target, n_basis, w)]
+    rows.append(np.zeros((int(line_density) + int(width_varies), n_basis)))
     beta = np.concatenate(rows)
     x = np.asarray(_basis(jnp.asarray(gamma0), n_basis)) * np.asarray(
         _sqrt_spd(jnp.asarray(_A0), jnp.asarray(_L0), n_basis)
@@ -340,13 +341,32 @@ def _scale_velocities(velocities: VectorComponents, keys: tuple[str, ...], /) ->
 
 
 def _scale(
-    positions: VectorComponents, velocities: VectorComponents | None, /
+    positions: VectorComponents,
+    velocities: VectorComponents | None,
+    keep: np.ndarray | None = None,
+    /,
 ) -> tuple[Array, dict[str, Any], Any]:
-    """Scale to the model's units: ``z``, each position's mean, and one length."""
-    z, centre, s = _scale_positions(positions)
-    if velocities is not None:
-        z = jnp.concatenate([z, _scale_velocities(velocities, tuple(positions))], 1)
-    return z, centre, s
+    """Scale to the model's units: ``z``, each position's mean, and one length.
+
+    The means and the scales come from the tracers in ``keep`` (all of them when
+    ``None``), so a tracer of weight 0 changes nothing.
+    """
+    comps = [*positions.values(), *(velocities or {}).values()]
+    if len({hasattr(v, "unit") for v in comps}) > 1:
+        msg = "the inputs mix Quantities and plain arrays; give every component a unit."
+        raise ValueError(msg)
+    zq, centre, s = _scale_positions(positions)
+    if keep is not None:  # re-centre and re-scale on the kept tracers
+        m = jnp.mean(zq[keep], axis=0)
+        f = jnp.sqrt(jnp.mean(jnp.var(zq[keep], axis=0)))
+        centre = {k: c + m[i] * s for i, (k, c) in enumerate(centre.items())}
+        zq, s = (zq - m) / f, s * f
+    if velocities is None:
+        return zq, centre, s
+    zp = _scale_velocities(velocities, tuple(positions))
+    if keep is not None:
+        zp = zp / jnp.sqrt(jnp.mean(jnp.sum(zp[keep] ** 2, axis=1)))
+    return jnp.concatenate([zq, zp], 1), centre, s
 
 
 class TrackPosterior(TrackEnsemble):
@@ -772,7 +792,11 @@ def sample_track(
         msg = f"background must be True or False, got {background!r}."
         raise ValueError(msg)
     background = bool(background)
-    z, centre, scale = _scale(positions, velocities)
+    n = jnp.shape(next(iter(positions.values())))[0]
+    if weights is not None:
+        weights = check_weights(weights, n)
+    keep = None if weights is None else np.asarray(weights) > 0
+    z, centre, scale = _scale(positions, velocities, keep)
     if not bool(jnp.all(jnp.isfinite(z))):
         msg = (
             "sample_track needs finite positions that are not all equal, and "
@@ -780,9 +804,7 @@ def sample_track(
             "fit positions alone)."
         )
         raise ValueError(msg)
-    n, n_q = z.shape[0], len(positions)
-    if weights is not None:
-        weights = check_weights(weights, n)
+    n_q = len(positions)
     if ordering is None:
         if velocities is None:
             msg = "sample_track(velocities=None) needs an ordering of the positions."
@@ -802,8 +824,10 @@ def sample_track(
         "width_varies": width_varies,
         "velocity_tie": velocity_tie,
     }
-    init = _start(z, gamma0, idx, **opts)
-    log_rho = float(jnp.log(uniform_background_density(z))) if background else None
+    w_start = None if weights is None else np.asarray(weights)[idx]
+    init = _start(z, gamma0, idx, **opts, weights=w_start)
+    z_kept = z if keep is None else z[keep]
+    log_rho = float(jnp.log(uniform_background_density(z_kept))) if background else None
     if background:  # NumPyro would otherwise start it anywhere in (0.12, 0.88)
         init["f_bg"] = jnp.asarray(0.05)
     data: dict[str, Any] = {

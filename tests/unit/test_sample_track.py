@@ -701,7 +701,7 @@ def test_columns_follow_their_keys():
 def test_mixed_quantity_and_array_positions_raise():
     pos, vel = _arc(40)
     mixed = {"x": u.Q(pos["x"], "kpc"), "y": pos["y"]}
-    with pytest.raises(ValueError, match="mixes Quantities"):
+    with pytest.raises(ValueError, match="mix Quantities"):
         posterior._scale(mixed, None)
 
 
@@ -709,5 +709,34 @@ def test_mixed_quantity_and_array_velocities_raise():
     pos, vel = _arc(40)
     pq = {k: u.Q(v, "kpc") for k, v in pos.items()}
     mixed = {"x": u.Q(vel["x"], "km/s"), "y": vel["y"]}
-    with pytest.raises(ValueError, match="mixes Quantities"):
+    with pytest.raises(ValueError, match="mix Quantities"):
         posterior._scale(pq, mixed)
+
+
+# ---- thirteenth review --------------------------------------------------------
+
+
+@pytest.mark.parametrize("first_has_unit", [True, False])
+def test_mixed_inputs_raise_in_any_order(first_has_unit):
+    pos, vel = _arc(40)
+    q = u.Q(pos["x"], "kpc")
+    mixed = {"x": q, "y": pos["y"]} if first_has_unit else {"x": pos["x"], "y": q}
+    with pytest.raises(ValueError, match="mix Quantities"):
+        posterior._scale(mixed, None)
+    pq = {k: u.Q(v, "kpc") for k, v in pos.items()}
+    with pytest.raises(ValueError, match="mix Quantities"):
+        posterior._scale(pq, vel)  # Quantity positions, array velocities
+
+
+def test_weight_zero_tracer_changes_nothing():
+    """A weight-0 star far out gives the same scaling as dropping it."""
+    pos, vel = _arc(60)
+    far = {k: jnp.append(v, 100.0) for k, v in pos.items()}
+    far_vel = {k: jnp.append(v, 0.0) for k, v in vel.items()}
+    keep = np.arange(61) < 60
+    z_far, c_far, s_far = posterior._scale(far, far_vel, keep)
+    z, c, s = posterior._scale(pos, vel)
+    np.testing.assert_allclose(z_far[:60], z, rtol=1e-4, atol=1e-5)
+    np.testing.assert_allclose(s_far, s, rtol=1e-5)
+    for k in c:
+        np.testing.assert_allclose(c_far[k], c[k], rtol=1e-5, atol=1e-5)

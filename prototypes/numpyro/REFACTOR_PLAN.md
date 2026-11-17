@@ -53,9 +53,10 @@ pcf.track_model  # the NumPyro model, to use inside a user's own model
   0.032 to 0.019 and rescued the loop.
 - **Start**: the orderer's ordering (PR A's default), ranked γ by cumulative
   weight, least-squares basis fit.
-- **Inference**: SVI with a full-rank Gaussian guide by default (12–60 s per
-  run, calibrated on helix, gap, loop and mock). NUTS as an option. It warns
-  when R̂ > 1.05, which happened on 5 of 14 runs.
+- **Inference**: SVI with a full-rank Gaussian guide by default (12–60 s per run
+  in the prototypes; 17–100 s per run with the shipped defaults on a shared
+  machine). NUTS as an option. It warns when R̂ > 1.05; in the prototypes R̂ was 2
+  to 3.5 on 5 of 14 NUTS runs.
 - **Result**: `TrackPosterior`, holding the draws as callable tracks with their
   own γ range. `TrackEnsemble`'s `offsets` and `radius` are reused by typing
   their members as anything callable on γ, not by copying them.
@@ -67,7 +68,7 @@ pcf.track_model  # the NumPyro model, to use inside a user's own model
   the shared notes). Each position's mean and one length scale stay Quantities;
   the model sees only dimensionless ratios, stripped with `ustrip("", ...)`, and
   draws return Quantities. No unxt change needed.
-- **Dependency**: `phasecurvefit[numpyro]`, imported when installed;
+- **Dependency**: `phasecurvefit[numpyro]`, imported on the first call;
   `sample_track` raises a clear error without it.
 - **Not doing**: a shared likelihood with `mixture_membership_loss` (they share
   only a Gaussian and `uniform_background_density`, which is reused); Bayesian
