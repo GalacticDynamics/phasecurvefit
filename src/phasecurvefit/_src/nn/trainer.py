@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import equinox as eqx
+import jax
 import jax.random as jr
 import optax
 from jaxtyping import Array, Bool, PRNGKeyArray
@@ -111,8 +112,20 @@ class EqxScanTrainer(AbstractScanNNTrainer):
         and the rest are part of the cache key. For a cache hit, `make_step`
         must compare equal across calls: build it with `eqx.Partial`, not
         `functools.partial`, which compares by identity.
+
+        If a non-array part can't be hashed (e.g. a config holding a JAX
+        scalar), this runs jaxmore's loop eagerly instead, as before.
         """
         fields = {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
+        static = eqx.filter(
+            (fields, initial_carry, epoch_data, kw), eqx.is_array, inverse=True
+        )
+        try:
+            hash(tuple(jax.tree.leaves(static)))
+        except TypeError:
+            # ponytail: no compile cache for unhashable static parts; they recompile
+            # every call, as before this jit existed.
+            return AbstractScanNNTrainer.run(self, initial_carry, epoch_data, **kw)
         return _jit_run(type(self), fields, initial_carry, epoch_data, **kw)
 
     def init(  # type: ignore[override]
