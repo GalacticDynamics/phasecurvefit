@@ -184,9 +184,9 @@ times the value in the table (0.025). A point that half the draws or fewer reach
 | case | 68% coverage | 95% coverage | 68% half-width | rms offset of the band's centre from the truth | time per fit |
 |---|---|---|---|---|---|
 | helix | 0.72 | 0.97 | 0.019 | 0.018 | 21 s |
-| gap | 0.68 | 0.95 | 0.023 | 0.023 | 21 s |
-| loop | 0.73 | 0.96 | 0.018 | 0.017 | 22 s |
-| varying | 0.85 | 0.99 | 0.015 | 0.015 | 19 s |
+| gap | 0.68 | 0.95 | 0.023 | 0.023 | 19 s |
+| loop | 0.73 | 0.96 | 0.018 | 0.017 | 27 s |
+| varying | 0.85 | 0.99 | 0.015 | 0.015 | 23 s |
 
 On the varying case the fitted width matched the true one with a median ratio of
 1.01, and the true width lay inside the draws' central 68% at 0.63 of the points. The
