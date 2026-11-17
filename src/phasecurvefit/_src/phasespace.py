@@ -5,9 +5,9 @@ similarities in phase-space. All functions operate on **scalar components**
 (single phase-space points). Use `jax.vmap` to vectorize operations over
 multiple points.
 
-**Cartesian Coordinate System**: All functions operate in Cartesian space.
-Position and velocity dictionaries must use standard Cartesian coordinate
-keys: ``"x"`` (required), ``"y"`` (optional), ``"z"`` (optional).
+**Cartesian Coordinate System**: All functions treat the components as
+Cartesian axes. The component names are free, e.g. ``"x"``/``"y"``/``"z"`` or
+``"phi1"``/``"phi2"``.
 
 Phase-space data is represented as two dictionaries: one for positions and
 one for velocities, where keys represent Cartesian coordinate components.
@@ -16,7 +16,7 @@ The fundamental data structure is simply two `dict[str, FLikeSz0]`:
 - `position`: Maps Cartesian component names ("x", "y", "z") to scalar position values
 - `velocity`: Maps Cartesian component names ("x", "y", "z") to scalar velocity values
 
-Both dictionaries must have the same keys, with ``"x"`` at minimum.
+Both dictionaries must have the same keys, with at least one component.
 
 Examples
 --------
@@ -98,7 +98,7 @@ def euclidean_distance(q_a: ScalarComponents, q_b: ScalarComponents, /) -> FLike
 
     """
     diffsq = jtu.map(_diff_sq, q_a, q_b)
-    jnit = (0 * q_a["x"]) ** 2
+    jnit = (0 * next(iter(q_a.values()))) ** 2
     sumsq = jtu.reduce(jnp.add, diffsq, initializer=jnit)
     return jnp.sqrt(sumsq)
 
@@ -170,7 +170,7 @@ def velocity_norm(velocity: ScalarComponents, /) -> FLikeSz0:
     """
     vel_sq = jtu.map(jnp.square, velocity)
     # Use reduce with proper initializer to handle unit-valued components
-    init = (0 * velocity["x"]) ** 2
+    init = (0 * next(iter(velocity.values()))) ** 2
     sumsq = jtu.reduce(jnp.add, vel_sq, initializer=init)
     return jnp.sqrt(sumsq)
 

@@ -352,3 +352,28 @@ def test_som_quantity_metric_scale_accepts_a_time_unit():
         metric_scale=float(u.ustrip(usys, u.Q(50.0, "Myr"))),
     ).order(q_plain, p_plain)
     assert jnp.array_equal(result.indices, stripped.indices)
+
+
+def test_default_pipeline_quantity_without_x_key():
+    """Quantity inputs keyed ``phi1``/``phi2`` order like ``x``/``y``."""
+    q, p = _arc_quantity()
+    meta = StateMetadata(usys=u.unitsystems.galactic)
+    rename = {"x": "phi1", "y": "phi2"}
+    q_phi = {rename[k]: v for k, v in q.items()}
+    p_phi = {rename[k]: v for k, v in p.items()}
+    expected = pcf.order(q, p, metadata=meta)
+    result = pcf.order(q_phi, p_phi, metadata=meta)
+    assert jnp.array_equal(result.indices, expected.indices)
+
+
+def test_local_flow_quantity_without_x_key():
+    """The local-flow walk accepts Quantity dicts without an ``"x"`` key."""
+    q, p = _arc_quantity()
+    meta = StateMetadata(usys=u.unitsystems.galactic)
+    orderer = pcf.orderers.LocalFlowOrderer(metric_scale=u.Q(1.0, "kpc"))
+    rename = {"x": "phi1", "y": "phi2"}
+    q_phi = {rename[k]: v for k, v in q.items()}
+    p_phi = {rename[k]: v for k, v in p.items()}
+    expected = orderer.order(q, p, metadata=meta)
+    result = orderer.order(q_phi, p_phi, metadata=meta)
+    assert jnp.array_equal(result.indices, expected.indices)
