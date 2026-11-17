@@ -153,3 +153,41 @@ def test_n_samples_must_be_positive():
     vel = {"x": jnp.ones(10), "y": jnp.zeros(10)}
     with pytest.raises(ValueError, match="n_samples"):
         pcf.bootstrap_track(pos, vel, key=jax.random.key(0), n_samples=0)
+
+
+def test_quantity_inputs_give_quantity_offsets_and_radius():
+    """Quantity tracers fit the same tracks as bare ones, with kpc offsets."""
+    u = pytest.importorskip("unxt")
+    rng = np.random.default_rng(0)
+    ang = jnp.linspace(0.0, jnp.pi, 40)
+    pos = {
+        "x": 5.0 * jnp.cos(ang) + rng.normal(0, 0.1, 40),
+        "y": 5.0 * jnp.sin(ang) + rng.normal(0, 0.1, 40),
+    }
+    vel = {"x": -jnp.sin(ang), "y": jnp.cos(ang)}  # km/s
+    opts = {
+        "key": jax.random.key(0),
+        "n_samples": 3,
+        "n_prototypes": 8,
+        "training_config": _fast_config(),
+    }
+    q_ens = pcf.bootstrap_track(
+        {k: u.Q(v, "kpc") for k, v in pos.items()},
+        {k: u.Q(v, "km/s") for k, v in vel.items()},
+        metadata=pcf.StateMetadata(usys=u.unitsystems.galactic),
+        **opts,
+    )
+    # The bare run is in the galactic unit system: kpc and kpc/Myr.
+    kpc_myr = u.Q(1.0, "km/s").ustrip("kpc/Myr")
+    ens = pcf.bootstrap_track(pos, {k: v * kpc_myr for k, v in vel.items()}, **opts)
+
+    g = _gamma(ens)[1:-1]
+    d_q = q_ens.offsets(g)
+    r_q = q_ens.radius(g, 0.3)  # low enough that one member stopping short is ok
+    assert d_q.unit == u.unit("kpc")
+    assert r_q.unit == u.unit("kpc")
+    assert jnp.any(jnp.isfinite(r_q.ustrip("kpc")))
+    # Equal up to float32 roundoff from the unit conversion.
+    tol = {"rtol": 1e-3, "atol": 1e-4, "equal_nan": True}
+    assert jnp.allclose(d_q.ustrip("kpc"), ens.offsets(g), **tol)
+    assert jnp.allclose(r_q.ustrip("kpc"), ens.radius(g, 0.3), **tol)

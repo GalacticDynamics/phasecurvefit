@@ -167,14 +167,14 @@ class TrackEnsemble(ReprMixin, eqx.Module):
 
     def offsets(
         self, gamma: Float[Array, " G"], /, *, n_dense: int = 1000
-    ) -> Float[Array, "M G D"]:
+    ) -> Float[Array, "M G D"] | Any:
         r"""Offset of each member from the reference, across the reference.
 
         Parameters
         ----------
         gamma
             Points on the reference, as its own $\gamma$ (within
-            ``reference.gamma_range``).
+            ``reference.track_range``).
         n_dense
             Points at which each member's track is evaluated, over its
             ``track_range``, to find the one nearest each reference point.
@@ -184,17 +184,36 @@ class TrackEnsemble(ReprMixin, eqx.Module):
         Array
             The perpendicular offsets, with shape ``(n_members, len(gamma),
             n_spatial_dims)`` and the last axis in the order of the position
-            components. NaN where a member's nearest point is one of its
-            ends, which means its track stops short of that reference point.
+            components. With Quantity tracks they are a Quantity in the unit
+            of the first position component. NaN where a member's nearest
+            point is one of its ends, which means its track stops short of
+            that reference point.
 
         """
+        values, wrap = self._offsets(gamma, n_dense)
+        return wrap(values)
+
+    def _offsets(
+        self, gamma: Float[Array, " G"], n_dense: int, /
+    ) -> tuple[Float[Array, "M G D"], Any]:
+        """Offsets as bare values, and a function that puts their unit back."""
         ref = self.reference
         gamma = jnp.atleast_1d(jnp.asarray(gamma))
         q = ref(gamma)
         keys = list(q)
 
+        # Quantities are read in the first component's unit, as offsets are.
+        unit = getattr(q[keys[0]], "unit", None)
+        qtype = type(q[keys[0]])
+
+        def wrap(a: Array, /) -> Any:
+            return a if unit is None else qtype(a, unit)
+
         def stack(q: Mapping[str, Array], /) -> Float[Array, "N D"]:
-            return jnp.stack([q[k] for k in keys], axis=-1)
+            return jnp.stack(
+                [q[k] if unit is None else q[k].ustrip(unit) for k in keys],  # type: ignore[attr-defined]  # Quantity iff unit
+                axis=-1,
+            )
 
         c = stack(q)
         dc = jax.vmap(jax.jacfwd(lambda g: stack(ref(g))))(gamma)
@@ -204,18 +223,19 @@ class TrackEnsemble(ReprMixin, eqx.Module):
             if member.track_range is None:  # pragma: no cover - training sets it
                 msg = "every member needs a track_range."
                 raise ValueError(msg)
-            v = stack(member(jnp.linspace(*member.track_range, n_dense)))
+            lo, hi = member.track_range
+            v = stack(member(jnp.linspace(lo, hi, n_dense)))
             i = jnp.argmin(jnp.sum((v[None] - c[:, None]) ** 2, axis=-1), axis=1)
             d = v[i] - c
             d = d - jnp.sum(d * t, axis=-1, keepdims=True) * t
             stops_short = (i == 0) | (i == n_dense - 1)
             return jnp.where(stops_short[:, None], jnp.nan, d)
 
-        return jnp.stack([one(m) for m in self.members])
+        return jnp.stack([one(m) for m in self.members]), wrap
 
     def radius(
         self, gamma: Float[Array, " G"], /, level: float = 0.68, *, n_dense: int = 1000
-    ) -> Float[Array, " G"]:
+    ) -> Float[Array, " G"] | Any:
         r"""Radius of the tube about the reference that holds ``level`` of the members.
 
         At each point it is the ``level`` quantile of the members' distances
@@ -228,10 +248,19 @@ class TrackEnsemble(ReprMixin, eqx.Module):
         track bends the true curve can lie outside it more often than
         ``level`` implies; see the explanation page on track uncertainty.
 
+        With Quantity tracks it is a Quantity, in the unit of the first
+        position component, as :meth:`offsets` is.
+
         """
-        dist = jnp.linalg.norm(self.offsets(gamma, n_dense=n_dense), axis=-1)
+        values, wrap = self._offsets(gamma, n_dense)
+        dist = jnp.linalg.norm(values, axis=-1)
         r = jnp.quantile(jnp.where(jnp.isnan(dist), jnp.inf, dist), level, axis=0)
-        return jnp.where(jnp.isinf(r), jnp.nan, r)
+        return wrap(jnp.where(jnp.isinf(r), jnp.nan, r))
+
+
+def _take(v: Any, idx: Array, /) -> Any:
+    """``v[idx]``, keeping a Quantity's unit; other array-likes become arrays."""
+    return v[idx] if hasattr(v, "unit") else jnp.asarray(v)[idx]
 
 
 def bootstrap_track(
@@ -325,8 +354,8 @@ def bootstrap_track(
         idx = jr.randint(key_draw, (n,), 0, n)
         members.append(
             fit(
-                {c: jnp.asarray(v)[idx] for c, v in positions.items()},
-                {c: jnp.asarray(v)[idx] for c, v in velocities.items()},
+                {c: _take(v, idx) for c, v in positions.items()},
+                {c: _take(v, idx) for c, v in velocities.items()},
                 None if weights is None else jnp.asarray(weights)[idx],
                 key_fit,
             )
