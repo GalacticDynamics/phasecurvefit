@@ -76,6 +76,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Docs before v0.4 render their notebooks with nbsphinx, which needs pandoc.
+      - name: Install pandoc
+        run: sudo apt-get install -y --no-install-recommends pandoc
+
       - name: Install
         run: uv sync --no-default-groups --group nox --locked
 
