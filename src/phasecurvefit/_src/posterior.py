@@ -343,29 +343,30 @@ def _scale_velocities(velocities: VectorComponents, keys: tuple[str, ...], /) ->
 def _scale(
     positions: VectorComponents,
     velocities: VectorComponents | None,
-    keep: np.ndarray | None = None,
+    weights: Array | np.ndarray | None = None,
     /,
 ) -> tuple[Array, dict[str, Any], Any]:
     """Scale to the model's units: ``z``, each position's mean, and one length.
 
-    The means and the scales come from the tracers in ``keep`` (all of them when
-    ``None``), so a tracer of weight 0 changes nothing.
+    The means and the scales are weighted, so a weight of 2 scales the data as
+    a repeated row does, and a tracer of weight 0 changes nothing.
     """
     comps = [*positions.values(), *(velocities or {}).values()]
     if len({hasattr(v, "unit") for v in comps}) > 1:
         msg = "the inputs mix Quantities and plain arrays; give every component a unit."
         raise ValueError(msg)
     zq, centre, s = _scale_positions(positions)
-    if keep is not None:  # re-centre and re-scale on the kept tracers
-        m = jnp.mean(zq[keep], axis=0)
-        f = jnp.sqrt(jnp.mean(jnp.var(zq[keep], axis=0)))
+    if weights is not None:  # re-centre and re-scale with the weights
+        p = jnp.asarray(weights) / jnp.sum(weights)
+        m = p @ zq
+        f = jnp.sqrt(jnp.mean(p @ (zq - m) ** 2))
         centre = {k: c + m[i] * s for i, (k, c) in enumerate(centre.items())}
         zq, s = (zq - m) / f, s * f
     if velocities is None:
         return zq, centre, s
     zp = _scale_velocities(velocities, tuple(positions))
-    if keep is not None:
-        zp = zp / jnp.sqrt(jnp.mean(jnp.sum(zp[keep] ** 2, axis=1)))
+    if weights is not None:
+        zp = zp / jnp.sqrt(p @ jnp.sum(zp**2, axis=1))
     return jnp.concatenate([zq, zp], 1), centre, s
 
 
@@ -527,21 +528,23 @@ def _start_gamma(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Order the start, and give each tracer a gamma by cumulative weight.
 
-    With velocities, the start is turned to run along them, since a reversed
-    start predicts every velocity backwards and the fit does not recover.
+    Only tracers of positive weight take part, so a tracer of weight 0 changes
+    nothing about the start. With velocities, the start is turned to run along
+    them, since a reversed start predicts every velocity backwards and the fit
+    does not recover.
     """
-    n = z.shape[0]
     idx = np.asarray(ordering.ordering)
+    w = np.ones(z.shape[0]) if weights is None else np.asarray(weights)
+    idx = idx[w[idx] > 0]
     if idx.size < 2:
-        msg = f"the ordering visits {idx.size} tracers; it needs at least 2."
+        msg = (
+            f"the ordering visits {idx.size} tracers of positive weight; "
+            "it needs at least 2."
+        )
         raise ValueError(msg)
     if n_q < z.shape[1] and _runs_backwards(np.asarray(z)[idx], n_q):
         idx = idx[::-1]
-    w = np.ones(n) if weights is None else np.asarray(weights)
     cw = np.cumsum(w[idx]) - 0.5 * w[idx]
-    if cw[-1] - cw[0] <= 0:
-        msg = "the tracers in the ordering all have weight 0."
-        raise ValueError(msg)
     return idx, -1 + 2 * (cw - cw[0]) / (cw[-1] - cw[0])
 
 
@@ -637,6 +640,10 @@ def _check_options(
     """
     if not positions:
         msg = "positions needs at least one component."
+        raise ValueError(msg)
+    arrays = [*positions.values(), *(velocities or {}).values()]
+    if not all(hasattr(v, "shape") for v in arrays):
+        msg = "every component must be an array or a Quantity, not a list."
         raise ValueError(msg)
     comps = {**{f"positions[{k!r}]": v for k, v in positions.items()}}
     if velocities is not None:
@@ -796,7 +803,7 @@ def sample_track(
     if weights is not None:
         weights = check_weights(weights, n)
     keep = None if weights is None else np.asarray(weights) > 0
-    z, centre, scale = _scale(positions, velocities, keep)
+    z, centre, scale = _scale(positions, velocities, weights)
     if not bool(jnp.all(jnp.isfinite(z))):
         msg = (
             "sample_track needs finite positions that are not all equal, and "

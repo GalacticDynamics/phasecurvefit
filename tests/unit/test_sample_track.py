@@ -368,7 +368,7 @@ def test_degenerate_orderings_raise():
     one = eqx.tree_at(lambda r: r.indices, o, jnp.full(40, -1).at[0].set(0))
     with pytest.raises(ValueError, match="at least 2"):
         posterior._start_gamma(z, 2, one, None)
-    with pytest.raises(ValueError, match="weight 0"):
+    with pytest.raises(ValueError, match="positive weight"):
         posterior._start_gamma(z, 2, o, jnp.zeros(40))
 
 
@@ -733,10 +733,47 @@ def test_weight_zero_tracer_changes_nothing():
     pos, vel = _arc(60)
     far = {k: jnp.append(v, 100.0) for k, v in pos.items()}
     far_vel = {k: jnp.append(v, 0.0) for k, v in vel.items()}
-    keep = np.arange(61) < 60
-    z_far, c_far, s_far = posterior._scale(far, far_vel, keep)
+    w = np.append(np.ones(60), 0.0)
+    z_far, c_far, s_far = posterior._scale(far, far_vel, w)
     z, c, s = posterior._scale(pos, vel)
     np.testing.assert_allclose(z_far[:60], z, rtol=1e-4, atol=1e-5)
     np.testing.assert_allclose(s_far, s, rtol=1e-5)
     for k in c:
         np.testing.assert_allclose(c_far[k], c[k], rtol=1e-5, atol=1e-5)
+
+
+# ---- fourteenth review --------------------------------------------------------
+
+
+def test_weight_two_scales_like_a_repeated_row():
+    pos, vel = _arc(30)
+    w = np.ones(30)
+    w[4] = 2.0
+    twice = {k: jnp.append(v, v[4]) for k, v in pos.items()}
+    twice_v = {k: jnp.append(v, v[4]) for k, v in vel.items()}
+    _, c_w, s_w = posterior._scale(pos, vel, w)
+    _, c_r, s_r = posterior._scale(twice, twice_v)
+    np.testing.assert_allclose(s_w, s_r, rtol=1e-5)
+    for k in c_w:
+        np.testing.assert_allclose(c_w[k], c_r[k], rtol=1e-5, atol=1e-6)
+
+
+def test_weight_zero_tracers_take_no_part_in_the_start():
+    """Masked tracers with reversed velocities don't turn or space the start."""
+    pos, clean = _arc(90)
+    o = pcf.orderers.default_pipeline(pos, clean)  # a good ordering, to test the start
+    flip = np.arange(90) % 3 != 0  # two in three masked, with reversed velocities
+    vel = {k: jnp.where(flip, -v, v) for k, v in clean.items()}
+    w = np.where(flip, 0.0, 1.0)
+    z, _, _ = posterior._scale(pos, vel, w)
+    idx, gamma0 = posterior._start_gamma(z, 2, o, jnp.asarray(w))
+    assert np.all(w[idx] > 0)
+    assert gamma0[0] == -1.0
+    assert gamma0[-1] == 1.0
+    step = np.diff(np.asarray(z)[idx, :2], axis=0)
+    assert np.mean(np.sign(np.sum(step * np.asarray(z)[idx[1:], 2:], axis=1))) > 0.5
+
+
+def test_list_components_raise():
+    with pytest.raises(ValueError, match="not a list"):
+        pcf.sample_track({"x": [0.0, 1.0, 2.0]}, None, key=jax.random.key(0))  # type: ignore[dict-item]
