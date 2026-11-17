@@ -177,6 +177,8 @@ ignore = [
 "docs/**" = ["N803", "T201"]
 "docs/conf.py" = ["A001", "INP001", "T201"]
 "noxfile.py" = ["A001", "T20"]
+# CI helper scripts, run as `python script.py`.
+".github/scripts/**" = ["INP001", "PLC0415", "S101", "T20"]
 "src/phasecurvefit/_src/algorithm.py" = [
   "FBT003", # Boolean literal in function call is clearer than named constant
   "PYI025", # Set from collections.abc is clear in context

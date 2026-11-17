@@ -1,0 +1,126 @@
+name: Docs
+
+# Builds the docs and publishes them on GitHub Pages, one folder per version on
+# the gh-pages branch:
+#   main                          -> latest/
+#   tag vX.Y.Z, branch versions/vX.Y.x -> vX.Y/ (and stable/, if X.Y is newest)
+# Each build replaces only its own folder, so old versions are kept as built.
+# Pull requests are built by the "Docs build" job in ci.yml instead.
+
+on:
+  push:
+    branches:
+      - main
+      - "versions/**"
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or tag to build, e.g. v0.3.3 or versions/v0.3.x"
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  # One queue per branch or tag. GitHub keeps only the newest waiting run in a
+  # group, so a shared group would let a push to main drop a waiting release
+  # build. Runs never cancel a running deploy; the publish step retries if
+  # another version's run pushed to gh-pages first.
+  group: docs-pages-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_COLOR: 3
+  PAGES_URL: https://galacticdynamics.github.io/phasecurvefit/
+
+jobs:
+  deploy:
+    name: Build and publish
+    # Publish from the main repository only, not from forks that sync main.
+    # Pull requests, forks' included, still build the docs in ci.yml.
+    if: github.repository == 'GalacticDynamics/phasecurvefit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write # push to gh-pages
+    steps:
+      - name: Choose the version folder
+        id: version
+        env:
+          REF: ${{ inputs.ref || github.ref }}
+        run: |
+          ref="${REF#refs/heads/}"; ref="${ref#refs/tags/}"
+          if [ "$ref" = main ]; then
+            v=latest
+          elif [[ "$ref" =~ ^(versions/)?v([0-9]+)\.([0-9]+)(\.[0-9x]+)?$ ]]; then
+            v="v${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+          else
+            echo "::error::Can't tell which docs version $ref is."; exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "name=$v" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5.5.0
+        with:
+          ref: ${{ steps.version.outputs.ref }}
+
+      # The index script comes from the commit that runs this workflow, so a
+      # build of an old tag still gets it.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5.5.0
+        with:
+          path: _workflow
+          sparse-checkout: .github/scripts
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+
+      # Docs before v0.4 render their notebooks with nbsphinx, which needs pandoc.
+      - name: Install pandoc
+        run: sudo apt-get install -y --no-install-recommends pandoc
+
+      - name: Install
+        run: uv sync --no-default-groups --group nox --locked
+
+      - name: Build the docs
+        env:
+          DOCS_VERSION: ${{ steps.version.outputs.name }}
+        run: uv run --frozen nox -s docs
+
+      - name: Publish to gh-pages
+        env:
+          VERSION: ${{ steps.version.outputs.name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Runs for other versions publish to the same branch, so a push can be
+          # rejected. Then start again from the new gh-pages.
+          for attempt in 1 2 3 4 5; do
+            git worktree remove --force site 2>/dev/null || true
+            if git fetch --depth 1 origin gh-pages; then
+              git worktree add site FETCH_HEAD
+              git -C site switch -C gh-pages
+            else
+              git worktree add --orphan -b gh-pages site
+            fi
+            rsync -a --delete --checksum docs/_build/html/ "site/$VERSION/"
+            newest=$(python3 _workflow/.github/scripts/docs_pages_index.py site "$PAGES_URL")
+            if [ -n "$newest" ] && [ "$newest" = "$VERSION" ]; then
+              rsync -a --delete --checksum "site/$VERSION/" site/stable/
+            fi
+            git -C site add -A
+            if git -C site diff --cached --quiet; then
+              echo "Nothing changed."; exit 0
+            fi
+            git -C site commit -q -m "docs: publish $VERSION from ${GITHUB_SHA::7}"
+            if git -C site push origin gh-pages; then
+              exit 0
+            fi
+            echo "gh-pages moved on; trying again ($attempt)."
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not publish to gh-pages."; exit 1

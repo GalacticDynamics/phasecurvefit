@@ -48,7 +48,6 @@ repos:
     hooks:
       - id: check-dependabot
       - id: check-github-workflows
-      - id: check-readthedocs
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: "v0.14.9"
