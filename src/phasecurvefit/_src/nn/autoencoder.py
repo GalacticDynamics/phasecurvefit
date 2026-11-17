@@ -931,8 +931,14 @@ def train_ordering_and_track_net(
         mask, all_ws, weights, batch_size=config.batch_size, pad_value=1
     )
 
+    # The normalizer is a plain object that compares by identity, so inside
+    # the jitted training loop it would make every call a cache miss. Training
+    # works on normalized data and never uses it; put it back afterwards.
+    normalizer = model.normalizer
+    model = eqx.tree_at(lambda m: m.normalizer, model, None)
+
     trainer = PathAutoencoderTrainer(
-        make_step=ft.partial(
+        make_step=eqx.Partial(
             eqx_step,
             loss_fn=compute_decoder_loss,
             optimizer=optimizer,
@@ -957,6 +963,9 @@ def train_ordering_and_track_net(
         key=key,
         show_pbar=config.show_pbar,
     )
+    model = eqx.tree_at(
+        lambda m: m.normalizer, model, normalizer, is_leaf=lambda x: x is None
+    )
 
     if membership is not None:
         # Keep the width training ended with. Above the ceiling the width net
@@ -970,6 +979,14 @@ def train_ordering_and_track_net(
         model = eqx.tree_at(lambda m: m.width, model, _with_sigma_max(width, final))
 
     return model, opt_state, epoch_losses
+
+
+@eqx.filter_jit
+def _encode_all(
+    encoder: OrderingNet, ws: Float[Array, "N TwoF"], key: PRNGKeyArray, /
+) -> tuple[Float[Array, " N"], Float[Array, " N"]]:
+    """Run the encoder on every row of `ws`, compiled once per shape."""
+    return jax.vmap(encoder, in_axes=(0, None))(ws, key)
 
 
 def _with_sigma_max(width: WidthNet, sigma_max: float, /) -> WidthNet:
@@ -1090,9 +1107,8 @@ def train_autoencoder(
     # Train Decoder on the running mean
 
     # Use the trained encoder to compute membership for all samples.
-    # TODO: this happens outside of JIT. Speed up.
     # TODO: add an optional exclusion for the progenitor
-    _, prob = jax.jit(jax.vmap(model.encoder, in_axes=(0, None)))(all_ws, keys[1])
+    _, prob = _encode_all(model.encoder, all_ws, keys[1])
     is_member = prob > config.member_threshold
 
     # Denoise the decoder target over the ORDERING coordinate, not the (locally

@@ -26,6 +26,7 @@ supplies only a loss function.
 
 __all__ = ("EqxScanTrainer", "EqxTrainCarry", "eqx_step")
 
+import dataclasses
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -94,6 +95,26 @@ class EqxScanTrainer(AbstractScanNNTrainer):
 
     filter_spec: Any = eqx.is_array
 
+    def run(
+        self,
+        initial_carry: EqxTrainCarry,
+        epoch_data: tuple[Bool[Array, " N"], tuple[Array, ...]],
+        /,
+        **kw: Any,
+    ) -> tuple[Any, Array]:
+        """Run `jaxmore.nn.AbstractScanNNTrainer.run` under `eqx.filter_jit`.
+
+        jaxmore runs its epoch scan eagerly, so every call would trace and
+        compile it again. Jitting here lets a repeat call with the same shapes,
+        settings and functions reuse the compiled program. The trainer's fields
+        go in as a pytree, so array fields (e.g. sampling bounds) are traced
+        and the rest are part of the cache key. For a cache hit, `make_step`
+        must compare equal across calls: build it with `eqx.Partial`, not
+        `functools.partial`, which compares by identity.
+        """
+        fields = {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
+        return _jit_run(type(self), fields, initial_carry, epoch_data, **kw)
+
     def init(  # type: ignore[override]
         self,
         model: eqx.Module,
@@ -149,3 +170,16 @@ class EqxScanTrainer(AbstractScanNNTrainer):
             raise ValueError(msg)
         model = eqx.combine(model_dynamic, static["model_static"])
         return (model, opt_state, key)
+
+
+@eqx.filter_jit
+def _jit_run(
+    cls: type[EqxScanTrainer],
+    fields: dict[str, Any],
+    initial_carry: EqxTrainCarry,
+    epoch_data: tuple[Bool[Array, " N"], tuple[Array, ...]],
+    /,
+    **kw: Any,
+) -> tuple[Any, Array]:
+    """Rebuild the trainer from its fields and run jaxmore's training loop."""
+    return AbstractScanNNTrainer.run(cls(**fields), initial_carry, epoch_data, **kw)

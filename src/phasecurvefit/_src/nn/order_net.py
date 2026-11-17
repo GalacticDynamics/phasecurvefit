@@ -12,7 +12,6 @@ __all__: tuple[str, ...] = (
     "compute_loss",
 )
 
-import functools as ft
 from dataclasses import KW_ONLY, dataclass
 from typing import ClassVar
 
@@ -541,7 +540,7 @@ def train_ordering_net(
     ordered_mask = jnp.ones(n_total, dtype=bool)
 
     trainer = OrderingNetTrainer(
-        make_step=ft.partial(
+        make_step=eqx.Partial(
             eqx_step,
             loss_fn=_weighted_compute_loss,
             optimizer=optimizer,

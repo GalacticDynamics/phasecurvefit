@@ -454,6 +454,55 @@ class TestTrainAutoencoder:
         assert result is not None
         assert len(losses) == 110
 
+    def test_repeat_training_does_not_recompile(self, rng_key: PRNGKeyArray):
+        """A second training call with the same shapes reuses the compiled scans.
+
+        Each call builds its own model, normalizer and trainers from the same
+        inputs, so this checks that none of these objects leaks into the jit
+        cache key. The inputs and keys match because the walk's visited count
+        and the trained model's member count set shapes outside the scans.
+        """
+        config = pcf.nn.TrainingConfig(
+            n_epochs_encoder=3, n_epochs_decoder=2, n_epochs_both=2, show_pbar=False
+        )
+
+        def setup(
+            key: PRNGKeyArray,
+        ) -> tuple[pcf.nn.PathAutoencoder, object, PRNGKeyArray]:
+            t = jnp.linspace(0, 5, 20)
+            pos = {"x": t, "y": 0.5 * t}
+            vel = {"x": jnp.ones(20), "y": 0.5 * jnp.ones(20)}
+            wlf = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer())
+            normalizer = pcf.nn.StandardScalerNormalizer(pos, vel)
+            key1, key2 = jr.split(key)
+            ae = pcf.nn.PathAutoencoder.make(
+                normalizer, gamma_range=(0.0, 1.0), key=key1
+            )
+            return ae, wlf, key2
+
+        def train(ae: pcf.nn.PathAutoencoder, wlf: object, key: PRNGKeyArray) -> None:
+            _, _, losses = pcf.nn.train_autoencoder(ae, wlf, config=config, key=key)
+            jax.block_until_ready(losses)
+
+        first, second = setup(rng_key), setup(rng_key)
+        assert first[0] is not second[0]
+        train(*first)
+
+        compiles: list[str] = []
+
+        def listener(event: str, duration_secs: float, **_: str | int) -> None:
+            del duration_secs
+            if event == "/jax/core/compile/backend_compile_duration":
+                compiles.append(event)
+
+        jax.monitoring.register_event_duration_secs_listener(listener)
+        try:
+            train(*second)
+        finally:
+            jax.monitoring.unregister_event_duration_listener(listener)
+
+        assert compiles == []
+
     def test_training_reduces_loss(self, simple_wlf_result, rng_key: PRNGKeyArray):
         """Test that training reduces the loss within each phase."""
         normalizer = pcf.nn.StandardScalerNormalizer(
