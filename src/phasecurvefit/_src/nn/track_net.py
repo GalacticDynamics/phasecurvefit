@@ -8,7 +8,6 @@ __all__: tuple[str, ...] = (
 )
 
 import abc
-import functools as ft
 from dataclasses import KW_ONLY, dataclass
 
 import equinox as eqx
@@ -436,7 +435,7 @@ def train_track_net(
         w = w / jnp.where(w_mean > 0, w_mean, 1.0)
 
     trainer = EqxScanTrainer(
-        make_step=ft.partial(eqx_step, loss_fn=compute_loss, optimizer=optimizer),
+        make_step=eqx.Partial(eqx_step, loss_fn=compute_loss, optimizer=optimizer),
         loss_agg_fn=masked_mean,
     )
     initial_carry, epoch_data = trainer.init(
