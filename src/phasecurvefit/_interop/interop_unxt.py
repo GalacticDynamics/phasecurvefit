@@ -408,7 +408,9 @@ def _scale_positions_quantity(
     positions: VectorQComponents, /
 ) -> tuple[Array, dict[str, Any], AbcQ]:
     # The means and the length stay Quantities; only dimensionless ratios are
-    # stripped, so a unit mismatch raises instead of passing silently.
+    # stripped, so a unit mismatch raises instead of passing silently. Plain
+    # Quantities, since an Angle can't be squared for the variance.
+    positions = {k: u.Quantity(v.value, v.unit) for k, v in positions.items()}
     q = qnp.stack([positions[k] for k in positions], axis=1)  # type: ignore[misc]  # quaxed takes Quantities
     s = qnp.sqrt(qnp.mean(qnp.var(q, axis=0)))
     centre = {k: qnp.mean(v) for k, v in positions.items()}

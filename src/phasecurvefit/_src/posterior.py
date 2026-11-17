@@ -35,15 +35,9 @@ from phasecurvefit._src.orderers.result import OrderingResult
 from phasecurvefit._src.pipeline import TrackEnsemble
 from phasecurvefit._src.track_draw import TrackDraw
 
-# Every use of numpyro below follows _require_numpyro().
-# pylint: disable=possibly-used-before-assignment
-if OptDeps.NUMPYRO.installed:  # pragma: no branch
-    import numpyro
-    import numpyro.contrib.hsgp.laplacian
-    import numpyro.diagnostics
-    import numpyro.distributions
-    import numpyro.infer
-    import numpyro.infer.autoguide
+# Imported on first use by _require_numpyro, so `import phasecurvefit` stays
+# fast for users who never sample.
+numpyro: Any = None
 
 _L_BOX = 1.3  # HSGP box half-width; gamma lives in [-1, 1]
 _A0, _L0 = 1.0, 0.3  # GP amplitude and length scale the start is fitted at
@@ -51,12 +45,20 @@ _RHAT_WARN = 1.05
 
 
 def _require_numpyro() -> None:
+    # pylint: disable=global-statement,import-outside-toplevel
+    global numpyro
     if not OptDeps.NUMPYRO.installed:
         msg = (
             "sample_track and track_model need NumPyro: "
             "pip install 'phasecurvefit[numpyro]'."
         )
         raise ImportError(msg)
+    if numpyro is None:
+        import numpyro.contrib.hsgp.laplacian  # noqa: PLC0415
+        import numpyro.diagnostics  # noqa: PLC0415
+        import numpyro.distributions  # noqa: PLC0415
+        import numpyro.infer  # noqa: PLC0415
+        import numpyro.infer.autoguide  # noqa: PLC0415
 
 
 def _sqrt_spd(amp: Array, length: Array, n_basis: int, /) -> Array:
@@ -76,6 +78,7 @@ def _sqrt_spd(amp: Array, length: Array, n_basis: int, /) -> Array:
 
 
 def _basis(gamma: Array, n_basis: int, /) -> Array:
+    _require_numpyro()
     return numpyro.contrib.hsgp.laplacian.eigenfunctions(gamma, _L_BOX, n_basis)
 
 
@@ -203,7 +206,10 @@ def track_model(
         mean to the track: the speed (a log channel) times the unit tangent,
         plus ``velocity_tie`` times an offset channel per component. Stream
         stars move a few degrees off their track, and 0.05 lets them. ``0``
-        is a hard tie.
+        is a hard tie. The tie needs velocities in the frame where the track
+        is at rest: a shared velocity several times the speed along the track
+        (heliocentric velocities, say) can't be fitted, and the track comes out
+        wrong. Use ``None`` for velocities in another frame.
 
     """
     _require_numpyro()
@@ -418,6 +424,7 @@ def _warn_if_chains_disagree(by_chain: dict[str, Array], /) -> None:
 
     A chain stuck at one value gives a NaN R-hat, which counts as disagreeing.
     """
+    _require_numpyro()
     with np.errstate(invalid="ignore", divide="ignore"):  # a stuck chain: 0 / 0
         stats = numpyro.diagnostics.summary(by_chain).values()
     rhat = np.concatenate([np.ravel(v["r_hat"]) for v in stats])
@@ -428,6 +435,17 @@ def _warn_if_chains_disagree(by_chain: dict[str, Array], /) -> None:
             "or not computable); they may sit in different modes or be stuck. "
             "The reference, at the mean of the draws, may then match neither "
             "mode. Compare with method='svi'.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+
+
+def _warn_if_divergent(n_divergent: int, /) -> None:
+    """Warn when NUTS reported divergent transitions after warmup."""
+    if n_divergent:
+        warnings.warn(
+            f"NUTS had {n_divergent} divergent transitions; the draws near them may "
+            "be biased. Try a larger n_warmup, or compare with method='svi'.",
             RuntimeWarning,
             stacklevel=3,
         )
@@ -597,6 +615,19 @@ def _check_options(
     Returns the counts as Python ints. They may be Python, NumPy or JAX
     integers; a bool is refused.
     """
+    if not positions:
+        msg = "positions needs at least one component."
+        raise ValueError(msg)
+    comps = {**{f"positions[{k!r}]": v for k, v in positions.items()}}
+    if velocities is not None:
+        comps |= {f"velocities[{k!r}]": v for k, v in velocities.items()}
+    lengths = {k: jnp.shape(v) for k, v in comps.items()}
+    if len(set(lengths.values())) > 1 or any(len(s) != 1 for s in lengths.values()):
+        msg = (
+            "every component needs one value per tracer, the same number; "
+            f"got {lengths}."
+        )
+        raise ValueError(msg)
     if not isinstance(method, str) or method not in ("svi", "nuts"):  # type: ignore[redundant-expr]  # runtime guard on a mistyped argument
         msg = f"method must be 'svi' or 'nuts', got {method!r}."
         raise ValueError(msg)
@@ -655,7 +686,8 @@ def sample_track(
         Phase-space tracers, arrays or `unxt` Quantities, with matching
         component names. Values must be finite. Every position component
         needs the same dimension, since one length scales them all, and the
-        velocities are their time derivatives. A catalogue with some missing
+        velocities are their time derivatives, in the frame where the track
+        is at rest (see ``velocity_tie``). A catalogue with some missing
         velocities, which the default ordering accepts, needs those tracers
         left out here, or ``velocities=None``. ``velocities=None`` fits the
         positions alone, for example the pixels of an image; it needs an
@@ -819,8 +851,9 @@ def sample_track(
             chain_method="sequential",
             progress_bar=False,
         )
-        mcmc.run(key_fit)
+        mcmc.run(key_fit, extra_fields=("diverging",))
         _warn_if_chains_disagree(mcmc.get_samples(group_by_chain=True))
+        _warn_if_divergent(int(jnp.sum(mcmc.get_extra_fields()["diverging"])))
         samples = {k: v[:n_draws] for k, v in mcmc.get_samples().items()}
 
     samples = {k: v for k, v in samples.items() if k != "loglik"}

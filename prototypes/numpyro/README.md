@@ -270,3 +270,8 @@ These were measured during review of PR B, on `sample_track` as shipped.
   reproduced the saved offsets bit for bit.
 - A subset of `tests/unit/test_sample_track.py` passes on numpyro 0.20.0, the
   lowest version `pyproject.toml` allows.
+- Velocity frame: on a radius-5 arc (200 tracers, noise 0.05, 2000 steps, the
+  same ordering), adding a constant to every x velocity left the default fit's
+  track within 0.014 of the truth (median |r - 5|) for offsets up to 1 times the
+  speed; at 3 times the speed it was 0.747 off (max 2.218, width 0.562), against
+  0.007 with `velocity_tie=None`. Measured in review (audit 11).

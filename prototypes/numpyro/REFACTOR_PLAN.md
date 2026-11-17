@@ -47,8 +47,10 @@ pcf.track_model  # the NumPyro model, to use inside a user's own model
 
 - **Model** (`tracklik.model` made proper): HSGP track, γ summed out on a grid,
   Hogg, Bovy & Lang (2010) flat background with latent fraction. When velocities
-  are given, their mean is speed × unit tangent of the track. That tie improved
-  the helix centre error from 0.032 to 0.019 and rescued the loop.
+  are given, their mean is speed × unit tangent of the track, plus 0.05 of the
+  rms speed times an offset channel (the loose tie that shipped; the hard tie
+  biased the mock stream). The hard tie improved the helix centre error from
+  0.032 to 0.019 and rescued the loop.
 - **Start**: the orderer's ordering (PR A's default), ranked γ by cumulative
   weight, least-squares basis fit.
 - **Inference**: SVI with a full-rank Gaussian guide by default (12–60 s per

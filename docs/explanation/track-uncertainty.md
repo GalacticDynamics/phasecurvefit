@@ -133,15 +133,20 @@ The model, {func}`~phasecurvefit.track_model`:
 - The velocities' mean is the speed times the track's unit tangent, plus a small
   offset: `velocity_tie` (0.05 by default) times a Gaussian process per component,
   in units of the samples' rms speed. A track that runs the wrong way, or turns the wrong
-  way round a loop, then misfits every velocity. Stream stars move a few degrees off
+  way round a loop, then misfits every velocity. The tie needs velocities in the
+  frame where the track is at rest. On a test arc, adding 3 times the speed to every
+  x velocity moved the default fit's track 0.75 off the truth (median), against
+  0.007 with `velocity_tie=None`. Stream stars move a few degrees off
   their track, and a hard tie (`velocity_tie=0`) pulled the track of a mock stream
   away from its stars.
 
 The fit starts from the ordering of {func}`~phasecurvefit.orderers.default_pipeline`,
 turned to run along the velocities. On a stream that crosses itself, a start that
-turns onto the other branch stays there in the untied model. NUTS from such a start,
-on two seeds, covered the truth only 0.46 and 0.57 of the time at 68% and 95% with
-velocities untied, and 0.60 and 0.78 with positions only. In the prototypes, on a loop where every orderer then turned at the
+turns onto the other branch stays there in the untied model. In an earlier prototype
+(uniform $\gamma$, a fixed width, no background and a constant learning rate), NUTS
+from such a start, on two seeds, covered the truth only 0.46 and 0.57 of the time at
+68% and 95% with velocities untied, and 0.60 and 0.78 with positions only. In the
+prototypes, on a loop where every orderer then turned at the
 crossing, a hard velocity tie (`velocity_tie=0`) got the right branch on 5 of the 8
 seeds. That rescue wasn't measured for the default loose tie. Since the
 default pipeline now crosses straight over, the start is usually right. In the

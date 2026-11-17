@@ -120,8 +120,12 @@ def test_untied_has_free_velocity_channels():
 
 
 def test_nuts_warns_when_chains_disagree():
+    """Five warmup steps leave the chains apart, and divergent."""
     pos, vel = _arc(60)
-    with pytest.warns(RuntimeWarning, match="R-hat"):
+    with (
+        pytest.warns(RuntimeWarning, match="divergent"),
+        pytest.warns(RuntimeWarning, match="R-hat"),
+    ):
         post = pcf.sample_track(
             pos, vel, key=jax.random.key(0), method="nuts", n_warmup=5, n_draws=7
         )
@@ -183,6 +187,7 @@ def test_positions_only_model():
 def test_plain_options_and_quiet_nuts(monkeypatch):
     """Hard tie, no line density or width channel, a given ordering, NUTS."""
     monkeypatch.setattr(posterior, "_RHAT_WARN", np.inf)
+    monkeypatch.setattr(posterior, "_warn_if_divergent", lambda _n: None)
     pos, vel = _arc(60)
     ordering = pcf.orderers.default_pipeline(pos, vel)
     post = pcf.sample_track(
@@ -596,8 +601,10 @@ def test_track_range_holds_the_central_line_density(monkeypatch):
         scale=1.0,
     )
     lo, hi = draw.track_range
-    assert 0.5 < lo < 0.8
-    assert 0.8 < hi <= 1.0
+    assert lo > 0.5
+    assert lo < 0.8
+    assert hi > 0.8
+    assert hi <= 1.0
 
 
 def test_ordering_far_from_the_origin_in_other_units_is_accepted():
@@ -632,3 +639,33 @@ def test_dimensionful_count_raises():
 def test_draws_that_are_not_finite_raise():
     with pytest.raises(RuntimeError, match="not finite"):
         posterior._require_finite({"a": jnp.array([1.0, jnp.nan])}, "nuts")
+
+
+# ---- eleventh review ----------------------------------------------------------
+
+
+def test_divergences_warn():
+    with pytest.warns(RuntimeWarning, match="3 divergent"):
+        posterior._warn_if_divergent(3)
+    posterior._warn_if_divergent(0)  # none: no warning, which would be an error
+
+
+def test_empty_positions_raise():
+    with pytest.raises(ValueError, match="at least one component"):
+        pcf.sample_track({}, {}, key=jax.random.key(0))
+
+
+def test_components_of_other_lengths_raise():
+    pos, vel = _arc(40)
+    vel = {"x": vel["x"][:-1], "y": vel["y"]}
+    with pytest.raises(ValueError, match="one value per tracer"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0))
+
+
+def test_angle_positions_scale():
+    """An Angle can't be squared, so the scaling uses plain Quantities."""
+    pos, _ = _arc(40)
+    angles = {k: u.Angle(v, "deg") for k, v in pos.items()}
+    z, centre, scale = posterior._scale(angles, None)
+    assert z.shape == (40, 2)
+    assert u.unit_of(scale) == u.unit("deg")

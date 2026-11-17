@@ -144,7 +144,7 @@ track's uncertainty ([](../how-to/track-uncertainty.md)). It takes every option 
 | `background` | `True` | a flat background over the samples' bounding box, with a latent fraction |
 | `line_density` | `True` | a latent density of samples along the track |
 | `width_varies` | `True` | a width that changes along the track |
-| `velocity_tie` | `0.05` | tie the velocities' mean to the track's tangent, with this much slack; `0` is a hard tie, `None` fits velocities freely |
+| `velocity_tie` | `0.05` | tie the velocities' mean to the track's tangent, with this much slack; `0` is a hard tie, `None` fits velocities freely (needed when the velocities aren't in the track's rest frame) |
 
 {class}`~phasecurvefit.TrackPosterior`, which it returns, is a
 {class}`~phasecurvefit.TrackEnsemble`, so it has `offsets` and `radius`. Its members
