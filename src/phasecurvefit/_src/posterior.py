@@ -270,6 +270,12 @@ def _basis_fit(
     return np.linalg.solve(a, (x * w[:, None]).T @ np.asarray(y)).T
 
 
+def _wstd(r: np.ndarray, w: np.ndarray, /) -> float:
+    """Weighted standard deviation of every entry of ``r``, rows weighted by ``w``."""
+    m = np.average(r, axis=0, weights=w)
+    return float(np.sqrt(np.average(np.mean((r - m) ** 2, axis=1), weights=w)))
+
+
 def _start(
     z: Array,
     gamma0: np.ndarray,
@@ -307,10 +313,10 @@ def _start(
         "alpha": jnp.full((n_ch, 1), _A0),
         "length": jnp.full((n_ch, 1), _L0),
         "beta": jnp.asarray(beta),
-        "sigma": jnp.asarray(max(float(resid[:, :n_q].std()), 0.02)),
+        "sigma": jnp.asarray(max(_wstd(resid[:, :n_q], w), 0.02)),
     }
     if d > n_q:
-        sp = 0.2 if tied else max(float(resid[:, n_q:].std()), 0.02)
+        sp = 0.2 if tied else max(_wstd(resid[:, n_q:], w), 0.02)
         init["sigma_p"] = jnp.asarray(sp)
     return init
 
@@ -433,7 +439,7 @@ def _draws(
                 sigma=sigma[i],
                 centre=centre,
                 scale=scale,
-                track_range=(lo, hi),
+                track_range=jnp.array([lo, hi]),
                 keys=tuple(centre),
             )
         )
@@ -472,21 +478,22 @@ def _warn_if_divergent(n_divergent: int, /) -> None:
         )
 
 
-def _runs_backwards(zo: np.ndarray, n_q: int, /) -> bool:
+def _runs_backwards(zo: np.ndarray, wo: np.ndarray, n_q: int, /) -> bool:
     """Whether an ordered start runs against its velocities, by a vote of steps.
 
     Each step between neighbours votes with the sign of its dot product with
-    the mean velocity of its two ends. Only steps up to 3 times the median
-    step vote, so long jumps out to interlopers, whose velocities are random,
-    don't decide it, and steps of zero length don't vote. Reversing the order
-    flips every vote.
+    the mean velocity of its two ends, weighted by its ends' mean weight. Only
+    steps up to 3 times the median step vote, so long jumps out to
+    interlopers, whose velocities are random, don't decide it, and steps of
+    zero length don't vote. Reversing the order flips every vote.
     """
     step = np.diff(zo[:, :n_q], axis=0)
     v = 0.5 * (zo[1:, n_q:] + zo[:-1, n_q:])
     length = np.linalg.norm(step, axis=1)
     moved = length > 0  # repeated positions carry no direction
     typical = moved & (length <= 3 * np.median(length[moved] if moved.any() else 0))
-    return bool(np.sum(np.sign(np.sum(step * v, axis=1))[typical]) < 0)
+    vote = np.sign(np.sum(step * v, axis=1)) * 0.5 * (wo[1:] + wo[:-1])
+    return bool(np.sum(vote[typical]) < 0)
 
 
 @plum.dispatch
@@ -496,9 +503,16 @@ def _ratio(x: Array, /) -> Array:
 
 
 def _check_ordering(
-    zq: Array, centre: dict[str, Any], scale: Any, ordering: OrderingResult, /
+    positions: VectorComponents,
+    centre: dict[str, Any],
+    scale: Any,
+    ordering: OrderingResult,
+    /,
 ) -> None:
     """Raise unless ``ordering`` is of these tracers, in this order."""
+    zq = jnp.stack(
+        [_ratio((positions[k] - c) / scale) for k, c in centre.items()], axis=1
+    )
     n = zq.shape[0]
     if ordering.indices.shape[0] != n:
         msg = f"ordering is of {ordering.indices.shape[0]} tracers, not these {n}."
@@ -524,7 +538,7 @@ def _check_ordering(
 
 
 def _start_gamma(
-    z: Array, n_q: int, ordering: OrderingResult, weights: Array | None, /
+    z: Array, n_q: int, order: np.ndarray, weights: Array | None, /
 ) -> tuple[np.ndarray, np.ndarray]:
     """Order the start, and give each tracer a gamma by cumulative weight.
 
@@ -533,8 +547,8 @@ def _start_gamma(
     them, since a reversed start predicts every velocity backwards and the fit
     does not recover.
     """
-    idx = np.asarray(ordering.ordering)
     w = np.ones(z.shape[0]) if weights is None else np.asarray(weights)
+    idx = np.asarray(order)
     idx = idx[w[idx] > 0]
     if idx.size < 2:
         msg = (
@@ -542,7 +556,7 @@ def _start_gamma(
             "it needs at least 2."
         )
         raise ValueError(msg)
-    if n_q < z.shape[1] and _runs_backwards(np.asarray(z)[idx], n_q):
+    if n_q < z.shape[1] and _runs_backwards(np.asarray(z)[idx], w[idx], n_q):
         idx = idx[::-1]
     cw = np.cumsum(w[idx]) - 0.5 * w[idx]
     return idx, -1 + 2 * (cw - cw[0]) / (cw[-1] - cw[0])
@@ -626,6 +640,37 @@ def _require_finite(samples: dict[str, Array], method: str, /) -> None:
         raise RuntimeError(msg)
 
 
+def _keep_positive(
+    positions: VectorComponents,
+    velocities: VectorComponents | None,
+    weights: Array | None,
+    /,
+) -> tuple[np.ndarray, dict[str, Any], dict[str, Any] | None, Array | None]:
+    """Drop the tracers of weight 0, so nothing downstream sees them.
+
+    Returns the mask of kept tracers, then the kept positions, velocities and
+    weights.
+    """
+    n = jnp.shape(next(iter(positions.values())))[0]
+    keep = np.ones(n, dtype=bool)
+    if weights is not None:
+        weights = check_weights(weights, n)
+        keep = np.asarray(weights) > 0
+    if keep.sum() < 2:
+        msg = "weights must be positive for at least 2 tracers."
+        raise ValueError(msg)
+
+    def take(comps: VectorComponents, /) -> dict[str, Any]:
+        return {k: v[keep] for k, v in comps.items()}  # type: ignore[index]  # arrays or Quantities
+
+    return (
+        keep,
+        take(positions),
+        None if velocities is None else take(velocities),
+        None if weights is None else weights[keep],
+    )
+
+
 def _check_options(
     positions: VectorComponents,
     velocities: VectorComponents | None,
@@ -643,7 +688,7 @@ def _check_options(
         raise ValueError(msg)
     arrays = [*positions.values(), *(velocities or {}).values()]
     if not all(hasattr(v, "shape") for v in arrays):
-        msg = "every component must be an array or a Quantity, not a list."
+        msg = "every component must be an array or a Quantity."
         raise ValueError(msg)
     comps = {**{f"positions[{k!r}]": v for k, v in positions.items()}}
     if velocities is not None:
@@ -799,11 +844,8 @@ def sample_track(
         msg = f"background must be True or False, got {background!r}."
         raise ValueError(msg)
     background = bool(background)
-    n = jnp.shape(next(iter(positions.values())))[0]
-    if weights is not None:
-        weights = check_weights(weights, n)
-    keep = None if weights is None else np.asarray(weights) > 0
-    z, centre, scale = _scale(positions, velocities, weights)
+    keep, kept_pos, kept_vel, weights = _keep_positive(positions, velocities, weights)
+    z, centre, scale = _scale(kept_pos, kept_vel, weights)
     if not bool(jnp.all(jnp.isfinite(z))):
         msg = (
             "sample_track needs finite positions that are not all equal, and "
@@ -813,15 +855,18 @@ def sample_track(
         raise ValueError(msg)
     n_q = len(positions)
     if ordering is None:
-        if velocities is None:
+        if kept_vel is None:
             msg = "sample_track(velocities=None) needs an ordering of the positions."
             raise ValueError(msg)
         ordering = default_pipeline(
-            positions, velocities, metadata=metadata, weights=weights
+            kept_pos, kept_vel, metadata=metadata, weights=weights
         )
-    else:
-        _check_ordering(z[:, :n_q], centre, scale, ordering)
-    idx, gamma0 = _start_gamma(z, n_q, ordering, weights)
+        order = np.asarray(ordering.ordering)
+    else:  # of every tracer: check it, then keep the tracers of positive weight
+        _check_ordering(positions, centre, scale, ordering)
+        full = np.asarray(ordering.ordering)
+        order = (np.cumsum(keep) - 1)[full[keep[full]]]
+    idx, gamma0 = _start_gamma(z, n_q, order, weights)
 
     opts: dict[str, Any] = {
         "n_q": n_q,
@@ -833,8 +878,7 @@ def sample_track(
     }
     w_start = None if weights is None else np.asarray(weights)[idx]
     init = _start(z, gamma0, idx, **opts, weights=w_start)
-    z_kept = z if keep is None else z[keep]
-    log_rho = float(jnp.log(uniform_background_density(z_kept))) if background else None
+    log_rho = float(jnp.log(uniform_background_density(z))) if background else None
     if background:  # NumPyro would otherwise start it anywhere in (0.12, 0.88)
         init["f_bg"] = jnp.asarray(0.05)
     data: dict[str, Any] = {

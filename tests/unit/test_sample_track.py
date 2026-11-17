@@ -203,7 +203,7 @@ def test_plain_options_and_quiet_nuts(monkeypatch):
         width_varies=False,
         velocity_tie=0.0,
     )
-    assert post.reference.track_range == (-1.0, 1.0)
+    np.testing.assert_array_equal(post.reference.track_range, [-1.0, 1.0])
     assert "f_bg" not in post.samples
 
 
@@ -304,7 +304,7 @@ def test_direction_vote_ignores_interlopers():
     o = pcf.orderers.default_pipeline(pos, vel)
     rev = eqx.tree_at(lambda r: r.indices, o, o.indices[::-1])
     for start in (o, rev):
-        idx, _ = posterior._start_gamma(z, 2, start, None)
+        idx, _ = posterior._start_gamma(z, 2, np.asarray(start.ordering), None)
         members = idx[idx < 300]
         step = np.diff(np.asarray(z)[members, :2], axis=0)
         along = np.sum(step * np.asarray(z)[members[1:], 2:], axis=1)
@@ -357,8 +357,8 @@ def test_vote_ignores_repeated_positions():
     """Steps of zero length carry no direction, even when they are most steps."""
     q = np.array([[0.0, 0.0]] * 5 + [[1.0, 0.0], [2.0, 0.0]])
     zo = np.concatenate([q, np.tile([[1.0, 0.0]], (7, 1))], axis=1)
-    assert not posterior._runs_backwards(zo, 2)
-    assert posterior._runs_backwards(zo[::-1], 2)
+    assert not posterior._runs_backwards(zo, np.ones(len(zo)), 2)
+    assert posterior._runs_backwards(zo[::-1], np.ones(len(zo)), 2)
 
 
 def test_degenerate_orderings_raise():
@@ -367,9 +367,9 @@ def test_degenerate_orderings_raise():
     o = pcf.orderers.default_pipeline(pos, vel)
     one = eqx.tree_at(lambda r: r.indices, o, jnp.full(40, -1).at[0].set(0))
     with pytest.raises(ValueError, match="at least 2"):
-        posterior._start_gamma(z, 2, one, None)
+        posterior._start_gamma(z, 2, np.asarray(one.ordering), None)
     with pytest.raises(ValueError, match="positive weight"):
-        posterior._start_gamma(z, 2, o, jnp.zeros(40))
+        posterior._start_gamma(z, 2, np.asarray(o.ordering), jnp.zeros(40))
 
 
 @pytest.mark.parametrize(
@@ -615,7 +615,7 @@ def test_ordering_far_from_the_origin_in_other_units_is_accepted():
     pp = {k: u.Q(1000 * u.ustrip("kpc", v), "pc") for k, v in pk.items()}
     o = pcf.orderers.default_pipeline(pp, vq, metadata=meta)
     z, centre, scale = posterior._scale(pk, vq)
-    posterior._check_ordering(z[:, :2], centre, scale, o)
+    posterior._check_ordering(pk, centre, scale, o)
 
 
 # ---- coverage of the remaining error paths -------------------------------------
@@ -766,7 +766,7 @@ def test_weight_zero_tracers_take_no_part_in_the_start():
     vel = {k: jnp.where(flip, -v, v) for k, v in clean.items()}
     w = np.where(flip, 0.0, 1.0)
     z, _, _ = posterior._scale(pos, vel, w)
-    idx, gamma0 = posterior._start_gamma(z, 2, o, jnp.asarray(w))
+    idx, gamma0 = posterior._start_gamma(z, 2, np.asarray(o.ordering), jnp.asarray(w))
     assert np.all(w[idx] > 0)
     assert gamma0[0] == -1.0
     assert gamma0[-1] == 1.0
@@ -775,5 +775,50 @@ def test_weight_zero_tracers_take_no_part_in_the_start():
 
 
 def test_list_components_raise():
-    with pytest.raises(ValueError, match="not a list"):
+    with pytest.raises(ValueError, match="array or a Quantity"):
         pcf.sample_track({"x": [0.0, 1.0, 2.0]}, None, key=jax.random.key(0))  # type: ignore[dict-item]
+
+
+# ---- fifteenth review ---------------------------------------------------------
+
+
+def test_weight_zero_tracers_give_the_same_fit_as_dropping_them():
+    """Masked tracers near the arc, or at a sentinel 1e20, change nothing."""
+    pos, vel = _arc(80)
+    rng = np.random.default_rng(0)
+    extra_q = rng.normal(0, 0.3, (20, 2)) + np.array([0.0, 5.0])
+    extra_q[0] = 1e20  # a masked row with a sentinel value
+    extra_p = rng.normal(0, 1, (20, 2))
+    more = {k: jnp.append(v, extra_q[:, i]) for i, (k, v) in enumerate(pos.items())}
+    more_v = {k: jnp.append(v, extra_p[:, i]) for i, (k, v) in enumerate(vel.items())}
+    w = jnp.append(jnp.ones(80), jnp.zeros(20))
+    run = {"key": jax.random.key(0), "n_steps": 200, "n_draws": 3}
+    a = pcf.sample_track(pos, vel, **run)
+    b = pcf.sample_track(more, more_v, weights=w, **run)
+    g = jnp.linspace(-0.5, 0.5, 5)
+    for k in ("x", "y"):
+        np.testing.assert_allclose(b.reference(g)[k], a.reference(g)[k], rtol=1e-5)
+
+
+def test_one_positive_weight_raises():
+    pos, vel = _arc(40)
+    w = jnp.zeros(40).at[3].set(1.0)
+    with pytest.raises(ValueError, match="at least 2 tracers"):
+        pcf.sample_track(pos, vel, key=jax.random.key(0), weights=w)
+
+
+def test_draws_jit_once_for_all_members():
+    pos, vel = _arc(40)
+    post = pcf.sample_track(pos, vel, key=jax.random.key(0), n_steps=50, n_draws=4)
+    traces = []
+
+    @eqx.filter_jit
+    def call(m, g):
+        traces.append(1)
+        return m(g)
+
+    for m in post.members:
+        call(m, jnp.asarray(0.0))
+    assert len(traces) == 1
+    radius = jax.jit(lambda p, g: p.radius(g))(post, jnp.array([0.0]))
+    assert isinstance(radius, jax.Array)

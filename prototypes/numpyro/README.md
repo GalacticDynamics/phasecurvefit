@@ -237,10 +237,10 @@ cases, 8 seeds each, 200 draws. Loop uses `n_basis=32, n_grid=512`.
 
 | case  | 68%  | 95%  | hw68  | centre rms | time |
 | ----- | ---- | ---- | ----- | ---------- | ---- |
-| helix | 0.72 | 0.97 | 0.019 | 0.018      | 23 s |
-| gap   | 0.68 | 0.95 | 0.023 | 0.023      | 18 s |
-| loop  | 0.73 | 0.96 | 0.018 | 0.017      | 23 s |
-| vary  | 0.85 | 0.99 | 0.015 | 0.015      | 25 s |
+| helix | 0.72 | 0.97 | 0.019 | 0.018      | 21 s |
+| gap   | 0.68 | 0.95 | 0.023 | 0.023      | 21 s |
+| loop  | 0.73 | 0.96 | 0.018 | 0.017      | 22 s |
+| vary  | 0.85 | 0.99 | 0.015 | 0.015      | 19 s |
 
 hw68 and centre rms are per direction across the track; for the 3-D helix the
 centre's rms distance from the truth is √2 times larger (0.025). Vary: width
@@ -268,9 +268,10 @@ These were measured during review of PR B, on `sample_track` as shipped.
 - The old setting (constant learning rate 2e-3, `f_bg` started at random) had
   68% half-widths of 0.025, 0.030, 0.026 and 0.027 (helix, gap, loop, vary),
   against 0.019, 0.023, 0.018 and 0.015 now: 30-80% wider.
-- `out_lib` provenance: the saved outputs were re-run in full with the code of
-  commit c57d8b0 (the weighted, flat-density start); every statistic in the
-  table matched the run before it, and only the times changed (17-34 s per run).
+- `out_lib` provenance: the saved outputs are from a full re-run with the code
+  that drops weight-0 tracers before scaling and weights the start (the commit
+  after ce4678c). Every statistic in the table matched the two runs before it
+  (at c57d8b0 and before); only the times changed (17-24 s per run).
 - A subset of `tests/unit/test_sample_track.py` passes on numpyro 0.20.0, the
   lowest version `pyproject.toml` allows.
 - Velocity frame: on a radius-5 arc (200 tracers, noise 0.05, 2000 steps, the

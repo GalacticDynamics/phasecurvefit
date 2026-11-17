@@ -38,9 +38,11 @@ class TrackDraw(ReprMixin, eqx.Module):
         The position components, in the order of the columns of ``x``. JAX
         re-sorts a dict's keys when it rebuilds one, so the columns are matched
         by these and not by the order of ``centre``.
-    track_range : tuple[float, float]
-        The $\gamma$ range the stars cover. With a latent line density it holds
-        the central 99% of it; otherwise it is ``(-1, 1)``.
+    track_range : Array
+        The $\gamma$ range the stars cover, as ``[lo, hi]``. With a latent line
+        density it holds the central 99% of it; otherwise it is ``[-1, 1]``.
+        An array, so every draw has the same tree structure and ``jit``
+        doesn't retrace for each one.
 
     """
 
@@ -49,7 +51,7 @@ class TrackDraw(ReprMixin, eqx.Module):
     sigma: Float[Array, " K"]
     centre: dict[str, Any]
     scale: Any
-    track_range: tuple[float, float]
+    track_range: Float[Array, " 2"]
     keys: tuple[str, ...] = eqx.field(static=True)
 
     def __call__(self, gamma: ArrayLike, /) -> dict[str, Any]:
