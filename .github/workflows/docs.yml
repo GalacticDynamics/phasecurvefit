@@ -36,6 +36,9 @@ env:
 jobs:
   deploy:
     name: Build and publish
+    # Publish from the main repository only, not from forks that sync main.
+    # Pull requests, forks' included, still build the docs in ci.yml.
+    if: github.repository == 'GalacticDynamics/phasecurvefit'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -72,6 +75,10 @@ jobs:
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: "3.12"
+
+      # Docs before v0.4 render their notebooks with nbsphinx, which needs pandoc.
+      - name: Install pandoc
+        run: sudo apt-get install -y --no-install-recommends pandoc
 
       - name: Install
         run: uv sync --no-default-groups --group nox --locked
