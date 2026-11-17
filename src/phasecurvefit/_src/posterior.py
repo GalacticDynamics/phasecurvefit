@@ -92,6 +92,12 @@ def _log_normal_iso(r2: Array, sigma: Array, d: int, /) -> Array:
     return -0.5 * r2 / sigma**2 - d * jnp.log(sigma) - 0.5 * d * jnp.log(2 * jnp.pi)
 
 
+def _sq_dist(a: Array, b: Array, /) -> Array:
+    """Squared distances ``(N, K)`` between rows, without an ``(N, K, D)`` array."""
+    r2 = jnp.sum(a**2, -1)[:, None] - 2 * a @ b.T + jnp.sum(b**2, -1)[None]
+    return jnp.maximum(r2, 0.0)  # rounding can take a near-zero distance below 0
+
+
 def _layout(d: int, n_q: int, velocity_tie: float | None, /) -> tuple[bool, int, int]:
     """Whether the velocities are tied, the slack channels, and the mean channels."""
     tied = velocity_tie is not None and d > n_q
@@ -139,10 +145,10 @@ def _log_likelihood(
     if width_varies:
         sigma = sigma * jnp.exp(x_all[:, col])
 
-    d2 = (z[:, None, :] - x[None]) ** 2  # (N, K, D)
-    ll = _log_normal_iso(jnp.sum(d2[..., :n_q], -1), sigma, n_q)
+    ll = _log_normal_iso(_sq_dist(z[:, :n_q], x[:, :n_q]), sigma, n_q)
     if d > n_q:
-        ll = ll + _log_normal_iso(jnp.sum(d2[..., n_q:], -1), sites["sigma_p"], d - n_q)
+        r2 = _sq_dist(z[:, n_q:], x[:, n_q:])
+        ll = ll + _log_normal_iso(r2, sites["sigma_p"], d - n_q)
     log_fg = jax.nn.logsumexp(ll + log_pi, -1)
     if log_rho_bg is not None:
         f_bg = sites["f_bg"]
@@ -217,12 +223,8 @@ def track_model(
     n_q, n_basis, n_grid, line_density, width_varies, velocity_tie = _model_options(
         d, n_q, n_basis, n_grid, line_density, width_varies, velocity_tie
     )
-    if weights is not None and jnp.shape(weights) != (n,):
-        msg = (
-            f"weights must have shape ({n},), one per row of z; "
-            f"got {jnp.shape(weights)}."
-        )
-        raise ValueError(msg)
+    if weights is not None:
+        weights = check_weights(weights, n)
     _, _, n_mean = _layout(d, n_q, velocity_tie)
     n_ch = n_mean + int(line_density) + int(width_varies)
 
@@ -482,7 +484,10 @@ def _runs_backwards(zo: np.ndarray, wo: np.ndarray, n_q: int, /) -> bool:
     """Whether an ordered start runs against its velocities, by a vote of steps.
 
     Each step between neighbours votes with the sign of its dot product with
-    the mean velocity of its two ends, weighted by its ends' mean weight. Only
+    the mean velocity of its two ends. Weights act as counts: copies of a
+    tracer add only zero-length steps, so a step between tracers of weight 1
+    or more votes 1, and a step to a tracer of weight below 1 votes that
+    weight (the smaller of its ends', capped at 1). Only
     steps up to 3 times the median step vote, so long jumps out to
     interlopers, whose velocities are random, don't decide it, and steps of
     zero length don't vote. Reversing the order flips every vote.
@@ -492,7 +497,8 @@ def _runs_backwards(zo: np.ndarray, wo: np.ndarray, n_q: int, /) -> bool:
     length = np.linalg.norm(step, axis=1)
     moved = length > 0  # repeated positions carry no direction
     typical = moved & (length <= 3 * np.median(length[moved] if moved.any() else 0))
-    vote = np.sign(np.sum(step * v, axis=1)) * 0.5 * (wo[1:] + wo[:-1])
+    count = np.minimum(np.minimum(wo[1:], wo[:-1]), 1.0)
+    vote = np.sign(np.sum(step * v, axis=1)) * count
     return bool(np.sum(vote[typical]) < 0)
 
 
@@ -507,9 +513,14 @@ def _check_ordering(
     centre: dict[str, Any],
     scale: Any,
     ordering: OrderingResult,
+    keep: np.ndarray,
     /,
 ) -> None:
-    """Raise unless ``ordering`` is of these tracers, in this order."""
+    """Raise unless ``ordering`` is of these tracers, in this order.
+
+    Only the tracers in ``keep`` (those of positive weight) are compared, so a
+    tracer of weight 0 may hold anything, NaN included.
+    """
     zq = jnp.stack(
         [_ratio((positions[k] - c) / scale) for k, c in centre.items()], axis=1
     )
@@ -532,7 +543,8 @@ def _check_ordering(
     # float32 rounds a unit conversion to about 1e-7 of the value, and the
     # scaled positions sit up to |centre| / scale from 0.
     far = max(float(np.abs(_ratio(c / scale))) for c in centre.values())
-    if not np.allclose(np.asarray(zo), np.asarray(zq), rtol=0, atol=1e-4 + 1e-6 * far):
+    zo, zq = np.asarray(zo)[keep], np.asarray(zq)[keep]
+    if not np.allclose(zo, zq, rtol=0, atol=1e-4 + 1e-6 * far):
         msg = "ordering is of other tracers: its positions differ from these."
         raise ValueError(msg)
 
@@ -863,7 +875,7 @@ def sample_track(
         )
         order = np.asarray(ordering.ordering)
     else:  # of every tracer: check it, then keep the tracers of positive weight
-        _check_ordering(positions, centre, scale, ordering)
+        _check_ordering(positions, centre, scale, ordering, keep)
         full = np.asarray(ordering.ordering)
         order = (np.cumsum(keep) - 1)[full[keep[full]]]
     idx, gamma0 = _start_gamma(z, n_q, order, weights)

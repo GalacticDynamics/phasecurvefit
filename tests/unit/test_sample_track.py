@@ -615,7 +615,7 @@ def test_ordering_far_from_the_origin_in_other_units_is_accepted():
     pp = {k: u.Q(1000 * u.ustrip("kpc", v), "pc") for k, v in pk.items()}
     o = pcf.orderers.default_pipeline(pp, vq, metadata=meta)
     z, centre, scale = posterior._scale(pk, vq)
-    posterior._check_ordering(pk, centre, scale, o)
+    posterior._check_ordering(pk, centre, scale, o, np.ones(60, bool))
 
 
 # ---- coverage of the remaining error paths -------------------------------------
@@ -822,3 +822,61 @@ def test_draws_jit_once_for_all_members():
     assert len(traces) == 1
     radius = jax.jit(lambda p, g: p.radius(g))(post, jnp.array([0.0]))
     assert isinstance(radius, jax.Array)
+
+
+# ---- seventeenth review ---------------------------------------------------------
+
+
+def test_ordering_ignores_weight_zero_tracers_positions():
+    """A weight-0 tracer may hold NaN when the ordering is given."""
+    pos, vel = _arc(40)
+    o = pcf.orderers.default_pipeline(pos, vel)
+    bad = {k: v.at[3].set(jnp.nan) for k, v in pos.items()}
+    w = jnp.ones(40).at[3].set(0.0)
+    post = pcf.sample_track(
+        bad, vel, key=jax.random.key(0), weights=w, ordering=o, n_steps=50, n_draws=2
+    )
+    assert len(post.members) == 2
+
+
+def test_ordering_still_checks_positive_weight_tracers():
+    pos, vel = _arc(40)
+    o = pcf.orderers.default_pipeline(pos, vel)
+    moved = {k: v.at[3].add(1.0) for k, v in pos.items()}
+    with pytest.raises(ValueError, match="differ"):
+        pcf.sample_track(moved, vel, key=jax.random.key(0), ordering=o)
+
+
+def test_track_model_rejects_negative_weights():
+    z = jnp.zeros((10, 4))
+    with pytest.raises(ValueError, match="non-negative"):
+        log_density(
+            posterior.track_model, (z,), {"n_q": 2, "weights": -jnp.ones(10)}, {}
+        )
+
+
+def test_vote_counts_a_weight_two_tracer_as_two_copies():
+    """A weight-2 tracer votes as the same tracer repeated."""
+    q = np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [3.0, 0.0]])
+    v = np.array([[1.0, 0.0], [-1.0, 0.0], [-1.0, 0.0], [1.0, 0.0]])
+    zo = np.concatenate([q, v], axis=1)
+    w = np.array([1.0, 2.0, 2.0, 1.0])
+    rep = np.repeat(zo, w.astype(int), axis=0)
+    assert posterior._runs_backwards(zo, w, 2) == posterior._runs_backwards(
+        rep, np.ones(len(rep)), 2
+    )
+
+
+def test_vote_downweights_fractional_weights():
+    q = np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [3.0, 0.0]])
+    v = np.array([[1.0, 0.0], [1.0, 0.0], [-3.0, 0.0], [-3.0, 0.0]])
+    zo = np.concatenate([q, v], axis=1)
+    assert posterior._runs_backwards(zo, np.ones(4), 2)
+    assert not posterior._runs_backwards(zo, np.array([1.0, 1.0, 0.1, 0.1]), 2)
+
+
+def test_sq_dist_matches_the_direct_sum():
+    a = jax.random.normal(jax.random.key(1), (7, 3))
+    b = jax.random.normal(jax.random.key(2), (5, 3))
+    direct = jnp.sum((a[:, None] - b[None]) ** 2, -1)
+    np.testing.assert_allclose(posterior._sq_dist(a, b), direct, atol=1e-5)
