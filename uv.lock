@@ -1155,8 +1155,8 @@ wheels = [
 
 [[package]]
 name = "jaxmore"
-version = "0.5.1.dev3+g0d423abc8"
-source = { git = "https://github.com/GalacticDynamics/jaxmore?rev=refs%2Fpull%2F38%2Fhead#0d423abc8775fb2389522626e39bd79bd6b43169" }
+version = "0.5.1.dev6+g7349f95e4"
+source = { git = "https://github.com/GalacticDynamics/jaxmore?rev=refs%2Fpull%2F38%2Fhead#7349f95e4f627c792a8b6f7a87e923092bfd825f" }
 dependencies = [
     { name = "jax" },
     { name = "jaxtyping" },
