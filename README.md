@@ -87,7 +87,7 @@ uv add phasecurvefit --extra kdtree
 ### Running the Tutorials
 
 The
-[tutorial notebooks](https://phasecurvefit.readthedocs.io/en/latest/tutorials/index.html)
+[tutorial notebooks](https://galacticdynamics.github.io/phasecurvefit/v0.3/tutorials/index.html)
 need packages beyond the runtime `[all]` extra — `matplotlib` for plotting and
 `galax` for the mock-stream examples. Install them with the `tutorials` extra:
 
@@ -263,9 +263,9 @@ print(mst_result.gamma_range)  # (-1.0, 1.0)
 `MSTOrderer` also has opt-in velocity mechanisms (`velocity_weight`,
 `sever_cos_threshold`, `orient_by_velocity`) for self-overlapping streams. See
 the
-[Orderers Guide](https://phasecurvefit.readthedocs.io/en/latest/guides/orderers.html)
+[Orderers Guide](https://galacticdynamics.github.io/phasecurvefit/v0.3/guides/orderers.html)
 and the
-[Migration Guide](https://phasecurvefit.readthedocs.io/en/latest/migration.html).
+[Migration Guide](https://galacticdynamics.github.io/phasecurvefit/v0.3/migration.html).
 
 ## Distance Metrics
 
@@ -346,7 +346,7 @@ result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
 
 See the
-[Metrics Guide](https://phasecurvefit.readthedocs.io/en/latest/guides/metrics.html)
+[Metrics Guide](https://galacticdynamics.github.io/phasecurvefit/v0.3/guides/metrics.html)
 for more details and examples.
 
 ## Query Strategies
