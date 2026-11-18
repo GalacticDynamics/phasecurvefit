@@ -962,6 +962,8 @@ def train_ordering_and_track_net(
         batch_size=config.batch_size,
         key=key,
         show_pbar=config.show_pbar,
+        # Reuse the compiled training loop across calls; jaxmore's default is eager.
+        jit=True,
     )
     model = eqx.tree_at(
         lambda m: m.normalizer, model, normalizer, is_leaf=lambda x: x is None
