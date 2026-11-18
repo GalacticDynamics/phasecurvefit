@@ -21,7 +21,7 @@ dependencies = [
   "equinox>=0.13.5",
   "jax>=0.7.2",
   "jaxknn>=0.1.1",
-  "jaxmore[tqdm]>=0.4.0",
+  "jaxmore[tqdm]>=0.6.0",
   "jaxtyping>=0.3.5",
   "optax>=0.2.4",
   "optional-dependencies>=0.4.0",
@@ -413,7 +413,3 @@ ignore = ["PC140"]
 # files. Drop `plum` and have `plum-dispatch` meet galax's `plum>=2.8.0` floor.
 constraint-dependencies = ["plum-dispatch>=2.8.0"]
 override-dependencies   = ["plum; sys_platform == 'never'"]
-
-[tool.uv.sources]
-# TEMPORARY: test GalacticDynamics/jaxmore#38 before it is released.
-jaxmore = { git = "https://github.com/GalacticDynamics/jaxmore", rev = "refs/pull/38/head" }
