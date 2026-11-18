@@ -1,0 +1,999 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Algorithm Details" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="guides/algorithm.html" />
+<meta property="og:site_name" content="phasecurvefit" />
+<meta property="og:description" content="This page explains the mathematical foundations and implementation details of the phase flow walking algorithm. Mathematical Foundation: Walking Algorithm (Metric-Agnostic): The walking algorithm i..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_guides_algorithm_0da161aa.png" />
+<meta property="og:image:alt" content="This page explains the mathematical foundations and implementation details of the phase flow walking algorithm. Mathematical Foundation: Walking Algorithm (Metric-Agnostic): The walking algorithm i..." />
+<meta name="description" content="This page explains the mathematical foundations and implementation details of the phase flow walking algorithm. Mathematical Foundation: Walking Algorithm (Metric-Agnostic): The walking algorithm i..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Algorithm Details &#8212; phasecurvefit</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=1ae7504c"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'guides/algorithm';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.3';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.3/guides/algorithm.html" />
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Orderers" href="orderers.html" />
+    <link rel="prev" title="Distance Metrics Guide" href="metrics.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/favicon.png" class="logo__image only-light" alt="phasecurvefit - Home"/>
+    <script>document.write(`<img src="../_static/favicon.png" class="logo__image only-dark" alt="phasecurvefit - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/GalacticDynamics/phasecurvefit" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/phasecurvefit/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/pypi/v/phasecurvefit" class="icon-link-image" alt="PyPI"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    🚀 Get Started
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">📚 Guides</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metrics.html">Distance Metrics Guide</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Algorithm Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orderers.html">Orderers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="nn.html">Autoencoder for Gap Filling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="outliers.html">Outlier rejection</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jax-integration.html">JAX Integration</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">🎓 Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">🔌 API Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">API Reference</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">🔀 Migration</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../migration.html">Migration Guide</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">More</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to phasecurvefit</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit/issues/new?title=Issue%20on%20page%20%2Fguides/algorithm.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/guides/algorithm.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Algorithm Details</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mathematical-foundation">Mathematical Foundation</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#walking-algorithm-metric-agnostic">Walking Algorithm (Metric-Agnostic)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#distance-metrics-pluggable">Distance Metrics (Pluggable)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#breaking-down-the-aligned-momentum-components">Breaking Down the Aligned-Momentum Components</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#spatial-distance-d-0">Spatial Distance (<span class="math notranslate nohighlight">\(d_0\)</span>)</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#momentum-term-lambda-cdot-1-cos-theta">Momentum Term (<span class="math notranslate nohighlight">\(\lambda \cdot (1 - \cos\theta)\)</span>)</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#effect-of-lambda-in-the-default-metric">Effect of <span class="math notranslate nohighlight">\(\lambda\)</span> in the Default Metric</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#physical-interpretation-default-metric">Physical Interpretation (Default Metric)</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#algorithm-pseudocode">Algorithm Pseudocode</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#gap-filling-with-autoencoder">Gap Filling with Autoencoder</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#extensions-and-variants">Extensions and Variants</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#reverse-walks">Reverse Walks</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#combining-forward-and-reverse-walks">Combining Forward and Reverse Walks</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#spatial-interpolation-from-ordering-parameter">Spatial Interpolation from Ordering Parameter</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#references">References</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="algorithm-details">
+<h1>Algorithm Details<a class="headerlink" href="#algorithm-details" title="Link to this heading">#</a></h1>
+<p>This page explains the mathematical foundations and implementation details of
+the phase flow walking algorithm.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The walk described here is one of the pluggable <strong>orderers</strong>. The examples below
+run it via <code class="docutils literal notranslate"><span class="pre">pcf.order</span></code> with a
+<a class="reference internal" href="../api/index.html#phasecurvefit.orderers.LocalFlowOrderer" title="phasecurvefit.orderers.LocalFlowOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a>. The walk <em>follows</em> the
+velocity field from a start point; on a <strong>near-closed loop</strong> whose velocity
+reverses at a progenitor it must start at the progenitor and walk both ways
+(<code class="docutils literal notranslate"><span class="pre">direction=&quot;both&quot;</span></code>, below). When no start point is known, the
+<a class="reference internal" href="../api/index.html#phasecurvefit.orderers.MSTOrderer" title="phasecurvefit.orderers.MSTOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a> backbone orders the loop tip-to-tip
+without one — see the <a class="reference internal" href="orderers.html"><span class="std std-doc">Orderers guide</span></a>.</p>
+</div>
+<section id="mathematical-foundation">
+<h2>Mathematical Foundation<a class="headerlink" href="#mathematical-foundation" title="Link to this heading">#</a></h2>
+<section id="walking-algorithm-metric-agnostic">
+<h3>Walking Algorithm (Metric-Agnostic)<a class="headerlink" href="#walking-algorithm-metric-agnostic" title="Link to this heading">#</a></h3>
+<p>The walking algorithm is <strong>metric-agnostic</strong>. It only requires a distance (or score)
+function that compares the current point to candidate points. The algorithm then:</p>
+<ol class="arabic simple">
+<li><p>Computes distances to all unvisited points</p></li>
+<li><p>Selects the minimum distance</p></li>
+<li><p>Advances the walk</p></li>
+<li><p>Stops early when termination criteria are met</p></li>
+</ol>
+<p>The specific <strong>distance metric is pluggable</strong> and can be replaced without changing
+the walking logic.</p>
+</section>
+<section id="distance-metrics-pluggable">
+<h3>Distance Metrics (Pluggable)<a class="headerlink" href="#distance-metrics-pluggable" title="Link to this heading">#</a></h3>
+<p>The default metric is <strong>AlignedMomentumDistanceMetric</strong>, which combines spatial
+proximity with momentum alignment:</p>
+<div class="math notranslate nohighlight">
+\[d = d_0 + \lambda \cdot (1 - \cos\theta)\]</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(d_0 = \|\mathbf{p}_{\text{candidate}} - \mathbf{p}_{\text{current}}\|\)</span> is the Euclidean distance in position space</p></li>
+<li><p><span class="math notranslate nohighlight">\(\cos\theta\)</span> is the cosine similarity between the velocity and the direction to the candidate</p></li>
+<li><p><span class="math notranslate nohighlight">\(\lambda \geq 0\)</span> is the momentum weight parameter</p></li>
+</ul>
+<p>Other metrics are available (e.g., spatial-only), and custom metrics can be supplied.
+See <a class="reference internal" href="metrics.html"><span class="std std-doc">Metrics</span></a> for the full list and extension guide.</p>
+</section>
+<section id="breaking-down-the-aligned-momentum-components">
+<h3>Breaking Down the Aligned-Momentum Components<a class="headerlink" href="#breaking-down-the-aligned-momentum-components" title="Link to this heading">#</a></h3>
+<section id="spatial-distance-d-0">
+<h4>Spatial Distance (<span class="math notranslate nohighlight">\(d_0\)</span>)<a class="headerlink" href="#spatial-distance-d-0" title="Link to this heading">#</a></h4>
+<p>The Euclidean distance between two points in position space:</p>
+<div class="math notranslate nohighlight">
+\[d_0 = \sqrt{\sum_i (p_i^{\text{candidate}} - p_i^{\text{current}})^2}\]</div>
+<p>This measures how far apart the points are spatially.</p>
+</section>
+<section id="momentum-term-lambda-cdot-1-cos-theta">
+<h4>Momentum Term (<span class="math notranslate nohighlight">\(\lambda \cdot (1 - \cos\theta)\)</span>)<a class="headerlink" href="#momentum-term-lambda-cdot-1-cos-theta" title="Link to this heading">#</a></h4>
+<p>The momentum term penalizes points that are not in the direction of the current velocity:</p>
+<ol class="arabic simple">
+<li><p><strong>Unit direction vector</strong> from current to candidate:
+$<span class="math notranslate nohighlight">\(\hat{\mathbf{u}}_{\text{dir}} = \frac{\mathbf{p}_{\text{candidate}} - \mathbf{p}_{\text{current}}}{d_0}\)</span>$</p></li>
+<li><p><strong>Unit velocity vector</strong>:
+$<span class="math notranslate nohighlight">\(\hat{\mathbf{v}} = \frac{\mathbf{v}_{\text{current}}}{\|\mathbf{v}_{\text{current}}\|}\)</span>$</p></li>
+<li><p><strong>Cosine similarity</strong>:
+$<span class="math notranslate nohighlight">\(\cos\theta = \hat{\mathbf{u}}_{\text{dir}} \cdot \hat{\mathbf{v}}\)</span>$</p></li>
+<li><p><strong>Momentum penalty</strong>:</p>
+<ul class="simple">
+<li><p>When <span class="math notranslate nohighlight">\(\cos\theta = 1\)</span> (aligned): penalty = 0</p></li>
+<li><p>When <span class="math notranslate nohighlight">\(\cos\theta = 0\)</span> (perpendicular): penalty = <span class="math notranslate nohighlight">\(\lambda\)</span></p></li>
+<li><p>When <span class="math notranslate nohighlight">\(\cos\theta = -1\)</span> (opposite): penalty = <span class="math notranslate nohighlight">\(2\lambda\)</span></p></li>
+</ul>
+</li>
+</ol>
+</section>
+</section>
+<section id="effect-of-lambda-in-the-default-metric">
+<h3>Effect of <span class="math notranslate nohighlight">\(\lambda\)</span> in the Default Metric<a class="headerlink" href="#effect-of-lambda-in-the-default-metric" title="Link to this heading">#</a></h3>
+<p>The momentum weight <span class="math notranslate nohighlight">\(\lambda\)</span> controls the balance between spatial and momentum considerations:</p>
+<ul class="simple">
+<li><p><strong><span class="math notranslate nohighlight">\(\lambda = 0\)</span></strong>: Pure nearest neighbor (spatial only)
+$<span class="math notranslate nohighlight">\(d = d_0\)</span>$
+Selects the closest point regardless of velocity direction.</p></li>
+<li><p><strong><span class="math notranslate nohighlight">\(\lambda \to \infty\)</span></strong>: Pure momentum (directional only)
+$<span class="math notranslate nohighlight">\(d \approx \lambda \cdot (1 - \cos\theta)\)</span>$
+Strongly favors points in the velocity direction, even if far away.</p></li>
+<li><p><strong><span class="math notranslate nohighlight">\(\lambda\)</span> comparable to the spacing between neighbouring points</strong>: balanced.
+<span class="math notranslate nohighlight">\(\lambda\)</span> is a length, so “balanced” is relative to the data: at <span class="math notranslate nohighlight">\(\lambda\)</span> equal
+to the typical spacing <span class="math notranslate nohighlight">\(s\)</span>, a neighbour at <span class="math notranslate nohighlight">\(90°\)</span> and distance <span class="math notranslate nohighlight">\(s\)</span> costs <span class="math notranslate nohighlight">\(2s\)</span>,
+the same as a point straight ahead at distance <span class="math notranslate nohighlight">\(2s\)</span>.</p></li>
+</ul>
+<p>Larger <span class="math notranslate nohighlight">\(\lambda\)</span> makes the walk take longer strides along the flow and skip points
+off to the side; that is often what you want for a thin stream, since the skipped
+points can be ordered later by the <a class="reference internal" href="nn.html"><span class="std std-doc">autoencoder</span></a>.</p>
+</section>
+<section id="physical-interpretation-default-metric">
+<h3>Physical Interpretation (Default Metric)<a class="headerlink" href="#physical-interpretation-default-metric" title="Link to this heading">#</a></h3>
+<p>For stellar streams, the momentum term encodes the fact that stars in a stream follow
+coherent trajectories. A star is more likely to be the next member of the stream if:</p>
+<ol class="arabic simple">
+<li><p>It’s spatially close (<span class="math notranslate nohighlight">\(d_0\)</span> is small)</p></li>
+<li><p>It lies in the direction the stream is flowing (<span class="math notranslate nohighlight">\(\cos\theta \approx 1\)</span>)</p></li>
+</ol>
+<p>The algorithm naturally traces the stream by following the “flow” of velocities
+through phase-space.</p>
+</section>
+</section>
+<section id="algorithm-pseudocode">
+<h2>Algorithm Pseudocode<a class="headerlink" href="#algorithm-pseudocode" title="Link to this heading">#</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Input:
+    position: dict[str, Array]  # N points with shape (N,) per component
+    velocity: dict[str, Array]  # N points with shape (N,) per component
+    start_idx: int              # starting index
+    metric_scale: float         # scale parameter for distance metric
+    max_dist: float | None      # optional gap detection
+    terminate_indices: Set[int] | None  # optional termination indices
+    n_max: int | None           # optional iteration limit
+
+Output:
+    indices: tuple[int, ...]
+    skipped_indices: tuple[int, ...]
+
+Procedure:
+    Initialize:
+        ordered_arr ← [-1, -1, ..., -1]  # Array to store ordered indices
+        visited_mask ← [1.0, 1.0, ..., 1.0]  # 0 = visited, 1 = unvisited
+        visited_mask[start_idx] ← 0.0
+        ordered_arr[0] ← start_idx
+        current_idx ← start_idx
+        step ← 1
+
+    While (step &lt; n_max) AND (current_idx not in terminate_indices):
+        # Get scalar phase-space data at current index
+        current_pos ← {key: position[key][current_idx] for key in position}
+        current_vel ← {key: velocity[key][current_idx] for key in velocity}
+
+      # Vectorized computation to all points (vmap over array index)
+      distances[i] ← metric(current_pos, current_vel, {key: position[key][i] for key}, {key: velocity[key][i] for key})
+
+        # Mask visited points with infinity
+        distances_masked[i] ← visited_mask[i] &gt; 0.5 ? distances[i] : infinity
+
+        # Best unvisited candidate under the metric
+        best_idx ← argmin(distances_masked)
+
+        # Check early termination: max_dist is a *spatial* distance
+        spatial[i] ← ||position[i] - current_pos||  (unvisited only)
+        if distances_masked[best_idx] is infinity:
+            Break  # No unvisited candidates remain
+        if min(spatial) &gt; max_dist OR spatial[best_idx] &gt; max_dist:
+            Break  # Gap detected, stop algorithm
+
+        # Update state
+        ordered_arr[step] ← best_idx
+        visited_mask[best_idx] ← 0.0
+        current_idx ← best_idx
+        step ← step + 1
+
+    # Extract valid indices
+    skipped ← {i : visited_mask[i] &gt; 0.5 for i in 0..N-1}
+    Return (ordered_arr[:step], skipped)
+</pre></div>
+</div>
+</section>
+<section id="gap-filling-with-autoencoder">
+<h2>Gap Filling with Autoencoder<a class="headerlink" href="#gap-filling-with-autoencoder" title="Link to this heading">#</a></h2>
+<p>Due to the momentum condition, the walk algorithm inevitably skips some tracers.
+To assign <span class="math notranslate nohighlight">\(\gamma\)</span> values to these skipped particles, an <strong>autoencoder neural
+network</strong> can interpolate based on phase-space location:</p>
+<ol class="arabic simple">
+<li><p><strong>Encoder</strong>: learns <span class="math notranslate nohighlight">\((x, v) \rightarrow (\gamma, p)\)</span> from the ordered tracers</p></li>
+<li><p><strong>Decoder</strong>: learns the mean track <span class="math notranslate nohighlight">\(\gamma \rightarrow x\)</span></p></li>
+<li><p><strong>Joint training</strong>: refines both, with a velocity-alignment term that keeps the
+track’s direction consistent with the stars’ velocities</p></li>
+</ol>
+<p>See <a class="reference internal" href="nn.html"><span class="std std-doc">Autoencoder for Gap Filling</span></a> for details.</p>
+</section>
+<section id="extensions-and-variants">
+<h2>Extensions and Variants<a class="headerlink" href="#extensions-and-variants" title="Link to this heading">#</a></h2>
+<p>The current implementation supports:</p>
+<ul class="simple">
+<li><p><strong>Arbitrary dimensions</strong>: Works in 1D, 2D, 3D, or higher</p></li>
+<li><p><strong>Gap detection</strong>: <code class="docutils literal notranslate"><span class="pre">max_dist</span></code> parameter</p></li>
+<li><p><strong>Conditional termination</strong>: <code class="docutils literal notranslate"><span class="pre">terminate_indices</span></code> parameter</p></li>
+<li><p><strong>Limited search</strong>: <code class="docutils literal notranslate"><span class="pre">n_max</span></code> parameter</p></li>
+<li><p><strong>Gap filling</strong>: Autoencoder neural network for skipped tracers</p></li>
+<li><p><strong>Reverse walks</strong>: <code class="docutils literal notranslate"><span class="pre">direction=&quot;backward&quot;</span></code> parameter to trace streams backwards by negating velocities</p></li>
+<li><p><strong>Bidirectional walks</strong>: <code class="docutils literal notranslate"><span class="pre">combine_results()</span></code> to trace streams in both directions simultaneously</p></li>
+</ul>
+<section id="reverse-walks">
+<h3>Reverse Walks<a class="headerlink" href="#reverse-walks" title="Link to this heading">#</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">direction</span></code> parameter enables walking through phase-space in the opposite
+direction by negating the velocity vectors. This is useful for:</p>
+<ul class="simple">
+<li><p>Tracing stellar streams backwards from the tidal tail towards the progenitor</p></li>
+<li><p>Exploring both branches of a bifurcated stream</p></li>
+<li><p>Testing bidirectional connectivity in phase-space</p></li>
+</ul>
+<p>To use backward walks:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
+
+<span class="c1"># Create sample data</span>
+<span class="n">pos</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]),</span>
+    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]),</span>
+<span class="p">}</span>
+<span class="n">vel</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]),</span>
+    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]),</span>
+<span class="p">}</span>
+
+<span class="c1"># Forward walk (default)</span>
+<span class="n">result_forward</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
+    <span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">start_idx</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metric_scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Reverse walk from the same starting point</span>
+<span class="n">result_reverse</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
+    <span class="n">pos</span><span class="p">,</span>
+    <span class="n">vel</span><span class="p">,</span>
+    <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">start_idx</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metric_scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;backward&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The negated velocities ensure that the algorithm follows the stream in the
+opposite direction. This is mathematically equivalent to physically reversing
+time in the dynamical system.</p>
+</section>
+<section id="combining-forward-and-reverse-walks">
+<h3>Combining Forward and Reverse Walks<a class="headerlink" href="#combining-forward-and-reverse-walks" title="Link to this heading">#</a></h3>
+<p>For stellar streams that extend in both directions from a starting point (e.g.,
+from a progenitor or disruption point), the <code class="docutils literal notranslate"><span class="pre">combine_results()</span></code> function
+combines the results of two separate walks into a single coherent ordering:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Run forward and reverse walks separately</span>
+<span class="n">result_forward</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
+    <span class="n">pos</span><span class="p">,</span>
+    <span class="n">vel</span><span class="p">,</span>
+    <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">start_idx</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">metric_scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;forward&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">result_reverse</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
+    <span class="n">pos</span><span class="p">,</span>
+    <span class="n">vel</span><span class="p">,</span>
+    <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">start_idx</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">metric_scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;backward&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="c1"># Combine the results</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">combine_results</span><span class="p">(</span><span class="n">result_forward</span><span class="p">,</span> <span class="n">result_reverse</span><span class="p">)</span>
+
+<span class="c1"># Result indices are ordered: [reverse tail] → [start] → [forward tail]</span>
+</pre></div>
+</div>
+<p>This can be simplified to:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
+    <span class="n">pos</span><span class="p">,</span>
+    <span class="n">vel</span><span class="p">,</span>
+    <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">start_idx</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">metric_scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This is particularly useful for:</p>
+<ul class="simple">
+<li><p><strong>Complete stream tracing</strong>: Get a full ordering from one tidal tail to the other</p></li>
+<li><p><strong>Progenitor analysis</strong>: Start from the progenitor and trace both streams</p></li>
+<li><p><strong>Bifurcated streams</strong>: Explore complex geometries extending in multiple directions</p></li>
+<li><p><strong>Stream validation</strong>: Verify connectivity in both directions simultaneously</p></li>
+</ul>
+<p>The combination strategy ensures spatial coherence by placing the starting point
+near the center with the reverse tail on one end and the forward tail on the
+other. Since you run the walks separately, you have full control over the
+parameters for each direction (e.g., different <code class="docutils literal notranslate"><span class="pre">max_dist</span></code> thresholds).</p>
+</section>
+<section id="spatial-interpolation-from-ordering-parameter">
+<h3>Spatial Interpolation from Ordering Parameter<a class="headerlink" href="#spatial-interpolation-from-ordering-parameter" title="Link to this heading">#</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">WalkLocalFlowResult</span></code> object provides a <code class="docutils literal notranslate"><span class="pre">__call__</span></code> method that enables
+efficient linear interpolation of spatial positions along the walk ordering
+from an ordering parameter <span class="math notranslate nohighlight">\(\gamma \in [0, 1]\)</span>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
+
+<span class="c1"># Create sample data</span>
+<span class="n">pos</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span>
+    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">50</span><span class="p">)),</span>
+<span class="p">}</span>
+<span class="n">vel</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">50</span><span class="p">),</span>
+    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">),</span>
+<span class="p">}</span>
+
+<span class="c1"># Run the walk via the orderer interface</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
+    <span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">start_idx</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metric_scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Interpolate positions at specific gamma values</span>
+<span class="n">gamma_values</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.75</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">])</span>
+<span class="n">interpolated_pos</span> <span class="o">=</span> <span class="n">result</span><span class="p">(</span><span class="n">gamma_values</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Interpolated x:&quot;</span><span class="p">,</span> <span class="n">interpolated_pos</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">])</span>  <span class="c1"># Shape (5,)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Interpolated y:&quot;</span><span class="p">,</span> <span class="n">interpolated_pos</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">])</span>  <span class="c1"># Shape (5,)</span>
+</pre></div>
+</div>
+<p>The interpolator is <strong>JAX-compatible</strong> and works with all JAX transformations:</p>
+<p><strong>JIT Compilation:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">interpolate_position</span><span class="p">(</span><span class="n">gamma</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">result</span><span class="p">(</span><span class="n">gamma</span><span class="p">)</span>
+
+
+<span class="c1"># Compile once, run efficiently</span>
+<span class="n">pos_jitted</span> <span class="o">=</span> <span class="n">interpolate_position</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Vectorization (vmap):</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Interpolate batch of gamma values</span>
+<span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">interpolate_batch</span><span class="p">(</span><span class="n">gamma_array</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">result</span><span class="p">)(</span><span class="n">gamma_array</span><span class="p">)</span>
+
+
+<span class="n">gamma_batch</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="n">pos_batch</span> <span class="o">=</span> <span class="n">interpolate_batch</span><span class="p">(</span><span class="n">gamma_batch</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Shape:&quot;</span><span class="p">,</span> <span class="n">pos_batch</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># (100,)</span>
+</pre></div>
+</div>
+<p><strong>Automatic Differentiation (grad):</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compute gradients with respect to gamma</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">loss_fn</span><span class="p">(</span><span class="n">gamma</span><span class="p">):</span>
+    <span class="n">pos</span> <span class="o">=</span> <span class="n">result</span><span class="p">(</span><span class="n">gamma</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">pos</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+
+
+<span class="n">grad_fn</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">loss_fn</span><span class="p">)</span>
+<span class="n">gradient</span> <span class="o">=</span> <span class="n">grad_fn</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Composition of Transformations:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># JIT + vmap + grad combination</span>
+<span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compute_gradients</span><span class="p">(</span><span class="n">gamma_array</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">loss_fn</span><span class="p">))(</span><span class="n">gamma_array</span><span class="p">)</span>
+
+
+<span class="n">gradients</span> <span class="o">=</span> <span class="n">compute_gradients</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>The interpolator works by:</p>
+<ol class="arabic simple">
+<li><p>Mapping <span class="math notranslate nohighlight">\(\gamma \in [0, 1]\)</span> to indices in the visited observation sequence</p></li>
+<li><p>Finding lower and upper neighboring visited observations</p></li>
+<li><p>Computing linear interpolation weights</p></li>
+<li><p>Interpolating each position component across all visited observations</p></li>
+</ol>
+<p>Unvisited observations (marked with index -1) are automatically masked out
+without changing array shapes, making the interpolation efficient in JIT.</p>
+<p>Potential future extensions:</p>
+<ul class="simple">
+<li><p>Adaptive <span class="math notranslate nohighlight">\(\lambda\)</span> based on local stream properties</p></li>
+<li><p>Multiple starting points with graph merging</p></li>
+<li><p>Probabilistic variants for noisy data</p></li>
+<li><p>GPU-specific optimizations for very large datasets</p></li>
+</ul>
+</section>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading">#</a></h2>
+<p>Nibauer, J., et al. (2022). “Charting Galactic Accelerations with Stellar Streams and Machine Learning.” arXiv:2201.12042.</p>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="metrics.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Distance Metrics Guide</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="orderers.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Orderers</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mathematical-foundation">Mathematical Foundation</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#walking-algorithm-metric-agnostic">Walking Algorithm (Metric-Agnostic)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#distance-metrics-pluggable">Distance Metrics (Pluggable)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#breaking-down-the-aligned-momentum-components">Breaking Down the Aligned-Momentum Components</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#spatial-distance-d-0">Spatial Distance (<span class="math notranslate nohighlight">\(d_0\)</span>)</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#momentum-term-lambda-cdot-1-cos-theta">Momentum Term (<span class="math notranslate nohighlight">\(\lambda \cdot (1 - \cos\theta)\)</span>)</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#effect-of-lambda-in-the-default-metric">Effect of <span class="math notranslate nohighlight">\(\lambda\)</span> in the Default Metric</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#physical-interpretation-default-metric">Physical Interpretation (Default Metric)</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#algorithm-pseudocode">Algorithm Pseudocode</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#gap-filling-with-autoencoder">Gap Filling with Autoencoder</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#extensions-and-variants">Extensions and Variants</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#reverse-walks">Reverse Walks</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#combining-forward-and-reverse-walks">Combining Forward and Reverse Walks</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#spatial-interpolation-from-ordering-parameter">Spatial Interpolation from Ordering Parameter</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#references">References</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By phasecurvefit Developers
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, phasecurvefit Developers.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

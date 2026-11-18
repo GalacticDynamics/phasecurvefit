@@ -1,0 +1,1109 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Learning a Stream with an Autoencoder" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="tutorials/stream_autoencoder.html" />
+<meta property="og:site_name" content="phasecurvefit" />
+<meta property="og:description" content="Open In Colab A stellar stream is a thin trail of stars pulled off a globular cluster or dwarf galaxy by the tides of its host galaxy. A catalogue gives each star’s position and velocity, but not w..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_tutorials_stream_autoencoder_76c881b4.png" />
+<meta property="og:image:alt" content="Open In Colab A stellar stream is a thin trail of stars pulled off a globular cluster or dwarf galaxy by the tides of its host galaxy. A catalogue gives each star’s position and velocity, but not w..." />
+<meta name="description" content="Open In Colab A stellar stream is a thin trail of stars pulled off a globular cluster or dwarf galaxy by the tides of its host galaxy. A catalogue gives each star’s position and velocity, but not w..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Learning a Stream with an Autoencoder &#8212; phasecurvefit</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=1ae7504c"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/stream_autoencoder';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.3';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.3/tutorials/stream_autoencoder.html" />
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Learning a Stream with a Running Mean" href="stream_runningmean.html" />
+    <link rel="prev" title="Tutorials" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/favicon.png" class="logo__image only-light" alt="phasecurvefit - Home"/>
+    <script>document.write(`<img src="../_static/favicon.png" class="logo__image only-dark" alt="phasecurvefit - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/GalacticDynamics/phasecurvefit" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/phasecurvefit/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/pypi/v/phasecurvefit" class="icon-link-image" alt="PyPI"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    🚀 Get Started
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">📚 Guides</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../guides/quickstart.html">Quickstart Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/metrics.html">Distance Metrics Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/algorithm.html">Algorithm Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/orderers.html">Orderers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/nn.html">Autoencoder for Gap Filling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/outliers.html">Outlier rejection</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guides/jax-integration.html">JAX Integration</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">🎓 Tutorials</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Tutorials</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Learning a Stream with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">🔌 API Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">API Reference</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">🔀 Migration</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../migration.html">Migration Guide</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">More</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to phasecurvefit</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit/issues/new?title=Issue%20on%20page%20%2Ftutorials/stream_autoencoder.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/tutorials/stream_autoencoder.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Learning a Stream with an Autoencoder</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Data:-a-simulated-stream">Data: a simulated stream</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Shuffling">Shuffling</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Step-1:-a-sparse-ordering-from-the-local-flow-walk">Step 1: a sparse ordering from the local-flow walk</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Step-2:-extending-the-ordering-with-an-autoencoder">Step 2: extending the ordering with an autoencoder</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Reading-the-loss-curve">Reading the loss curve</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Checking-the-final-weights">Checking the final weights</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Result">Result</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Takeaways">Takeaways</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="Learning-a-Stream-with-an-Autoencoder">
+<h1>Learning a Stream with an Autoencoder<a class="headerlink" href="#Learning-a-Stream-with-an-Autoencoder" title="Link to this heading">#</a></h1>
+<p><a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_autoencoder.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
+<p>A stellar stream is a thin trail of stars pulled off a globular cluster or dwarf galaxy by the tides of its host galaxy. A catalogue gives each star’s position and velocity, but not <em>where along the stream</em> it sits. This tutorial recovers that ordering, a coordinate <span class="math notranslate nohighlight">\(\gamma\)</span> running from one tip of the stream to the other, and a smooth mean track <span class="math notranslate nohighlight">\(\vec{x}(\gamma)\)</span> through the stars.</p>
+<p>It works in two stages:</p>
+<ol class="arabic simple">
+<li><p><strong>A local-flow walk</strong> hops from star to star along the velocity field. It produces a reliable ordering, but only for a sparse subset of the stars.</p></li>
+<li><p><strong>An autoencoder</strong> learns from that subset to assign <span class="math notranslate nohighlight">\(\gamma\)</span> to <em>every</em> star, and learns the mean track at the same time.</p></li>
+</ol>
+<p>Along the way we look closely at the training loss curve, which is easy to misread, and check which network weights the final model uses and whether they are good ones.</p>
+<p>This is the recommended first tutorial for streams. The <a class="reference internal" href="stream_runningmean.html"><span class="doc">running-mean tutorial</span></a> swaps the learned track for a faster, less accurate one, and the <a class="reference internal" href="stream_mst.html"><span class="doc">MST tutorial</span></a> orders the same stream without choosing a starting star.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">dataclasses</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">galax.coordinates</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">galax.dynamics</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">galax.potential</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.spatial</span><span class="w"> </span><span class="kn">import</span> <span class="n">cKDTree</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">quaxed.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">unxt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">u</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># One root random key; we split it whenever a step needs randomness.</span>
+<span class="n">key</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">201030</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<section id="Data:-a-simulated-stream">
+<h2>Data: a simulated stream<a class="headerlink" href="#Data:-a-simulated-stream" title="Link to this heading">#</a></h2>
+<p>We simulate a stream with <code class="docutils literal notranslate"><span class="pre">`galax</span></code> &lt;<a class="github reference external" href="https://github.com/GalacticDynamics/galax">GalacticDynamics/galax</a>&gt;`__: a <span class="math notranslate nohighlight">\(2.5 \times 10^4\,M_\odot\)</span> cluster orbits for 4 Gyr in a flattened logarithmic potential, and the Fardal et al. (2015) distribution function releases stars near its Lagrange points. Stars released ahead of the cluster form the leading tail; stars released behind it form the trailing tail.</p>
+<p>The simulation takes a while, so the result is cached in <code class="docutils literal notranslate"><span class="pre">mockstream.pkl</span></code>; the cell below loads it, and only re-runs the simulation if the file is missing.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">usys</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">unitsystems</span><span class="o">.</span><span class="n">galactic</span>
+
+<span class="c1"># Progenitor Parameters</span>
+<span class="n">prog_w0</span> <span class="o">=</span> <span class="n">gc</span><span class="o">.</span><span class="n">PhaseSpaceCoordinate</span><span class="p">(</span>
+    <span class="n">q</span><span class="o">=</span><span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">([</span><span class="mi">10</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span> <span class="s2">&quot;kpc&quot;</span><span class="p">),</span> <span class="n">p</span><span class="o">=</span><span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">([</span><span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="s2">&quot;km/s&quot;</span><span class="p">),</span> <span class="n">t</span><span class="o">=</span><span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;Myr&quot;</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="n">prog_mass</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span><span class="p">(</span><span class="mf">2.5e4</span><span class="p">,</span> <span class="s2">&quot;Msun&quot;</span><span class="p">)</span>
+
+<span class="c1"># Stream Distribution Function</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">gd</span><span class="o">.</span><span class="n">FardalStreamDF</span><span class="p">()</span>
+
+<span class="c1"># Potential</span>
+<span class="n">pot</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">LMJ09LogarithmicPotential</span><span class="p">(</span>
+    <span class="n">v_c</span><span class="o">=</span><span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="mi">150</span><span class="p">,</span> <span class="s2">&quot;km/s&quot;</span><span class="p">),</span>
+    <span class="n">r_s</span><span class="o">=</span><span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;kpc&quot;</span><span class="p">),</span>
+    <span class="n">q1</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">q2</span><span class="o">=</span><span class="mf">1.3</span><span class="p">,</span>
+    <span class="n">q3</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+    <span class="n">phi</span><span class="o">=</span><span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;deg&quot;</span><span class="p">),</span>
+    <span class="n">units</span><span class="o">=</span><span class="n">usys</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Mock stream generator (galax)</span>
+<span class="n">mockgen</span> <span class="o">=</span> <span class="n">gd</span><span class="o">.</span><span class="n">MockStreamGenerator</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">pot</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mockstream_path</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;mockstream.pkl&quot;</span><span class="p">)</span>
+<span class="n">mockstream_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">mockstream_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">with</span> <span class="n">mockstream_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
+            <span class="n">mockstream</span><span class="p">,</span> <span class="n">prog</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>  <span class="c1"># noqa: S301</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Missing </span><span class="si">{</span><span class="n">mockstream_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># noqa: EM102, TRY003, TRY301</span>
+<span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading failed (</span><span class="si">{</span><span class="n">exc</span><span class="si">!r}</span><span class="s2">); running the simulation.&quot;</span><span class="p">)</span>
+    <span class="n">mockstream</span><span class="p">,</span> <span class="n">prog</span> <span class="o">=</span> <span class="n">mockgen</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">key</span><span class="p">,</span>
+        <span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">4_000</span><span class="p">),</span> <span class="s2">&quot;Gyr&quot;</span><span class="p">),</span>
+        <span class="n">prog_w0</span><span class="p">,</span>
+        <span class="n">prog_mass</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">mockstream</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">block_until_ready</span><span class="p">(</span><span class="n">mockstream</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">mockstream_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
+        <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">((</span><span class="n">mockstream</span><span class="p">,</span> <span class="n">prog</span><span class="p">),</span> <span class="n">handle</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mockstream</span><span class="o">.</span><span class="n">q</span><span class="o">.</span><span class="n">x</span><span class="p">),</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mockstream</span><span class="o">.</span><span class="n">q</span><span class="o">.</span><span class="n">y</span><span class="p">),</span>
+    <span class="n">s</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">c</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">mockstream</span><span class="o">.</span><span class="n">q</span><span class="p">)),</span>
+    <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu_r&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;time since release (normalised)&quot;</span><span class="p">,</span> <span class="n">shrink</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="n">xlabel</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;$x$ [kpc]&quot;</span><span class="p">,</span>
+    <span class="n">ylabel</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;$y$ [kpc]&quot;</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Mock stellar stream in a flattened logarithmic potential&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_stream_autoencoder_8_0.png" src="../_images/tutorials_stream_autoencoder_8_0.png" />
+</div>
+</div>
+<p>The colour is each star’s position in the simulation output, which follows release time: red stars left the cluster early and have drifted to the tips, blue stars left recently and still sit near the cluster at <span class="math notranslate nohighlight">\((x, y) \approx (-10, -2)\)</span> kpc. This is the ordering we want to recover, but none of the methods below get to see it.</p>
+</section>
+<section id="Shuffling">
+<h2>Shuffling<a class="headerlink" href="#Shuffling" title="Link to this heading">#</a></h2>
+<p>A real catalogue lists stars in no particular order along the stream. We shuffle the simulated stars so the array order carries no information the methods could exploit by accident.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Shuffle the data</span>
+<span class="n">key</span><span class="p">,</span> <span class="n">subkey</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+<span class="n">order</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">subkey</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">mockstream</span><span class="o">.</span><span class="n">q</span><span class="o">.</span><span class="n">x</span><span class="p">)))</span>
+
+<span class="n">qs</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">mockstream</span><span class="o">.</span><span class="n">q</span><span class="p">,</span> <span class="n">k</span><span class="p">)[</span><span class="n">order</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">mockstream</span><span class="o">.</span><span class="n">q</span><span class="o">.</span><span class="n">components</span><span class="p">}</span>
+<span class="n">ps</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">mockstream</span><span class="o">.</span><span class="n">p</span><span class="p">,</span> <span class="n">k</span><span class="p">)[</span><span class="n">order</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">mockstream</span><span class="o">.</span><span class="n">p</span><span class="o">.</span><span class="n">components</span><span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Step-1:-a-sparse-ordering-from-the-local-flow-walk">
+<h2>Step 1: a sparse ordering from the local-flow walk<a class="headerlink" href="#Step-1:-a-sparse-ordering-from-the-local-flow-walk" title="Link to this heading">#</a></h2>
+<p>The walk starts at one star and repeatedly steps to the unvisited star that best continues the stream. The settings below control what “best continues” means:</p>
+<ul class="simple">
+<li><p><strong>``start_idx``</strong>: we start at the star closest to the progenitor. It has to be a plain Python <code class="docutils literal notranslate"><span class="pre">int</span></code> (not a JAX array), because the walk is compiled around it.</p></li>
+<li><p><strong>``direction=”both”``</strong>: stars stream <em>away</em> from the progenitor in both directions, so from the middle we walk forward along the velocities to one tip, then backward (velocities negated) to the other. The two halves are joined into a single ordering with <span class="math notranslate nohighlight">\(\gamma \in [-1, 1]\)</span> and the progenitor near <span class="math notranslate nohighlight">\(\gamma = 0\)</span>.</p></li>
+<li><p><strong>``AlignedMomentumDistanceMetric``</strong> scores a candidate as <span class="math notranslate nohighlight">\(d = d_0 + \lambda (1 - \cos\theta)\)</span>: its distance <span class="math notranslate nohighlight">\(d_0\)</span> plus a penalty for lying off the current direction of motion (<span class="math notranslate nohighlight">\(\theta\)</span> is the angle between the current velocity and the step). <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code> sets <span class="math notranslate nohighlight">\(\lambda\)</span>. At 100 kpc, stepping even <span class="math notranslate nohighlight">\(15°\)</span> off-axis costs more than a 3 kpc step straight ahead, so the walk strongly prefers to keep going the way the stream flows.</p></li>
+<li><p><strong>``KDTree(k=50)``</strong>: at each step only the 50 nearest stars are scored, which keeps the walk fast.</p></li>
+<li><p><strong>``max_dist``</strong>: the walk stops when its chosen step would be longer than 3 kpc. This is gap detection: it keeps the walk from leaping onto an unrelated part of the stream once it runs out of stars.</p></li>
+</ul>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># The index of the star closest to the progenitor. It must be a Python int.</span>
+<span class="n">start_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">mockstream</span><span class="o">.</span><span class="n">q</span><span class="p">[</span><span class="n">order</span><span class="p">]</span> <span class="o">-</span> <span class="n">prog</span><span class="o">.</span><span class="n">q</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)))</span>
+
+<span class="n">walk_config</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">WalkConfig</span><span class="p">(</span>
+    <span class="n">strategy</span><span class="o">=</span><span class="n">pcf</span><span class="o">.</span><span class="n">strats</span><span class="o">.</span><span class="n">KDTree</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">50</span><span class="p">),</span>
+    <span class="n">metric</span><span class="o">=</span><span class="n">pcf</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">AlignedMomentumDistanceMetric</span><span class="p">(),</span>
+<span class="p">)</span>
+<span class="n">walkresult</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
+    <span class="n">qs</span><span class="p">,</span>
+    <span class="n">ps</span><span class="p">,</span>
+    <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span>
+        <span class="n">start_idx</span><span class="o">=</span><span class="n">start_idx</span><span class="p">,</span>
+        <span class="n">metric_scale</span><span class="o">=</span><span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;kpc&quot;</span><span class="p">),</span>
+        <span class="n">max_dist</span><span class="o">=</span><span class="n">u</span><span class="o">.</span><span class="n">Q</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;kpc&quot;</span><span class="p">),</span>
+        <span class="n">config</span><span class="o">=</span><span class="n">walk_config</span><span class="p">,</span>
+        <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">metadata</span><span class="o">=</span><span class="n">pcf</span><span class="o">.</span><span class="n">StateMetadata</span><span class="p">(</span><span class="n">usys</span><span class="o">=</span><span class="n">usys</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">n_visited</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">walkresult</span><span class="o">.</span><span class="n">indices</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;gamma range: </span><span class="si">{</span><span class="n">walkresult</span><span class="o">.</span><span class="n">gamma_range</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;stars ordered by the walk: </span><span class="si">{</span><span class="n">n_visited</span><span class="si">}</span><span class="s2"> of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">walkresult</span><span class="o">.</span><span class="n">indices</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+gamma range: (-1.0, 1.0)
+stars ordered by the walk: 248 of 8000
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">s</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;0.6&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;all stars&quot;</span><span class="p">)</span>
+
+<span class="n">ordering</span> <span class="o">=</span> <span class="n">walkresult</span><span class="o">.</span><span class="n">ordering</span>
+<span class="n">walk_qs</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="n">ordering</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">walkresult</span><span class="o">.</span><span class="n">positions</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+<span class="n">walk_gamma</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">*</span><span class="n">walkresult</span><span class="o">.</span><span class="n">gamma_range</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ordering</span><span class="p">))</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">walk_qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">walk_qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">s</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">walk_gamma</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">walk_qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">walk_qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="p">[</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">]],</span>
+    <span class="p">[</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">]],</span>
+    <span class="n">s</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+    <span class="n">c</span><span class="o">=</span><span class="s2">&quot;tab:green&quot;</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;start (nearest the progenitor)&quot;</span><span class="p">,</span>
+    <span class="n">zorder</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;walk $\gamma$&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;$x$ [kpc]&quot;</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;$y$ [kpc]&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Local-flow walk ordering&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_stream_autoencoder_14_0.png" src="../_images/tutorials_stream_autoencoder_14_0.png" />
+</div>
+</div>
+<p><strong>What to look for:</strong> the dashed line should run from one tip, through the starting star, to the other tip without jumping between the inner and outer edges of the stream. It does.</p>
+<p>Only about 3% of the stars are visited. That is by design: the walk follows a single thread through the stream, one star per step, rather than sweeping up the stars on either side of it. Where the stream is dense the steps are short; out at the sparse tips they stretch to a few kpc. The result is a reliable <em>skeleton</em> of the stream. Extending the ordering to all the stars is the autoencoder’s job.</p>
+</section>
+<section id="Step-2:-extending-the-ordering-with-an-autoencoder">
+<h2>Step 2: extending the ordering with an autoencoder<a class="headerlink" href="#Step-2:-extending-the-ordering-with-an-autoencoder" title="Link to this heading">#</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">PathAutoencoder</span></code> has two networks:</p>
+<ul class="simple">
+<li><p>an <strong>encoder</strong>, <span class="math notranslate nohighlight">\((\vec{x}, \vec{v}) \to (\gamma, p)\)</span>, that maps any star to an ordering coordinate <span class="math notranslate nohighlight">\(\gamma\)</span> and a membership probability <span class="math notranslate nohighlight">\(p\)</span>, and</p></li>
+<li><p>a <strong>decoder</strong>, <span class="math notranslate nohighlight">\(\gamma \to \vec{x}\)</span>, that maps an ordering coordinate back to a position on the mean track.</p></li>
+</ul>
+<p>Before either sees the data, a <code class="docutils literal notranslate"><span class="pre">StandardScalerNormalizer</span></code> rescales each coordinate to zero mean and unit variance, so that positions in kpc and velocities in kpc/Myr carry comparable weight. Results are converted back to physical units.</p>
+<p><code class="docutils literal notranslate"><span class="pre">train_autoencoder</span></code> trains in three phases, each with its own objective:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Phase</p></th>
+<th class="head"><p>Default epochs</p></th>
+<th class="head"><p>Trains</p></th>
+<th class="head"><p>Objective</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><ol class="arabic simple">
+<li><p>encoder</p></li>
+</ol>
+</td>
+<td><p>800</p></td>
+<td><p>encoder</p></td>
+<td><p>match the walk’s <span class="math notranslate nohighlight">\(\gamma\)</span> on the ordered stars; separate stream stars from random points (<span class="math notranslate nohighlight">\(p\)</span>)</p></td>
+</tr>
+<tr class="row-odd"><td><ol class="arabic simple" start="2">
+<li><p>decoder</p></li>
+</ol>
+</td>
+<td><p>100</p></td>
+<td><p>decoder (encoder frozen)</p></td>
+<td><p>reproduce a running mean of the ordered stars’ positions, as a warm start</p></td>
+</tr>
+<tr class="row-even"><td><ol class="arabic simple" start="3">
+<li><p>joint</p></li>
+</ol>
+</td>
+<td><p>200</p></td>
+<td><p>both</p></td>
+<td><p>put every member star close to the track at its own <span class="math notranslate nohighlight">\(\gamma\)</span>, <em>and</em> align the track’s direction with the stars’
+velocities</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>In phase 3 the weight on velocity alignment, <span class="math notranslate nohighlight">\(\lambda_p\)</span>, ramps linearly from 1 to</p>
+<ol class="arabic simple" start="5">
+<li><p>We keep the <code class="docutils literal notranslate"><span class="pre">TrainingConfig</span></code> in a variable so we can refer to the phase lengths when reading the loss curve.</p></li>
+</ol>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">key</span><span class="p">,</span> <span class="n">model_key</span><span class="p">,</span> <span class="n">train_key</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+<span class="n">normalizer</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">StandardScalerNormalizer</span><span class="p">(</span><span class="n">qs</span><span class="p">,</span> <span class="n">ps</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">PathAutoencoder</span><span class="o">.</span><span class="n">make</span><span class="p">(</span>
+    <span class="n">normalizer</span><span class="p">,</span> <span class="n">gamma_range</span><span class="o">=</span><span class="n">walkresult</span><span class="o">.</span><span class="n">gamma_range</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">model_key</span>
+<span class="p">)</span>
+
+<span class="n">train_config</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">TrainingConfig</span><span class="p">()</span>  <span class="c1"># the defaults, kept for reference below</span>
+<span class="n">result</span><span class="p">,</span> <span class="n">opt_states</span><span class="p">,</span> <span class="n">losses</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">train_autoencoder</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">walkresult</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">train_config</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">train_key</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"version_major": 2, "version_minor": 0, "model_id": "cef015943a4245069e7686290363c0c9"}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"version_major": 2, "version_minor": 0, "model_id": "cfe9037738674c2190cf7208d72ff439"}</script></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"version_major": 2, "version_minor": 0, "model_id": "ff260b22135c48eeb68464fe2dd5f85b"}</script></div>
+</div>
+</section>
+<section id="Reading-the-loss-curve">
+<h2>Reading the loss curve<a class="headerlink" href="#Reading-the-loss-curve" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">losses</span></code> holds one value per epoch, with the three phases concatenated. We shade the phases so the curve can be read correctly.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">end_1</span> <span class="o">=</span> <span class="n">train_config</span><span class="o">.</span><span class="n">n_epochs_encoder</span>
+<span class="n">end_2</span> <span class="o">=</span> <span class="n">end_1</span> <span class="o">+</span> <span class="n">train_config</span><span class="o">.</span><span class="n">n_epochs_decoder</span>
+<span class="n">end_3</span> <span class="o">=</span> <span class="n">end_2</span> <span class="o">+</span> <span class="n">train_config</span><span class="o">.</span><span class="n">n_epochs_both</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">phases</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">end_1</span><span class="p">,</span> <span class="s2">&quot;1: encoder&quot;</span><span class="p">,</span> <span class="s2">&quot;C0&quot;</span><span class="p">),</span>
+    <span class="p">(</span><span class="n">end_1</span><span class="p">,</span> <span class="n">end_2</span><span class="p">,</span> <span class="s2">&quot;2: decoder&quot;</span><span class="p">,</span> <span class="s2">&quot;C1&quot;</span><span class="p">),</span>
+    <span class="p">(</span><span class="n">end_2</span><span class="p">,</span> <span class="n">end_3</span><span class="p">,</span> <span class="s2">&quot;3: joint&quot;</span><span class="p">,</span> <span class="s2">&quot;C2&quot;</span><span class="p">),</span>
+<span class="p">]</span>
+<span class="k">for</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="n">phases</span><span class="p">:</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axvspan</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">text</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">lo</span> <span class="o">+</span> <span class="n">hi</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="mf">1.01</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">ax</span><span class="o">.</span><span class="n">get_xaxis_transform</span><span class="p">(),</span>
+        <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span>
+        <span class="n">va</span><span class="o">=</span><span class="s2">&quot;bottom&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">losses</span><span class="p">),</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.2</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span>
+    <span class="s2">&quot;returned weights&quot;</span><span class="p">,</span>
+    <span class="n">xy</span><span class="o">=</span><span class="p">(</span><span class="n">end_3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">losses</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])),</span>
+    <span class="n">xytext</span><span class="o">=</span><span class="p">(</span><span class="n">end_3</span> <span class="o">-</span> <span class="mi">120</span><span class="p">,</span> <span class="mf">2e-3</span><span class="p">),</span>
+    <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span>
+    <span class="n">arrowprops</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;arrowstyle&quot;</span><span class="p">:</span> <span class="s2">&quot;-&gt;&quot;</span><span class="p">},</span>
+<span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="s2">&quot;Epoch&quot;</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;Loss (objective of the current phase)&quot;</span><span class="p">,</span> <span class="n">yscale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_stream_autoencoder_19_0.png" src="../_images/tutorials_stream_autoencoder_19_0.png" />
+</div>
+</div>
+<p>Because each phase optimises a different objective, <strong>loss values can only be compared within a phase</strong>, never across a boundary:</p>
+<ul class="simple">
+<li><p><strong>Phase 1</strong> falls to about <span class="math notranslate nohighlight">\(10^{-4}\)</span>. This measures only how well the encoder reproduces the walk’s ordering; no track exists yet.</p></li>
+<li><p><strong>The jump at the start of phase 2</strong> is the loss switching to a different quantity (track error), computed by a freshly initialised decoder.</p></li>
+<li><p><strong>The jump at the start of phase 3</strong> is another switch, to an objective that adds a velocity-alignment term.</p></li>
+<li><p><strong>The slow rise through phase 3</strong> is the <span class="math notranslate nohighlight">\(\lambda_p\)</span> ramp. The velocity term is weighted 5× more heavily at the end of the phase than at the start, so the same model error reports a larger loss. A rising curve here does not mean the model is getting worse.</p></li>
+</ul>
+<p><strong>Which weights does the final model use?</strong> Those from the last epoch of the last phase, marked by the arrow. <code class="docutils literal notranslate"><span class="pre">train_autoencoder</span></code> does not keep a “best loss” checkpoint, and picking the lowest point on this curve would be misleading: the lowest values are in phase 1, before the decoder has been trained at all.</p>
+<p>To judge the model we need a measure that means the same thing throughout, which we check next.</p>
+</section>
+<section id="Checking-the-final-weights">
+<h2>Checking the final weights<a class="headerlink" href="#Checking-the-final-weights" title="Link to this heading">#</a></h2>
+<p>A measure that does not change between phases: how far each star lies from the decoded track. We compute it for the final model and for the model as it stood at the end of phase 2. Re-running training with <code class="docutils literal notranslate"><span class="pre">n_epochs_both=0</span></code> and the same keys reproduces phases 1 and 2 exactly, so that second model is the same one the curve above passes through at epoch 900.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">distance_to_track</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Distance (kpc) from each star to the nearest point on the decoded track.&quot;&quot;&quot;</span>
+    <span class="n">track</span> <span class="o">=</span> <span class="n">result</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">*</span><span class="n">result</span><span class="o">.</span><span class="n">gamma_range</span><span class="p">,</span> <span class="mi">5_000</span><span class="p">))</span>
+    <span class="n">comps</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">)</span>
+    <span class="n">T</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="s2">&quot;kpc&quot;</span><span class="p">,</span> <span class="n">track</span><span class="p">[</span><span class="n">c</span><span class="p">]))</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">comps</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">P</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">ustrip</span><span class="p">(</span><span class="s2">&quot;kpc&quot;</span><span class="p">,</span> <span class="n">qs</span><span class="p">[</span><span class="n">c</span><span class="p">]))</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">comps</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">cKDTree</span><span class="p">(</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">P</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+
+<span class="c1"># The same training, stopped after phase 2.</span>
+<span class="n">config_12</span> <span class="o">=</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">train_config</span><span class="p">,</span> <span class="n">n_epochs_both</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">show_pbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">result_12</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">train_autoencoder</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">walkresult</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config_12</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">train_key</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;model&#39;</span><span class="si">:</span><span class="s2">&lt;24</span><span class="si">}{</span><span class="s1">&#39;median [kpc]&#39;</span><span class="si">:</span><span class="s2">&gt;14</span><span class="si">}{</span><span class="s1">&#39;90th pct [kpc]&#39;</span><span class="si">:</span><span class="s2">&gt;16</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="p">[(</span><span class="s2">&quot;after phase 2&quot;</span><span class="p">,</span> <span class="n">result_12</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;final (after phase 3)&quot;</span><span class="p">,</span> <span class="n">result</span><span class="p">)]:</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">distance_to_track</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">:</span><span class="s2">&lt;24</span><span class="si">}{</span><span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">d</span><span class="p">)</span><span class="si">:</span><span class="s2">&gt;14.3f</span><span class="si">}{</span><span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">d</span><span class="p">,</span><span class="w"> </span><span class="mi">90</span><span class="p">)</span><span class="si">:</span><span class="s2">&gt;16.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+model                     median [kpc]  90th pct [kpc]
+after phase 2                    0.777           3.035
+final (after phase 3)            0.073           0.155
+</pre></div></div>
+</div>
+<p>The final weights are the better model by a wide margin, even though the loss curve seemed to say otherwise. Phase 3 is where most of the improvement happens: phase 2 only fits the track to the few hundred stars the walk ordered, while phase 3 fits it to every star the encoder considers a member.</p>
+<p>If on your data phase 3 makes the track worse by this kind of measure, set <code class="docutils literal notranslate"><span class="pre">n_epochs_both=0</span></code> to stop after phase 2. The <a class="reference internal" href="epitrochoid_mst.html"><span class="doc">epitrochoid MST tutorial</span></a> does this for a curve where the joint phase does not help.</p>
+</section>
+<section id="Result">
+<h2>Result<a class="headerlink" href="#Result" title="Link to this heading">#</a></h2>
+<p>Finally, we colour every star by the <span class="math notranslate nohighlight">\(\gamma\)</span> the encoder assigns it and draw the mean track. Stars whose membership probability <span class="math notranslate nohighlight">\(p\)</span> falls below the training threshold (<code class="docutils literal notranslate"><span class="pre">train_config.member_threshold</span></code>, 0.5 by default) are circled in cyan: the encoder does not consider them part of the stream.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">all_gamma</span><span class="p">,</span> <span class="n">all_probs</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">walkresult</span><span class="o">.</span><span class="n">positions</span><span class="p">,</span> <span class="n">walkresult</span><span class="o">.</span><span class="n">velocities</span><span class="p">)</span>
+<span class="n">rejected</span> <span class="o">=</span> <span class="n">all_probs</span> <span class="o">&lt;</span> <span class="n">train_config</span><span class="o">.</span><span class="n">member_threshold</span>
+<span class="n">track</span> <span class="o">=</span> <span class="n">result</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">*</span><span class="n">result</span><span class="o">.</span><span class="n">gamma_range</span><span class="p">,</span> <span class="mi">1_000</span><span class="p">))</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]),</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">]),</span>
+    <span class="n">s</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+    <span class="n">c</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">all_gamma</span><span class="p">),</span>
+    <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span>
+    <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;stars&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">track</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">track</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">]),</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;mean track&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][</span><span class="n">rejected</span><span class="p">]),</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][</span><span class="n">rejected</span><span class="p">]),</span>
+    <span class="n">s</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">c</span><span class="o">=</span><span class="s2">&quot;cyan&quot;</span><span class="p">,</span>
+    <span class="n">edgecolors</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span>
+    <span class="n">linewidths</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">label</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;$p$ below threshold&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">]),</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">qs</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][</span><span class="n">start_idx</span><span class="p">]),</span>
+    <span class="n">s</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+    <span class="n">c</span><span class="o">=</span><span class="s2">&quot;tab:green&quot;</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;walk start&quot;</span><span class="p">,</span>
+    <span class="n">zorder</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;encoder $\gamma$&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="n">xlabel</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;$x$ [kpc]&quot;</span><span class="p">,</span>
+    <span class="n">ylabel</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;$y$ [kpc]&quot;</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Autoencoder ordering and mean track&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper right&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_stream_autoencoder_25_0.png" src="../_images/tutorials_stream_autoencoder_25_0.png" />
+</div>
+</div>
+<p><strong>What to look for:</strong> the colour now changes smoothly along the <em>whole</em> stream, not just along the walk’s few hundred stars, and the track runs down the middle of the stream from tip to tip.</p>
+<p>Notice that only one of the two far-flung stars on the right is flagged. The encoder’s <span class="math notranslate nohighlight">\(p\)</span> is a simple classifier, trained to tell stream stars from random points, and is not designed to reject contaminating field stars. For real outlier rejection, see the <a class="reference internal" href="outlier_rejection.html"><span class="doc">outlier rejection tutorial</span></a>.</p>
+</section>
+<section id="Takeaways">
+<h2>Takeaways<a class="headerlink" href="#Takeaways" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>The <strong>walk</strong> gives a sparse but reliable ordering; the <strong>autoencoder</strong> extends it to every star and learns a smooth mean track.</p></li>
+<li><p>The loss curve concatenates <strong>three different objectives</strong>. Compare values only within a phase, and judge the finished model with a fixed measure such as the distance from stars to the track.</p></li>
+<li><p>The returned model uses the <strong>final-epoch weights</strong>. Set <code class="docutils literal notranslate"><span class="pre">n_epochs_both=0</span></code> if the joint phase does not help on your data.</p></li>
+</ul>
+<p><strong>Next:</strong> the <a class="reference internal" href="stream_runningmean.html"><span class="doc">running-mean tutorial</span></a> trades accuracy for speed, and the <a class="reference internal" href="stream_mst.html"><span class="doc">MST tutorial</span></a> orders this stream without a starting star and rejects injected interlopers.</p>
+<script type="application/vnd.jupyter.widget-state+json">
+{"state": {"f011a51f48d44c3dbb0b9f1f21a8dd02": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": "2", "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "c7a2be2500dd4335bea37f49f8cf4330": {"model_name": "ProgressStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "ProgressStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "bar_color": null, "description_width": ""}}, "06a683fa49ad48f192960f61ca4d8aaa": {"model_name": "FloatProgressModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "FloatProgressModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "ProgressView", "bar_style": "success", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_f011a51f48d44c3dbb0b9f1f21a8dd02", "max": 800.0, "min": 0.0, "orientation": "horizontal", "style": "IPY_MODEL_c7a2be2500dd4335bea37f49f8cf4330", "tabbable": null, "tooltip": null, "value": 800.0}}, "400dd5de23e0457cba217649c2f4eb2e": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "e955fd84b8ef4e2e85b0e83f5b4d07a9": {"model_name": "HTMLStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "background": null, "description_width": "", "font_size": null, "text_color": null}}, "3b61487045514bd3b0b11242eaf69a05": {"model_name": "HTMLModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HTMLView", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_400dd5de23e0457cba217649c2f4eb2e", "placeholder": "\u200b", "style": "IPY_MODEL_e955fd84b8ef4e2e85b0e83f5b4d07a9", "tabbable": null, "tooltip": null, "value": "Training:\u2007100%"}}, "b8706ed01e79450889a2b68641752516": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "5a3a4d4f595341db9c9c44536ffa1fc0": {"model_name": "HTMLStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "background": null, "description_width": "", "font_size": null, "text_color": null}}, "2801d638694e469997e64d20e6fe4336": {"model_name": "HTMLModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HTMLView", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_b8706ed01e79450889a2b68641752516", "placeholder": "\u200b", "style": "IPY_MODEL_5a3a4d4f595341db9c9c44536ffa1fc0", "tabbable": null, "tooltip": null, "value": "\u2007800/800\u2007[00:00&lt;00:00,\u20071762.90epoch/s]"}}, "019e8f027dcd425b890617be6aa87d6f": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": "inline-flex", "flex": null, "flex_flow": "row wrap", "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": "100%"}}, "cef015943a4245069e7686290363c0c9": {"model_name": "HBoxModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HBoxModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HBoxView", "box_style": "", "children": ["IPY_MODEL_3b61487045514bd3b0b11242eaf69a05", "IPY_MODEL_06a683fa49ad48f192960f61ca4d8aaa", "IPY_MODEL_2801d638694e469997e64d20e6fe4336"], "layout": "IPY_MODEL_019e8f027dcd425b890617be6aa87d6f", "tabbable": null, "tooltip": null}}, "5740d0dad6874f06b760b890512b9344": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": "2", "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "8bc40898f16b4e35b3fd2aecbf2722ab": {"model_name": "ProgressStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "ProgressStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "bar_color": null, "description_width": ""}}, "cfb8828888394c60821c0a18ab5d1b6e": {"model_name": "FloatProgressModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "FloatProgressModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "ProgressView", "bar_style": "success", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_5740d0dad6874f06b760b890512b9344", "max": 100.0, "min": 0.0, "orientation": "horizontal", "style": "IPY_MODEL_8bc40898f16b4e35b3fd2aecbf2722ab", "tabbable": null, "tooltip": null, "value": 100.0}}, "548091d1ecea49789b262431e8b8aa6a": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "0ad0c8ab3c2b432d8b94a4ceaf0d8ceb": {"model_name": "HTMLStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "background": null, "description_width": "", "font_size": null, "text_color": null}}, "8750cc309eb94af6bf05ab4b6ff3aeb4": {"model_name": "HTMLModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HTMLView", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_548091d1ecea49789b262431e8b8aa6a", "placeholder": "\u200b", "style": "IPY_MODEL_0ad0c8ab3c2b432d8b94a4ceaf0d8ceb", "tabbable": null, "tooltip": null, "value": "Training:\u2007100%"}}, "1b424619691f48e2a7cf12b2c503ecfb": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "9602c17059534b77b6f8740628c44b8b": {"model_name": "HTMLStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "background": null, "description_width": "", "font_size": null, "text_color": null}}, "59fd81dcfd984f7f996d18cac5a9196e": {"model_name": "HTMLModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HTMLView", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_1b424619691f48e2a7cf12b2c503ecfb", "placeholder": "\u200b", "style": "IPY_MODEL_9602c17059534b77b6f8740628c44b8b", "tabbable": null, "tooltip": null, "value": "\u2007100/100\u2007[00:00&lt;00:00,\u2007487.72epoch/s]"}}, "07c7ea6965364ab69b2945cd3a83ea9f": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": "inline-flex", "flex": null, "flex_flow": "row wrap", "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": "100%"}}, "cfe9037738674c2190cf7208d72ff439": {"model_name": "HBoxModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HBoxModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HBoxView", "box_style": "", "children": ["IPY_MODEL_8750cc309eb94af6bf05ab4b6ff3aeb4", "IPY_MODEL_cfb8828888394c60821c0a18ab5d1b6e", "IPY_MODEL_59fd81dcfd984f7f996d18cac5a9196e"], "layout": "IPY_MODEL_07c7ea6965364ab69b2945cd3a83ea9f", "tabbable": null, "tooltip": null}}, "96cee48f00654778b4bc7bc64cbdeb57": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": "2", "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "17f07221b65b4a7297f45285070ef3f3": {"model_name": "ProgressStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "ProgressStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "bar_color": null, "description_width": ""}}, "80f9aa4addaa444483ead08fb37a3d4a": {"model_name": "FloatProgressModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "FloatProgressModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "ProgressView", "bar_style": "success", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_96cee48f00654778b4bc7bc64cbdeb57", "max": 200.0, "min": 0.0, "orientation": "horizontal", "style": "IPY_MODEL_17f07221b65b4a7297f45285070ef3f3", "tabbable": null, "tooltip": null, "value": 200.0}}, "f14ac20090a3408593db18e5d86cb296": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "4096e77602e74f90a60087303e0c63a3": {"model_name": "HTMLStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "background": null, "description_width": "", "font_size": null, "text_color": null}}, "51b52b2a6011473285abaf63c59b4224": {"model_name": "HTMLModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HTMLView", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_f14ac20090a3408593db18e5d86cb296", "placeholder": "\u200b", "style": "IPY_MODEL_4096e77602e74f90a60087303e0c63a3", "tabbable": null, "tooltip": null, "value": "Training:\u2007100%"}}, "96b8efcdc1444acc805592a025c1d31b": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "014f23ae5b9048fb807cc2e81d679e5f": {"model_name": "HTMLStyleModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLStyleModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "StyleView", "background": null, "description_width": "", "font_size": null, "text_color": null}}, "561a84d3abac4066b64ed7a0aeb86b02": {"model_name": "HTMLModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HTMLModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HTMLView", "description": "", "description_allow_html": false, "layout": "IPY_MODEL_96b8efcdc1444acc805592a025c1d31b", "placeholder": "\u200b", "style": "IPY_MODEL_014f23ae5b9048fb807cc2e81d679e5f", "tabbable": null, "tooltip": null, "value": "\u2007200/200\u2007[00:06&lt;00:00,\u200733.63epoch/s]"}}, "11318229857b44e791cbe07637fdd7dc": {"model_name": "LayoutModel", "model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": "inline-flex", "flex": null, "flex_flow": "row wrap", "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": "100%"}}, "ff260b22135c48eeb68464fe2dd5f85b": {"model_name": "HBoxModel", "model_module": "@jupyter-widgets/controls", "model_module_version": "2.0.0", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/controls", "_model_module_version": "2.0.0", "_model_name": "HBoxModel", "_view_count": null, "_view_module": "@jupyter-widgets/controls", "_view_module_version": "2.0.0", "_view_name": "HBoxView", "box_style": "", "children": ["IPY_MODEL_51b52b2a6011473285abaf63c59b4224", "IPY_MODEL_80f9aa4addaa444483ead08fb37a3d4a", "IPY_MODEL_561a84d3abac4066b64ed7a0aeb86b02"], "layout": "IPY_MODEL_11318229857b44e791cbe07637fdd7dc", "tabbable": null, "tooltip": null}}}, "version_major": 2, "version_minor": 0}
+</script></section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Tutorials</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="stream_runningmean.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Learning a Stream with a Running Mean</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Data:-a-simulated-stream">Data: a simulated stream</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Shuffling">Shuffling</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Step-1:-a-sparse-ordering-from-the-local-flow-walk">Step 1: a sparse ordering from the local-flow walk</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Step-2:-extending-the-ordering-with-an-autoencoder">Step 2: extending the ordering with an autoencoder</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Reading-the-loss-curve">Reading the loss curve</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Checking-the-final-weights">Checking the final weights</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Result">Result</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Takeaways">Takeaways</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By phasecurvefit Developers
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, phasecurvefit Developers.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
