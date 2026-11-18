@@ -1155,16 +1155,12 @@ wheels = [
 
 [[package]]
 name = "jaxmore"
-version = "0.4.0"
-source = { registry = "https://pypi.org/simple" }
+version = "0.5.1.dev3+g0d423abc8"
+source = { git = "https://github.com/GalacticDynamics/jaxmore?rev=refs%2Fpull%2F38%2Fhead#0d423abc8775fb2389522626e39bd79bd6b43169" }
 dependencies = [
     { name = "jax" },
     { name = "jaxtyping" },
     { name = "optional-dependencies" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/73/99/91e358a0fc8f0445316ac8d7405cca70af33fd989ab93c3d9419a8eed795/jaxmore-0.4.0.tar.gz", hash = "sha256:2a27df81b7c7ec734c586aedeb7e487a5eb5cd9b90aea6de2e48a8417d698fdc", size = 202566, upload-time = "2026-07-13T01:13:46.523Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1c/52/bdb86d6286fc9847b1add5fbe227f8f1f9702775e51337aa9f67e63b79ea/jaxmore-0.4.0-py3-none-any.whl", hash = "sha256:bce27de0c758980eada7a6c0a89d71c5c39d000b16a707bccb7807ac9057adfb", size = 43103, upload-time = "2026-07-13T01:13:45.218Z" },
 ]
 
 [package.optional-dependencies]
@@ -2168,7 +2164,7 @@ requires-dist = [
     { name = "jaxkd", marker = "extra == 'kdtree'", specifier = ">=0.0.5" },
     { name = "jaxkd", marker = "extra == 'tutorials'", specifier = ">=0.0.5" },
     { name = "jaxknn", specifier = ">=0.1.1" },
-    { name = "jaxmore", extras = ["tqdm"], specifier = ">=0.4.0" },
+    { name = "jaxmore", extras = ["tqdm"], git = "https://github.com/GalacticDynamics/jaxmore?rev=refs%2Fpull%2F38%2Fhead" },
     { name = "jaxtyping", specifier = ">=0.3.5" },
     { name = "matplotlib", marker = "extra == 'tutorials'", specifier = ">=3.10.8" },
     { name = "optax", specifier = ">=0.2.4" },
