@@ -768,6 +768,9 @@ converts a dimensionful Quantity to a bare array with <code class="docutils lite
 unit you name, e.g. <code class="docutils literal notranslate"><span class="pre">u.ustrip(&quot;kpc&quot;,</span> <span class="pre">q)</span></code>, or in a unit system’s unit for its
 dimension, e.g. <code class="docutils literal notranslate"><span class="pre">u.ustrip(usys,</span> <span class="pre">q)</span></code>. To plot Quantities directly with matplotlib, install
 <code class="docutils literal notranslate"><span class="pre">unxt[interop-mpl]</span></code>, which the <code class="docutils literal notranslate"><span class="pre">tutorials</span></code> extra includes.</p>
+<p>v0.4 also requires <code class="docutils literal notranslate"><span class="pre">jaxmore&gt;=0.6.1</span></code> (was <code class="docutils literal notranslate"><span class="pre">&gt;=0.4.0</span></code>). The <code class="docutils literal notranslate"><span class="pre">pcf.nn</span></code> training loops
+use jaxmore’s compiled training loop, so a repeat training call with the same
+shapes and settings reuses its compiled program instead of compiling again.</p>
 </section>
 <section id="compatibility-summary">
 <h2>Compatibility summary<a class="headerlink" href="#compatibility-summary" title="Link to this heading">#</a></h2>
