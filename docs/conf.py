@@ -74,8 +74,8 @@ nb_execution_raise_on_error = True
 # Share JAX's compiled programs between the pages' kernels, which inherit this
 # environment. Most of a small page's run time is compiling, and many pages
 # compile the same programs. A minimum compile time of 0 also caches the training
-# scans, which `jaxmore` recompiles on every call. This took about a quarter off
-# the guides' run time.
+# scans, which each page's kernel would otherwise compile for itself. This took
+# about a quarter off the guides' run time.
 os.environ.setdefault("JAX_COMPILATION_CACHE_DIR", str(_docs_dir / "_build/jax_cache"))
 os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0")
 os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES", "0")

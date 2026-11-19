@@ -448,6 +448,8 @@ def train_track_net(
         batch_size=config.batch_size,
         key=key,
         show_pbar=config.show_pbar,
+        # Reuse the compiled training loop across calls; jaxmore's default is eager.
+        jit=True,
     )
 
     return model, opt_state, epoch_losses
