@@ -1,0 +1,1117 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Options and defaults" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="reference/options.html" />
+<meta property="og:site_name" content="phasecurvefit" />
+<meta property="og:description" content="Every option of the orderers and of autoencoder training, with its default. Pass options as keywords. The API Reference has the full signatures, and the how-to guides( How-to guides) show how to ch..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_reference_options_0e792f9f.png" />
+<meta property="og:image:alt" content="Every option of the orderers and of autoencoder training, with its default. Pass options as keywords. The API Reference has the full signatures, and the how-to guides( How-to guides) show how to ch..." />
+<meta name="description" content="Every option of the orderers and of autoencoder training, with its default. Pass options as keywords. The API Reference has the full signatures, and the how-to guides( How-to guides) show how to ch..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Options and defaults &#8212; phasecurvefit</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=1ae7504c"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'reference/options';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.4';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.4/reference/options.html" />
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="The ordering result" href="result.html" />
+    <link rel="prev" title="API Reference" href="api.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/favicon.png" class="logo__image only-light" alt="phasecurvefit - Home"/>
+    <script>document.write(`<img src="../_static/favicon.png" class="logo__image only-dark" alt="phasecurvefit - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/GalacticDynamics/phasecurvefit" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/phasecurvefit/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/pypi/v/phasecurvefit" class="icon-link-image" alt="PyPI"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    phasecurvefit
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Start</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../start/what-it-does.html">What phasecurvefit does</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/is-it-right.html">Is phasecurvefit right for my data?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/install.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/quickstart.html">Quick start</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/density_fields.html">Fitting a Track Through a Density Image</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How-to guides</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../how-to/index.html">How-to guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/data.html">Prepare your data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/units.html">Use physical units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/choose-orderer.html">Choose an orderer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/chain-orderers.html">Chain orderers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/local-flow-walk.html">Use the local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/tune-metric.html">Choose and tune the walk’s metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/custom-metric.html">Write a custom metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/kdtree.html">Restrict the walk to nearby points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/som.html">Refine an ordering with a self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/autoencoder.html">Fill gaps and fit a track with the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/interpolate.html">Interpolate positions along an ordering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/outliers.html">Reject outliers with the mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/track-uncertainty.html">Put an uncertainty band on the track</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/jax.html">Compile, batch and differentiate with JAX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/gpu.html">Run on a GPU</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How it works</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../explanation/index.html">How it works</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/walk.html">The local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/mst.html">The MST backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/som.html">The self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/autoencoder.html">The autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/outliers.html">Outlier rejection with a mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/track-uncertainty.html">Track uncertainty</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/density-fields.html">Density fields</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Reference</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Options and defaults</a></li>
+<li class="toctree-l2"><a class="reference internal" href="result.html">The ordering result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="migration/v0.3-to-v0.4.html">Migrating from v0.3 to v0.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="migration/v0.2-to-v0.3.html">Migrating from v0.2 to v0.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="migration/v0.1-to-v0.2.html">Migrating from v0.1 to v0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="citation.html">Citation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to phasecurvefit</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit/issues/new?title=Issue%20on%20page%20%2Freference/options.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/reference/options.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Options and defaults</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#localfloworderer"><code class="docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#walkconfig"><code class="docutils literal notranslate"><span class="pre">WalkConfig</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mstorderer"><code class="docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#ridgeorderer"><code class="docutils literal notranslate"><span class="pre">RidgeOrderer</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#somorderer"><code class="docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#sommixture"><code class="docutils literal notranslate"><span class="pre">SOMMixture</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fit-track"><code class="docutils literal notranslate"><span class="pre">fit_track</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bootstrap-track"><code class="docutils literal notranslate"><span class="pre">bootstrap_track</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#trainingconfig"><code class="docutils literal notranslate"><span class="pre">TrainingConfig</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mixturemembershipconfig"><code class="docutils literal notranslate"><span class="pre">MixtureMembershipConfig</span></code></a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="options-and-defaults">
+<h1>Options and defaults<a class="headerlink" href="#options-and-defaults" title="Link to this heading">#</a></h1>
+<p>Every option of the orderers and of autoencoder training, with its default. Pass
+options as keywords. The <a class="reference internal" href="api.html"><span class="std std-doc">API Reference</span></a> has the full signatures, and the how-to guides
+(<a class="reference internal" href="../how-to/index.html"><span class="std std-doc">How-to guides</span></a>) show how to choose values.</p>
+<section id="localfloworderer">
+<h2><code class="docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code><a class="headerlink" href="#localfloworderer" title="Link to this heading">#</a></h2>
+<p><a class="reference internal" href="api.html#phasecurvefit.orderers.LocalFlowOrderer" title="phasecurvefit.orderers.LocalFlowOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a>: the local-flow walk
+(<a class="reference internal" href="../how-to/local-flow-walk.html"><span class="std std-doc">Use the local-flow walk</span></a>).</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">metric_scale</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.0</span></code></p></td>
+<td><p>the metric’s scale: a length for the default metric, a time for <code class="docutils literal notranslate"><span class="pre">FullPhaseSpaceDistanceMetric</span></code>, ignored by <code class="docutils literal notranslate"><span class="pre">SpatialDistanceMetric</span></code> (<a class="reference internal" href="../how-to/tune-metric.html"><span class="std std-doc">Choose and tune the walk’s metric</span></a>)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">config</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">WalkConfig()</span></code></p></td>
+<td><p>the distance metric and neighbour-query strategy, see below</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">start_idx</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>index of the first sample; <code class="docutils literal notranslate"><span class="pre">None</span></code> takes it from a previous chained stage, or else uses 0</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">direction</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;forward&quot;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;forward&quot;</span></code> follows the velocities, <code class="docutils literal notranslate"><span class="pre">&quot;backward&quot;</span></code> goes against them, <code class="docutils literal notranslate"><span class="pre">&quot;both&quot;</span></code> walks each way from <code class="docutils literal notranslate"><span class="pre">start_idx</span></code> and joins the two</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max_dist</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">inf</span></code></p></td>
+<td><p>stop when the next step would be longer than this, in position</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">terminate_indices</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>a <code class="docutils literal notranslate"><span class="pre">frozenset</span></code> of indices at which the walk stops</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">n_max</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>the most samples the walk visits</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nan_policy</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;raise&quot;</span></code></p></td>
+<td><p>what to do with NaN inputs</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="walkconfig">
+<h2><code class="docutils literal notranslate"><span class="pre">WalkConfig</span></code><a class="headerlink" href="#walkconfig" title="Link to this heading">#</a></h2>
+<p><a class="reference internal" href="api.html#phasecurvefit.WalkConfig" title="phasecurvefit.WalkConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">WalkConfig</span></code></a>: the walk’s metric and query strategy.</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">metric</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">AlignedMomentumDistanceMetric()</span></code></p></td>
+<td><p>how candidate points are scored (<a class="reference internal" href="../explanation/walk.html"><span class="std std-doc">The local-flow walk</span></a>)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">strategy</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">BruteForce()</span></code></p></td>
+<td><p>which candidates are scored: all of them, or the <code class="docutils literal notranslate"><span class="pre">k</span></code> nearest with <code class="docutils literal notranslate"><span class="pre">KDTree(k=...)</span></code> (<a class="reference internal" href="../how-to/kdtree.html"><span class="std std-doc">Restrict the walk to nearby points</span></a>)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="mstorderer">
+<h2><code class="docutils literal notranslate"><span class="pre">MSTOrderer</span></code><a class="headerlink" href="#mstorderer" title="Link to this heading">#</a></h2>
+<p><a class="reference internal" href="api.html#phasecurvefit.orderers.MSTOrderer" title="phasecurvefit.orderers.MSTOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a>: the minimum-spanning-tree backbone
+(<a class="reference internal" href="../how-to/choose-orderer.html"><span class="std std-doc">Choose an orderer</span></a>). The default pipeline uses <code class="docutils literal notranslate"><span class="pre">jump_cap=inf</span></code>,
+<code class="docutils literal notranslate"><span class="pre">velocity_factor=30.0</span></code>, <code class="docutils literal notranslate"><span class="pre">orient_by_velocity=True</span></code>, <code class="docutils literal notranslate"><span class="pre">on_disconnected=&quot;connect&quot;</span></code> and
+<code class="docutils literal notranslate"><span class="pre">nan_policy=&quot;omit&quot;</span></code> instead of the defaults below.</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">k</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
+<td><p>neighbours each sample links to</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">jump_cap</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">3.0</span></code></p></td>
+<td><p>cut edges longer than this, in position (in the unit system’s length unit for Quantities)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">velocity_weight</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.0</span></code></p></td>
+<td><p>weight of the velocity-alignment penalty added to edge lengths, in position</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">velocity_factor</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.0</span></code></p></td>
+<td><p>the same penalty in units of the median neighbour distance</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sever_cos_threshold</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>drop edges whose velocity cosine is below this</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">orient_by_velocity</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>flip the ordering so <span class="math notranslate nohighlight">\(\gamma\)</span> increases along the mean velocity</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">on_disconnected</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;raise&quot;</span></code></p></td>
+<td><p>for a disconnected graph: <code class="docutils literal notranslate"><span class="pre">&quot;raise&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;warn&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;largest&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;connect&quot;</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">edge_clip_sigma</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>clip edges whose length is an outlier at this many sigma</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">edge_clip_max_iters</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">5</span></code></p></td>
+<td><p>most rounds of edge clipping</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">neighbors</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>the nearest-neighbour backend; <code class="docutils literal notranslate"><span class="pre">None</span></code> picks SciPy for concrete inputs and <code class="docutils literal notranslate"><span class="pre">BucketKDTree</span></code> for traced ones (<a class="reference internal" href="../how-to/jax.html"><span class="std std-doc">Compile, batch and differentiate with JAX</span></a>)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nan_policy</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;raise&quot;</span></code></p></td>
+<td><p>what to do with NaN inputs</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="ridgeorderer">
+<h2><code class="docutils literal notranslate"><span class="pre">RidgeOrderer</span></code><a class="headerlink" href="#ridgeorderer" title="Link to this heading">#</a></h2>
+<p><a class="reference internal" href="api.html#phasecurvefit.orderers.RidgeOrderer" title="phasecurvefit.orderers.RidgeOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">RidgeOrderer</span></code></a>: a backbone along the ridge of the
+weighted sample density (<a class="reference internal" href="../how-to/choose-orderer.html"><span class="std std-doc">Choose an orderer</span></a>). It does not use
+velocities, and it runs on the host, so it can’t be traced under <code class="docutils literal notranslate"><span class="pre">jit</span></code>.</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">bandwidth</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>width of the Gaussian kernel for the density, in position, roughly the stream’s half-width (in the unit system’s length unit for Quantities); <code class="docutils literal notranslate"><span class="pre">None</span></code> estimates it as the RMS distance of the samples from the ridge, iterating from a tenth of the data’s extent</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">k</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">8</span></code></p></td>
+<td><p>neighbours each sample links to in the graph the backbone runs on</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">core</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.2</span></code></p></td>
+<td><p>density, as a fraction of its peak, above which a sample can be an end of the backbone</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">trim</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.5</span></code></p></td>
+<td><p>cut the backbone where the density along it falls below this fraction of its median</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="somorderer">
+<h2><code class="docutils literal notranslate"><span class="pre">SOMOrderer</span></code><a class="headerlink" href="#somorderer" title="Link to this heading">#</a></h2>
+<p><a class="reference internal" href="api.html#phasecurvefit.orderers.SOMOrderer" title="phasecurvefit.orderers.SOMOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a>: the self-organizing map
+(<a class="reference internal" href="../how-to/som.html"><span class="std std-doc">Refine an ordering with a self-organizing map</span></a>). The default pipeline uses <code class="docutils literal notranslate"><span class="pre">n_prototypes=15</span></code>.</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">n_prototypes</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">25</span></code></p></td>
+<td><p>lattice points</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">metric</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code> follows the previous stage: phase space after a velocity-aware stage, position otherwise</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">metric_scale</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code> derives it from the data when the metric uses velocity</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">n_epochs</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
+<td><p>training epochs</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sigma_start</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>starting neighbourhood width in lattice units; <code class="docutils literal notranslate"><span class="pre">None</span></code> uses <code class="docutils literal notranslate"><span class="pre">max(n_prototypes</span> <span class="pre">/</span> <span class="pre">4,</span> <span class="pre">sigma_end)</span></code> on its own and <code class="docutils literal notranslate"><span class="pre">sigma_end</span></code> when chained</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">sigma_end</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.7</span></code></p></td>
+<td><p>final neighbourhood width in lattice units</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">densify_factor</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">5</span></code></p></td>
+<td><p>backbone samples per lattice segment</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">orient_by_velocity</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>flip the ordering so <span class="math notranslate nohighlight">\(\gamma\)</span> increases along the mean velocity</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">outlier_mixture</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>a <code class="docutils literal notranslate"><span class="pre">phasecurvefit.som.SOMMixture</span></code> to reject outliers, see below</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nan_policy</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;raise&quot;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;raise&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;omit&quot;</span></code> for NaN inputs</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<section id="sommixture">
+<h3><code class="docutils literal notranslate"><span class="pre">SOMMixture</span></code><a class="headerlink" href="#sommixture" title="Link to this heading">#</a></h3>
+<p><a class="reference internal" href="api.html#phasecurvefit.som.SOMMixture" title="phasecurvefit.som.SOMMixture"><code class="xref py py-class docutils literal notranslate"><span class="pre">SOMMixture</span></code></a>: outlier rejection for the SOM, a curve
+or background mixture (<a class="reference internal" href="../how-to/som.html"><span class="std std-doc">Refine an ordering with a self-organizing map</span></a>).</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">background_density</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>density of the flat background, per unit position volume; <code class="docutils literal notranslate"><span class="pre">None</span></code> uses one over the volume of the positions’ bounding box</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">background_inflate</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.0</span></code></p></td>
+<td><p>scale each side of that bounding box by this; raise it when the data do not fill the field</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</section>
+<section id="fit-track">
+<h2><code class="docutils literal notranslate"><span class="pre">fit_track</span></code><a class="headerlink" href="#fit-track" title="Link to this heading">#</a></h2>
+<p><a class="reference internal" href="api.html#phasecurvefit.fit_track" title="phasecurvefit.fit_track"><code class="xref py py-func docutils literal notranslate"><span class="pre">fit_track()</span></code></a>: order, then train an autoencoder, in one call
+(<a class="reference internal" href="../how-to/autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a>).</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">key</span></code></p></td>
+<td><p>required</p></td>
+<td><p>random key, split for the model and for training</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">metadata</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>passed to the default pipeline</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">weights</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>per-sample weights, passed to the default pipeline and on to training</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">n_prototypes</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">15</span></code></p></td>
+<td><p>SOM lattice points; with fewer samples the SOM stage is skipped</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">outlier_mixture</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SOMMixture()</span></code></p></td>
+<td><p>a <code class="docutils literal notranslate"><span class="pre">SOMMixture</span></code> for the SOM stage, to leave out of the ordering samples it calls background; <code class="docutils literal notranslate"><span class="pre">None</span></code> keeps every sample (<a class="reference internal" href="../explanation/autoencoder.html"><span class="std std-doc">The autoencoder</span></a>)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">training_config</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>a <code class="docutils literal notranslate"><span class="pre">TrainingConfig</span></code>; <code class="docutils literal notranslate"><span class="pre">None</span></code> uses its defaults</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="bootstrap-track">
+<h2><code class="docutils literal notranslate"><span class="pre">bootstrap_track</span></code><a class="headerlink" href="#bootstrap-track" title="Link to this heading">#</a></h2>
+<p><a class="reference internal" href="api.html#phasecurvefit.bootstrap_track" title="phasecurvefit.bootstrap_track"><code class="xref py py-func docutils literal notranslate"><span class="pre">bootstrap_track()</span></code></a>: a fit and fits to bootstrap resamples, for the
+track’s uncertainty (<a class="reference internal" href="../how-to/track-uncertainty.html"><span class="std std-doc">Put an uncertainty band on the track</span></a>). It takes every option of
+<code class="docutils literal notranslate"><span class="pre">fit_track</span></code> and passes it to each fit.</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">key</span></code></p></td>
+<td><p>required</p></td>
+<td><p>random key, split for the reference fit and for each member</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">n_samples</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">20</span></code></p></td>
+<td><p>number of resamples; each costs one <code class="docutils literal notranslate"><span class="pre">fit_track</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">weights</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>per-sample weights, resampled with the samples</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><a class="reference internal" href="api.html#phasecurvefit.TrackEnsemble" title="phasecurvefit.TrackEnsemble"><code class="xref py py-class docutils literal notranslate"><span class="pre">TrackEnsemble</span></code></a>, which it returns:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Method</p></th>
+<th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">offsets(gamma)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">n_dense</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1000</span></code></p></td>
+<td><p>points per member track searched for the nearest one</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">radius(gamma,</span> <span class="pre">level)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">level</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.68</span></code></p></td>
+<td><p>fraction of members inside the tube</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="trainingconfig">
+<h2><code class="docutils literal notranslate"><span class="pre">TrainingConfig</span></code><a class="headerlink" href="#trainingconfig" title="Link to this heading">#</a></h2>
+<p><a class="reference internal" href="api.html#phasecurvefit.nn.TrainingConfig" title="phasecurvefit.nn.TrainingConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">TrainingConfig</span></code></a>: autoencoder training
+(<a class="reference internal" href="../how-to/autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a>). Phase 1 trains the encoder, phase 2 the decoder,
+phase 3 both (<a class="reference internal" href="../explanation/autoencoder.html"><span class="std std-doc">The autoencoder</span></a>).</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">optimizer</span></code></p></td>
+<td><p>the library’s default Optax optimizer</p></td>
+<td><p>Optax optimizer for all phases</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">batch_size</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">100</span></code></p></td>
+<td><p>samples per batch</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">show_pbar</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
+<td><p>show a progress bar</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">member_threshold</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.5</span></code></p></td>
+<td><p>membership probability above which a sample counts as a member</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">n_epochs_encoder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">800</span></code></p></td>
+<td><p>phase 1 epochs</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">lambda_prob</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.0</span></code></p></td>
+<td><p>weight of the membership loss terms</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">n_epochs_decoder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">100</span></code></p></td>
+<td><p>phase 2 epochs</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">n_epochs_both</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">200</span></code></p></td>
+<td><p>phase 3 epochs</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">lambda_q</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.0</span></code></p></td>
+<td><p>weight of position reconstruction in phase 3</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">lambda_p</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(1.0,</span> <span class="pre">5.0)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(start,</span> <span class="pre">stop)</span></code> of the velocity-alignment weight, ramped over phase 3</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">weight_by_density</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>weight samples by inverse density: <code class="docutils literal notranslate"><span class="pre">True</span></code>, or a mapping of keyword arguments passed to the density estimate; use with care</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">freeze_encoder_final_training</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>freeze the encoder during phase 3; <code class="docutils literal notranslate"><span class="pre">None</span></code> freezes it when <code class="docutils literal notranslate"><span class="pre">membership</span></code> is set, and then its membership head still trains</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">membership</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>a <code class="docutils literal notranslate"><span class="pre">MixtureMembershipConfig</span></code> to turn on outlier rejection, see below</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">track_ends</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;half_max&quot;</span></code></p></td>
+<td><p>how <code class="docutils literal notranslate"><span class="pre">track_range</span></code> finds the ends: <code class="docutils literal notranslate"><span class="pre">&quot;half_max&quot;</span></code> where the line density falls to half, or <code class="docutils literal notranslate"><span class="pre">&quot;mask&quot;</span></code> from the caps of a mask made by thickening a curve (<a class="reference internal" href="../explanation/density-fields.html"><span class="std std-doc">Density fields</span></a>)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="mixturemembershipconfig">
+<h2><code class="docutils literal notranslate"><span class="pre">MixtureMembershipConfig</span></code><a class="headerlink" href="#mixturemembershipconfig" title="Link to this heading">#</a></h2>
+<p><a class="reference internal" href="api.html#phasecurvefit.nn.MixtureMembershipConfig" title="phasecurvefit.nn.MixtureMembershipConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">MixtureMembershipConfig</span></code></a>: the stream-plus-background
+mixture model (<a class="reference internal" href="../how-to/outliers.html"><span class="std std-doc">Reject outliers with the mixture model</span></a>).</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sigma_init</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.1</span></code></p></td>
+<td><p>starting stream half-width, in the normalised coordinates the networks see</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">sigma_min</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.001</span></code></p></td>
+<td><p>floor on the width</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sigma_ceiling</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(0.5,</span> <span class="pre">0.1)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(start,</span> <span class="pre">stop)</span></code> of the width ceiling, shrunk geometrically over training; the trained width stays capped at <code class="docutils literal notranslate"><span class="pre">stop</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">warmup_frac</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.3</span></code></p></td>
+<td><p>fraction of training spent ramping the membership term in</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">background_density</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>the background density <span class="math notranslate nohighlight">\(\rho_{\mathrm{bg}}\)</span>; <code class="docutils literal notranslate"><span class="pre">None</span></code> computes it from the extent of the training positions</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">background_inflate</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.0</span></code></p></td>
+<td><p>inflation of that extent when <code class="docutils literal notranslate"><span class="pre">background_density</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>; raise it if the stars do not fill the survey footprint</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">width_size</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">32</span></code></p></td>
+<td><p>width of the network that predicts the stream width</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">depth</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2</span></code></p></td>
+<td><p>depth of that network</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">lambda_velocity</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.0</span></code></p></td>
+<td><p>weight of the velocity-alignment term, reweighted by membership; 0 turns it off</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="api.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">API Reference</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="result.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">The ordering result</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#localfloworderer"><code class="docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#walkconfig"><code class="docutils literal notranslate"><span class="pre">WalkConfig</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mstorderer"><code class="docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#ridgeorderer"><code class="docutils literal notranslate"><span class="pre">RidgeOrderer</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#somorderer"><code class="docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#sommixture"><code class="docutils literal notranslate"><span class="pre">SOMMixture</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fit-track"><code class="docutils literal notranslate"><span class="pre">fit_track</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bootstrap-track"><code class="docutils literal notranslate"><span class="pre">bootstrap_track</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#trainingconfig"><code class="docutils literal notranslate"><span class="pre">TrainingConfig</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mixturemembershipconfig"><code class="docutils literal notranslate"><span class="pre">MixtureMembershipConfig</span></code></a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By phasecurvefit Developers
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, phasecurvefit Developers.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

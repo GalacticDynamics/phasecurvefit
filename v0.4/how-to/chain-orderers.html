@@ -1,0 +1,774 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Chain orderers" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="how-to/chain-orderers.html" />
+<meta property="og:site_name" content="phasecurvefit" />
+<meta property="og:description" content="This guide shows how to run orderers in sequence, so that each stage starts from the previous stage’s ordering. Chain with|: Join orderers with|. Each stage receives the previous stage’s result as ..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_how-to_chain-orderers_e15a6789.png" />
+<meta property="og:image:alt" content="This guide shows how to run orderers in sequence, so that each stage starts from the previous stage’s ordering. Chain with|: Join orderers with|. Each stage receives the previous stage’s result as ..." />
+<meta name="description" content="This guide shows how to run orderers in sequence, so that each stage starts from the previous stage’s ordering. Chain with|: Join orderers with|. Each stage receives the previous stage’s result as ..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Chain orderers &#8212; phasecurvefit</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=1ae7504c"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'how-to/chain-orderers';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.4';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.4/how-to/chain-orderers.html" />
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Use the local-flow walk" href="local-flow-walk.html" />
+    <link rel="prev" title="Choose an orderer" href="choose-orderer.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/favicon.png" class="logo__image only-light" alt="phasecurvefit - Home"/>
+    <script>document.write(`<img src="../_static/favicon.png" class="logo__image only-dark" alt="phasecurvefit - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/GalacticDynamics/phasecurvefit" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/phasecurvefit/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/pypi/v/phasecurvefit" class="icon-link-image" alt="PyPI"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    phasecurvefit
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Start</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../start/what-it-does.html">What phasecurvefit does</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/is-it-right.html">Is phasecurvefit right for my data?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/install.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/quickstart.html">Quick start</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/density_fields.html">Fitting a Track Through a Density Image</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How-to guides</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">How-to guides</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="data.html">Prepare your data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="units.html">Use physical units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="choose-orderer.html">Choose an orderer</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Chain orderers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="local-flow-walk.html">Use the local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tune-metric.html">Choose and tune the walk’s metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom-metric.html">Write a custom metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kdtree.html">Restrict the walk to nearby points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="som.html">Refine an ordering with a self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoencoder.html">Fill gaps and fit a track with the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="interpolate.html">Interpolate positions along an ordering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="outliers.html">Reject outliers with the mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="track-uncertainty.html">Put an uncertainty band on the track</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jax.html">Compile, batch and differentiate with JAX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gpu.html">Run on a GPU</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How it works</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../explanation/index.html">How it works</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/walk.html">The local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/mst.html">The MST backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/som.html">The self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/autoencoder.html">The autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/outliers.html">Outlier rejection with a mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/track-uncertainty.html">Track uncertainty</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/density-fields.html">Density fields</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/api.html">API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/options.html">Options and defaults</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/result.html">The ordering result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.3-to-v0.4.html">Migrating from v0.3 to v0.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.2-to-v0.3.html">Migrating from v0.2 to v0.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.1-to-v0.2.html">Migrating from v0.1 to v0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/citation.html">Citation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to phasecurvefit</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit/issues/new?title=Issue%20on%20page%20%2Fhow-to/chain-orderers.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/how-to/chain-orderers.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Chain orderers</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#chain-with">Chain with <code class="docutils literal notranslate"><span class="pre">|</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tune-the-default-pipeline">Tune the default pipeline</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#let-the-mst-find-the-walks-start-point">Let the MST find the walk’s start point</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#keep-rejections-through-a-chain">Keep rejections through a chain</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="chain-orderers">
+<h1>Chain orderers<a class="headerlink" href="#chain-orderers" title="Link to this heading">#</a></h1>
+<p>This guide shows how to run orderers in sequence, so that each stage starts from the
+previous stage’s ordering.</p>
+<section id="chain-with">
+<h2>Chain with <code class="docutils literal notranslate"><span class="pre">|</span></code><a class="headerlink" href="#chain-with" title="Link to this heading">#</a></h2>
+<p>Join orderers with <code class="docutils literal notranslate"><span class="pre">|</span></code>. Each stage receives the previous stage’s result as <code class="docutils literal notranslate"><span class="pre">init</span></code>.
+A stage that can use a prior ordering does, and one that cannot ignores it.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
+
+<span class="n">ang</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">60</span><span class="p">)</span>
+<span class="n">pos</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="mf">5.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">ang</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="mf">5.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">ang</span><span class="p">)}</span>
+<span class="n">vel</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="o">-</span><span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">ang</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">ang</span><span class="p">)}</span>
+
+<span class="n">chain</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">MSTOrderer</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">jump_cap</span><span class="o">=</span><span class="mf">3.0</span><span class="p">)</span> <span class="o">|</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">()</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">chain</span><span class="p">)</span>
+<span class="k">assert</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">n_visited</span><span class="p">)</span> <span class="o">==</span> <span class="mi">60</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">|</span></code> builds a <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.ChainOrderer" title="phasecurvefit.orderers.ChainOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">ChainOrderer</span></code></a> and flattens it, so
+<code class="docutils literal notranslate"><span class="pre">a</span> <span class="pre">|</span> <span class="pre">b</span> <span class="pre">|</span> <span class="pre">c</span></code> is one chain of three stages. The explicit form is the same:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">chain</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">ChainOrderer</span><span class="p">(</span>
+    <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">MSTOrderer</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">jump_cap</span><span class="o">=</span><span class="mf">3.0</span><span class="p">),</span>
+    <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(),</span>
+<span class="p">)</span>
+<span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">chain</span><span class="o">.</span><span class="n">stages</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>A custom orderer written without an <code class="docutils literal notranslate"><span class="pre">init</span></code> parameter can lead a chain, but raises
+<code class="docutils literal notranslate"><span class="pre">TypeError</span></code> if it is placed after another stage, rather than silently dropping the
+ordering it was handed.</p>
+</section>
+<section id="tune-the-default-pipeline">
+<h2>Tune the default pipeline<a class="headerlink" href="#tune-the-default-pipeline" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel)</span></code> with no orderer runs
+<a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.default_pipeline" title="phasecurvefit.orderers.default_pipeline"><code class="xref py py-func docutils literal notranslate"><span class="pre">default_pipeline()</span></code></a>, which is
+<code class="docutils literal notranslate"><span class="pre">MSTOrderer(...)</span> <span class="pre">|</span> <span class="pre">SOMOrderer(...)</span></code>. You can call it directly, and any
+<a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.SOMOrderer" title="phasecurvefit.orderers.SOMOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a> keyword passes through to it:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">default_pipeline</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">n_prototypes</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="k">assert</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">n_visited</span><span class="p">)</span> <span class="o">==</span> <span class="mi">60</span>
+<span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">gamma_range</span> <span class="o">==</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>It falls back to the MST alone when the MST visited fewer samples than
+<code class="docutils literal notranslate"><span class="pre">n_prototypes</span></code> (15 by default), instead of raising, and it cannot run under <code class="docutils literal notranslate"><span class="pre">jit</span></code> or
+<code class="docutils literal notranslate"><span class="pre">vmap</span></code>. Its MST stage uses different settings from <code class="docutils literal notranslate"><span class="pre">MSTOrderer()</span></code>’s defaults so that
+it works on any data without tuning (<a class="reference internal" href="../explanation/mst.html"><span class="std std-doc">The MST backbone</span></a>). A gap in a stream wider than the neighbours reach does not lose either side:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">t</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">60</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">1.2</span><span class="p">,</span> <span class="mf">2.2</span><span class="p">,</span> <span class="mi">60</span><span class="p">)])</span>
+<span class="n">gappy</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">t</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">120</span><span class="p">)}</span>
+<span class="n">flow</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">120</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">120</span><span class="p">)}</span>
+<span class="k">assert</span> <span class="nb">int</span><span class="p">(</span><span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="n">gappy</span><span class="p">,</span> <span class="n">flow</span><span class="p">)</span><span class="o">.</span><span class="n">n_visited</span><span class="p">)</span> <span class="o">==</span> <span class="mi">120</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>To tune the MST stage, for example a finite <code class="docutils literal notranslate"><span class="pre">jump_cap</span></code>, velocity-aware edges, or
+outlier clipping with <code class="docutils literal notranslate"><span class="pre">edge_clip_sigma</span></code>, build the chain yourself and pass it to
+<code class="docutils literal notranslate"><span class="pre">pcf.order</span></code>:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">chain</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">MSTOrderer</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">jump_cap</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">edge_clip_sigma</span><span class="o">=</span><span class="mf">3.0</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span>
+    <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">SOMOrderer</span><span class="p">(</span><span class="n">n_prototypes</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">chain</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="let-the-mst-find-the-walks-start-point">
+<h2>Let the MST find the walk’s start point<a class="headerlink" href="#let-the-mst-find-the-walks-start-point" title="Link to this heading">#</a></h2>
+<p>The local-flow walk has to start at an end of the curve. Chained after an
+<a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.MSTOrderer" title="phasecurvefit.orderers.MSTOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a>, it starts from the first sample of the
+MST ordering, which is an end. On a shuffled 400-point arc, the rank correlation
+<code class="docutils literal notranslate"><span class="pre">|rho|</span></code> between the walk’s order and the true order goes from about 0.6 walking from
+index 0 to 1.00 walking from the MST’s end:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="n">ang</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">400</span><span class="p">))</span>
+<span class="n">arc</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="mf">5.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">ang</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="mf">5.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">ang</span><span class="p">)}</span>
+<span class="n">arc_vel</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="o">-</span><span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">ang</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">ang</span><span class="p">)}</span>
+
+<span class="n">walk</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">metric_scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<span class="n">runs</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;walk from index 0&quot;</span><span class="p">:</span> <span class="n">walk</span><span class="p">,</span>
+    <span class="s2">&quot;MST | walk&quot;</span><span class="p">:</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">MSTOrderer</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">jump_cap</span><span class="o">=</span><span class="mf">3.0</span><span class="p">)</span> <span class="o">|</span> <span class="n">walk</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axs</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mf">3.2</span><span class="p">),</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">orderer</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axs</span><span class="p">,</span> <span class="n">runs</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="n">arc</span><span class="p">,</span> <span class="n">arc_vel</span><span class="p">,</span> <span class="n">orderer</span><span class="p">)</span>
+    <span class="n">rho</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">corrcoef</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">400</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">ang</span><span class="p">)[</span><span class="n">res</span><span class="o">.</span><span class="n">ordering</span><span class="p">])[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">q</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order_w</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">arc</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">arc</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;0.75&quot;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">q</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span> <span class="n">q</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">q</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">q</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;start&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: |rho| = </span><span class="si">{</span><span class="nb">abs</span><span class="p">(</span><span class="n">rho</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;equal&quot;</span><span class="p">)</span>
+<span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+
+<span class="k">assert</span> <span class="nb">abs</span><span class="p">(</span><span class="n">rho</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.999</span>  <span class="c1"># the chained walk recovers the order</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/5ab95bc779a85e45adee70395faaad138d9949bd6bdb111e9deba34cf03b4465.png" src="../_images/5ab95bc779a85e45adee70395faaad138d9949bd6bdb111e9deba34cf03b4465.png" />
+</div>
+</div>
+<p>From index 0, a random point after shuffling, the walk runs to one end and then
+jumps back to cover the rest. From the MST’s end it runs from one end to the other.</p>
+<p>An explicit <code class="docutils literal notranslate"><span class="pre">start_idx</span></code> always wins. The default, <code class="docutils literal notranslate"><span class="pre">start_idx=None</span></code>, means “take the
+start from <code class="docutils literal notranslate"><span class="pre">init</span></code>, or else start at index 0”.</p>
+</section>
+<section id="keep-rejections-through-a-chain">
+<h2>Keep rejections through a chain<a class="headerlink" href="#keep-rejections-through-a-chain" title="Link to this heading">#</a></h2>
+<p>Every stage is handed all of the positions and velocities; <code class="docutils literal notranslate"><span class="pre">init</span></code> is extra context.
+So a stage does not inherit an earlier stage’s rejections unless it is written to.
+A sample that the MST’s <code class="docutils literal notranslate"><span class="pre">edge_clip_sigma</span></code> dropped is visited again by a following
+<a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.LocalFlowOrderer" title="phasecurvefit.orderers.LocalFlowOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a>, which reads only its start index
+from <code class="docutils literal notranslate"><span class="pre">init</span></code>.</p>
+<p><a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.SOMOrderer" title="phasecurvefit.orderers.SOMOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a> is different: it works on exactly the
+samples the previous stage visited, so rejections stick through it. Check
+<code class="docutils literal notranslate"><span class="pre">n_visited</span></code> on the final result when a rejection must stick.</p>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="choose-orderer.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Choose an orderer</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="local-flow-walk.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Use the local-flow walk</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#chain-with">Chain with <code class="docutils literal notranslate"><span class="pre">|</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tune-the-default-pipeline">Tune the default pipeline</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#let-the-mst-find-the-walks-start-point">Let the MST find the walk’s start point</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#keep-rejections-through-a-chain">Keep rejections through a chain</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By phasecurvefit Developers
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, phasecurvefit Developers.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

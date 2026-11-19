@@ -152,8 +152,11 @@ def main(
     print("Training autoencoder...")
     key, model_key, train_key = jr.split(key, 3)
     normalizer = pcf.nn.StandardScalerNormalizer(qs, ps)
-    model = pcf.nn.PathAutoencoder.make(normalizer, track_depth=4, key=model_key)
-    model, _, losses = pcf.nn.train_autoencoder(model, walkresult, key=train_key)
+    model = pcf.nn.PathAutoencoder.make(
+        normalizer, track_depth=4, gamma_range=walkresult.gamma_range, key=model_key
+    )
+    result, _, losses = pcf.nn.train_autoencoder(model, walkresult, key=train_key)
+    model = result.model
     print(f"Final training loss: {losses[-1]:.6f}")
 
     # Encode all points and get mean path

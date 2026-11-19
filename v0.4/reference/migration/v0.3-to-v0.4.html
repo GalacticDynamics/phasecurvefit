@@ -1,0 +1,920 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Migrating from v0.3 to v0.4" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="reference/migration/v0.3-to-v0.4.html" />
+<meta property="og:site_name" content="phasecurvefit" />
+<meta property="og:description" content="In v0.4 the default ordering pipeline is an MST backbone refined by a SOM. pcf.order(positions, velocities) with no orderer used to run the velocity-following local-flow walk (in v0.3.1 and v0.3.2;..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_reference_migration_v0.3-to-v0.4_e22e8367.png" />
+<meta property="og:image:alt" content="In v0.4 the default ordering pipeline is an MST backbone refined by a SOM. pcf.order(positions, velocities) with no orderer used to run the velocity-following local-flow walk (in v0.3.1 and v0.3.2;..." />
+<meta name="description" content="In v0.4 the default ordering pipeline is an MST backbone refined by a SOM. pcf.order(positions, velocities) with no orderer used to run the velocity-following local-flow walk (in v0.3.1 and v0.3.2;..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Migrating from v0.3 to v0.4 &#8212; phasecurvefit</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../_static/togglebutton.js?v=1ae7504c"></script>
+    <script src="../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'reference/migration/v0.3-to-v0.4';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.4';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.4/reference/migration/v0.3-to-v0.4.html" />
+    <link rel="icon" href="../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Migrating from v0.2 to v0.3" href="v0.2-to-v0.3.html" />
+    <link rel="prev" title="The ordering result" href="../result.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../_static/favicon.png" class="logo__image only-light" alt="phasecurvefit - Home"/>
+    <script>document.write(`<img src="../../_static/favicon.png" class="logo__image only-dark" alt="phasecurvefit - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/GalacticDynamics/phasecurvefit" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/phasecurvefit/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/pypi/v/phasecurvefit" class="icon-link-image" alt="PyPI"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../../index.html">
+                    phasecurvefit
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Start</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../start/what-it-does.html">What phasecurvefit does</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../start/is-it-right.html">Is phasecurvefit right for my data?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../start/install.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../start/quickstart.html">Quick start</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/density_fields.html">Fitting a Track Through a Density Image</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How-to guides</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../how-to/index.html">How-to guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/data.html">Prepare your data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/units.html">Use physical units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/choose-orderer.html">Choose an orderer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/chain-orderers.html">Chain orderers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/local-flow-walk.html">Use the local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/tune-metric.html">Choose and tune the walk’s metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/custom-metric.html">Write a custom metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/kdtree.html">Restrict the walk to nearby points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/som.html">Refine an ordering with a self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/autoencoder.html">Fill gaps and fit a track with the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/interpolate.html">Interpolate positions along an ordering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/outliers.html">Reject outliers with the mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/track-uncertainty.html">Put an uncertainty band on the track</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/jax.html">Compile, batch and differentiate with JAX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how-to/gpu.html">Run on a GPU</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How it works</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../explanation/index.html">How it works</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../explanation/walk.html">The local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../explanation/mst.html">The MST backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../explanation/som.html">The self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../explanation/autoencoder.html">The autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../explanation/outliers.html">Outlier rejection with a mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../explanation/track-uncertainty.html">Track uncertainty</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../explanation/density-fields.html">Density fields</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../index.html">Reference</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../api.html">API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../options.html">Options and defaults</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../result.html">The ordering result</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Migrating from v0.3 to v0.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="v0.2-to-v0.3.html">Migrating from v0.2 to v0.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="v0.1-to-v0.2.html">Migrating from v0.1 to v0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../citation.html">Citation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../contributing.html">Contributing to phasecurvefit</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit/issues/new?title=Issue%20on%20page%20%2Freference/migration/v0.3-to-v0.4.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../_sources/reference/migration/v0.3-to-v0.4.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Migrating from v0.3 to v0.4</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-changed-and-why">What changed, and why</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#keeping-the-walk">Keeping the walk</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-the-new-default-returns">What the new default returns</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#small-inputs-fall-back-to-the-mst">Small inputs fall back to the MST</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-default-traces-under-jit-vmap-and-grad">The default traces under jit, vmap and grad</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tuning-the-default">Tuning the default</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#new-in-v0-4">New in v0.4</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#walk-local-flow-is-removed"><code class="docutils literal notranslate"><span class="pre">walk_local_flow</span></code> is removed</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dependency-floors">Dependency floors</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compatibility-summary">Compatibility summary</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="migrating-from-v0-3-to-v0-4">
+<h1>Migrating from v0.3 to v0.4<a class="headerlink" href="#migrating-from-v0-3-to-v0-4" title="Link to this heading">#</a></h1>
+<p>In v0.4 the default ordering pipeline is <strong>an MST backbone refined by a SOM</strong>.
+<code class="docutils literal notranslate"><span class="pre">pcf.order(positions,</span> <span class="pre">velocities)</span></code> with no orderer used to run the
+velocity-following local-flow walk (in v0.3.1 and v0.3.2; v0.3.0 required an
+orderer argument); it now runs
+<a class="reference internal" href="../api.html#phasecurvefit.orderers.default_pipeline" title="phasecurvefit.orderers.default_pipeline"><code class="xref py py-func docutils literal notranslate"><span class="pre">default_pipeline()</span></code></a>, i.e.
+<code class="docutils literal notranslate"><span class="pre">MSTOrderer(...)</span> <span class="pre">|</span> <span class="pre">SOMOrderer(...)</span></code>. This is a <strong>breaking change</strong> to the package’s
+primary entry point. Code that passes an orderer explicitly is unaffected.</p>
+<p>v0.4 also <strong>removes <code class="docutils literal notranslate"><span class="pre">pcf.walk_local_flow</span></code></strong>, which has warned since v0.3.1; see
+<a class="reference internal" href="#walk-local-flow-is-removed">below</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you call <code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel)</span></code> without an orderer, your results change. If you
+call <code class="docutils literal notranslate"><span class="pre">pcf.walk_local_flow</span></code>, it no longer exists. In both cases, to get the v0.3.1
+walk, name it yourself:</p>
+<p><code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel,</span> <span class="pre">pcf.orderers.LocalFlowOrderer())</span></code></p>
+</div>
+<section id="what-changed-and-why">
+<h2>What changed, and why<a class="headerlink" href="#what-changed-and-why" title="Link to this heading">#</a></h2>
+<p>The SOM is a smoothing stage: its prototypes average over many tracers, so the
+backbone it produces is far less sensitive to local noise than a greedy walk’s
+step-by-step choices. The MST ahead of it needs no progenitor or start index — the
+graph diameter finds the two ends of the curve itself — and handles near-closed
+loops where the velocity field reverses. Together they work on more data with
+fewer decisions from you, which is what a default should do. See the
+<a class="reference internal" href="../../how-to/choose-orderer.html"><span class="doc std std-doc">Orderers guide</span></a> and the <a class="reference internal" href="../../how-to/som.html"><span class="doc std std-doc">SOM guide</span></a>.</p>
+</section>
+<section id="keeping-the-walk">
+<h2>Keeping the walk<a class="headerlink" href="#keeping-the-walk" title="Link to this heading">#</a></h2>
+<p>The v0.3.1 default is one explicit argument away, and reproduces it exactly:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
+
+<span class="n">pos</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">])}</span>
+<span class="n">vel</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">5</span><span class="p">)}</span>
+
+<span class="c1"># v0.3.1: the default. v0.4: name it.</span>
+<span class="n">walk</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">())</span>
+<span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">walk</span><span class="p">,</span> <span class="n">pcf</span><span class="o">.</span><span class="n">WalkLocalFlowResult</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">walk</span><span class="o">.</span><span class="n">gamma_range</span> <span class="o">==</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>Walk parameters (<code class="docutils literal notranslate"><span class="pre">start_idx</span></code>, <code class="docutils literal notranslate"><span class="pre">metric_scale</span></code>, <code class="docutils literal notranslate"><span class="pre">direction</span></code>, <code class="docutils literal notranslate"><span class="pre">config</span></code>, …) live on
+<code class="docutils literal notranslate"><span class="pre">LocalFlowOrderer(...)</span></code>, exactly as they did for v0.3’s explicit form.</p>
+</section>
+<section id="what-the-new-default-returns">
+<h2>What the new default returns<a class="headerlink" href="#what-the-new-default-returns" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p>v0.3.1 default (walk)</p></th>
+<th class="head"><p>v0.4 default (MST | SOM)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Result type</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">WalkLocalFlowResult</span></code></p></td>
+<td><p><a class="reference internal" href="../api.html#phasecurvefit.orderers.OrderingResult" title="phasecurvefit.orderers.OrderingResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrderingResult</span></code></a></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gamma_range</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(0.0,</span> <span class="pre">1.0)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(-1.0,</span> <span class="pre">1.0)</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Needs a start index</p></td>
+<td><p>yes (<code class="docutils literal notranslate"><span class="pre">start_idx</span></code>)</p></td>
+<td><p>no</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">backbone</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>a fitted polyline, which <code class="docutils literal notranslate"><span class="pre">result(gamma)</span></code> interpolates along</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chord</span></code></p></td>
+<td><p>distance along the walk’s path</p></td>
+<td><p>arc length along the fitted backbone</p></td>
+</tr>
+<tr class="row-odd"><td><p>Tracers left unvisited</p></td>
+<td><p>those the walk skipped</p></td>
+<td><p>none: a gap in the stream is bridged, not dropped</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">jit</span></code> / <code class="docutils literal notranslate"><span class="pre">vmap</span></code></p></td>
+<td><p>yes</p></td>
+<td><p><strong>no</strong> — see below</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Things to check in code that consumed the old default:</p>
+<ul class="simple">
+<li><p><strong>Type checks.</strong> <code class="docutils literal notranslate"><span class="pre">isinstance(result,</span> <span class="pre">WalkLocalFlowResult)</span></code> is now false.
+<code class="docutils literal notranslate"><span class="pre">WalkLocalFlowResult</span></code> subclasses <code class="docutils literal notranslate"><span class="pre">OrderingResult</span></code>, so annotate and check against
+<code class="docutils literal notranslate"><span class="pre">OrderingResult</span></code> to accept either.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">init=</span></code>.</strong> The v0.3.1 default took its walk start index from <code class="docutils literal notranslate"><span class="pre">init</span></code>; the new
+default has no use for one, so <code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel,</span> <span class="pre">init=...)</span></code> with no orderer
+raises a <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> rather than ignore it. Pass an explicit orderer to use
+<code class="docutils literal notranslate"><span class="pre">init</span></code>.</p></li>
+<li><p><strong>Gaps in the stream.</strong> A gap wider than the <code class="docutils literal notranslate"><span class="pre">k=10</span></code> neighbours reach splits the
+neighbour graph. The default bridges the pieces along their shortest links
+(<code class="docutils literal notranslate"><span class="pre">on_disconnected=&quot;connect&quot;</span></code>), so no side of the stream is dropped; the bridge
+can be long, so look at the ordering across the gap. Pass your own
+<code class="docutils literal notranslate"><span class="pre">MSTOrderer(...,</span> <span class="pre">on_disconnected=...)</span></code> chain for the other policies.</p></li>
+<li><p><strong>A hard-coded <code class="docutils literal notranslate"><span class="pre">gamma_range</span></code>.</strong> Read it off the result
+(<code class="docutils literal notranslate"><span class="pre">result.gamma_range</span></code>) rather than assuming <code class="docutils literal notranslate"><span class="pre">(0.0,</span> <span class="pre">1.0)</span></code>; the autoencoder
+already does (<code class="docutils literal notranslate"><span class="pre">PathAutoencoder.make(...,</span> <span class="pre">gamma_range=result.gamma_range)</span></code>).</p></li>
+<li><p><strong>Direction.</strong> The default orients <code class="docutils literal notranslate"><span class="pre">gamma</span></code> along the mean velocity
+(<code class="docutils literal notranslate"><span class="pre">orient_by_velocity=True</span></code>), so a stream ordered “with the flow” still is.</p></li>
+<li><p><strong>Cost.</strong> The SOM adds <code class="docutils literal notranslate"><span class="pre">n_epochs</span></code> (default 10) batch-Kohonen passes over the
+visited tracers, so <code class="docutils literal notranslate"><span class="pre">order()</span></code> is no longer free to call in a tight loop.</p></li>
+</ul>
+</section>
+<section id="small-inputs-fall-back-to-the-mst">
+<h2>Small inputs fall back to the MST<a class="headerlink" href="#small-inputs-fall-back-to-the-mst" title="Link to this heading">#</a></h2>
+<p>The SOM needs at least <code class="docutils literal notranslate"><span class="pre">n_prototypes</span></code> (default 15) tracers to bin. Rather than
+raise on small inputs — the library’s own examples are five points — the default
+skips the SOM stage and returns the MST ordering alone:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
+
+<span class="n">pos</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">])}</span>
+<span class="n">vel</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">])}</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">)</span>  <span class="c1"># 3 &lt; 15 tracers: MST alone</span>
+<span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">gamma_range</span> <span class="o">==</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">==</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>Both stages report <code class="docutils literal notranslate"><span class="pre">gamma_range</span> <span class="pre">==</span> <span class="pre">(-1.0,</span> <span class="pre">1.0)</span></code>, so the fallback is invisible to
+code that reads it off the result.</p>
+</section>
+<section id="the-default-traces-under-jit-vmap-and-grad">
+<h2>The default traces under jit, vmap and grad<a class="headerlink" href="#the-default-traces-under-jit-vmap-and-grad" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel)</span></code> with no orderer runs inside <code class="docutils literal notranslate"><span class="pre">jax.jit</span></code>, <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> and
+<code class="docutils literal notranslate"><span class="pre">jax.grad</span></code>, as the walk default did in v0.3.1. So does any chain that ends in a
+SOM, such as <code class="docutils literal notranslate"><span class="pre">MSTOrderer()</span> <span class="pre">|</span> <span class="pre">SOMOrderer()</span></code>. Samples an earlier stage left unvisited
+stay unvisited. An explicit orderer traces too:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
+
+<span class="n">t</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">40</span><span class="p">)</span>
+<span class="n">pos</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="mf">5.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="mf">5.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)}</span>
+<span class="n">vel</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="o">-</span><span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)}</span>
+
+<span class="n">walk</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">()</span>
+<span class="n">chord</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="k">lambda</span> <span class="n">q</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">walk</span><span class="p">)</span><span class="o">.</span><span class="n">chord</span><span class="p">)(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>See the <a class="reference internal" href="../../how-to/som.html"><span class="doc std std-doc">SOM guide</span></a> and the
+<a class="reference internal" href="../../how-to/jax.html"><span class="doc std std-doc">JAX Integration guide</span></a>.</p>
+</section>
+<section id="tuning-the-default">
+<h2>Tuning the default<a class="headerlink" href="#tuning-the-default" title="Link to this heading">#</a></h2>
+<p>The default’s MST stage is configured to work on data of any scale, not to be
+tuned: <code class="docutils literal notranslate"><span class="pre">jump_cap=inf</span></code>, <code class="docutils literal notranslate"><span class="pre">velocity_factor=30.0</span></code>, <code class="docutils literal notranslate"><span class="pre">orient_by_velocity=True</span></code>,
+<code class="docutils literal notranslate"><span class="pre">on_disconnected=&quot;connect&quot;</span></code>. It
+deliberately does <strong>not</strong> use <code class="docutils literal notranslate"><span class="pre">MSTOrderer()</span></code>’s own defaults — <code class="docutils literal notranslate"><span class="pre">jump_cap=3.0</span></code> is an
+absolute length, and severs every edge of a sparse or large-scale dataset.
+<code class="docutils literal notranslate"><span class="pre">default_pipeline</span></code> takes <code class="docutils literal notranslate"><span class="pre">n_prototypes</span></code> and any other
+<a class="reference internal" href="../api.html#phasecurvefit.orderers.SOMOrderer" title="phasecurvefit.orderers.SOMOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a> keyword. For anything else — a finite
+<code class="docutils literal notranslate"><span class="pre">jump_cap</span></code>, velocity-aware edges, outlier rejection with <code class="docutils literal notranslate"><span class="pre">edge_clip_sigma</span></code> — build
+the chain and pass it:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
+
+<span class="n">t</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">60</span><span class="p">)</span>
+<span class="n">pos</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="mf">5.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="mf">5.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)}</span>
+<span class="n">vel</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="o">-</span><span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)}</span>
+
+<span class="n">chain</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">MSTOrderer</span><span class="p">(</span>
+    <span class="n">k</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">jump_cap</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">edge_clip_sigma</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span> <span class="n">orient_by_velocity</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span> <span class="o">|</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">SOMOrderer</span><span class="p">(</span><span class="n">n_prototypes</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">chain</span><span class="p">)</span>
+<span class="k">assert</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">n_visited</span><span class="p">)</span> <span class="o">==</span> <span class="mi">60</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="new-in-v0-4">
+<h2>New in v0.4<a class="headerlink" href="#new-in-v0-4" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../api.html#phasecurvefit.orderers.SOMOrderer" title="phasecurvefit.orderers.SOMOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">SOMOrderer</span></code></a> and the <a class="reference internal" href="../api.html#module-phasecurvefit.som" title="phasecurvefit.som"><code class="xref py py-mod docutils literal notranslate"><span class="pre">phasecurvefit.som</span></code></a>
+module: a Self-Organizing Map ordering stage (Starkman et al. 2023).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">a</span> <span class="pre">|</span> <span class="pre">b</span></code> and <a class="reference internal" href="../api.html#phasecurvefit.orderers.ChainOrderer" title="phasecurvefit.orderers.ChainOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">ChainOrderer</span></code></a>: run orderers in
+sequence, each receiving the previous result as <code class="docutils literal notranslate"><span class="pre">init</span></code>.</p></li>
+<li><p><a class="reference internal" href="../api.html#phasecurvefit.orderers.default_pipeline" title="phasecurvefit.orderers.default_pipeline"><code class="xref py py-func docutils literal notranslate"><span class="pre">default_pipeline()</span></code></a>: the function behind the new
+default.</p></li>
+<li><p><a class="reference internal" href="../api.html#phasecurvefit.fit_track" title="phasecurvefit.fit_track"><code class="xref py py-func docutils literal notranslate"><span class="pre">fit_track()</span></code></a>: order, refine, and train the autoencoder in one
+call (it uses the default pipeline).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MSTOrderer(velocity_factor=...)</span></code>: the velocity penalty of <code class="docutils literal notranslate"><span class="pre">velocity_weight</span></code> in
+units of the median neighbour distance, so it needs no unit. The default pipeline
+sets <code class="docutils literal notranslate"><span class="pre">velocity_factor=30.0</span></code>, so on a stream that crosses itself it crosses
+straight over instead of turning onto the other branch, and its SOM stage then
+uses velocities too. Earlier v0.4 development builds ordered on position alone;
+for that behaviour, chain <code class="docutils literal notranslate"><span class="pre">MSTOrderer(jump_cap=float(&quot;inf&quot;),</span> <span class="pre">orient_by_velocity=True,</span> <span class="pre">on_disconnected=&quot;connect&quot;)</span> <span class="pre">|</span> <span class="pre">SOMOrderer()</span></code> yourself.</p></li>
+</ul>
+</section>
+<section id="walk-local-flow-is-removed">
+<h2><code class="docutils literal notranslate"><span class="pre">walk_local_flow</span></code> is removed<a class="headerlink" href="#walk-local-flow-is-removed" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">pcf.walk_local_flow</span></code>, deprecated since v0.3.1, is gone. Its replacement is the
+orderer, with the walk’s keyword arguments moved onto <code class="docutils literal notranslate"><span class="pre">LocalFlowOrderer(...)</span></code> — see
+<a class="reference internal" href="v0.2-to-v0.3.html"><span class="doc std std-doc">Migrating from v0.2 to v0.3</span></a>:</p>
+<!-- skip: next -->
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># v0.3 (deprecated, warns):</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">walk_local_flow</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">start_idx</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metric_scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+
+<span class="c1"># v0.4:</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span>
+    <span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">start_idx</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metric_scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel)</span></code> with no orderer is <em>not</em> a replacement: it runs the
+default MST | SOM pipeline. The walk’s <code class="docutils literal notranslate"><span class="pre">usys</span></code> keyword for Quantity inputs is passed
+as <code class="docutils literal notranslate"><span class="pre">metadata=pcf.StateMetadata(usys=...)</span></code> to <code class="docutils literal notranslate"><span class="pre">order</span></code>. <code class="docutils literal notranslate"><span class="pre">combine_results</span></code>,
+<code class="docutils literal notranslate"><span class="pre">order_w</span></code> and <code class="docutils literal notranslate"><span class="pre">WalkLocalFlowResult</span></code> are unchanged.</p>
+</section>
+<section id="dependency-floors">
+<h2>Dependency floors<a class="headerlink" href="#dependency-floors" title="Link to this heading">#</a></h2>
+<p>v0.4 requires <code class="docutils literal notranslate"><span class="pre">unxt&gt;=2.0</span></code> (was <code class="docutils literal notranslate"><span class="pre">&gt;=1.10.4</span></code>) for the <code class="docutils literal notranslate"><span class="pre">interop</span></code> extra, and the
+<code class="docutils literal notranslate"><span class="pre">tutorials</span></code> extra requires <code class="docutils literal notranslate"><span class="pre">galax&gt;=0.1.0</span></code> (was <code class="docutils literal notranslate"><span class="pre">&gt;=0.0.3</span></code>). unxt 2 no longer
+converts a dimensionful Quantity to a bare array with <code class="docutils literal notranslate"><span class="pre">np.asarray</span></code>; strip it in a
+unit you name, e.g. <code class="docutils literal notranslate"><span class="pre">u.ustrip(&quot;kpc&quot;,</span> <span class="pre">q)</span></code>, or in a unit system’s unit for its
+dimension, e.g. <code class="docutils literal notranslate"><span class="pre">u.ustrip(usys,</span> <span class="pre">q)</span></code>. To plot Quantities directly with matplotlib, install
+<code class="docutils literal notranslate"><span class="pre">unxt[interop-mpl]</span></code>, which the <code class="docutils literal notranslate"><span class="pre">tutorials</span></code> extra includes.</p>
+<p>v0.4 also requires <code class="docutils literal notranslate"><span class="pre">jaxmore&gt;=0.6.1</span></code> (was <code class="docutils literal notranslate"><span class="pre">&gt;=0.4.0</span></code>). The <code class="docutils literal notranslate"><span class="pre">pcf.nn</span></code> training loops
+use jaxmore’s compiled training loop, so a repeat training call with the same
+shapes and settings reuses its compiled program instead of compiling again.</p>
+</section>
+<section id="compatibility-summary">
+<h2>Compatibility summary<a class="headerlink" href="#compatibility-summary" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Symbol</p></th>
+<th class="head"><p>Status</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel)</span></code> (no orderer)</p></td>
+<td><p><strong>Changed</strong>: runs <code class="docutils literal notranslate"><span class="pre">MSTOrderer</span> <span class="pre">|</span> <span class="pre">SOMOrderer</span></code>, not the walk</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel,</span> <span class="pre">orderer)</span></code></p></td>
+<td><p>Unchanged</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pcf.orderers.LocalFlowOrderer</span></code>, <code class="docutils literal notranslate"><span class="pre">MSTOrderer</span></code></p></td>
+<td><p>Unchanged</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pcf.walk_local_flow</span></code></p></td>
+<td><p><strong>Removed</strong> (deprecated since v0.3.1); use <code class="docutils literal notranslate"><span class="pre">order</span></code> with <code class="docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pcf.WalkLocalFlowResult</span></code></p></td>
+<td><p>Unchanged; subclasses <code class="docutils literal notranslate"><span class="pre">OrderingResult</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pcf.combine_results</span></code>, <code class="docutils literal notranslate"><span class="pre">pcf.order_w</span></code>, <code class="docutils literal notranslate"><span class="pre">pcf.WalkConfig</span></code>, <code class="docutils literal notranslate"><span class="pre">pcf.metrics</span></code>, <code class="docutils literal notranslate"><span class="pre">pcf.strats</span></code>, <code class="docutils literal notranslate"><span class="pre">pcf.nn</span></code></p></td>
+<td><p>Unchanged</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pcf.orderers.SOMOrderer</span></code>, <code class="docutils literal notranslate"><span class="pre">ChainOrderer</span></code>, <code class="docutils literal notranslate"><span class="pre">default_pipeline</span></code>, <code class="docutils literal notranslate"><span class="pre">pcf.fit_track</span></code>, <code class="docutils literal notranslate"><span class="pre">pcf.som</span></code></p></td>
+<td><p><strong>New</strong></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../result.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">The ordering result</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="v0.2-to-v0.3.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Migrating from v0.2 to v0.3</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-changed-and-why">What changed, and why</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#keeping-the-walk">Keeping the walk</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-the-new-default-returns">What the new default returns</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#small-inputs-fall-back-to-the-mst">Small inputs fall back to the MST</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-default-traces-under-jit-vmap-and-grad">The default traces under jit, vmap and grad</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tuning-the-default">Tuning the default</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#new-in-v0-4">New in v0.4</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#walk-local-flow-is-removed"><code class="docutils literal notranslate"><span class="pre">walk_local_flow</span></code> is removed</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dependency-floors">Dependency floors</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compatibility-summary">Compatibility summary</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By phasecurvefit Developers
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, phasecurvefit Developers.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

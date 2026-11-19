@@ -1,0 +1,729 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Is phasecurvefit right for my data?" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="start/is-it-right.html" />
+<meta property="og:site_name" content="phasecurvefit" />
+<meta property="og:description" content="phasecurvefit fits when three things hold. You have many samples. Each sample has a position and a velocity, given as dictionaries of arrays with the same keys. And the samples lie along one curve ..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_start_is-it-right_14383d9b.png" />
+<meta property="og:image:alt" content="phasecurvefit fits when three things hold. You have many samples. Each sample has a position and a velocity, given as dictionaries of arrays with the same keys. And the samples lie along one curve ..." />
+<meta name="description" content="phasecurvefit fits when three things hold. You have many samples. Each sample has a position and a velocity, given as dictionaries of arrays with the same keys. And the samples lie along one curve ..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Is phasecurvefit right for my data? &#8212; phasecurvefit</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=1ae7504c"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'start/is-it-right';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.4';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.4/start/is-it-right.html" />
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Install" href="install.html" />
+    <link rel="prev" title="What phasecurvefit does" href="what-it-does.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/favicon.png" class="logo__image only-light" alt="phasecurvefit - Home"/>
+    <script>document.write(`<img src="../_static/favicon.png" class="logo__image only-dark" alt="phasecurvefit - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/GalacticDynamics/phasecurvefit" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/phasecurvefit/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/pypi/v/phasecurvefit" class="icon-link-image" alt="PyPI"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    phasecurvefit
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Start</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="what-it-does.html">What phasecurvefit does</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Is phasecurvefit right for my data?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick start</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/density_fields.html">Fitting a Track Through a Density Image</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How-to guides</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../how-to/index.html">How-to guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/data.html">Prepare your data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/units.html">Use physical units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/choose-orderer.html">Choose an orderer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/chain-orderers.html">Chain orderers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/local-flow-walk.html">Use the local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/tune-metric.html">Choose and tune the walk’s metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/custom-metric.html">Write a custom metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/kdtree.html">Restrict the walk to nearby points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/som.html">Refine an ordering with a self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/autoencoder.html">Fill gaps and fit a track with the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/interpolate.html">Interpolate positions along an ordering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/outliers.html">Reject outliers with the mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/track-uncertainty.html">Put an uncertainty band on the track</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/jax.html">Compile, batch and differentiate with JAX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/gpu.html">Run on a GPU</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How it works</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../explanation/index.html">How it works</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/walk.html">The local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/mst.html">The MST backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/som.html">The self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/autoencoder.html">The autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/outliers.html">Outlier rejection with a mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/track-uncertainty.html">Track uncertainty</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/density-fields.html">Density fields</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/api.html">API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/options.html">Options and defaults</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/result.html">The ordering result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.3-to-v0.4.html">Migrating from v0.3 to v0.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.2-to-v0.3.html">Migrating from v0.2 to v0.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.1-to-v0.2.html">Migrating from v0.1 to v0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/citation.html">Citation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to phasecurvefit</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit/issues/new?title=Issue%20on%20page%20%2Fstart/is-it-right.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/start/is-it-right.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Is phasecurvefit right for my data?</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-have">What you have</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-want">What you want</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-phasecurvefit-does-not-do">What phasecurvefit does not do</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="is-phasecurvefit-right-for-my-data">
+<h1>Is phasecurvefit right for my data?<a class="headerlink" href="#is-phasecurvefit-right-for-my-data" title="Link to this heading">#</a></h1>
+<p>phasecurvefit fits when three things hold. You have many samples. Each sample has a
+position and a velocity, given as dictionaries of arrays with the same keys. And the
+samples lie along one curve whose order you don’t know. The tables below match what
+you have and what you want to the call to use and the page to read.</p>
+<section id="what-you-have">
+<h2>What you have<a class="headerlink" href="#what-you-have" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>You have</p></th>
+<th class="head"><p>Use</p></th>
+<th class="head"><p>Read more</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>positions and velocities along a curve, and no known start point</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">pcf.order(pos,</span> <span class="pre">vel)</span></code>, the default pipeline</p></td>
+<td><p><a class="reference internal" href="quickstart.html"><span class="std std-doc">Quick start</span></a>, <a class="reference internal" href="../tutorials/stream_mst.html"><span class="std std-doc">Ordering a Mock Stream with the MST Backbone</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p>a known start point, such as a stream’s progenitor</p></td>
+<td><p><a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.LocalFlowOrderer" title="phasecurvefit.orderers.LocalFlowOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a> with <code class="docutils literal notranslate"><span class="pre">start_idx</span></code>, and <code class="docutils literal notranslate"><span class="pre">direction=&quot;both&quot;</span></code> if the curve flows away from it both ways</p></td>
+<td><p><a class="reference internal" href="../how-to/local-flow-walk.html"><span class="std std-doc">Use the local-flow walk</span></a>, <a class="reference internal" href="../tutorials/stream_autoencoder.html"><span class="std std-doc">Learning a Stream with an Autoencoder</span></a></p></td>
+</tr>
+<tr class="row-even"><td><p>a curve that crosses itself</p></td>
+<td><p>once: the default pipeline, whose MST weighs edges by velocity and crosses straight over. Many times: <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.LocalFlowOrderer" title="phasecurvefit.orderers.LocalFlowOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">LocalFlowOrderer</span></code></a>, or <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.MSTOrderer" title="phasecurvefit.orderers.MSTOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a> with <code class="docutils literal notranslate"><span class="pre">sever_cos_threshold</span></code>.</p></td>
+<td><p><a class="reference internal" href="../how-to/choose-orderer.html"><span class="std std-doc">Choose an orderer</span></a>, <a class="reference internal" href="../tutorials/epitrochoid_autoencoder.html"><span class="std std-doc">Learning an Epitrochoid with an Autoencoder</span></a>, <a class="reference internal" href="../tutorials/epitrochoid_mst.html"><span class="std std-doc">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p>samples with some missing velocities (NaN)</p></td>
+<td><p>the default pipeline, which joins a sample with a missing velocity by position alone and skips it when orienting the ordering</p></td>
+<td><p><a class="reference internal" href="../how-to/data.html"><span class="std std-doc">Prepare your data</span></a></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">unxt</span></code> Quantities with physical units</p></td>
+<td><p>any orderer, with <code class="docutils literal notranslate"><span class="pre">metadata=pcf.StateMetadata(usys=...)</span></code></p></td>
+<td><p><a class="reference internal" href="../how-to/units.html"><span class="std std-doc">Use physical units</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p>a dataset where background points mix with the curve</p></td>
+<td><p>an MST with <code class="docutils literal notranslate"><span class="pre">edge_clip_sigma</span></code>, then the mixture membership model</p></td>
+<td><p><a class="reference internal" href="../how-to/outliers.html"><span class="std std-doc">Reject outliers with the mixture model</span></a>, <a class="reference internal" href="../tutorials/outlier_rejection.html"><span class="std std-doc">Outlier rejection with mixture-model membership</span></a></p></td>
+</tr>
+<tr class="row-even"><td><p>an ordering to run inside <code class="docutils literal notranslate"><span class="pre">jit</span></code>, <code class="docutils literal notranslate"><span class="pre">vmap</span></code> or <code class="docutils literal notranslate"><span class="pre">grad</span></code></p></td>
+<td><p>any orderer, the default pipeline included, except the ones that run on the host: <a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.RidgeOrderer" title="phasecurvefit.orderers.RidgeOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">RidgeOrderer</span></code></a> and <code class="docutils literal notranslate"><span class="pre">MSTOrderer(neighbors=SciPy())</span></code></p></td>
+<td><p><a class="reference internal" href="../how-to/jax.html"><span class="std std-doc">Compile, batch and differentiate with JAX</span></a></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="what-you-want">
+<h2>What you want<a class="headerlink" href="#what-you-want" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>You want</p></th>
+<th class="head"><p>phasecurvefit gives</p></th>
+<th class="head"><p>Read more</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>the order of the samples along the curve</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">result.ordering</span></code>, or <code class="docutils literal notranslate"><span class="pre">pcf.order_w(result)</span></code> for the reordered arrays</p></td>
+<td><p><a class="reference internal" href="quickstart.html"><span class="std std-doc">Quick start</span></a>, <a class="reference internal" href="../reference/result.html"><span class="std std-doc">The ordering result</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p>an ordering coordinate <span class="math notranslate nohighlight">\(\gamma\)</span> for every sample</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fitted.gamma</span></code> from <a class="reference internal" href="../reference/api.html#phasecurvefit.fit_track" title="phasecurvefit.fit_track"><code class="xref py py-func docutils literal notranslate"><span class="pre">fit_track()</span></code></a> or <a class="reference internal" href="../reference/api.html#phasecurvefit.nn.train_autoencoder" title="phasecurvefit.nn.train_autoencoder"><code class="xref py py-func docutils literal notranslate"><span class="pre">train_autoencoder()</span></code></a></p></td>
+<td><p><a class="reference internal" href="../how-to/autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a></p></td>
+</tr>
+<tr class="row-even"><td><p>a smooth mean track <span class="math notranslate nohighlight">\(x(\gamma)\)</span></p></td>
+<td><p>calling the fitted result, <code class="docutils literal notranslate"><span class="pre">fitted(gamma)</span></code></p></td>
+<td><p><a class="reference internal" href="../how-to/autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a>, <a class="reference internal" href="../how-to/interpolate.html"><span class="std std-doc">Interpolate positions along an ordering</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p>a track fast enough for every step of an MCMC</p></td>
+<td><p><a class="reference internal" href="../reference/api.html#phasecurvefit.nn.RunningMeanDecoder" title="phasecurvefit.nn.RunningMeanDecoder"><code class="xref py py-class docutils literal notranslate"><span class="pre">RunningMeanDecoder</span></code></a>, which needs no training</p></td>
+<td><p><a class="reference internal" href="../tutorials/stream_runningmean.html"><span class="std std-doc">Learning a Stream with a Running Mean</span></a></p></td>
+</tr>
+<tr class="row-even"><td><p>a probability that each sample belongs to the curve</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fitted.membership_prob</span></code>, or <a class="reference internal" href="../reference/api.html#phasecurvefit.nn.posterior_membership" title="phasecurvefit.nn.posterior_membership"><code class="xref py py-func docutils literal notranslate"><span class="pre">posterior_membership()</span></code></a> with the mixture model</p></td>
+<td><p><a class="reference internal" href="../how-to/outliers.html"><span class="std std-doc">Reject outliers with the mixture model</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p>positions at given values of <span class="math notranslate nohighlight">\(\gamma\)</span> from an ordering alone</p></td>
+<td><p>calling the ordering result, <code class="docutils literal notranslate"><span class="pre">result(gamma)</span></code></p></td>
+<td><p><a class="reference internal" href="../how-to/interpolate.html"><span class="std std-doc">Interpolate positions along an ordering</span></a></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="what-phasecurvefit-does-not-do">
+<h2>What phasecurvefit does not do<a class="headerlink" href="#what-phasecurvefit-does-not-do" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Each call orders one curve. The default pipeline joins disconnected pieces into
+one ordering, so separate distinct streams in a catalogue before you order them.</p></li>
+<li><p>It does not model the dynamics. The track is a smooth curve through the data in
+phase space, and phasecurvefit fits no orbit, potential or progenitor.</p></li>
+<li><p>The local-flow walk does not choose its own start point. Chaining an
+<a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.MSTOrderer" title="phasecurvefit.orderers.MSTOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">MSTOrderer</span></code></a> in front of it supplies an end of the
+curve (<a class="reference internal" href="../how-to/chain-orderers.html"><span class="std std-doc">Chain orderers</span></a>).</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="what-it-does.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">What phasecurvefit does</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="install.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Install</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-have">What you have</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-want">What you want</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-phasecurvefit-does-not-do">What phasecurvefit does not do</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By phasecurvefit Developers
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, phasecurvefit Developers.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

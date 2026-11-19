@@ -1,0 +1,822 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Density fields" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="explanation/density-fields.html" />
+<meta property="og:site_name" content="phasecurvefit" />
+<meta property="og:description" content="A density field is data given as an image of a wide, diffuse curve, such as a density map of a stellar stream from a simulation or a probability map from a segmentation. phasecurvefit fits a track ..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_explanation_density-fields_d11d1de0.png" />
+<meta property="og:image:alt" content="A density field is data given as an image of a wide, diffuse curve, such as a density map of a stellar stream from a simulation or a probability map from a segmentation. phasecurvefit fits a track ..." />
+<meta name="description" content="A density field is data given as an image of a wide, diffuse curve, such as a density map of a stellar stream from a simulation or a probability map from a segmentation. phasecurvefit fits a track ..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Density fields &#8212; phasecurvefit</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=1ae7504c"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'explanation/density-fields';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.4';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.4/explanation/density-fields.html" />
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Reference" href="../reference/index.html" />
+    <link rel="prev" title="Track uncertainty" href="track-uncertainty.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/favicon.png" class="logo__image only-light" alt="phasecurvefit - Home"/>
+    <script>document.write(`<img src="../_static/favicon.png" class="logo__image only-dark" alt="phasecurvefit - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/GalacticDynamics/phasecurvefit" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/phasecurvefit/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/pypi/v/phasecurvefit" class="icon-link-image" alt="PyPI"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    phasecurvefit
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Start</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../start/what-it-does.html">What phasecurvefit does</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/is-it-right.html">Is phasecurvefit right for my data?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/install.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/quickstart.html">Quick start</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/density_fields.html">Fitting a Track Through a Density Image</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How-to guides</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../how-to/index.html">How-to guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/data.html">Prepare your data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/units.html">Use physical units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/choose-orderer.html">Choose an orderer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/chain-orderers.html">Chain orderers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/local-flow-walk.html">Use the local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/tune-metric.html">Choose and tune the walk’s metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/custom-metric.html">Write a custom metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/kdtree.html">Restrict the walk to nearby points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/som.html">Refine an ordering with a self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/autoencoder.html">Fill gaps and fit a track with the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/interpolate.html">Interpolate positions along an ordering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/outliers.html">Reject outliers with the mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/track-uncertainty.html">Put an uncertainty band on the track</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/jax.html">Compile, batch and differentiate with JAX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/gpu.html">Run on a GPU</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How it works</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">How it works</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="walk.html">The local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mst.html">The MST backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="som.html">The self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoencoder.html">The autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="outliers.html">Outlier rejection with a mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="track-uncertainty.html">Track uncertainty</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Density fields</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/api.html">API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/options.html">Options and defaults</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/result.html">The ordering result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.3-to-v0.4.html">Migrating from v0.3 to v0.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.2-to-v0.3.html">Migrating from v0.2 to v0.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.1-to-v0.2.html">Migrating from v0.1 to v0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/citation.html">Citation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to phasecurvefit</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit/issues/new?title=Issue%20on%20page%20%2Fexplanation/density-fields.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/explanation/density-fields.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Density fields</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-the-weights-enter-membership">How the weights enter membership</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#in-the-mixture-model">In the mixture model</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#why-the-weight-isnt-a-prior-on-membership">Why the weight isn’t a prior on membership</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#in-the-encoder">In the encoder</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#uncertainties">Uncertainties</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-order-along-the-ridge">Why order along the ridge</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-the-som-sits-outside-the-bends">Why the SOM sits outside the bends</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-a-wide-curve-trains-differently">Why a wide curve trains differently</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#where-the-track-ends">Where the track ends</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="density-fields">
+<h1>Density fields<a class="headerlink" href="#density-fields" title="Link to this heading">#</a></h1>
+<p>A density field is data given as an image of a wide, diffuse curve, such as a
+density map of a stellar stream from a simulation or a probability map from a
+segmentation. phasecurvefit fits a track through it by treating each pixel as a
+sample weighted by its value. This page
+explains how the weights enter membership, and why a density field needs a different
+orderer, two training settings, and care at the ends of the track. The <a class="reference internal" href="../tutorials/density_fields.html"><span class="std std-doc">density-field tutorial</span></a>
+runs the whole fit.</p>
+<section id="how-the-weights-enter-membership">
+<h2>How the weights enter membership<a class="headerlink" href="#how-the-weights-enter-membership" title="Link to this heading">#</a></h2>
+<p>A weight <span class="math notranslate nohighlight">\(\omega_n\)</span> counts like <span class="math notranslate nohighlight">\(\omega_n\)</span> coincident samples, so the SOM fits the
+weighted density and the autoencoder weights its fit to the track. Taking that rule
+literally also settles how the weights enter membership.</p>
+<section id="in-the-mixture-model">
+<h3>In the mixture model<a class="headerlink" href="#in-the-mixture-model" title="Link to this heading">#</a></h3>
+<p>The mixture model of <a class="reference internal" href="outliers.html"><span class="std std-doc">Outlier rejection with a mixture model</span></a> gives each sample the likelihood</p>
+<div class="math notranslate nohighlight">
+\[
+\mathcal{L}_n = \pi_n \mathcal{N}_n + (1 - \pi_n)\,\rho_{\mathrm{bg}} ,
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(\mathcal{N}_n\)</span> is the Gaussian about the track evaluated at the sample. The
+<span class="math notranslate nohighlight">\(\omega_n\)</span> copies of sample <span class="math notranslate nohighlight">\(n\)</span> sit at the same position, so they share
+<span class="math notranslate nohighlight">\(\mathcal{L}_n\)</span> and together add <span class="math notranslate nohighlight">\(\omega_n \log \mathcal{L}_n\)</span> to the
+log-likelihood. Training minimizes</p>
+<div class="math notranslate nohighlight">
+\[
+-\frac{1}{N} \sum_n \omega_n \log \mathcal{L}_n ,
+\]</div>
+<p>with the weights normalized to mean 1. Scaling every weight by the same factor scales
+the loss and leaves its minimum where it was.</p>
+<p>The posterior membership of a sample is</p>
+<div class="math notranslate nohighlight">
+\[
+\hat{q}_n = \frac{\pi_n \mathcal{N}_n}{\mathcal{L}_n} .
+\]</div>
+<p>The weight doesn’t appear in it. The posterior depends on where the sample is and on
+the model, and every copy of a sample has the same posterior however many copies
+there are. The weight sets how hard the sample pulls on the model. For the membership,
+the gradient is</p>
+<div class="math notranslate nohighlight">
+\[
+\frac{\partial}{\partial \pi_n} \, \omega_n \log \mathcal{L}_n
+= \omega_n \, \frac{\mathcal{N}_n - \rho_{\mathrm{bg}}}{\mathcal{L}_n} .
+\]</div>
+<p>Its sign depends on whether the curve or the background explains the sample better,
+and the weight only scales it. A faint pixel inside the curve pulls weakly towards
+membership, and a faint pixel far outside it pulls weakly towards the background. In
+the velocity-alignment term each sample counts by <span class="math notranslate nohighlight">\(\omega_n \hat{q}_n\)</span>, the expected
+mass of members at that sample.</p>
+<p>The SOM’s outlier mixture follows the same rule: a weight multiplies a sample’s terms
+in the prototype update and in the fits of the member fraction and the curve’s width,
+and doesn’t appear in the sample’s membership, which depends on where the sample is
+and on the model (<a class="reference internal" href="som.html"><span class="std std-doc">The self-organizing map</span></a>).</p>
+<p>For an image the sum has a continuum limit. With each pixel weighted by the image
+<span class="math notranslate nohighlight">\(I(q)\)</span>, the loss tends, as the pixels shrink, to</p>
+<div class="math notranslate nohighlight">
+\[
+-\frac{\int I(q) \log \mathcal{L}(q) \, dq}{\int I(q) \, dq} ,
+\]</div>
+<p>the cross-entropy between the normalized image and the model. Minimizing it is
+maximum likelihood for an unlimited number of samples drawn from the image. Pixels of
+value zero add nothing to it, so leaving them out of the samples changes nothing.</p>
+</section>
+<section id="why-the-weight-isnt-a-prior-on-membership">
+<h3>Why the weight isn’t a prior on membership<a class="headerlink" href="#why-the-weight-isnt-a-prior-on-membership" title="Link to this heading">#</a></h3>
+<p>The weight could instead go into the prior, for example as <span class="math notranslate nohighlight">\(\omega_n \pi_n\)</span> for
+weights between 0 and 1, so that faint pixels are less likely to be members. That
+reads the weight as evidence about which component a sample came from. In a density
+map the weight says how much is there. Putting it in the prior sends the faint pixels
+in the wings and tails of the curve to the background because they are faint, so
+the model fits a narrower, shorter curve than the image shows.</p>
+<p>The prior reading looks more natural for a segmentation map, whose values <span class="math notranslate nohighlight">\(p_n\)</span> are
+probabilities that each pixel belongs to the curve. Those values are already the
+weights, though, so putting them in the prior as well would count them twice. Reading
+<span class="math notranslate nohighlight">\(p_n\)</span> as the probability that pixel <span class="math notranslate nohighlight">\(n\)</span> is part of the data gives the expected
+log-likelihood <span class="math notranslate nohighlight">\(\sum_n p_n \log \mathcal{L}_n\)</span>, the same loss as above.</p>
+</section>
+<section id="in-the-encoder">
+<h3>In the encoder<a class="headerlink" href="#in-the-encoder" title="Link to this heading">#</a></h3>
+<p>The encoder’s first training phase learns its membership as a classifier, pushing
+the ordered samples towards 1 and uniform random points towards 0
+(<a class="reference internal" href="outliers.html"><span class="std std-doc">Outlier rejection with a mixture model</span></a>). Its membership term is left unweighted. Weighting only the ordered
+samples would let a faint pixel count less against the same random points around
+it, and its membership would drop below the threshold. That comes from the random
+points, which have no weights of their own; weighting consistently would mean
+rescaling them as well, and that isn’t implemented. The mixture model has no random
+points, since the background enters as the density <span class="math notranslate nohighlight">\(\rho_{\mathrm{bg}}\)</span>, so its
+weights need no such care.</p>
+</section>
+<section id="uncertainties">
+<h3>Uncertainties<a class="headerlink" href="#uncertainties" title="Link to this heading">#</a></h3>
+<p>The weighted sum gives the best-fitting track, which is all the training uses. Its
+curvature gives the uncertainty of that track only when the weights are counts, such
+as numbers of stars per pixel. For image intensities or segmentation probabilities,
+an uncertainty would need a noise model for the pixel values.</p>
+</section>
+</section>
+<section id="why-order-along-the-ridge">
+<h2>Why order along the ridge<a class="headerlink" href="#why-order-along-the-ridge" title="Link to this heading">#</a></h2>
+<p>The default pipeline’s MST orders samples along the longest path of a tree linking
+near neighbours. A thin curve of samples has one long path through it. A wide, evenly
+filled region has many paths of about the same length, and the longest one zigzags
+across the curve and ends in a corner. On a uniform mask of radius 0.5 and a line
+blurred with <span class="math notranslate nohighlight">\(\sigma = 0.25\)</span>, its backbone cuts inside the bends and ends 0.3 to 1.1
+from the true ends.</p>
+<p><a class="reference internal" href="../reference/api.html#phasecurvefit.orderers.RidgeOrderer" title="phasecurvefit.orderers.RidgeOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">RidgeOrderer</span></code></a> uses the shape of the density instead.
+Smoothing a uniform tube, or a line blurred by any symmetric kernel, puts the highest
+density on the centre line, so a path that prefers dense pixels follows it. On the
+same two images, the ridge then a SOM ends within 0.04 of the true ends. The ridge
+backbone only needs to be roughly right, because the SOM chained after it refines the
+middle.</p>
+<p>How wide to smooth is estimated from the data. Starting from a deliberately wide
+width, each round sets it to the RMS distance of the samples from the ridge it just
+found, and it settles on the curve’s own scatter: 0.104 for a blur of
+<span class="math notranslate nohighlight">\(\sigma = 0.1\)</span>. It starts wide because a wide kernel gives a smooth ridge that the
+iteration then tightens, while a narrow one could lock onto noise.</p>
+</section>
+<section id="why-the-som-sits-outside-the-bends">
+<h2>Why the SOM sits outside the bends<a class="headerlink" href="#why-the-som-sits-outside-the-bends" title="Link to this heading">#</a></h2>
+<p>A SOM converges to a principal curve of the weighted density: each point is the
+weighted mean of the samples nearest it. On a bend of radius <span class="math notranslate nohighlight">\(R\)</span>, a uniform tube of
+half-width <span class="math notranslate nohighlight">\(r\)</span> holds more area outside the bend than inside, and the mean radius
+across it is</p>
+<div class="math notranslate nohighlight">
+\[
+\frac{\int_{R-r}^{R+r} \rho^2 \, d\rho}{\int_{R-r}^{R+r} \rho \, d\rho}
+= R + \frac{r^2}{3R} .
+\]</div>
+<p>For <span class="math notranslate nohighlight">\(r = 0.5\)</span> and <span class="math notranslate nohighlight">\(R = 1.85\)</span> that offset is 0.045, and the SOM’s largest error on such
+a mask is 0.045.</p>
+<p>Where the curve is wide and noisy, the SOM’s backbone can wiggle. With 30 prototypes
+on the tutorial’s image, the prototypes near the wide end sit closer together than the
+curve is wide, so each follows the clumps of noise near it. The autoencoder fits one
+smooth track through all the samples, so the wiggle doesn’t reach the final track.</p>
+</section>
+<section id="why-a-wide-curve-trains-differently">
+<h2>Why a wide curve trains differently<a class="headerlink" href="#why-a-wide-curve-trains-differently" title="Link to this heading">#</a></h2>
+<p>Along a thin curve every sample sits close to the track, so there is little room for
+<span class="math notranslate nohighlight">\(\gamma\)</span> to vary across it. A wide field leaves that room, and two things go wrong:</p>
+<ul class="simple">
+<li><p>In the joint training phase, the reconstruction loss can lower itself by letting
+<span class="math notranslate nohighlight">\(\gamma\)</span> encode position across the curve as well as along it, and the track bends
+into loops on the curves. Freezing the encoder in that phase keeps <span class="math notranslate nohighlight">\(\gamma\)</span> an
+along-track coordinate.</p></li>
+<li><p>The samples’ spread across the curve, with variance about <span class="math notranslate nohighlight">\(r^2/3\)</span>, is much larger
+than the error the decoder has left to fix, so small batches keep the optimizer
+jittering around the track. On a uniform tube of half-width 0.5, batches of 1000
+brought the track’s largest error away from its ends from 0.11 to 0.04.</p></li>
+</ul>
+<p><a class="reference internal" href="../how-to/autoencoder.html"><span class="std std-doc">Fill gaps and fit a track with the autoencoder</span></a> shows the two settings.</p>
+</section>
+<section id="where-the-track-ends">
+<h2>Where the track ends<a class="headerlink" href="#where-the-track-ends" title="Link to this heading">#</a></h2>
+<p>The faint samples past each end of a curve get the most extreme <span class="math notranslate nohighlight">\(\gamma\)</span>, so the
+whole of <code class="docutils literal notranslate"><span class="pre">gamma_range</span></code> runs past the ends. <code class="docutils literal notranslate"><span class="pre">track_range</span></code> stops each end where the
+weighted number of samples per unit length along the track falls below half its
+value just inside. It counts per unit length because near an end the encoder squeezes
+many samples into little <span class="math notranslate nohighlight">\(\gamma\)</span>, which would make a faint tail look dense, and it
+compares with the value just inside so that a curve that narrows or fades keeps its
+ends.</p>
+<p>For a curve blurred by a symmetric kernel, the line density at the true end is half
+its value just inside, so this finds the end. A mask made by thickening a curve has a
+cap past each end that holds real weight, and the half-density point falls partway
+into it. On the tutorial’s image the wide end stops 0.33 past the true end, where the
+cap reaches 0.7 past the curve. The image alone can’t tell a short curve with a cap
+from a longer, blurrier one, so the user has to say which it is.</p>
+<p><code class="docutils literal notranslate"><span class="pre">TrainingConfig(track_ends=&quot;mask&quot;)</span></code> says the image is a mask. A curve thickened to
+half-width <span class="math notranslate nohighlight">\(w\)</span> has a cap that reaches <span class="math notranslate nohighlight">\(w\)</span> past its end, so each end is placed <span class="math notranslate nohighlight">\(w\)</span> in
+from the farthest sample along the track. <span class="math notranslate nohighlight">\(w\)</span> is the widest any sample reaches across
+the track near that end. This rule uses the samples’ positions and ignores their
+weights, so it suits segmentation maps and other images with a definite edge. On the
+tutorial’s image both ends land within 0.1 of the true ends. On a point cloud there is
+no edge, and the half-density rule is the one to use.</p>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="track-uncertainty.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Track uncertainty</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../reference/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Reference</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-the-weights-enter-membership">How the weights enter membership</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#in-the-mixture-model">In the mixture model</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#why-the-weight-isnt-a-prior-on-membership">Why the weight isn’t a prior on membership</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#in-the-encoder">In the encoder</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#uncertainties">Uncertainties</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-order-along-the-ridge">Why order along the ridge</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-the-som-sits-outside-the-bends">Why the SOM sits outside the bends</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-a-wide-curve-trains-differently">Why a wide curve trains differently</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#where-the-track-ends">Where the track ends</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By phasecurvefit Developers
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, phasecurvefit Developers.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

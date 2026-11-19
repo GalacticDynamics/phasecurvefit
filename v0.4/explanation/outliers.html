@@ -1,0 +1,784 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Outlier rejection with a mixture model" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="explanation/outliers.html" />
+<meta property="og:site_name" content="phasecurvefit" />
+<meta property="og:description" content="The autoencoder’s default membership is bad at finding outliers. Stars that are plainly not on the stream survive as members, and because they survive they pull the fitted track towards themselves,..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_explanation_outliers_e089c772.png" />
+<meta property="og:image:alt" content="The autoencoder’s default membership is bad at finding outliers. Stars that are plainly not on the stream survive as members, and because they survive they pull the fitted track towards themselves,..." />
+<meta name="description" content="The autoencoder’s default membership is bad at finding outliers. Stars that are plainly not on the stream survive as members, and because they survive they pull the fitted track towards themselves,..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Outlier rejection with a mixture model &#8212; phasecurvefit</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=1ae7504c"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'explanation/outliers';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.4';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.4/explanation/outliers.html" />
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Track uncertainty" href="track-uncertainty.html" />
+    <link rel="prev" title="The autoencoder" href="autoencoder.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/favicon.png" class="logo__image only-light" alt="phasecurvefit - Home"/>
+    <script>document.write(`<img src="../_static/favicon.png" class="logo__image only-dark" alt="phasecurvefit - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/GalacticDynamics/phasecurvefit" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/phasecurvefit/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/pypi/v/phasecurvefit" class="icon-link-image" alt="PyPI"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    phasecurvefit
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Start</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../start/what-it-does.html">What phasecurvefit does</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/is-it-right.html">Is phasecurvefit right for my data?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/install.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/quickstart.html">Quick start</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/density_fields.html">Fitting a Track Through a Density Image</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How-to guides</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../how-to/index.html">How-to guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/data.html">Prepare your data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/units.html">Use physical units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/choose-orderer.html">Choose an orderer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/chain-orderers.html">Chain orderers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/local-flow-walk.html">Use the local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/tune-metric.html">Choose and tune the walk’s metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/custom-metric.html">Write a custom metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/kdtree.html">Restrict the walk to nearby points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/som.html">Refine an ordering with a self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/autoencoder.html">Fill gaps and fit a track with the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/interpolate.html">Interpolate positions along an ordering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/outliers.html">Reject outliers with the mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/track-uncertainty.html">Put an uncertainty band on the track</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/jax.html">Compile, batch and differentiate with JAX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/gpu.html">Run on a GPU</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How it works</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">How it works</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="walk.html">The local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mst.html">The MST backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="som.html">The self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="autoencoder.html">The autoencoder</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Outlier rejection with a mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="track-uncertainty.html">Track uncertainty</a></li>
+<li class="toctree-l2"><a class="reference internal" href="density-fields.html">Density fields</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/api.html">API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/options.html">Options and defaults</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/result.html">The ordering result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.3-to-v0.4.html">Migrating from v0.3 to v0.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.2-to-v0.3.html">Migrating from v0.2 to v0.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.1-to-v0.2.html">Migrating from v0.1 to v0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/citation.html">Citation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to phasecurvefit</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/GalacticDynamics/phasecurvefit/issues/new?title=Issue%20on%20page%20%2Fexplanation/outliers.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/explanation/outliers.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Outlier rejection with a mixture model</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-the-default-membership-cannot-reject-anything">Why the default membership cannot reject anything</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#it-is-trained-to-keep-the-outliers">It is trained to keep the outliers</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#the-negatives-are-too-easy">The negatives are too easy</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#the-membership-never-sees-the-residual">The membership never sees the residual</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#modelling-the-background">Modelling the background</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#two-ways-the-fit-can-fail">Two ways the fit can fail</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-the-encoder-is-frozen">Why the encoder is frozen</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-it-does-not-fix">What it does not fix</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#references">References</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="outlier-rejection-with-a-mixture-model">
+<h1>Outlier rejection with a mixture model<a class="headerlink" href="#outlier-rejection-with-a-mixture-model" title="Link to this heading">#</a></h1>
+<p>The autoencoder’s default membership is bad at finding outliers. Stars that are
+plainly not on the stream survive as members, and because they survive they pull the
+fitted track towards themselves, worst at the ends, where there is least data to hold
+it in place. This page explains why, and how modelling the background fixes it.
+<a class="reference internal" href="../how-to/outliers.html"><span class="std std-doc">Reject outliers with the mixture model</span></a> shows how to turn it on.</p>
+<section id="why-the-default-membership-cannot-reject-anything">
+<h2>Why the default membership cannot reject anything<a class="headerlink" href="#why-the-default-membership-cannot-reject-anything" title="Link to this heading">#</a></h2>
+<section id="it-is-trained-to-keep-the-outliers">
+<h3>It is trained to keep the outliers<a class="headerlink" href="#it-is-trained-to-keep-the-outliers" title="Link to this heading">#</a></h3>
+<p>The encoder’s first phase trains the membership head as a classifier:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>prob_ordered_penalty = masked_mean((1.0 - prob_pred_ordered) ** 2, mask)  # p -&gt; 1
+prob_random_penalty  = masked_mean(prob_pred_random ** 2, mask)           # p -&gt; 0
+</pre></div>
+</div>
+<p>The positive set is every sample the orderer visited. An MST, like any spanning
+structure, has no way to reject a sample: it threads outliers into the ordering along
+their cheapest edge. Those outliers then land in the positive set, and the network is
+trained to call them members. The membership head reproduces the orderer’s blind spot,
+and training longer does not fix it.</p>
+</section>
+<section id="the-negatives-are-too-easy">
+<h3>The negatives are too easy<a class="headerlink" href="#the-negatives-are-too-easy" title="Link to this heading">#</a></h3>
+<p>The negatives are drawn uniformly from the bounding box of positions and velocities. A
+uniform draw in that box almost never has a plausible pairing of position and velocity,
+because real stream stars have tightly correlated <span class="math notranslate nohighlight">\((x, v)\)</span>. So the classifier reaches a
+low loss by learning a coarse boundary around correlated <span class="math notranslate nohighlight">\((x, v)\)</span>, and never has to
+resolve the structure across the track, which is where outliers are found.</p>
+</section>
+<section id="the-membership-never-sees-the-residual">
+<h3>The membership never sees the residual<a class="headerlink" href="#the-membership-never-sees-the-residual" title="Link to this heading">#</a></h3>
+<p>What defines an outlier is its distance from the fitted track,</p>
+<div class="math notranslate nohighlight">
+\[r_n = \lVert q_n - x_\theta(\gamma_\theta(w_n)) \rVert ,\]</div>
+<p>and the decoder computes it at every step. But no gradient connects “this star is far
+from the track” to “lower its membership”. The membership is badly calibrated as a
+result: it saturates near 1 for anything near the data, so a threshold of 0.5 cuts
+nothing.</p>
+</section>
+</section>
+<section id="modelling-the-background">
+<h2>Modelling the background<a class="headerlink" href="#modelling-the-background" title="Link to this heading">#</a></h2>
+<p>Instead of classifying, the mixture model describes the data. Following Hogg, Bovy &amp;
+Lang (2010), §3, each star comes either from the stream or from a smooth background:</p>
+<div class="math notranslate nohighlight">
+\[
+\mathcal{L}_n = \pi_n \, \mathcal{N}\!\left(q_n \,;\, x_\theta(\gamma_n),\,
+                \sigma^2(\gamma_n)\,\mathbb{I}\right)
+              + (1 - \pi_n)\,\rho_{\mathrm{bg}} ,
+\]</div>
+<p>and training minimizes <span class="math notranslate nohighlight">\(-\sum_n \log \mathcal{L}_n\)</span>.</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\pi_n\)</span> is the encoder’s membership output. It plays the role of <span class="math notranslate nohighlight">\(1 - P_b\)</span> in Hogg
+et al., except that a network predicts a weight for each star instead of one global
+fraction of bad data.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\mathcal{N}(\cdot)\)</span> is the stream: a Gaussian of width <span class="math notranslate nohighlight">\(\sigma(\gamma)\)</span> about the
+decoded track.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\rho_{\mathrm{bg}}\)</span> is a flat background density over the field. Hogg et al. use a
+broad Gaussian; a uniform density is the natural analogue when the field is a bounded
+footprint.</p></li>
+</ul>
+<p>The gradient with respect to <span class="math notranslate nohighlight">\(\pi_n\)</span> now does the right thing. Close to the track the
+Gaussian dominates and <span class="math notranslate nohighlight">\(\pi_n \to 1\)</span>; far from it the background dominates and
+<span class="math notranslate nohighlight">\(\pi_n \to 0\)</span>. Outlier rejection comes out of the likelihood instead of a
+self-referential label. The crossover is set by <span class="math notranslate nohighlight">\(\rho_{\mathrm{bg}}\)</span>, a background
+surface density with a physical meaning, rather than a hand-picked cut. Hogg et al.
+argue against sigma-clipping and hand-tuned cuts for the same reason.</p>
+<p>With per-sample weights, each sample’s term in the sum is multiplied by its weight,
+and its posterior membership doesn’t change. <a class="reference internal" href="density-fields.html"><span class="std std-doc">Density fields</span></a> derives this.</p>
+<p>The encoder’s output is the prior <span class="math notranslate nohighlight">\(\pi_n\)</span>. The posterior membership, which
+<a class="reference internal" href="../reference/api.html#phasecurvefit.nn.posterior_membership" title="phasecurvefit.nn.posterior_membership"><code class="xref py py-func docutils literal notranslate"><span class="pre">posterior_membership()</span></code></a> returns, also accounts for how far the
+star landed from the track, and is the number to use. It uses the width capped at the
+<code class="docutils literal notranslate"><span class="pre">stop</span></code> of <code class="docutils literal notranslate"><span class="pre">sigma_ceiling</span></code>, the same cap as the last epoch of training. Above the cap the
+width network gets no gradient, so its own output there can be wider than any width the
+fit used.</p>
+</section>
+<section id="two-ways-the-fit-can-fail">
+<h2>Two ways the fit can fail<a class="headerlink" href="#two-ways-the-fit-can-fail" title="Link to this heading">#</a></h2>
+<p>A plain mixture likelihood has two degenerate optima, and training can reach both.
+Each is closed off by a schedule. A third failure, from the encoder, is covered in
+the next section.</p>
+<p><strong>Width inflation.</strong> If a few outliers sit only a few widths off the track, the
+likelihood prefers to widen the stream to include them over lowering their <span class="math notranslate nohighlight">\(\pi_n\)</span>, so
+more training does not help. <code class="docutils literal notranslate"><span class="pre">sigma_ceiling</span></code> caps the width with a ceiling that shrinks
+during training. Early on, while the track is still poor, everything should look like a
+member. As the track sharpens, the ceiling tightens and stars that stay far from it are
+forced into the background. The width may fall below the ceiling, but not rise above
+it.</p>
+<p><strong>Membership collapse.</strong> At the start the decoded track is meaningless, so every star
+has a large residual, and the cheapest move is to call the whole dataset background,
+<span class="math notranslate nohighlight">\(\pi_n \to 0\)</span>. Once <span class="math notranslate nohighlight">\(\pi_n = 0\)</span> the stream component carries no weight, no gradient
+reaches the decoder, the track drifts, residuals grow, and <span class="math notranslate nohighlight">\(\pi\)</span> stays at zero. With
+outliers 20 widths away, a mixture without a warm-up pushed the median member residual
+to about 8, against a true width of 0.15, and rejected all 400 genuine members.
+<code class="docutils literal notranslate"><span class="pre">warmup_frac</span></code> prevents this the way EM is usually initialized: it fits the track first,
+with membership held near 1, and only then lets the model reject stars. In the loss,
+<span class="math notranslate nohighlight">\(\pi^{\mathrm{eff}}_n = 1 - w(t)\,(1 - \pi_n)\)</span>, so at <span class="math notranslate nohighlight">\(w = 0\)</span> it is a plain Gaussian fit
+to the track.</p>
+</section>
+<section id="why-the-encoder-is-frozen">
+<h2>Why the encoder is frozen<a class="headerlink" href="#why-the-encoder-is-frozen" title="Link to this heading">#</a></h2>
+<p>A third failure comes from the encoder. If it keeps training while the mixture is
+fitted, <span class="math notranslate nohighlight">\(\gamma\)</span> can move under the track during the warm-up, before the width and
+the membership have settled. The track then drifts off the stream, and once the
+warm-up ends the fit calls every star background. On the outlier tutorial’s data,
+ordered with the default pipeline, this happened on 3 of 5 training seeds.</p>
+<p>So with mixture membership the encoder is frozen during the joint phase by default.
+The trunk and the <span class="math notranslate nohighlight">\(\gamma\)</span> head keep the weights from the first phase, which fixes
+<span class="math notranslate nohighlight">\(\gamma\)</span>, and the membership head keeps training on the frozen features, so the prior
+can still learn which stars to reject. On the same data and seeds, none of the fits
+collapsed, and every one rejected all 25 interlopers.</p>
+</section>
+<section id="what-it-does-not-fix">
+<h2>What it does not fix<a class="headerlink" href="#what-it-does-not-fix" title="Link to this heading">#</a></h2>
+<p>The encoder’s negatives are still uniform in the box, so its prior <span class="math notranslate nohighlight">\(\pi_n\)</span> remains a
+weak discriminator. The mixture works anyway, because the posterior is dominated by the
+residual. Harder negatives, such as real stars displaced across the track or with
+shuffled velocities, would sharpen the prior too; that is not implemented.</p>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading">#</a></h2>
+<p>Hogg, D. W., Bovy, J., &amp; Lang, D. (2010). <em>Data analysis recipes: Fitting a model to
+data.</em> <a class="reference external" href="https://arxiv.org/abs/1008.4686">arXiv:1008.4686</a>. §3, “Pruning outliers”, is
+the mixture model implemented here.</p>
+<div class="highlight-bibtex notranslate"><div class="highlight"><pre><span></span><span class="nc">@article</span><span class="p">{</span><span class="nl">hogg2010data</span><span class="p">,</span>
+<span class="w">  </span><span class="na">title</span><span class="p">=</span><span class="s">{Data analysis recipes: Fitting a model to data}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">author</span><span class="p">=</span><span class="s">{Hogg, David W. and Bovy, Jo and Lang, Dustin}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">journal</span><span class="p">=</span><span class="s">{arXiv preprint arXiv:1008.4686}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">year</span><span class="p">=</span><span class="s">{2010}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">eprint</span><span class="p">=</span><span class="s">{1008.4686}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">archivePrefix</span><span class="p">=</span><span class="s">{arXiv}</span><span class="p">,</span>
+<span class="w">  </span><span class="na">primaryClass</span><span class="p">=</span><span class="s">{astro-ph.IM}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="autoencoder.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">The autoencoder</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="track-uncertainty.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Track uncertainty</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-the-default-membership-cannot-reject-anything">Why the default membership cannot reject anything</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#it-is-trained-to-keep-the-outliers">It is trained to keep the outliers</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#the-negatives-are-too-easy">The negatives are too easy</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#the-membership-never-sees-the-residual">The membership never sees the residual</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#modelling-the-background">Modelling the background</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#two-ways-the-fit-can-fail">Two ways the fit can fail</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-the-encoder-is-frozen">Why the encoder is frozen</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-it-does-not-fix">What it does not fix</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#references">References</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By phasecurvefit Developers
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, phasecurvefit Developers.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

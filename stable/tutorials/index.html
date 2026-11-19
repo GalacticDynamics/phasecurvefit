@@ -11,12 +11,12 @@
 <meta property="og:type" content="website" />
 <meta property="og:url" content="tutorials/index.html" />
 <meta property="og:site_name" content="phasecurvefit" />
-<meta property="og:description" content="This section contains practical examples demonstrating how to use phasecurvefit. Running these notebooks locally requires the tutorials extra, which adds matplotlib and galax on top of phasecurvefi..." />
+<meta property="og:description" content="Each tutorial is a complete analysis that runs from simulated data to a result. The groups follow the kind of data you have; start with the group that matches yours. New to phasecurvefit? Begin wit..." />
 <meta property="og:image:width" content="1146" />
 <meta property="og:image:height" content="600" />
-<meta property="og:image" content="_images/social_previews/summary_tutorials_index_33c57b38.png" />
-<meta property="og:image:alt" content="This section contains practical examples demonstrating how to use phasecurvefit. Running these notebooks locally requires the tutorials extra, which adds matplotlib and galax on top of phasecurvefi..." />
-<meta name="description" content="This section contains practical examples demonstrating how to use phasecurvefit. Running these notebooks locally requires the tutorials extra, which adds matplotlib and galax on top of phasecurvefi..." />
+<meta property="og:image" content="_images/social_previews/summary_tutorials_index_4ee8a8f0.png" />
+<meta property="og:image:alt" content="Each tutorial is a complete analysis that runs from simulated data to a result. The groups follow the kind of data you have; start with the group that matches yours. New to phasecurvefit? Begin wit..." />
+<meta name="description" content="Each tutorial is a complete analysis that runs from simulated data to a result. The groups follow the kind of data you have; start with the group that matches yours. New to phasecurvefit? Begin wit..." />
 <meta name="twitter:card" content="summary_large_image" />
 
     <title>Tutorials &#8212; phasecurvefit</title>
@@ -41,6 +41,7 @@
 
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
     <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=9c3e77be" />
     <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
@@ -62,21 +63,19 @@
     <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
     <script src="../_static/design-tabs.js?v=f930bc37"></script>
     <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
-    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/index';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
-        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.3';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.4';
         DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
         </script>
-    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.3/tutorials/index.html" />
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.4/tutorials/index.html" />
     <link rel="icon" href="../_static/favicon.png"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Learning a Stream with an Autoencoder" href="stream_autoencoder.html" />
-    <link rel="prev" title="JAX Integration" href="../guides/jax-integration.html" />
+    <link rel="prev" title="Quick start" href="../start/quickstart.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -239,42 +238,79 @@ document.write(`
         <ul class="nav bd-sidenav bd-sidenav__home-link">
             <li class="toctree-l1">
                 <a class="reference internal" href="../index.html">
-                    🚀 Get Started
+                    phasecurvefit
                 </a>
             </li>
         </ul>
-        <p aria-level="2" class="caption" role="heading"><span class="caption-text">📚 Guides</span></p>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Start</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="../guides/quickstart.html">Quickstart Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guides/metrics.html">Distance Metrics Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guides/algorithm.html">Algorithm Details</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guides/orderers.html">Orderers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guides/nn.html">Autoencoder for Gap Filling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guides/outliers.html">Outlier rejection</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guides/jax-integration.html">JAX Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/what-it-does.html">What phasecurvefit does</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/is-it-right.html">Is phasecurvefit right for my data?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/install.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/quickstart.html">Quick start</a></li>
 </ul>
-<p aria-level="2" class="caption" role="heading"><span class="caption-text">🎓 Tutorials</span></p>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="current nav bd-sidenav">
 <li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">Tutorials</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
 <li class="toctree-l2"><a class="reference internal" href="stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
 <li class="toctree-l2"><a class="reference internal" href="stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
-<li class="toctree-l2"><a class="reference internal" href="outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
 <li class="toctree-l2"><a class="reference internal" href="epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
 <li class="toctree-l2"><a class="reference internal" href="epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
-<li class="toctree-l2"><a class="reference internal" href="epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="density_fields.html">Fitting a Track Through a Density Image</a></li>
 </ul>
 </details></li>
 </ul>
-<p aria-level="2" class="caption" role="heading"><span class="caption-text">🔌 API Reference</span></p>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How-to guides</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="../api/index.html">API Reference</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../how-to/index.html">How-to guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/data.html">Prepare your data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/units.html">Use physical units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/choose-orderer.html">Choose an orderer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/chain-orderers.html">Chain orderers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/local-flow-walk.html">Use the local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/tune-metric.html">Choose and tune the walk’s metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/custom-metric.html">Write a custom metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/kdtree.html">Restrict the walk to nearby points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/som.html">Refine an ordering with a self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/autoencoder.html">Fill gaps and fit a track with the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/interpolate.html">Interpolate positions along an ordering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/outliers.html">Reject outliers with the mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/track-uncertainty.html">Put an uncertainty band on the track</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/jax.html">Compile, batch and differentiate with JAX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how-to/gpu.html">Run on a GPU</a></li>
 </ul>
-<p aria-level="2" class="caption" role="heading"><span class="caption-text">🔀 Migration</span></p>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How it works</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="../migration.html">Migration Guide</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../explanation/index.html">How it works</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/walk.html">The local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/mst.html">The MST backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/som.html">The self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/autoencoder.html">The autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/outliers.html">Outlier rejection with a mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/track-uncertainty.html">Track uncertainty</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../explanation/density-fields.html">Density fields</a></li>
 </ul>
-<p aria-level="2" class="caption" role="heading"><span class="caption-text">More</span></p>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/api.html">API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/options.html">Options and defaults</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/result.html">The ordering result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.3-to-v0.4.html">Migrating from v0.3 to v0.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.2-to-v0.3.html">Migrating from v0.2 to v0.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/migration/v0.1-to-v0.2.html">Migrating from v0.1 to v0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/citation.html">Citation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to phasecurvefit</a></li>
 </ul>
@@ -449,7 +485,9 @@ document.write(`
   </button>
 `);
 </script>
-
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
 </div></div>
       
     </div>
@@ -465,6 +503,18 @@ document.write(`
     <div id="print-main-content">
         <div id="jb-print-toc">
             
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#a-stream-with-velocities">A stream with velocities</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#no-known-start-point">No known start point</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#a-curve-that-crosses-itself">A curve that crosses itself</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#contaminated-data">Contaminated data</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#an-image-or-density-map">An image or density map</a></li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
@@ -476,107 +526,64 @@ document.write(`
                   
   <section class="tex2jax_ignore mathjax_ignore" id="tutorials">
 <h1>Tutorials<a class="headerlink" href="#tutorials" title="Link to this heading">#</a></h1>
-<p>This section contains practical examples demonstrating how to use phasecurvefit.</p>
-<p>Running these notebooks locally requires the <code class="docutils literal notranslate"><span class="pre">tutorials</span></code> extra, which adds
-<code class="docutils literal notranslate"><span class="pre">matplotlib</span></code> and <code class="docutils literal notranslate"><span class="pre">galax</span></code> on top of <code class="docutils literal notranslate"><span class="pre">phasecurvefit[all]</span></code>:</p>
-<div class="sd-tab-set docutils">
-<input checked="checked" id="sd-tab-item-0" name="sd-tab-set-0" type="radio">
-<label class="sd-tab-label" for="sd-tab-item-0">
-pip</label><div class="sd-tab-content docutils">
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;phasecurvefit[tutorials]&quot;</span>
-</pre></div>
-</div>
-</div>
-<input id="sd-tab-item-1" name="sd-tab-set-0" type="radio">
-<label class="sd-tab-label" for="sd-tab-item-1">
-uv</label><div class="sd-tab-content docutils">
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uv<span class="w"> </span>add<span class="w"> </span>phasecurvefit<span class="w"> </span>--extra<span class="w"> </span>tutorials
-</pre></div>
-</div>
-</div>
-</div>
-<p><strong>Where to start:</strong> new to <code class="docutils literal notranslate"><span class="pre">phasecurvefit</span></code>? Begin with the <strong>Stream
-Autoencoder</strong> tutorial, which introduces ordering, the autoencoder and how to read
-its training. The others build on it: the running-mean tutorials trade accuracy
-for speed, the MST tutorials order without a starting point, the epitrochoid
-tutorials handle curves that cross themselves, and Outlier Rejection covers
-contaminated data.</p>
-<div class="sd-container-fluid sd-sphinx-override sd-mb-4 docutils">
-<div class="sd-row sd-row-cols-1 sd-row-cols-xs-1 sd-row-cols-sm-2 sd-row-cols-md-2 sd-row-cols-lg-3 sd-g-2 sd-g-xs-2 sd-g-sm-2 sd-g-md-2 sd-g-lg-2 docutils">
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Stream Autoencoder</div>
-<p class="sd-card-text"><strong>Start here.</strong> Order a simulated stellar stream, fit its mean track, and read the training loss.</p>
-<p class="sd-card-text"><a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_autoencoder.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="stream_autoencoder.html"><span class="doc">Learning a Stream with an Autoencoder</span></a></div>
-</div>
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Stream Running Mean Path</div>
-<p class="sd-card-text">A faster, training-free mean track for the same stream, and when it is accurate enough.</p>
-<p class="sd-card-text"><a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_runningmean.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="stream_runningmean.html"><span class="doc">Learning a Stream with a Running Mean</span></a></div>
-</div>
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Stream MST Backbone</div>
-<p class="sd-card-text">Order a stream with no progenitor or start index, and reject injected interlopers.</p>
-<p class="sd-card-text"><a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_mst.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="stream_mst.html"><span class="doc">Ordering a Mock Stream with the MST Backbone</span></a></div>
-</div>
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Outlier Rejection</div>
-<p class="sd-card-text">Reject interlopers with a stream-plus-background mixture model, and see why the orderers alone can’t.</p>
-<p class="sd-card-text"><a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/outlier_rejection.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="outlier_rejection.html"><span class="doc">Outlier rejection with mixture-model membership</span></a></div>
-</div>
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Epitrochoid Autoencoder</div>
-<p class="sd-card-text">Order a curve that crosses itself, using velocities to stay on the right strand.</p>
-<p class="sd-card-text"><a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_autoencoder.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="epitrochoid_autoencoder.html"><span class="doc">Learning an Epitrochoid with an Autoencoder</span></a></div>
-</div>
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Epitrochoid Running Mean Path</div>
-<p class="sd-card-text">Why a running mean cuts inside tight bends, and how the window size controls it.</p>
-<p class="sd-card-text"><a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_runningmean.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="epitrochoid_runningmean.html"><span class="doc">Learning an Epitrochoid with a Running Mean</span></a></div>
-</div>
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Epitrochoid MST Backbone</div>
-<p class="sd-card-text">Why the MST needs velocities on a self-crossing curve, plus a Fourier-feature decoder.</p>
-<p class="sd-card-text"><a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_mst.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="epitrochoid_mst.html"><span class="doc">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</span></a></div>
-</div>
-</div>
-</div>
+<p>Each tutorial is a complete analysis that runs from simulated data to a result.
+The groups follow the kind of data you have; start with the group that matches
+yours. New to phasecurvefit? Begin with the <a class="reference internal" href="../start/quickstart.html"><span class="std std-doc">Quick start</span></a>, then the
+stream autoencoder tutorial.</p>
+<p>The notebooks need the <code class="docutils literal notranslate"><span class="pre">tutorials</span></code> extra, which adds <code class="docutils literal notranslate"><span class="pre">matplotlib</span></code> and <code class="docutils literal notranslate"><span class="pre">galax</span></code>
+(<a class="reference internal" href="../start/install.html"><span class="std std-doc">Install</span></a>). Continuous integration runs every notebook on each
+change, so each one is checked to run with the current code.</p>
+<section id="a-stream-with-velocities">
+<h2>A stream with velocities<a class="headerlink" href="#a-stream-with-velocities" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="stream_autoencoder.html"><span class="std std-doc">Learning a Stream with an Autoencoder</span></a>: order a simulated stellar stream from its progenitor,
+fit its mean track, and read the training loss. <strong>Start here.</strong>
+<a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_autoencoder.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p></li>
+<li><p><a class="reference internal" href="stream_runningmean.html"><span class="std std-doc">Learning a Stream with a Running Mean</span></a>: a faster, training-free mean track for the same
+stream, and when it is accurate enough.
+<a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_runningmean.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p></li>
+</ul>
+</section>
+<section id="no-known-start-point">
+<h2>No known start point<a class="headerlink" href="#no-known-start-point" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="stream_mst.html"><span class="std std-doc">Ordering a Mock Stream with the MST Backbone</span></a>: order a stream with no progenitor or start index, and reject
+injected interlopers.
+<a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/stream_mst.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p></li>
+<li><p><a class="reference internal" href="epitrochoid_mst.html"><span class="std std-doc">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</span></a>: why the MST needs velocities on a self-crossing curve,
+and a Fourier-feature decoder.
+<a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_mst.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p></li>
+</ul>
+</section>
+<section id="a-curve-that-crosses-itself">
+<h2>A curve that crosses itself<a class="headerlink" href="#a-curve-that-crosses-itself" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="epitrochoid_autoencoder.html"><span class="std std-doc">Learning an Epitrochoid with an Autoencoder</span></a>: order a curve that crosses itself, using
+velocities to stay on the right strand.
+<a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_autoencoder.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p></li>
+<li><p><a class="reference internal" href="epitrochoid_runningmean.html"><span class="std std-doc">Learning an Epitrochoid with a Running Mean</span></a>: why a running mean cuts inside tight bends, and
+how the window size controls it.
+<a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/epitrochoid_runningmean.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p></li>
+</ul>
+</section>
+<section id="contaminated-data">
+<h2>Contaminated data<a class="headerlink" href="#contaminated-data" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="outlier_rejection.html"><span class="std std-doc">Outlier rejection with mixture-model membership</span></a>: reject interlopers with a stream-plus-background mixture
+model, and see why the orderers alone can’t.
+<a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/outlier_rejection.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p></li>
+</ul>
+</section>
+<section id="an-image-or-density-map">
+<h2>An image or density map<a class="headerlink" href="#an-image-or-density-map" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="density_fields.html"><span class="std std-doc">Fitting a Track Through a Density Image</span></a>: fit a track through an image of a wide, diffuse curve, with
+each pixel a sample weighted by its value.
+<a class="reference external" href="https://colab.research.google.com/github/GalacticDynamics/phasecurvefit/blob/main/docs/tutorials/density_fields.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p></li>
+</ul>
 <div class="toctree-wrapper compound">
 </div>
+</section>
 </section>
 
 
@@ -591,12 +598,12 @@ Epitrochoid MST Backbone</div>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../guides/jax-integration.html"
+       href="../start/quickstart.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">JAX Integration</p>
+        <p class="prev-next-title">Quick start</p>
       </div>
     </a>
     <a class="right-next"
@@ -614,6 +621,25 @@ Epitrochoid MST Backbone</div>
             </div>
             
             
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#a-stream-with-velocities">A stream with velocities</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#no-known-start-point">No known start point</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#a-curve-that-crosses-itself">A curve that crosses itself</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#contaminated-data">Contaminated data</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#an-image-or-density-map">An image or density map</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
               
             
           </div>

@@ -7,19 +7,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta property="og:title" content="🚀 Get Started" />
+<meta property="og:title" content="phasecurvefit" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="index.html" />
 <meta property="og:site_name" content="phasecurvefit" />
-<meta property="og:description" content="phasecurvefit is a Python library for constructing a single, ordered walk through phase-space data. It was originally built for stellar stream simulations but is general-purpose and applies to any ..." />
+<meta property="og:description" content="Order phase-space data along a curve, then fit a smooth track through it. You have positions and velocities for many samples that lie along a curve, such as the stars of a stellar stream, but not t..." />
 <meta property="og:image:width" content="1146" />
 <meta property="og:image:height" content="600" />
-<meta property="og:image" content="_images/social_previews/summary_index_f3be722d.png" />
-<meta property="og:image:alt" content="phasecurvefit is a Python library for constructing a single, ordered walk through phase-space data. It was originally built for stellar stream simulations but is general-purpose and applies to any ..." />
-<meta name="description" content="phasecurvefit is a Python library for constructing a single, ordered walk through phase-space data. It was originally built for stellar stream simulations but is general-purpose and applies to any ..." />
+<meta property="og:image" content="_images/social_previews/summary_index_b72b6363.png" />
+<meta property="og:image:alt" content="Order phase-space data along a curve, then fit a smooth track through it. You have positions and velocities for many samples that lie along a curve, such as the stars of a stellar stream, but not t..." />
+<meta name="description" content="Order phase-space data along a curve, then fit a smooth track through it. You have positions and velocities for many samples that lie along a curve, such as the stars of a stellar stream, but not t..." />
 <meta name="twitter:card" content="summary_large_image" />
 
-    <title>🚀 Get Started &#8212; phasecurvefit</title>
+    <title>phasecurvefit &#8212; phasecurvefit</title>
   
   
   
@@ -41,6 +41,7 @@
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=9c3e77be" />
     <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
@@ -62,20 +63,20 @@
     <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
     <script src="_static/design-tabs.js?v=f930bc37"></script>
     <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
-    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://galacticdynamics.github.io/phasecurvefit/switcher.json';
-        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.3';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'v0.4';
         DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
         </script>
-    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.3/index.html" />
+    <link rel="canonical" href="https://galacticdynamics.github.io/phasecurvefit/v0.4/index.html" />
     <link rel="icon" href="_static/favicon.png"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Quickstart Guide" href="guides/quickstart.html" />
+    <link rel="next" title="What phasecurvefit does" href="start/what-it-does.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -240,42 +241,79 @@ document.write(`
         <ul class="nav bd-sidenav bd-sidenav__home-link">
             <li class="toctree-l1 current active">
                 <a class="reference internal" href="#">
-                    🚀 Get Started
+                    phasecurvefit
                 </a>
             </li>
         </ul>
-        <p aria-level="2" class="caption" role="heading"><span class="caption-text">📚 Guides</span></p>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Start</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="guides/quickstart.html">Quickstart Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guides/metrics.html">Distance Metrics Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guides/algorithm.html">Algorithm Details</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guides/orderers.html">Orderers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guides/nn.html">Autoencoder for Gap Filling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guides/outliers.html">Outlier rejection</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guides/jax-integration.html">JAX Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="start/what-it-does.html">What phasecurvefit does</a></li>
+<li class="toctree-l1"><a class="reference internal" href="start/is-it-right.html">Is phasecurvefit right for my data?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="start/install.html">Install</a></li>
+<li class="toctree-l1"><a class="reference internal" href="start/quickstart.html">Quick start</a></li>
 </ul>
-<p aria-level="2" class="caption" role="heading"><span class="caption-text">🎓 Tutorials</span></p>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1 has-children"><a class="reference internal" href="tutorials/index.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/stream_autoencoder.html">Learning a Stream with an Autoencoder</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/stream_runningmean.html">Learning a Stream with a Running Mean</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/stream_mst.html">Ordering a Mock Stream with the MST Backbone</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tutorials/outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorials/epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/epitrochoid_autoencoder.html">Learning an Epitrochoid with an Autoencoder</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/epitrochoid_runningmean.html">Learning an Epitrochoid with a Running Mean</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tutorials/epitrochoid_mst.html">Ordering a Self-Intersecting Epitrochoid with the MST Backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorials/outlier_rejection.html">Outlier rejection with mixture-model membership</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorials/density_fields.html">Fitting a Track Through a Density Image</a></li>
 </ul>
 </details></li>
 </ul>
-<p aria-level="2" class="caption" role="heading"><span class="caption-text">🔌 API Reference</span></p>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How-to guides</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="api/index.html">API Reference</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="how-to/index.html">How-to guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="how-to/data.html">Prepare your data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/units.html">Use physical units</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/choose-orderer.html">Choose an orderer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/chain-orderers.html">Chain orderers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/local-flow-walk.html">Use the local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/tune-metric.html">Choose and tune the walk’s metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/custom-metric.html">Write a custom metric</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/kdtree.html">Restrict the walk to nearby points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/som.html">Refine an ordering with a self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/autoencoder.html">Fill gaps and fit a track with the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/interpolate.html">Interpolate positions along an ordering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/outliers.html">Reject outliers with the mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/track-uncertainty.html">Put an uncertainty band on the track</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/jax.html">Compile, batch and differentiate with JAX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how-to/gpu.html">Run on a GPU</a></li>
 </ul>
-<p aria-level="2" class="caption" role="heading"><span class="caption-text">🔀 Migration</span></p>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">How it works</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="migration.html">Migration Guide</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="explanation/index.html">How it works</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="explanation/walk.html">The local-flow walk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="explanation/mst.html">The MST backbone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="explanation/som.html">The self-organizing map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="explanation/autoencoder.html">The autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="explanation/outliers.html">Outlier rejection with a mixture model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="explanation/track-uncertainty.html">Track uncertainty</a></li>
+<li class="toctree-l2"><a class="reference internal" href="explanation/density-fields.html">Density fields</a></li>
 </ul>
-<p aria-level="2" class="caption" role="heading"><span class="caption-text">More</span></p>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="reference/index.html">Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="reference/api.html">API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/options.html">Options and defaults</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/result.html">The ordering result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/migration/v0.3-to-v0.4.html">Migrating from v0.3 to v0.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/migration/v0.2-to-v0.3.html">Migrating from v0.2 to v0.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/migration/v0.1-to-v0.2.html">Migrating from v0.1 to v0.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/citation.html">Citation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing to phasecurvefit</a></li>
 </ul>
@@ -463,7 +501,7 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>🚀 Get Started</h1>
+    <h1>phasecurvefit</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
@@ -473,15 +511,11 @@ document.write(`
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#installation">Installation</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quick-example">Quick Example</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#features">Features</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-it-works">How It Works</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#configuration-options">Configuration Options</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#data-format">Data Format</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#citation">Citation</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#next-steps">Next Steps</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#indices-and-tables">Indices and tables</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#where-to-start">Where to start</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-documentation">The documentation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-phasecurvefit">Why phasecurvefit? </a><ul class="visible nav section-nav flex-column">
+</ul>
+</li>
 </ul>
             </nav>
         </div>
@@ -493,293 +527,194 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <h1> <code> phasecurvefit </code> </h1>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<section class="tex2jax_ignore mathjax_ignore" id="get-started">
-<h1 class="sd-d-none">🚀 Get Started<a class="headerlink" href="#get-started" title="Link to this heading">#</a></h1>
-<p><strong>phasecurvefit</strong> is a Python library for constructing a single, ordered walk
-through phase-space data. It was originally built for stellar stream
-simulations but is general-purpose and applies to any dataset where you want to
-order observations by proximity and momentum in phase-space.</p>
-<p>The core approach combines:</p>
-<ul class="simple">
-<li><p><strong>Spatial proximity</strong>: Finding nearby points in position space</p></li>
-<li><p><strong>Velocity momentum</strong>: Preferring points that align with the current velocity direction</p></li>
-</ul>
-<p>This is particularly useful for coherent trajectories in phase-space, such as stellar streams, but works well for many other ordered-walk problems.</p>
-<hr class="docutils" />
-<section id="installation">
-<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">#</a></h2>
+  <section class="tex2jax_ignore mathjax_ignore" id="phasecurvefit">
+<h1 class="sd-d-none">phasecurvefit<a class="headerlink" href="#phasecurvefit" title="Link to this heading">#</a></h1>
+<h1> <code> phasecurvefit </code> </h1>
+<p><strong>Order phase-space data along a curve, then fit a smooth track through it.</strong></p>
+<p>You have positions and velocities for many samples that lie along a curve, such as
+the stars of a stellar stream, but not the order they come in along it. Or you have
+an image of the curve, such as a density map of a stream, and each pixel becomes a
+sample weighted by its density. phasecurvefit finds the order, gives every sample an
+ordering coordinate <span class="math notranslate nohighlight">\(\gamma\)</span>, and fits a smooth mean track <span class="math notranslate nohighlight">\(x(\gamma)\)</span>. Its default
+needs no known start point, and velocity-aware orderers keep the ordering on the
+right strand where a curve crosses itself. It is built on JAX: its orderers and
+networks work with <code class="docutils literal notranslate"><span class="pre">jit</span></code>, <code class="docutils literal notranslate"><span class="pre">vmap</span></code> and <code class="docutils literal notranslate"><span class="pre">grad</span></code>, and everything runs on CPU or GPU.</p>
 <div class="sd-tab-set docutils">
 <input checked="checked" id="sd-tab-item-0" name="sd-tab-set-0" type="radio">
 <label class="sd-tab-label" for="sd-tab-item-0">
-pip</label><div class="sd-tab-content docutils">
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>phasecurvefit<span class="o">[</span>all<span class="o">]</span>
-</pre></div>
-</div>
-<p>where “all” enables unit support (through <code class="docutils literal notranslate"><span class="pre">unxt</span></code>) and kdtree support through <code class="docutils literal notranslate"><span class="pre">jaxkd</span></code>.</p>
-</div>
-<input id="sd-tab-item-1" name="sd-tab-set-0" type="radio">
-<label class="sd-tab-label" for="sd-tab-item-1">
-uv</label><div class="sd-tab-content docutils">
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uv<span class="w"> </span>add<span class="w"> </span>phasecurvefit<span class="w"> </span>--extra<span class="w"> </span>all
-</pre></div>
-</div>
-<p>where “all” enables unit support (through <code class="docutils literal notranslate"><span class="pre">unxt</span></code>) and kdtree support through <code class="docutils literal notranslate"><span class="pre">jaxkd</span></code>.</p>
-</div>
-</div>
-<p>To run the <a class="reference internal" href="tutorials/index.html"><span class="doc std std-doc">tutorials</span></a>, install the <code class="docutils literal notranslate"><span class="pre">tutorials</span></code> extra instead,
-which adds <code class="docutils literal notranslate"><span class="pre">matplotlib</span></code> (plotting) and <code class="docutils literal notranslate"><span class="pre">galax</span></code> (mock-stream generation) on top
-of <code class="docutils literal notranslate"><span class="pre">[all]</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>phasecurvefit<span class="o">[</span>tutorials<span class="o">]</span>
-</pre></div>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">all</span></code> intentionally excludes <code class="docutils literal notranslate"><span class="pre">tutorials</span></code>: <code class="docutils literal notranslate"><span class="pre">all</span></code> is for optional <em>runtime</em>
-functionality, while <code class="docutils literal notranslate"><span class="pre">tutorials</span></code> is for packages only needed to run the
-example notebooks.</p>
-<div class="sd-tab-set docutils">
-<input checked="checked" id="sd-tab-item-2" name="sd-tab-set-1" type="radio">
-<label class="sd-tab-label" for="sd-tab-item-2">
-source, via uv</label><div class="sd-tab-content docutils">
-<p>To install the latest development version of <code class="docutils literal notranslate"><span class="pre">phasecurvefit</span></code> directly from the
-GitHub repository, use uv:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uv<span class="w"> </span>add<span class="w"> </span>git+https://github.com/GalacticDynamics/phasecurvefit.git@main
-</pre></div>
-</div>
-<p>You can customize the branch by replacing <code class="docutils literal notranslate"><span class="pre">main</span></code> with any other branch name.</p>
-</div>
-<input id="sd-tab-item-3" name="sd-tab-set-1" type="radio">
-<label class="sd-tab-label" for="sd-tab-item-3">
-building from source</label><div class="sd-tab-content docutils">
-<p>To build <code class="docutils literal notranslate"><span class="pre">phasecurvefit</span></code> from source, clone the repository and install it with uv:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>/path/to/parent
-git<span class="w"> </span>clone<span class="w"> </span>https://github.com/GalacticDynamics/phasecurvefit.git
-<span class="nb">cd</span><span class="w"> </span>phasecurvefit
-uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w">  </span><span class="c1"># editable mode</span>
-</pre></div>
-</div>
-</div>
-</div>
-</section>
-<section id="quick-example">
-<h2>Quick Example<a class="headerlink" href="#quick-example" title="Link to this heading">#</a></h2>
+Point cloud</label><div class="sd-tab-content docutils">
+<img alt="Two panels. Left, &quot;Input: shuffled tracers&quot;: 400 grey points along a spiral of one and a half turns, joined in their stored order by lines that criss-cross the whole figure. Right, &quot;pcf.fit_track: ordering and track&quot;: the same points coloured from purple at the inner end to yellow at the outer end by the ordering coordinate gamma, with an orange fitted track running smoothly along the spiral." src="_images/hero.png" />
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
 
-<span class="c1"># Create phase-space observations as dictionaries</span>
+<span class="c1"># A stand-in for your data: 400 noisy points along a spiral, with velocities</span>
+<span class="n">t</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">400</span><span class="p">)</span>
+<span class="n">r</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="mf">0.6</span> <span class="o">*</span> <span class="n">t</span>
+<span class="n">kx</span><span class="p">,</span> <span class="n">ky</span><span class="p">,</span> <span class="n">kp</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="mi">3</span><span class="p">)</span>
 <span class="n">pos</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]),</span>
-    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]),</span>
+    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">r</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.2</span> <span class="o">*</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">kx</span><span class="p">,</span> <span class="n">t</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span>
+    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">r</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.2</span> <span class="o">*</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">ky</span><span class="p">,</span> <span class="n">t</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span>
 <span class="p">}</span>
-<span class="n">vel</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]),</span>
-    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]),</span>
-<span class="p">}</span>
+<span class="n">vel</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="mf">0.6</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">-</span> <span class="n">r</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="mf">0.6</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">+</span> <span class="n">r</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)}</span>
+<span class="n">shuffle</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">kp</span><span class="p">,</span> <span class="n">t</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>  <span class="c1"># hide the true order</span>
+<span class="n">pos</span><span class="p">,</span> <span class="n">vel</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">a</span><span class="p">:</span> <span class="n">a</span><span class="p">[</span><span class="n">shuffle</span><span class="p">],</span> <span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">))</span>
 
-<span class="c1"># Order observations using pcf.order</span>
-<span class="n">config</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">WalkConfig</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">pcf</span><span class="o">.</span><span class="n">strats</span><span class="o">.</span><span class="n">KDTree</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">3</span><span class="p">))</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">))</span>
-
-<span class="c1"># Train autoencoder for gap filling</span>
-<span class="n">key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="n">normalizer</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">StandardScalerNormalizer</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">)</span>
-<span class="n">autoencoder</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">PathAutoencoder</span><span class="o">.</span><span class="n">make</span><span class="p">(</span>
-    <span class="n">normalizer</span><span class="p">,</span> <span class="n">gamma_range</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">gamma_range</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">key</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">TrainingConfig</span><span class="p">(</span><span class="n">show_pbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">ordering</span><span class="p">,</span> <span class="n">fitted</span><span class="p">,</span> <span class="n">losses</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">fit_track</span><span class="p">(</span>
+    <span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">training_config</span><span class="o">=</span><span class="n">config</span>
 <span class="p">)</span>
+<span class="n">track</span> <span class="o">=</span> <span class="n">fitted</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">*</span><span class="n">fitted</span><span class="o">.</span><span class="n">track_range</span><span class="p">,</span> <span class="mi">300</span><span class="p">))</span>  <span class="c1"># the smooth mean track</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">fitted</span><span class="o">.</span><span class="n">gamma</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># an ordering coordinate for every sample: (400,)</span>
+</pre></div>
+</div>
+</div>
+<input id="sd-tab-item-1" name="sd-tab-set-0" type="radio">
+<label class="sd-tab-label" for="sd-tab-item-1">
+Density field</label><div class="sd-tab-content docutils">
+<img alt="Two panels. Left, &quot;Input: a density image&quot;: a grey image of the same spiral, dark along the curve and fading out to either side. Right, &quot;pcf.fit_track with weights&quot;: the bright pixels of the image coloured from purple at the outer end to yellow at the inner end by the ordering coordinate gamma, fainter where the density is lower, with an orange fitted track running along the middle of the spiral." src="_images/hero-field.png" />
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
 
-<span class="n">train_cfg</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">TrainingConfig</span><span class="p">(</span>
-    <span class="n">n_epochs_encoder</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">n_epochs_both</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">show_pbar</span><span class="o">=</span><span class="kc">False</span>
+<span class="c1"># A stand-in for your data: the same spiral as an image, blurred across the curve</span>
+<span class="n">t</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">400</span><span class="p">)</span>
+<span class="n">r</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="mf">0.6</span> <span class="o">*</span> <span class="n">t</span>
+<span class="n">grid</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mf">7.5</span><span class="p">,</span> <span class="mf">7.5</span><span class="p">,</span> <span class="mi">120</span><span class="p">)</span>
+<span class="n">X</span><span class="p">,</span> <span class="n">Y</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">grid</span><span class="p">)</span>
+<span class="n">cx</span><span class="p">,</span> <span class="n">cy</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">),</span> <span class="n">r</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+<span class="n">d2</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">min</span><span class="p">((</span><span class="n">X</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">-</span> <span class="n">cx</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="n">Y</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">-</span> <span class="n">cy</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">image</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">d2</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="mf">0.3</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+
+<span class="n">keep</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mf">0.05</span>  <span class="c1"># each bright pixel becomes a sample</span>
+<span class="n">pos</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">X</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="n">keep</span><span class="p">],</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">Y</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="n">keep</span><span class="p">]}</span>
+<span class="n">vel</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span>  <span class="c1"># an image has no velocities</span>
+<span class="n">weights</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="n">keep</span><span class="p">]</span>  <span class="c1"># weighted by the density there</span>
+
+<span class="n">config</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">TrainingConfig</span><span class="p">(</span><span class="n">show_pbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">ordering</span><span class="p">,</span> <span class="n">fitted</span><span class="p">,</span> <span class="n">losses</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">fit_track</span><span class="p">(</span>
+    <span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">weights</span><span class="o">=</span><span class="n">weights</span><span class="p">,</span> <span class="n">training_config</span><span class="o">=</span><span class="n">config</span>
 <span class="p">)</span>
-<span class="n">result</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">train_autoencoder</span><span class="p">(</span><span class="n">autoencoder</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">train_cfg</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">indices</span><span class="p">)</span>  <span class="c1"># Array([0, 1, 2, 3, 4])</span>
+<span class="n">track</span> <span class="o">=</span> <span class="n">fitted</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">*</span><span class="n">fitted</span><span class="o">.</span><span class="n">track_range</span><span class="p">,</span> <span class="mi">300</span><span class="p">))</span>  <span class="c1"># the smooth mean track</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">fitted</span><span class="o">.</span><span class="n">gamma</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">weights</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># a gamma for every pixel: True</span>
 </pre></div>
 </div>
-</section>
-<section id="features">
-<h2>Features<a class="headerlink" href="#features" title="Link to this heading">#</a></h2>
+<p>An image has no velocities, so nothing sets which end of the curve <span class="math notranslate nohighlight">\(\gamma\)</span> starts
+from. <code class="docutils literal notranslate"><span class="pre">fit_track</span></code> orders with the default pipeline, which is fine for a thin
+stream like this one. For a wide or uniform field, order with a
+<a class="reference internal" href="reference/api.html#phasecurvefit.orderers.RidgeOrderer" title="phasecurvefit.orderers.RidgeOrderer"><code class="xref py py-class docutils literal notranslate"><span class="pre">RidgeOrderer</span></code></a> first (<a class="reference internal" href="how-to/choose-orderer.html"><span class="std std-doc">Choose an orderer</span></a>).</p>
+</div>
+</div>
+<p>The script that draws these figures runs this same code
+(<a class="reference external" href="https://github.com/GalacticDynamics/phasecurvefit/blob/main/docs/_static/generate_hero.py"><code class="docutils literal notranslate"><span class="pre">docs/_static/generate_hero.py</span></code></a>).</p>
+<section id="where-to-start">
+<h2>Where to start<a class="headerlink" href="#where-to-start" title="Link to this heading">#</a></h2>
+<p>Pick the line that matches your data. Each one leads to a tutorial that runs from
+simulated data to a result.</p>
 <ul class="simple">
-<li><p>✅ <strong>JAX-native</strong>: Full support for JIT compilation, vectorization, and auto-differentiation</p></li>
-<li><p>✅ <strong>High performance</strong>: Optimized with <code class="docutils literal notranslate"><span class="pre">jax.lax.while_loop</span></code> for speed</p></li>
-<li><p>✅ <strong>Gap filling</strong>: Autoencoder neural network interpolates skipped tracers</p></li>
-<li><p>✅ <strong>Flexible</strong>: Works in any number of dimensions</p></li>
-<li><p>✅ <strong>Type-safe</strong>: Full type annotations with <code class="docutils literal notranslate"><span class="pre">jaxtyping</span></code></p></li>
-<li><p>✅ <strong>Well-tested</strong>: Comprehensive test suite with property-based testing</p></li>
+<li><p><strong>A stream or curve, and no known start point.</strong> A minimum-spanning-tree backbone
+finds both ends itself: <a class="reference internal" href="tutorials/stream_mst.html"><span class="std std-doc">order a stream with no start index</span></a>.</p></li>
+<li><p><strong>A stream with a known progenitor or start point.</strong> Walk along the flow from it
+and fit the track: <a class="reference internal" href="tutorials/stream_autoencoder.html"><span class="std std-doc">the stream autoencoder tutorial</span></a>,
+the best first tutorial.</p></li>
+<li><p><strong>A curve that crosses itself.</strong> The default pipeline orders by position and cuts
+across the crossings, so use a velocity-aware orderer instead:
+<a class="reference internal" href="tutorials/epitrochoid_autoencoder.html"><span class="std std-doc">the epitrochoid autoencoder tutorial</span></a>.</p></li>
+<li><p><strong>Contaminated data.</strong> A stream-plus-background mixture model gives each sample
+a membership probability: <a class="reference internal" href="tutorials/outlier_rejection.html"><span class="std std-doc">the outlier-rejection tutorial</span></a>.</p></li>
+<li><p><strong>A track that must be fast</strong>, for example inside a likelihood evaluated at every
+step of an MCMC: <a class="reference internal" href="tutorials/stream_runningmean.html"><span class="std std-doc">the training-free running-mean track</span></a>.</p></li>
+<li><p><strong>An image or density map, not a list of samples.</strong> Each pixel becomes a sample
+weighted by its value: <a class="reference internal" href="tutorials/density_fields.html"><span class="std std-doc">the density-field tutorial</span></a>.</p></li>
 </ul>
 </section>
-<section id="how-it-works">
-<h2>How It Works<a class="headerlink" href="#how-it-works" title="Link to this heading">#</a></h2>
-<p>Localflowwalk constructs a <strong>single ordered walk</strong> through your phase-space data by iteratively selecting the nearest next point based on:</p>
-<ol class="arabic simple">
-<li><p><strong>Current position</strong>: Where you are in the walk</p></li>
-<li><p><strong>Candidate points</strong>: Remaining unvisited observations</p></li>
-<li><p><strong>Distance metric</strong>: A configurable function that scores proximity</p></li>
-<li><p><strong>Termination criteria</strong>: Optional constraints on walk length or distance thresholds</p></li>
-</ol>
-<p>The library ships with multiple built-in metrics (e.g., momentum-weighted, spatial-only), and you can implement custom metrics for domain-specific use cases. See the <a class="reference internal" href="guides/metrics.html"><span class="doc std std-doc">Metrics Guide</span></a> for full details and examples.</p>
-<p>For the mathematical background on momentum-weighted ordering, refer to the <a class="reference external" href="https://arxiv.org/abs/2201.12042">NN+p paper</a>.</p>
-</section>
-<section id="configuration-options">
-<h2>Configuration Options<a class="headerlink" href="#configuration-options" title="Link to this heading">#</a></h2>
-<ul class="simple">
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">metric</span></code></strong>: Distance metric to use (default: <code class="docutils literal notranslate"><span class="pre">AlignedMomentumDistanceMetric</span></code>). Determines how “closeness” is computed. See <a class="reference internal" href="guides/metrics.html"><span class="doc std std-doc">Metrics Guide</span></a>.</p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">metric_scale</span></code></strong>: Scale parameter for distance metrics. Interpretation depends on the metric:</p>
-<ul>
-<li><p><code class="docutils literal notranslate"><span class="pre">AlignedMomentumDistanceMetric</span></code>: momentum weight (distance units)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">FullPhaseSpaceDistanceMetric</span></code>: time scale for velocity-to-position conversion</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">SpatialDistanceMetric</span></code>: unused (can be any value)</p></li>
-</ul>
-</li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">max_dist</span></code></strong>: Maximum allowed distance to the next point. Stops the walk if no unvisited point is closer.</p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">n_max</span></code></strong>: Maximum number of points to include in the walk (caps walk length).</p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">start_idx</span></code></strong>: Starting index in the data (default: 0).</p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">terminate_indices</span></code></strong>: Set of indices where the walk should stop.</p></li>
-</ul>
-<p><strong><code class="docutils literal notranslate"><span class="pre">strategy</span></code></strong>: Neighbor query strategy instance. Options:
-- <code class="docutils literal notranslate"><span class="pre">BruteForce()</span></code> (default): compute distances to all points
-- <code class="docutils literal notranslate"><span class="pre">KDTree(k=...)</span></code>: spatial KD-tree prefiltering, then metric selection
-- Install optional dependency: <code class="docutils literal notranslate"><span class="pre">uv</span> <span class="pre">add</span> <span class="pre">phasecurvefit[kdtree]</span></code>
-- Uses <a class="reference external" href="https://github.com/dodgebc/jaxkd">jaxkd</a></p>
-<p>Example using KD-tree (requires <code class="docutils literal notranslate"><span class="pre">jaxkd</span></code>):</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">phasecurvefit</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pcf</span>
-
-<span class="n">config</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">WalkConfig</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">pcf</span><span class="o">.</span><span class="n">strats</span><span class="o">.</span><span class="n">KDTree</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">pcf</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">vel</span><span class="p">,</span> <span class="n">pcf</span><span class="o">.</span><span class="n">orderers</span><span class="o">.</span><span class="n">LocalFlowOrderer</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">))</span>
-</pre></div>
-</div>
-</section>
-<section id="data-format">
-<h2>Data Format<a class="headerlink" href="#data-format" title="Link to this heading">#</a></h2>
-<p>Phase-space data uses <strong>raw Python dictionaries</strong> for maximum performance and JAX compatibility:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-
-<span class="c1"># Position dictionary: coordinate names → arrays</span>
-<span class="n">position</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]),</span>
-    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]),</span>
-    <span class="s2">&quot;z&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]),</span>
-<span class="p">}</span>
-
-<span class="c1"># Velocity dictionary: same keys → velocity components</span>
-<span class="n">velocity</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]),</span>
-    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]),</span>
-    <span class="s2">&quot;z&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]),</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-<p>This dict-based API is designed for:</p>
-<ul class="simple">
-<li><p>Efficient JAX tree operations via <code class="docutils literal notranslate"><span class="pre">jax.tree.map</span></code></p></li>
-<li><p>Seamless integration with JAX transformations (<code class="docutils literal notranslate"><span class="pre">jit</span></code>, <code class="docutils literal notranslate"><span class="pre">vmap</span></code>, <code class="docutils literal notranslate"><span class="pre">grad</span></code>)</p></li>
-<li><p>Minimal overhead in hot loops</p></li>
-</ul>
-</section>
-<section id="citation">
-<h2>Citation<a class="headerlink" href="#citation" title="Link to this heading">#</a></h2>
-<p>The core algorithm originates from Nibauer et al. (2022). If you use <strong>momentum-weighted ordering</strong> or reference the original work in your research, please cite:</p>
-<div class="highlight-bibtex notranslate"><div class="highlight"><pre><span></span><span class="nc">@article</span><span class="p">{</span><span class="nl">nibauer2022charting</span><span class="p">,</span>
-<span class="w">  </span><span class="na">title</span><span class="p">=</span><span class="s">{Charting Galactic Accelerations with Stellar Streams and Machine Learning}</span><span class="p">,</span>
-<span class="w">  </span><span class="na">author</span><span class="p">=</span><span class="s">{Nibauer, Jacob and others}</span><span class="p">,</span>
-<span class="w">  </span><span class="na">journal</span><span class="p">=</span><span class="s">{arXiv preprint arXiv:2201.12042}</span><span class="p">,</span>
-<span class="w">  </span><span class="na">year</span><span class="p">=</span><span class="s">{2022}</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-<p>If you use <strong>mixture-model membership</strong> for outlier rejection (see
-<a class="reference internal" href="guides/outliers.html"><span class="doc">Outlier rejection</span></a>), please also cite Hogg, Bovy &amp; Lang (2010), whose §3
-(“Pruning outliers”) is the model implemented there:</p>
-<div class="highlight-bibtex notranslate"><div class="highlight"><pre><span></span><span class="nc">@article</span><span class="p">{</span><span class="nl">hogg2010data</span><span class="p">,</span>
-<span class="w">  </span><span class="na">title</span><span class="p">=</span><span class="s">{Data analysis recipes: Fitting a model to data}</span><span class="p">,</span>
-<span class="w">  </span><span class="na">author</span><span class="p">=</span><span class="s">{Hogg, David W. and Bovy, Jo and Lang, Dustin}</span><span class="p">,</span>
-<span class="w">  </span><span class="na">journal</span><span class="p">=</span><span class="s">{arXiv preprint arXiv:1008.4686}</span><span class="p">,</span>
-<span class="w">  </span><span class="na">year</span><span class="p">=</span><span class="s">{2010}</span><span class="p">,</span>
-<span class="w">  </span><span class="na">eprint</span><span class="p">=</span><span class="s">{1008.4686}</span><span class="p">,</span>
-<span class="w">  </span><span class="na">archivePrefix</span><span class="p">=</span><span class="s">{arXiv}</span><span class="p">,</span>
-<span class="w">  </span><span class="na">primaryClass</span><span class="p">=</span><span class="s">{astro-ph.IM}</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-<p>If you use <strong>phasecurvefit</strong> with custom metrics or for general phase-space ordering, please cite this package directly (check the <a class="reference external" href="https://github.com/GalacticDynamics/phasecurvefit">GitHub repository</a> for the latest citation format).</p>
-</section>
-<section id="next-steps">
-<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">#</a></h2>
+<section id="the-documentation">
+<h2>The documentation<a class="headerlink" href="#the-documentation" title="Link to this heading">#</a></h2>
 <div class="sd-container-fluid sd-sphinx-override sd-mb-4 docutils">
 <div class="sd-row sd-row-cols-1 sd-row-cols-xs-1 sd-row-cols-sm-2 sd-row-cols-md-2 sd-row-cols-lg-3 sd-g-2 sd-g-xs-2 sd-g-sm-2 sd-g-md-2 sd-g-lg-2 docutils">
 <div class="sd-col sd-d-flex-row docutils">
 <div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
 <div class="sd-card-body docutils">
 <div class="sd-card-title sd-font-weight-bold docutils">
-<svg version="4.0.0.63c5cb3" width="2.0em" height="2.0em" class="sd-material-icon sd-material-icon-rocket_launch" viewBox="0 0 24 24" aria-hidden="true"><g><rect fill="none" height="24" width="24"></rect></g><g><g><path d="M9.19,6.35c-2.04,2.29-3.44,5.58-3.57,5.89L2,10.69l4.05-4.05c0.47-0.47,1.15-0.68,1.81-0.55L9.19,6.35L9.19,6.35z M11.17,17c0,0,3.74-1.55,5.89-3.7c5.4-5.4,4.5-9.62,4.21-10.57c-0.95-0.3-5.17-1.19-10.57,4.21C8.55,9.09,7,12.83,7,12.83 L11.17,17z M17.65,14.81c-2.29,2.04-5.58,3.44-5.89,3.57L13.31,22l4.05-4.05c0.47-0.47,0.68-1.15,0.55-1.81L17.65,14.81 L17.65,14.81z M9,18c0,0.83-0.34,1.58-0.88,2.12C6.94,21.3,2,22,2,22s0.7-4.94,1.88-6.12C4.42,15.34,5.17,15,6,15 C7.66,15,9,16.34,9,18z M13,9c0-1.1,0.9-2,2-2s2,0.9,2,2s-0.9,2-2,2S13,10.1,13,9z"></path></g></g></svg> Quickstart</div>
-<p class="sd-card-text">Get up and running in minutes</p>
+Start</div>
+<p class="sd-card-text">What the library does, whether it suits your data, installation, and a first fit.</p>
 </div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="guides/quickstart.html"><span class="doc">Quickstart Guide</span></a></div>
-</div>
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-<svg version="4.0.0.63c5cb3" width="2.0em" height="2.0em" class="sd-material-icon sd-material-icon-tune" viewBox="0 0 24 24" aria-hidden="true"><path d="M0 0h24v24H0z" fill="none"></path><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"></path></svg> Distance Metrics</div>
-<p class="sd-card-text">Explore built-in and custom metrics</p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="guides/metrics.html"><span class="doc">Distance Metrics Guide</span></a></div>
+<a class="sd-stretched-link sd-hide-link-text reference internal" href="start/what-it-does.html"><span class="doc">What phasecurvefit does</span></a></div>
 </div>
 <div class="sd-col sd-d-flex-row docutils">
 <div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
 <div class="sd-card-body docutils">
 <div class="sd-card-title sd-font-weight-bold docutils">
-<svg version="4.0.0.63c5cb3" width="2.0em" height="2.0em" class="sd-material-icon sd-material-icon-psychology" viewBox="0 0 24 24" aria-hidden="true"><g><rect fill="none" height="24" width="24"></rect></g><g><g><path d="M13,8.57c-0.79,0-1.43,0.64-1.43,1.43s0.64,1.43,1.43,1.43s1.43-0.64,1.43-1.43S13.79,8.57,13,8.57z"></path><path d="M13,3C9.25,3,6.2,5.94,6.02,9.64L4.1,12.2C3.85,12.53,4.09,13,4.5,13H6v3c0,1.1,0.9,2,2,2h1v3h7v-4.68 c2.36-1.12,4-3.53,4-6.32C20,6.13,16.87,3,13,3z M16,10c0,0.13-0.01,0.26-0.02,0.39l0.83,0.66c0.08,0.06,0.1,0.16,0.05,0.25 l-0.8,1.39c-0.05,0.09-0.16,0.12-0.24,0.09l-0.99-0.4c-0.21,0.16-0.43,0.29-0.67,0.39L14,13.83c-0.01,0.1-0.1,0.17-0.2,0.17h-1.6 c-0.1,0-0.18-0.07-0.2-0.17l-0.15-1.06c-0.25-0.1-0.47-0.23-0.68-0.39l-0.99,0.4c-0.09,0.03-0.2,0-0.25-0.09l-0.8-1.39 c-0.05-0.08-0.03-0.19,0.05-0.25l0.84-0.66C10.01,10.26,10,10.13,10,10c0-0.13,0.02-0.27,0.04-0.39L9.19,8.95 c-0.08-0.06-0.1-0.16-0.05-0.26l0.8-1.38c0.05-0.09,0.15-0.12,0.24-0.09l1,0.4c0.2-0.15,0.43-0.29,0.67-0.39l0.15-1.06 C12.02,6.07,12.1,6,12.2,6h1.6c0.1,0,0.18,0.07,0.2,0.17l0.15,1.06c0.24,0.1,0.46,0.23,0.67,0.39l1-0.4c0.09-0.03,0.2,0,0.24,0.09 l0.8,1.38c0.05,0.09,0.03,0.2-0.05,0.26l-0.85,0.66C15.99,9.73,16,9.86,16,10z"></path></g></g></svg> Neural Network Gap Filling</div>
-<p class="sd-card-text">Interpolate skipped observations</p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="guides/nn.html"><span class="doc">Autoencoder for Gap Filling</span></a></div>
-</div>
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-<svg version="4.0.0.63c5cb3" width="2.0em" height="2.0em" class="sd-material-icon sd-material-icon-code" viewBox="0 0 24 24" aria-hidden="true"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"></path></svg> API Reference</div>
-<p class="sd-card-text">Full API documentation</p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="api/index.html"><span class="doc">API Reference</span></a></div>
-</div>
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-<svg version="4.0.0.63c5cb3" width="2.0em" height="2.0em" class="sd-material-icon sd-material-icon-bolt" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z"></path></svg> JAX Integration</div>
-<p class="sd-card-text">Optimize with JIT, vmap, and grad</p>
-</div>
-<a class="sd-stretched-link sd-hide-link-text reference internal" href="guides/jax-integration.html"><span class="doc">JAX Integration</span></a></div>
-</div>
-<div class="sd-col sd-d-flex-row docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-<svg version="4.0.0.63c5cb3" width="2.0em" height="2.0em" class="sd-material-icon sd-material-icon-book" viewBox="0 0 24 24" aria-hidden="true"><path d="M0 0h24v24H0z" fill="none"></path><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"></path></svg> Examples</div>
-<p class="sd-card-text">Interactive tutorials with Jupyter notebooks</p>
+Tutorials</div>
+<p class="sd-card-text">Complete analyses from simulated data to a result, grouped by the kind of data.</p>
 </div>
 <a class="sd-stretched-link sd-hide-link-text reference internal" href="tutorials/index.html"><span class="doc">Tutorials</span></a></div>
+</div>
+<div class="sd-col sd-d-flex-row docutils">
+<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
+<div class="sd-card-body docutils">
+<div class="sd-card-title sd-font-weight-bold docutils">
+How-to guides</div>
+<p class="sd-card-text">One task each: choose an orderer, tune the metric, fill gaps, reject outliers, use JAX.</p>
+</div>
+<a class="sd-stretched-link sd-hide-link-text reference internal" href="how-to/index.html"><span class="doc">How-to guides</span></a></div>
+</div>
+<div class="sd-col sd-d-flex-row docutils">
+<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
+<div class="sd-card-body docutils">
+<div class="sd-card-title sd-font-weight-bold docutils">
+How it works</div>
+<p class="sd-card-text">The local-flow walk, the MST backbone, the SOM, the autoencoder and the mixture model.</p>
+</div>
+<a class="sd-stretched-link sd-hide-link-text reference internal" href="explanation/index.html"><span class="doc">How it works</span></a></div>
+</div>
+<div class="sd-col sd-d-flex-row docutils">
+<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-sm sd-card-hover docutils">
+<div class="sd-card-body docutils">
+<div class="sd-card-title sd-font-weight-bold docutils">
+Reference</div>
+<p class="sd-card-text">Every public class and function, options and defaults, migration notes and citation.</p>
+</div>
+<a class="sd-stretched-link sd-hide-link-text reference internal" href="reference/index.html"><span class="doc">Reference</span></a></div>
 </div>
 </div>
 </div>
 </section>
-<section id="indices-and-tables">
-<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading">#</a></h2>
+<section id="why-phasecurvefit">
+<h2>Why phasecurvefit? <a class="reference external" href="https://github.com/pyOpenSci/software-submission/issues/285"><img alt="pyOpenSci Peer-Reviewed" src="https://pyopensci.org/badges/peer-reviewed.svg" /></a><a class="headerlink" href="#why-phasecurvefit" title="Link to this heading">#</a></h2>
+<p>Before fitting a model to a curve in phase space you need an ordering coordinate for
+every sample and a smooth track through them. Doing this by hand, or with a
+position-only nearest-neighbour or clustering method, breaks down in the cases that
+matter:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
-<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
-<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+<li><p><strong>Curves that cross or fold back on themselves.</strong> Where two strands meet, the
+nearest point is often on the wrong strand. phasecurvefit’s velocity-aware
+orderers use velocities as well as positions, so the ordering stays on the right
+strand.</p></li>
+<li><p><strong>No known starting point.</strong> The default pipeline finds the two ends of the curve
+itself, so no progenitor position or hand-picked start index is needed.</p></li>
+<li><p><strong>Incomplete orderings.</strong> An orderer may order only a reliable subset. An
+autoencoder then assigns <span class="math notranslate nohighlight">\(\gamma\)</span> to every sample and learns a smooth mean track.</p></li>
+<li><p><strong>Contamination.</strong> A stream-plus-background mixture model gives each sample a
+calibrated membership probability, so interlopers can be down-weighted or removed.</p></li>
+<li><p><strong>Use inside larger models.</strong> The orderers and networks work with <code class="docutils literal notranslate"><span class="pre">jit</span></code>, <code class="docutils literal notranslate"><span class="pre">vmap</span></code>
+and <code class="docutils literal notranslate"><span class="pre">grad</span></code>, and a training-free running-mean track is available when speed matters
+more than accuracy.</p></li>
 </ul>
+<p>phasecurvefit was built for stellar streams and applies to any ordered phase-space
+data.</p>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
 </section>
 </section>
 
@@ -795,11 +730,11 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
                   
 <div class="prev-next-area">
     <a class="right-next"
-       href="guides/quickstart.html"
+       href="start/what-it-does.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Quickstart Guide</p>
+        <p class="prev-next-title">What phasecurvefit does</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -819,15 +754,11 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
   </div>
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#installation">Installation</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quick-example">Quick Example</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#features">Features</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-it-works">How It Works</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#configuration-options">Configuration Options</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#data-format">Data Format</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#citation">Citation</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#next-steps">Next Steps</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#indices-and-tables">Indices and tables</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#where-to-start">Where to start</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-documentation">The documentation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-phasecurvefit">Why phasecurvefit? </a><ul class="visible nav section-nav flex-column">
+</ul>
+</li>
 </ul>
   </nav></div>
 
