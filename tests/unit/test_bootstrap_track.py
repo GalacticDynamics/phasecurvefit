@@ -184,10 +184,15 @@ def test_quantity_inputs_give_quantity_offsets_and_radius():
     g = _gamma(ens)[1:-1]
     d_q = q_ens.offsets(g)
     r_q = q_ens.radius(g, 0.3)  # low enough that one member stopping short is ok
+    assert isinstance(d_q, u.Q)
+    assert isinstance(r_q, u.Q)
     assert d_q.unit == u.unit("kpc")
     assert r_q.unit == u.unit("kpc")
     assert jnp.any(jnp.isfinite(r_q.ustrip("kpc")))
     # Equal up to float32 roundoff from the unit conversion.
-    tol = {"rtol": 1e-3, "atol": 1e-4, "equal_nan": True}
-    assert jnp.allclose(d_q.ustrip("kpc"), ens.offsets(g), **tol)
-    assert jnp.allclose(r_q.ustrip("kpc"), ens.radius(g, 0.3), **tol)
+    assert jnp.allclose(
+        d_q.ustrip("kpc"), ens.offsets(g), rtol=1e-3, atol=1e-4, equal_nan=True
+    )
+    assert jnp.allclose(
+        r_q.ustrip("kpc"), ens.radius(g, 0.3), rtol=1e-3, atol=1e-4, equal_nan=True
+    )
