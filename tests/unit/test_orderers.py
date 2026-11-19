@@ -648,3 +648,28 @@ def test_result_call_out_of_range_raises_value_error():
     result = pcf.orderers.MSTOrderer(k=5, jump_cap=2.0).order(pos, vel)
     with pytest.raises(ValueError):  # noqa: PT011
         result(jnp.asarray(5.0))
+
+
+@pytest.mark.parametrize(
+    "make_orderer",
+    [
+        lambda: None,
+        pcf.orderers.LocalFlowOrderer,
+        pcf.orderers.MSTOrderer,
+        lambda: pcf.orderers.SOMOrderer(n_prototypes=12),
+    ],
+    ids=["default", "local_flow", "mst", "som"],
+)
+def test_component_names_need_not_include_x(arc, make_orderer):
+    """Stream coordinates such as ``phi1``/``phi2`` order like ``x``/``y``.
+
+    ``euclidean_distance`` and ``velocity_norm`` used to seed their sums with
+    ``q["x"]``, so any dict without an ``"x"`` key raised ``KeyError``.
+    """
+    pos, vel, _ = arc(n=60)
+    rename = {"x": "phi1", "y": "phi2"}
+    pos_phi = {rename[k]: v for k, v in pos.items()}
+    vel_phi = {rename[k]: v for k, v in vel.items()}
+    expected = pcf.order(pos, vel, make_orderer())
+    result = pcf.order(pos_phi, vel_phi, make_orderer())
+    assert jnp.array_equal(result.indices, expected.indices)
