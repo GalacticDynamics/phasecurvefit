@@ -1293,7 +1293,7 @@ the reference’s tangent.</p>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>gamma</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Float[Array,</span> <span class="pre">'G']</span></code></span>) – Points on the reference, as its own $gamma$ (within
-<code class="docutils literal notranslate"><span class="pre">reference.gamma_range</span></code>).</p></li>
+<code class="docutils literal notranslate"><span class="pre">reference.track_range</span></code>).</p></li>
 <li><p><strong>n_dense</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>) – Points at which each member’s track is evaluated, over its
 <code class="docutils literal notranslate"><span class="pre">track_range</span></code>, to find the one nearest each reference point.</p></li>
 </ul>
@@ -1301,8 +1301,10 @@ the reference’s tangent.</p>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>The perpendicular offsets, with shape <code class="docutils literal notranslate"><span class="pre">(n_members,</span> <span class="pre">len(gamma),</span>
 <span class="pre">n_spatial_dims)</span></code> and the last axis in the order of the position
-components. NaN where a member’s nearest point is one of its
-ends, which means its track stops short of that reference point.</p>
+components. With Quantity tracks they are a Quantity in the unit
+of the first position component. NaN where a member’s nearest
+point is one of its ends, which means its track stops short of
+that reference point.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Array</p>
@@ -1322,6 +1324,8 @@ the reference with this radius on either side of it.</p>
 <p>It measures the variance of the fit and not its bias, so where the
 track bends the true curve can lie outside it more often than
 <code class="docutils literal notranslate"><span class="pre">level</span></code> implies; see the explanation page on track uncertainty.</p>
+<p>With Quantity tracks it is a Quantity, in the unit of the first
+position component, as <a class="reference internal" href="#phasecurvefit.TrackEnsemble.offsets" title="phasecurvefit.TrackEnsemble.offsets"><code class="xref py py-meth docutils literal notranslate"><span class="pre">offsets()</span></code></a> is.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -1331,7 +1335,7 @@ track bends the true curve can lie outside it more often than
 </ul>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Float[Array,</span> <span class="pre">'G']</span></code></span></p>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Float[Array,</span> <span class="pre">'G']</span></code> | <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.15)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
