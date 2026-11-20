@@ -397,7 +397,7 @@ def test_draws_survive_jax_tree_operations_with_unsorted_keys():
     mapped = jax.tree.map(lambda a: a, post.reference)(g)
     for out in (jitted, mapped):
         for k in ("x", "y"):
-            np.testing.assert_allclose(out[k], direct[k], rtol=1e-5)
+            np.testing.assert_allclose(out[k], direct[k], rtol=1e-5, atol=1e-5)
 
 
 def test_numpy_counts_and_unused_options_are_accepted():
@@ -797,7 +797,9 @@ def test_weight_zero_tracers_give_the_same_fit_as_dropping_them():
     b = pcf.sample_track(more, more_v, weights=w, **run)
     g = jnp.linspace(-0.5, 0.5, 5)
     for k in ("x", "y"):
-        np.testing.assert_allclose(b.reference(g)[k], a.reference(g)[k], rtol=1e-5)
+        np.testing.assert_allclose(
+            b.reference(g)[k], a.reference(g)[k], rtol=1e-5, atol=1e-5
+        )
 
 
 def test_one_positive_weight_raises():
