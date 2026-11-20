@@ -30,6 +30,7 @@ from phasecurvefit._src.nn import (
 )
 from phasecurvefit._src.orderers.default_pipeline import default_pipeline
 from phasecurvefit._src.som import SOMMixture
+from phasecurvefit._src.track_draw import TrackDraw
 
 _DEFAULT_MIXTURE = SOMMixture()
 
@@ -151,19 +152,21 @@ class TrackEnsemble(ReprMixin, eqx.Module):
 
     Attributes
     ----------
-    reference : AutoencoderResult
-        The track fitted to all the data.
-    members : tuple[AutoencoderResult, ...]
-        The tracks fitted to the resamples.
+    reference : AutoencoderResult or TrackDraw
+        The track fitted to all the data, or for a posterior the track at the
+        mean of the drawn parameters.
+    members : tuple[AutoencoderResult or TrackDraw, ...]
+        The tracks fitted to the resamples, or the posterior draws.
 
-    :meth:`offsets` and :meth:`radius` only call each track on $\gamma$ and
-    read its ``track_range``, so code that uses the band should not depend on
-    the members being :class:`~phasecurvefit.nn.AutoencoderResult`.
+    The methods :meth:`offsets` and :meth:`radius` only call each track on
+    $\gamma$ and read its ``track_range``, so they work the same for the
+    :class:`~phasecurvefit.TrackDraw` members of a
+    :class:`~phasecurvefit.TrackPosterior`.
 
     """
 
-    reference: AutoencoderResult
-    members: tuple[AutoencoderResult, ...]
+    reference: AutoencoderResult | TrackDraw
+    members: tuple[AutoencoderResult | TrackDraw, ...]
 
     def offsets(
         self, gamma: Float[Array, " G"], /, *, n_dense: int = 1000
@@ -219,7 +222,7 @@ class TrackEnsemble(ReprMixin, eqx.Module):
         dc = jax.vmap(jax.jacfwd(lambda g: stack(ref(g))))(gamma)
         t = dc / jnp.linalg.norm(dc, axis=-1, keepdims=True)
 
-        def one(member: AutoencoderResult, /) -> Float[Array, "G D"]:
+        def one(member: AutoencoderResult | TrackDraw, /) -> Float[Array, "G D"]:
             if member.track_range is None:  # pragma: no cover - training sets it
                 msg = "every member needs a track_range."
                 raise ValueError(msg)

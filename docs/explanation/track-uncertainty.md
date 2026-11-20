@@ -2,8 +2,9 @@
 
 A fitted track comes from one draw of the data, and a different draw from the same
 stream would give a slightly different track. This page explains where that
-uncertainty comes from, why phasecurvefit estimates it with a bootstrap of the whole
-pipeline, and how well the resulting bands are calibrated.
+uncertainty comes from, the two ways phasecurvefit estimates it (a bootstrap of the
+whole pipeline, and the posterior of a probabilistic model of the track), and how
+well the resulting bands are calibrated.
 [](../how-to/track-uncertainty.md) shows how to compute them.
 
 ## Where the uncertainty enters
@@ -109,6 +110,94 @@ A bootstrap resample can be written as integer weights.
 instead, so `weights` keep their own meaning, such as the density at each pixel, and a
 resampled sample keeps its weight.
 
+## A posterior for the track
+
+{func}`~phasecurvefit.sample_track` takes another route. It writes down a likelihood
+for the samples and draws from the posterior of the track under it, with NumPyro
+(Phan et al. 2019). There's no network, so the band holds the noise in the data and
+the unknown position of each sample along the track, given the ordering it starts
+from.
+
+The model, {func}`~phasecurvefit.track_model`:
+
+- The track is a Gaussian process in $\gamma \in [-1, 1]$, one per position
+  component, in the Hilbert-space approximation (Solin & Särkkä 2020;
+  Riutort-Mayol et al. 2020). Its amplitude and length scale are latent.
+- Each sample's $\gamma$ is summed out on a grid, so no sample is pinned to one
+  $\gamma$.
+- Samples scatter about the track with a Gaussian. By default its width changes
+  along the track, and $\gamma$ has a latent density along it, so a sparse tail
+  isn't squeezed into a sliver of $\gamma$.
+- A flat background over the samples' bounding box takes interlopers, with a latent
+  fraction (Hogg, Bovy & Lang 2010, sec. 3).
+- The velocities' mean is the speed times the track's unit tangent, plus a small
+  offset: `velocity_tie` (0.05 by default) times a Gaussian process per component,
+  in units of the samples' rms speed. A track that runs the wrong way, or turns the wrong
+  way round a loop, then misfits every velocity. The tie needs velocities in the
+  frame where the track is at rest. On a test arc, adding 3 times the speed to every
+  x velocity moved the default fit's track 0.75 off the truth (median), against
+  0.007 with `velocity_tie=None`. Stream stars move a few degrees off
+  their track, and a hard tie (`velocity_tie=0`) pulled the track of a mock stream
+  away from its stars.
+
+The fit starts from the ordering of {func}`~phasecurvefit.orderers.default_pipeline`,
+turned to run along the velocities. On a stream that crosses itself, a start that
+turns onto the other branch stays there in the untied model. In an earlier prototype
+(uniform $\gamma$, a fixed width and no background), NUTS
+from such a start, on two seeds, covered the truth only 0.46 and 0.57 of the time at
+68% and 95% with velocities untied, and 0.60 and 0.78 with positions only. In the
+prototypes, on a loop where every orderer then turned at the
+crossing, a hard velocity tie (`velocity_tie=0`) got the right branch on 5 of the 8
+seeds. That rescue wasn't measured for the default loose tie. Since the
+default pipeline now crosses straight over, the start is usually right. In the
+prototypes NUTS chains often settled in different modes, so SVI with a full-rank Gaussian is the
+default, and `method="nuts"` warns when its two chains disagree.
+
+`weights` act as counts in the likelihood, so they should be counts and not a density
+scaled to some peak ([](density-fields.md)). Pixels have no velocities, so an image is
+fitted with `velocities=None`. The band for an image hasn't been calibrated with
+`sample_track`'s defaults. An earlier prototype, with a constant learning rate and
+without the line density, the varying width or the background, measured that dividing
+the weights by their peak widened the band, as it should for counts.
+
+### Measured calibration of the posterior
+
+I ran {func}`~phasecurvefit.sample_track` with its defaults on four cases with a known
+true track, 8 datasets each and 200 draws per fit. Velocities are the unit tangent
+plus Gaussian noise of 0.1 per component.
+
+- helix: the sine arc above with a third component $z = 1.5 \cos(\pi s)$, 400
+  samples, width 0.2.
+- gap: the sine arc with no samples at $0.45 < s < 0.55$.
+- loop: a prolate trochoid with one loop that crosses itself, 600 samples, width
+  0.15, run with `n_basis=32, n_grid=512`.
+- varying: the sine arc with 800 samples, a dense clump near $s = 0.35$ and sparse
+  tails, and a width that grows from 0.06 to 0.36 along it.
+
+Coverage is counted at the same 46 points along the true curve, from each draw's
+offset in the plane normal to it, averaged over the plane's two directions for the
+helix. The half-width (the median over the points) and the centre's offset are per
+direction too, so for the helix the centre's distance from the truth is about √2
+times the value in the table (0.025). A point that half the draws or fewer reach counts as not covered. This measures the spread of the draws about the truth. The tube that
+`radius` draws about the reference wasn't measured.
+
+| case | 68% coverage | 95% coverage | 68% half-width | rms offset of the band's centre from the truth | time per fit |
+|---|---|---|---|---|---|
+| helix | 0.72 | 0.97 | 0.019 | 0.018 | 21 s |
+| gap | 0.68 | 0.95 | 0.023 | 0.023 | 19 s |
+| loop | 0.73 | 0.96 | 0.018 | 0.017 | 27 s |
+| varying | 0.85 | 0.99 | 0.015 | 0.015 | 23 s |
+
+On the varying case the fitted width matched the true one with a median ratio of
+1.01, and the true width lay inside the draws' central 68% at 0.63 of the points. The
+68% coverage in the sparse far tail ($s > 0.8$) was 0.75. The times are on a shared
+machine and include the ordering. The scripts are in `prototypes/numpyro/` in the
+repository.
+
+The bootstrap was measured on the arc alone and the posterior on the helix, which adds
+a third component to it, so the two aren't the same test. On them the posterior
+covered 0.72 and 0.97 and the bootstrap 0.56 and 0.84.
+
 ## References
 
 Blundell, C., Cornebise, J., Kavukcuoglu, K., & Wierstra, D. (2015). "Weight
@@ -130,6 +219,9 @@ Model Uncertainty in Deep Learning." ICML. [arXiv:1506.02142](https://arxiv.org/
 Hoffman, M. D., & Gelman, A. (2014). "The No-U-Turn Sampler: Adaptively Setting Path
 Lengths in Hamiltonian Monte Carlo." [arXiv:1111.4246](https://arxiv.org/abs/1111.4246).
 
+Hogg, D. W., Bovy, J., & Lang, D. (2010). "Data analysis recipes: Fitting a model to
+data." [arXiv:1008.4686](https://arxiv.org/abs/1008.4686).
+
 Izmailov, P., Vikram, S., Hoffman, M. D., & Wilson, A. G. (2021). "What Are Bayesian
 Neural Network Posteriors Really Like?" [arXiv:2104.14421](https://arxiv.org/abs/2104.14421).
 
@@ -143,3 +235,16 @@ Predictive Uncertainty Estimation using Deep Ensembles." NeurIPS.
 Maddox, W., Garipov, T., Izmailov, P., Vetrov, D., et al. (2019). "A Simple Baseline
 for Bayesian Uncertainty in Deep Learning." NeurIPS.
 [arXiv:1902.02476](https://arxiv.org/abs/1902.02476).
+
+Phan, D., Pradhan, N., & Jankowiak, M. (2019). "Composable Effects for Flexible and
+Accelerated Probabilistic Programming in NumPyro."
+[arXiv:1912.11554](https://arxiv.org/abs/1912.11554).
+
+Riutort-Mayol, G., Bürkner, P.-C., Andersen, M. R., Solin, A., & Vehtari, A. (2020).
+"Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic
+programming." [arXiv:2004.11408](https://arxiv.org/abs/2004.11408).
+
+Solin, A., & Särkkä, S. (2020). "Hilbert Space Methods for Reduced-Rank Gaussian
+Process Regression." Statistics and Computing 30, 419–446.
+[doi:10.1007/s11222-019-09886-w](https://doi.org/10.1007/s11222-019-09886-w),
+[arXiv:1401.5508](https://arxiv.org/abs/1401.5508).

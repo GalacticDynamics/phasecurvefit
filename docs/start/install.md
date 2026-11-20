@@ -29,7 +29,8 @@ uv add phasecurvefit --extra all
 | (none) | the core library | ordering and fitting plain JAX arrays |
 | `interop` | `unxt` | inputs with physical units ([](../how-to/units.md)) |
 | `kdtree` | `jaxkd` | the {class}`~phasecurvefit.strats.KDTree` query strategy ([](../how-to/kdtree.md)) |
-| `all` | `interop` and `kdtree` | all optional runtime features |
+| `numpyro` | `numpyro` | {func}`~phasecurvefit.sample_track`, a posterior for the track ([](../how-to/track-uncertainty.md)) |
+| `all` | `interop`, `kdtree` and `numpyro` | all optional runtime features |
 | `tutorials` | `all`, plus `matplotlib` and `galax` | running the [tutorial notebooks](../tutorials/index.md) |
 
 `all` leaves out `tutorials` on purpose: `all` is for optional features of the

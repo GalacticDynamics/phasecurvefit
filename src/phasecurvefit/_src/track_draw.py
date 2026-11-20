@@ -1,0 +1,68 @@
+"""One track drawn from :func:`~phasecurvefit.sample_track`'s posterior."""
+
+__all__: tuple[str, ...] = ("TrackDraw",)
+
+from typing import Any
+
+import equinox as eqx
+import jax.numpy as jnp
+from jaxtyping import Array, ArrayLike, Float
+
+from phasecurvefit._src._repr import ReprMixin
+
+
+class TrackDraw(ReprMixin, eqx.Module):
+    r"""One track from a posterior, callable on its $\gamma$.
+
+    Made by :func:`~phasecurvefit.sample_track`. The track and its width are
+    held on a grid in $\gamma \in [-1, 1]$, in units where the positions have
+    zero mean and unit spread, and are interpolated linearly between grid
+    points. Calling the draw puts them back in the units of the data, so with
+    `unxt` Quantity inputs it returns Quantities.
+
+    Attributes
+    ----------
+    gamma : Array
+        The grid, shape ``(K,)``.
+    x : Array
+        The track at ``gamma``, scaled, shape ``(K, D)``, with the last axis
+        in the order of the position components.
+    sigma : Array
+        The track's width (the standard deviation of the stars about it, per
+        axis) at ``gamma``, scaled, shape ``(K,)``.
+    centre : dict
+        Each position component's mean, which the scaling subtracted.
+    scale : Array or Quantity
+        The one length the scaling divided by.
+    keys : tuple[str, ...]
+        The position components, in the order of the columns of ``x``. JAX
+        re-sorts a dict's keys when it rebuilds one, so the columns are matched
+        by these and not by the order of ``centre``.
+    track_range : Array
+        The $\gamma$ range the stars cover, as ``[lo, hi]``. With a latent line
+        density it holds the central 99% of it; otherwise it is ``[-1, 1]``.
+        An array, so every draw has the same tree structure and ``jit``
+        doesn't retrace for each one.
+
+    """
+
+    gamma: Float[Array, " K"]
+    x: Float[Array, "K D"]
+    sigma: Float[Array, " K"]
+    centre: dict[str, Any]
+    scale: Any
+    track_range: Float[Array, " 2"]
+    keys: tuple[str, ...] = eqx.field(static=True)
+
+    def __call__(self, gamma: ArrayLike, /) -> dict[str, Any]:
+        r"""Evaluate the track's position components at ``gamma``."""
+        g = jnp.asarray(gamma)
+        return {
+            # centre first, so each component keeps its own unit
+            k: self.centre[k] + jnp.interp(g, self.gamma, self.x[:, i]) * self.scale
+            for i, k in enumerate(self.keys)
+        }
+
+    def width(self, gamma: ArrayLike, /) -> Any:
+        r"""Evaluate the track's width at ``gamma``, in the first position's unit."""
+        return jnp.interp(jnp.asarray(gamma), self.gamma, self.sigma) * self.scale
