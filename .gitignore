@@ -14,3 +14,7 @@ docs/superpowers/
 .coverage.*
 htmlcov/
 coverage.xml
+
+# graphify: track the graph itself; everything else here is rebuilt locally
+graphify-out/*
+!graphify-out/graph.json
