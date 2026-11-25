@@ -1,0 +1,18 @@
+# Fixes what graphify indexes, so a rebuild anywhere -- a contributor's
+# checkout, a fresh clone, the weekly workflow -- produces the same graph.
+# `graphify update` has no --code-only flag and the scope `extract` used lives
+# in an untracked cache, so without this file a fresh clone indexes more.
+
+# YAML is pure mapping keys, not structure: 286 nodes here, mostly CI workflows.
+*.yml
+*.yaml
+
+# Prose. 456 nodes from docs/ and the root Markdown files.
+*.md
+
+# Generated from docs/tutorials/*.md by the tutorial-ipynb hook, so indexing
+# them would double-count every tutorial.
+*.ipynb
+
+*.svg
+*.png

@@ -490,6 +490,12 @@ config = pcf.WalkConfig(strategy=SmallestIndexStrategy())
 result = pcf.order(pos, vel, pcf.orderers.LocalFlowOrderer(config=config))
 ```
 
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](.github/CONTRIBUTING.md). The
+repository ships a queryable code graph for contributors and AI assistants:
+[CONTRIBUTING.md](.github/CONTRIBUTING.md#the-code-graph).
+
 ## Citation
 
 If you use `phasecurvefit` in published work, please cite the package via its
